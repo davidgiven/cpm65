@@ -13,7 +13,7 @@ void error(fmt::format_string<T...> fmt, T&&... args)
 	exit(1);
 }
 
-std::vector<uint16_t> compare(const std::string& f1, const std::string& f2)
+std::pair<std::vector<uint16_t>, uint8_t> compare(const std::string& f1, const std::string& f2)
 {
 	if (std::filesystem::file_size(f1) != std::filesystem::file_size(f2))
 		error("files {} and {} are not the same size! {} {}", f1, f2);
@@ -23,17 +23,21 @@ std::vector<uint16_t> compare(const std::string& f1, const std::string& f2)
 	std::ifstream s2(f2);
 
 	unsigned pos = 0;
+	uint8_t max = 0;
 	while (!s1.eof())
 	{
 		uint8_t b1 = s1.get();
 		uint8_t b2 = s2.get();
 
 		if (b1 != b2)
+		{
 			results.push_back(pos);
+			max = std::max(max, b1);
+		}
 		pos++;
 	}
 
-	return results;
+	return std::make_pair(results, max);
 }
 
 std::vector<uint8_t> toBytestream(const std::vector<uint16_t>& differences)
@@ -106,9 +110,9 @@ int main(int argc, char* const* argv)
 
 	auto coreSize = std::filesystem::file_size(corefile);
 
-	auto zpDifferences = compare(corefile, zpfile);
+	auto [zpDifferences, zpMax] = compare(corefile, zpfile);
 	auto zpBytes = toBytestream(zpDifferences);
-	auto memDifferences = compare(corefile, memfile);
+	auto [memDifferences, memMax] = compare(corefile, memfile);
 	auto memBytes = toBytestream(memDifferences);
 
 	std::ofstream outs(outfile);
@@ -116,6 +120,8 @@ int main(int argc, char* const* argv)
 	/* Write the header. */
 
 	outs.write("CPM65", 5);
+	outs.put(zpMax + 1);
+	outs.put(memMax - 1); /* remember the 2 offset in the assembled code */
 	emitw(outs, paras(coreSize));
 	emitw(outs, paras(zpBytes.size()));
 	emitw(outs, paras(memBytes.size()));
