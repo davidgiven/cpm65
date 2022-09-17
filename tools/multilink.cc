@@ -114,6 +114,8 @@ int main(int argc, char* const* argv)
 	auto zpBytes = toBytestream(zpDifferences);
 	auto [memDifferences, memMax] = compare(corefile, memfile);
 	auto memBytes = toBytestream(memDifferences);
+	
+	unsigned reloBytesSize = zpBytes.size() + 1 + memBytes.size();
 
 	std::ofstream outs(outfile);
 
@@ -122,9 +124,9 @@ int main(int argc, char* const* argv)
 	outs.write("CPM65", 5);
 	outs.put(zpMax + 1);
 	outs.put(memMax - 1); /* remember the 2 offset in the assembled code */
+	emitw(outs, paras(coreSize) + 1 + paras(reloBytesSize));
 	emitw(outs, paras(coreSize));
-	emitw(outs, paras(zpBytes.size()));
-	emitw(outs, paras(memBytes.size()));
+	emitw(outs, paras(reloBytesSize));
 	align(outs);
 
 	/* Write the actual code body. */
@@ -147,17 +149,20 @@ int main(int argc, char* const* argv)
 		align(outs);
 	}
 
-	/* Write the zero page relocation bytes. */
+	/* Write the relocation bytes. */
 
 	for (uint8_t b : zpBytes)
 		outs.put(b);
-	align(outs);
-
-	/* Write out the memory relocation bytes. */
-
+	outs.put(0);
 	for (uint8_t b : memBytes)
 		outs.put(b);
 	align(outs);
+
+	/* Remove temporary files. */
+
+	std::filesystem::remove(corefile);
+	std::filesystem::remove(zpfile);
+	std::filesystem::remove(memfile);
 
 	return 0;
 }
