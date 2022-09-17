@@ -18,6 +18,9 @@ c000 kernel ROM
 
 
 BDOS system calls: https://www.seasip.info/Cpm/bdos.html
+Point to the BDOS entrypoint is passed to the application at header+4 (after a
+JMP instruction, so making the entrypoint JSRable). Pass the function code in Y
+and the parameter in XA.
 
 0: exit program
 1: console input
@@ -60,23 +63,23 @@ BDOS system calls: https://www.seasip.info/Cpm/bdos.html
 40: write random with zero fill
 
 BIOS system calls: https://www.seasip.info/Cpm/bios.html
+Pointer to the BIOS entrypoint is passed to the BDOS init entrypoint in XA.
+Call with the function code in Y and the parameter in XA.
 
-BOOT: cold start
-WBOOT: warm start
-CONST: console status
-CONIN: console input
-CONOUT: console output
-SELDSK: select disk drive
-SETTRK: select track
-SETSEC: select sector
-SETDMA: set DMA address
-READ: read a sector
-WRITE: write a sector
-RELOCATE: relocate a binary
-GETTPA: get TPA bounds
-SETTPA: set TPA bounds
-GETZP: get ZP bounds
-SETZP: set ZP bounds
+0: CONST: console status
+1: CONIN: console input
+2: CONOUT: console output
+3: SELDSK: select disk drive
+4: SETTRK: select track
+5: SETSEC: select sector
+6: SETDMA: set DMA address
+7: READ: read a sector
+8: WRITE: write a sector
+9: RELOCATE: relocate a binary
+10: GETTPA: get TPA bounds
+11: SETTPA: set TPA bounds
+12: GETZP: get ZP bounds
+13: SETZP: set ZP bounds
 
 Executable format:
 

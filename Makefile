@@ -2,20 +2,26 @@ CXX = g++
 CA65 = ca65
 LD65 = ld65
 
-all: tools/multilink boot.img test.com bdos.img
+OBJDIR = .obj
 
-tools/multilink: tools/multilink.cc
+all: $(OBJDIR)/multilink bios.img test.com bdos.img
+
+$(OBJDIR)/multilink: tools/multilink.cc
 	$(CXX) -Os -g -o $@ $< -lfmt
 
-%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
+$(OBJDIR)/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
+	@mkdir -p $(dir $@)
 	$(CA65) -o $@ $< -I include --listing $(patsubst %.o,%.lst,$@)
 
-boot.img: src/boot.o scripts/boot.cfg
-	$(LD65) -C scripts/boot.cfg -o $@ $<
+bios.img: $(OBJDIR)/src/bios.o scripts/bios.cfg
+	$(LD65) -C scripts/bios.cfg -o $@ $<
 	
-test.com: test.o tools/multilink
-	tools/multilink -o $@ $<
+test.com: $(OBJDIR)/test.o $(OBJDIR)/multilink
+	$(OBJDIR)/multilink -o $@ $<
 
-bdos.img: src/bdos.o tools/multilink
-	tools/multilink -o $@ $<
+bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/multilink
+	$(OBJDIR)/multilink -o $@ $<
+
+clean:
+	rm -rf $(OBJDIR) bios.img bdos.img
 

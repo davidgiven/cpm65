@@ -62,8 +62,6 @@ biosentry:
     jmp (ptr1)
 
 biostable_lo:
-    .byte <entry_BOOT
-    .byte <entry_WBOOT
     .byte <entry_CONST
     .byte <OSRDCH
     .byte <OSWRCH
@@ -79,8 +77,6 @@ biostable_lo:
     .byte <entry_GETZP
     .byte <entry_SETZP
 biostable_hi:
-    .byte >entry_BOOT
-    .byte >entry_WBOOT
     .byte >entry_CONST
     .byte >OSRDCH
     .byte >OSWRCH

@@ -7,7 +7,7 @@
     sta bios+0
     stx bios+1
 
-    ldy #BIOS_CONOUT
+    ldy #bios::conout
     lda #'q'
     jsr callbios
 

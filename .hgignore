@@ -1,0 +1,6 @@
+syntax: glob
+.obj
+*.img
+*.com
+bbc
+
