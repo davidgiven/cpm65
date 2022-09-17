@@ -11,9 +11,14 @@ ptr2: .word 0
 
     .code
 
-    lda #<banner
-    ldx #>banner
-    jsr print_s
+    ; Print banner.
+
+    ldy #banner_end - banner
+:
+    lda banner, y
+    jsr OSWRCH
+    dey
+    bne :-
 
     ; Figure out the start and end of the TPA.
 
@@ -49,7 +54,7 @@ ptr2: .word 0
 
     lda #<biosentry
     ldx #>biosentry
-    rts
+    rts                 ; indirect jump
 
     ; BIOS entry point. Parameter is in XA, function in Y.
 biosentry:
@@ -62,38 +67,36 @@ biosentry:
     jmp (ptr1)
 
 biostable_lo:
-    .byte <entry_CONST
-    .byte <OSRDCH
-    .byte <OSWRCH
-    .byte <entry_SELDSK
-    .byte <entry_SETTRK
-    .byte <entry_SETSEC
-    .byte <entry_SETDMA
-    .byte <entry_READ
-    .byte <entry_WRITE
-    .byte <entry_RELOCATE
-    .byte <entry_GETTPA
-    .byte <entry_SETTPA
-    .byte <entry_GETZP
-    .byte <entry_SETZP
+    .lobytes entry_CONST
+    .lobytes OSRDCH
+    .lobytes OSWRCH
+    .lobytes entry_SELDSK
+    .lobytes entry_SETTRK
+    .lobytes entry_SETSEC
+    .lobytes entry_SETDMA
+    .lobytes entry_READ
+    .lobytes entry_WRITE
+    .lobytes entry_RELOCATE
+    .lobytes entry_GETTPA
+    .lobytes entry_SETTPA
+    .lobytes entry_GETZP
+    .lobytes entry_SETZP
 biostable_hi:
-    .byte >entry_CONST
-    .byte >OSRDCH
-    .byte >OSWRCH
-    .byte >entry_SELDSK
-    .byte >entry_SETTRK
-    .byte >entry_SETSEC
-    .byte >entry_SETDMA
-    .byte >entry_READ
-    .byte >entry_WRITE
-    .byte >entry_RELOCATE
-    .byte >entry_GETTPA
-    .byte >entry_SETTPA
-    .byte >entry_GETZP
-    .byte >entry_SETZP
+    .hibytes entry_CONST
+    .hibytes OSRDCH
+    .hibytes OSWRCH
+    .hibytes entry_SELDSK
+    .hibytes entry_SETTRK
+    .hibytes entry_SETSEC
+    .hibytes entry_SETDMA
+    .hibytes entry_READ
+    .hibytes entry_WRITE
+    .hibytes entry_RELOCATE
+    .hibytes entry_GETTPA
+    .hibytes entry_SETTPA
+    .hibytes entry_GETZP
+    .hibytes entry_SETZP
     
-entry_BOOT:
-entry_WBOOT:
 entry_CONST:
 entry_CONIN:
 entry_CONOUT:
@@ -136,7 +139,7 @@ entry_RELOCATE:
     pla
     sta ptr1+0
     ldx mem_base
-    jmp relocate_loop
+    ; fall through
 
     ; ptr1 points at the beginning of the image
     ; ptr2 points at the relocation table
@@ -175,21 +178,6 @@ relocate_loop:
 @done:
     rts
 
-    ; Writes out the string in XA.
-
-print_s:
-    sta ptr1+0
-    stx ptr1+1
-    ldy #0
-@loop:
-    lda (ptr1), y
-    beq @exit
-    jsr OSWRCH
-    iny
-    jmp @loop
-@exit:
-    rts
-    
 print_h8:
     pha
     lsr a
@@ -225,7 +213,8 @@ bdos_filename:
     .byte "BDOS", 13
 
 banner:
-    .byte "CP/M-65", 10, 13, 0
+    .byte 13, 10, 13, 10, "56-M/PC" ; reversed!
+banner_end:
 
     .bss
 mem_base: .byte 0
