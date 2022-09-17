@@ -18,6 +18,10 @@ ENTRY:
 HDR_ZPSIZE = 0
 HDR_RELOTABLE_OFFSET = 1
 
+.enum bdos
+	exit
+.endenum
+
 .enum bios
 	const
 	conin

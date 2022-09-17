@@ -3,8 +3,12 @@ CA65 = ca65
 LD65 = ld65
 
 OBJDIR = .obj
+DISKFORMAT = bbc163
 
-all: $(OBJDIR)/multilink bios.img test.com bdos.img
+APPS = \
+	cpmfs/nop.com
+
+all: $(OBJDIR)/multilink bios.img bdos.img cpmfs.img
 
 $(OBJDIR)/multilink: tools/multilink.cc
 	$(CXX) -Os -g -o $@ $< -lfmt
@@ -16,12 +20,18 @@ $(OBJDIR)/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
 bios.img: $(OBJDIR)/src/bios.o scripts/bios.cfg
 	$(LD65) -C scripts/bios.cfg -o $@ $<
 	
-test.com: $(OBJDIR)/test.o $(OBJDIR)/multilink
+cpmfs/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/multilink
 	$(OBJDIR)/multilink -o $@ $<
 
 bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/multilink
 	$(OBJDIR)/multilink -o $@ $<
 
+cpmfs.img: $(wildcard cpmfs/*) $(APPS)
+	mkfs.cpm -f $(DISKFORMAT) $@
+	cpmcp -f $(DISKFORMAT) $@ $^ 0:
+
 clean:
 	rm -rf $(OBJDIR) bios.img bdos.img
+
+.DELETE_ON_ERROR:
 

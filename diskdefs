@@ -1,0 +1,19 @@
+diskdef bbc163
+    seclen 128
+    tracks 40
+    sectrk 32
+    blocksize 1024
+    maxdir 64
+    boottrk 0
+    os 2.2
+end
+
+diskdef bbc327
+    seclen 128
+    tracks 80
+    sectrk 32
+    blocksize 2048
+    maxdir 128
+    boottrk 0
+    os 2.2
+end
