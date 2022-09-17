@@ -1,3 +1,22 @@
+ffe0 system call entrypoints
+f800 I/O ports
+c000 kernel ROM
+8000 application ROM
+.... video memory
+7c00 HIMEM
+     CCP
+     ....
+     TPA
+     BDOS
+1900 PAGE
+....
+0800 filesystem storage
+0400 language workspace
+0200 OS gubbins
+0100 stack
+0000 zero page
+
+
 BDOS system calls: https://www.seasip.info/Cpm/bdos.html
 
 0: exit program
@@ -47,16 +66,25 @@ WBOOT: warm start
 CONST: console status
 CONIN: console input
 CONOUT: console output
-LIST: printer output
-PUNCH: papertape output
-READER: papertape input
-HOME: move disk head to track 0
 SELDSK: select disk drive
 SETTRK: select track
 SETSEC: select sector
 SETDMA: set DMA address
 READ: read a sector
 WRITE: write a sector
-LISTST: get printer status
-SECTRAN: translate sector numbers
+RELOCATE: relocate a binary
+GETTPA: get TPA bounds
+SETTPA: set TPA bounds
+GETZP: get ZP bounds
+SETZP: set ZP bounds
 
+Executable format:
+
+byte 0000 number of zero page bytes required
+word 0001 offset of relocation table
+code 0003 JMP instruction to BDOS (only COM files)
+code 0006 entrypoint
+...
+relocation bytes: two zero-terminated strings of incremental offsets from the
+beginning of the file; 0xff advances pointer but does nothing; first one is for
+ZP, second is for high byte of memory

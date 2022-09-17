@@ -48,10 +48,10 @@ std::vector<uint8_t> toBytestream(const std::vector<uint16_t>& differences)
 	for (uint16_t diff : differences)
 	{
 		uint16_t delta = diff - pos;
-		while (delta >= 0xff)
+		while (delta >= 0xfe)
 		{
-			results.push_back(0xff);
-			delta -= 0xff;
+			results.push_back(0xfe);
+			delta -= 0xfe;
 		}
 		results.push_back(delta);
 
@@ -71,11 +71,6 @@ void align(std::ostream& s)
 {
 	while (s.tellp() & 127)
 		s.put(0);
-}
-
-uint16_t paras(uint16_t value)
-{
-	return (value + 127) / 128;
 }
 
 unsigned roundup(unsigned value)
@@ -119,25 +114,17 @@ int main(int argc, char* const* argv)
 
 	std::ofstream outs(outfile);
 
-	/* Write the header. */
-
-	outs.write("CPM65", 5);
-	outs.put(zpMax + 1);
-	outs.put(memMax - 1); /* remember the 2 offset in the assembled code */
-	emitw(outs, paras(coreSize) + 1 + paras(reloBytesSize));
-	emitw(outs, paras(coreSize));
-	emitw(outs, paras(reloBytesSize));
-	align(outs);
-
 	/* Write the actual code body. */
 
 	{
 		auto memi = memDifferences.begin();
 		std::ifstream is(corefile);
 		unsigned pos = 0;
-		while (!is.eof())
+		for (;;)
 		{
-			uint8_t b = is.get();
+			int b = is.get();
+			if (b == -1)
+				break;
 			if (pos == *memi)
 			{
 				b -= 2;
@@ -146,17 +133,16 @@ int main(int argc, char* const* argv)
 			outs.put(b);
 			pos++;
 		}
-		align(outs);
 	}
 
 	/* Write the relocation bytes. */
 
 	for (uint8_t b : zpBytes)
 		outs.put(b);
-	outs.put(0);
+	outs.put(0xff);
 	for (uint8_t b : memBytes)
 		outs.put(b);
-	align(outs);
+	outs.put(0xff);
 
 	/* Remove temporary files. */
 
