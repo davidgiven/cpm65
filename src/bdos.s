@@ -14,6 +14,7 @@
 
     .zeropage
 
+current_dirent: .word 0     ; current directory entry
 temp:           .res 4      ; temporary storage
 debugp1:        .word 0     ; used for debug strings
 debugp2:        .word 0     ; used for debug strings
@@ -163,6 +164,14 @@ entry_LOGINDRIVE:
     jsr check_dir_pos
     beq @exit
 
+    ldy #0
+    lda (current_dirent), y
+    cmp #$e5                    ; is this directory entry in use?
+    beq @readloop
+
+    ldx #1
+    jsr update_bitmap_for_dirent
+
     jmp @readloop
 
 @exit:
@@ -205,12 +214,109 @@ read_dir_entry:
     ldy #bios::setdma
     jsr callbios
 
-    debug "read dir sector"
     jsr read_sector
     
 @exit:
+    clc
+    adc directory_buffer+0
+    sta current_dirent+0
+    lda directory_buffer+1
+    adc #0
+    sta current_dirent+1
     rts
 
+; Marks a dirent's blocks as either used or free in the bitmap.
+; X=1 to mark as used, X=0 to mark as free.
+update_bitmap_for_dirent:
+    stx temp+2              ; cache set/free flag
+    ldy #16                 ; offset into dirent
+@blockloop:
+    cpy #32
+    bne :+
+    rts
+:
+
+    lda blocks_on_disk+1
+    bne @bigdisk
+    
+    lda (current_dirent), y
+    sta temp+0              ; store low bye
+    lda #0
+    jmp @checkblock
+@bigdisk:
+    lda (current_dirent), y
+    sta temp+0              ; store low byte
+    iny
+    lda (current_dirent), y
+@checkblock:
+    iny
+    sta temp+1              ; store high byte
+    ora temp+0              ; check for zero
+    beq @blockloop
+
+    sty temp+3
+
+    lda temp+2              ; get set/free flag
+    jsr update_bitmap_status
+
+    ldy temp+3
+    jmp @blockloop
+
+; Given a block number in temp+0, return the address of the bitmap byte
+; in temp+0 and the bit position in A.
+
+get_bitmap_location:
+    lda temp+0              ; get bit position
+    and #7
+    eor #$ff
+    sec
+    adc #7                  ; compute 7-a
+
+    pha
+    ldy #3
+    jsr shiftr_temp0        ; temp0 is now offset into bitmap
+
+    lda bitmap+0            ; add bitmap address
+    clc
+    adc temp+0
+    sta temp+0
+    lda bitmap+1
+    adc temp+1
+    sta temp+1
+
+    pla
+    rts
+
+; Given a block number in temp+0, return the rotated block status in A.
+
+get_bitmap_status:
+    jsr get_bitmap_location
+    tax
+    ldy #0
+    lda (temp+0), y
+    jmp rotater8
+
+; Given a block number in temp+0 and a single-bit block status in A,
+; sets it.
+
+update_bitmap_status:
+    sta @value
+    jsr get_bitmap_location
+    sta @bitpos
+    tax
+
+    ldy #0
+    lda (temp+0), y
+    jsr rotater8            ; get rotated status
+    and #$fe                ; mask off bit we care about
+@value = *+1
+    ora #$00                ; or in the new status
+@bitpos = *+1
+    ldx #$00
+    jsr rotatel8            ; unrotate
+    ldy #0
+    sta (temp+0), y         ; update bitmap
+    rts
 
 ; --- Drive management ------------------------------------------------------
 
@@ -314,6 +420,7 @@ select_active_drive:
 shiftr:
     sta temp+0
     stx temp+1
+shiftr_temp0:
     iny
 @loop:
     dey
@@ -361,6 +468,32 @@ setbit:
     dey
     bpl :-
 
+    rts
+
+; Rotate A right X times.
+rotater8:
+    inx
+@loop:
+    dex
+    beq @exit
+    lsr a
+    bcc :+
+    ora #$80
+:
+    jmp @loop
+@exit:
+    rts
+
+; Rotate A left X times.
+rotatel8:
+    inx
+@loop:
+    dex
+    beq @exit
+    asl a
+    adc #0
+    jmp @loop
+@exit:
     rts
     
 ; Calls the BIOS entrypoint.
