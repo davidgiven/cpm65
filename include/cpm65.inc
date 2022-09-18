@@ -18,6 +18,30 @@ ENTRY:
 HDR_ZPSIZE = 0
 HDR_RELOTABLE_OFFSET = 1
 
+.enum fcb
+    dr
+    f1
+    f2
+    f3
+    f4
+    f5
+    f6
+    f7
+    f8
+    t1
+    t2
+    t3
+    ex
+    s1
+    s2
+    rc
+    al
+    cr = $20
+    r0
+    r1
+    r2
+.endenum
+
 .enum bdos
 	exit
 .endenum

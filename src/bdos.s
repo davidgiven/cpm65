@@ -111,7 +111,7 @@ new_user_fcb:
     sta current_fcb+0
     stx current_fcb+1
     
-    ldy #14
+    ldy #fcb::s2
     lda #0
     sta (current_fcb), y
 
@@ -140,7 +140,7 @@ open_fcb:
 
     ; We have a matching dirent!
 
-    ldy #12
+    ldy #fcb::ex
     lda (current_fcb), y        ; fetch user extent byte
     sta tempb
 
@@ -155,14 +155,14 @@ open_fcb:
 
     ; Set bit 7 of S2 to indicate that this file hasn't been modified.
 
-    ldy #14
+    ldy #fcb::s2
     lda (current_fcb), y
     ora #$80
     sta (current_fcb), y
 
     ; Compare the user extent byte with the dirent.
 
-    ldy #12
+    ldy #fcb::ex
     lda (current_fcb), y
     cmp tempb
     beq @setrc
@@ -173,7 +173,7 @@ open_fcb:
 @user_extent_larger:
     lda #$00                    ; after the end of the file, record count empty
 @setrc:
-    ldy #15
+    ldy #fcb::rc
     sta (current_fcb), y        ; set extent record count
 
     clc
@@ -215,9 +215,9 @@ find_next:
     lda (current_fcb), y
     cmp #'?'                ; wildcard
     beq @same_characters    ; ...skip comparing this byte
-    cpy #13                 ; don't care about byte 13
+    cpy #fcb::s1            ; don't care about byte 13
     beq @same_characters
-    cpy #12
+    cpy #fcb::ex
     bne @compare_chars
 
     ; Special logic for comparing extents.
