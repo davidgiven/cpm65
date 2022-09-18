@@ -15,7 +15,9 @@
     .zeropage
 
 current_dirent: .word 0     ; current directory entry
+current_fcb:    .word 0     ; current FCB being worked on
 temp:           .res 4      ; temporary storage
+tempb:          .byte 0     ; more temporary storage
 debugp1:        .word 0     ; used for debug strings
 debugp2:        .word 0     ; used for debug strings
 
@@ -50,13 +52,32 @@ debugp2:        .word 0     ; used for debug strings
 ; --- Warm start ------------------------------------------------------------
 
 entry_EXIT:
-    ldx #0                  ; reset stack point
+    ldx #$ff                ; reset stack point
     txs
 
     jsr entry_RESETDISK
 
+    ; Open the CCP.SYS file.
+
+    lda #<ccp_fcb
+    ldx #>ccp_fcb
+    jsr entry_OPENFILE
+    bcs @noccp
+
+    debug "failure"
+
     jmp *
     ; TODO: load CCP off disk, run it
+@noccp:
+    ; TODO: no CCP!
+    jmp *
+
+ccp_fcb:
+    .byte 0                 ; drive
+    .byte "CCP     SYS"     ; filename: CCP.SYS
+    .byte 0, 0, 0, 0        ; EX, S1, S2, RC
+    .res 16, 0              ; allocation block
+    .byte 0
 
 ; --- Reset disk system -----------------------------------------------------
 
@@ -75,6 +96,167 @@ entry_RESETDISK:
     ; A is 0
     jmp entry_LOGINDRIVE
 
+; --- Open a file -----------------------------------------------------------
+
+; Opens a file; the FCB is in XA.
+; Returns C is error; the code is in A.
+
+entry_OPENFILE:
+    jsr new_user_fcb
+    jmp open_fcb
+    
+; Sets up a user-supplied FCB.
+
+new_user_fcb:
+    sta current_fcb+0
+    stx current_fcb+1
+    
+    ldy #14
+    lda #0
+    sta (current_fcb), y
+
+    jsr select_fcb_drive
+
+; Selects the drive referred to in the FCB.
+
+select_fcb_drive:
+    ldy #0
+    lda (current_fcb), y        ; get drive byte
+    beq @default_drive
+    sec
+    sbc #1
+    jmp @set_active
+
+@default_drive:
+    lda current_drive
+@set_active:
+    sta active_drive
+    jmp select_active_drive
+
+open_fcb:
+    lda #15                     ; match 15 bytes of FCB
+    jsr find_first
+    bcs @exit
+
+    ; We have a matching dirent!
+
+    ldy #12
+    lda (current_fcb), y        ; fetch user extent byte
+    sta tempb
+
+    ; Copy the dirent to FCB.
+
+    ldy #31
+@loop:
+    lda (current_dirent), y
+    sta (current_fcb), y
+    dey
+    bpl @loop
+
+    ; Set bit 7 of S2 to indicate that this file hasn't been modified.
+
+    ldy #14
+    lda (current_fcb), y
+    ora #$80
+    sta (current_fcb), y
+
+    ; Compare the user extent byte with the dirent.
+
+    ldy #12
+    lda (current_fcb), y
+    cmp tempb
+    beq @setrc
+    bcs @user_extent_larger
+    ; user extent smaller
+    lda #$80                    ; middle of the file, record count full
+    jmp @setrc
+@user_extent_larger:
+    lda #$00                    ; after the end of the file, record count empty
+@setrc:
+    ldy #15
+    sta (current_fcb), y        ; set extent record count
+
+    clc
+@exit:
+    rts
+
+; --- Directory scanning ----------------------------------------------------
+
+; Find a dirent matching the user FCB.
+; On entry, A is the number of significant bytes in the FCB to use when
+; searching.
+; Returns C on error.
+
+find_first:
+    sta find_first_count
+    jsr home_drive
+    jsr reset_dir_pos
+    ; fall through
+
+find_next:
+    jsr read_dir_entry
+    jsr check_dir_pos
+    beq @nomorefiles
+
+    ; Does the user actually want to see deleted files?
+
+    lda #$e5
+    ldy #0
+    cmp (current_fcb), y
+    beq @compare_filenames
+
+    ; If not, optimise by checking to see if there are no more
+    ; files in the directory.
+    ; TODO: not done yet
+
+@compare_filenames:
+    ldy #0
+@compare_loop:
+    lda (current_fcb), y
+    cmp #'?'                ; wildcard
+    beq @same_characters    ; ...skip comparing this byte
+    cpy #13                 ; don't care about byte 13
+    beq @same_characters
+    cpy #12
+    bne @compare_chars
+
+    ; Special logic for comparing extents.
+
+    lda extent_mask
+    eor #$ff                ; inverted extent mask
+    pha
+    and (current_fcb), y    ; mask FCB extent
+    sta tempb
+    pla
+    and (current_dirent),y  ; mask dirent extent
+    cmp tempb
+    and #$1f                ; only check bits 0..4
+    beq @same_characters    ; they're the same!
+    jmp find_next
+
+@compare_chars:
+    sec
+    sbc (current_dirent), y ; compare the two characters
+    and #$7f                ; ignore top bit
+    bne find_next           ; not the same? give up
+@same_characters:
+    iny
+    cpy find_first_count    ; reached the end of the string?
+    bne @compare_loop
+
+    ; We found a file!
+
+    clc
+    rts
+    
+@nomorefiles:
+    jsr reset_dir_pos
+    sec
+    rts
+    
+    .bss
+find_first_count: .byte 0
+    .code
 ; --- Login drive -----------------------------------------------------------
 
 ; Logs in active_drive. If the drive was not already logged in, the bitmap

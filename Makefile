@@ -8,7 +8,7 @@ DISKFORMAT = bbc163
 APPS = \
 	cpmfs/nop.com
 
-all: $(OBJDIR)/multilink bios.img bdos.img cpmfs.img
+all: $(OBJDIR)/multilink bios.img bdos.img ccp.img cpmfs.img
 
 $(OBJDIR)/multilink: tools/multilink.cc
 	$(CXX) -Os -g -o $@ $< -lfmt
@@ -26,7 +26,10 @@ cpmfs/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/multilink
 bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/multilink
 	$(OBJDIR)/multilink -o $@ $<
 
-cpmfs.img: $(wildcard cpmfs/*) $(APPS)
+cpmfs/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/multilink
+	$(OBJDIR)/multilink -o $@ $<
+
+cpmfs.img: $(wildcard cpmfs/*) $(APPS) cpmfs/ccp.sys
 	mkfs.cpm -f $(DISKFORMAT) $@
 	cpmcp -f $(DISKFORMAT) $@ $^ 0:
 
