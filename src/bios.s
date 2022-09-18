@@ -1,10 +1,10 @@
     .include "zif.inc"
     .include "mos.inc"
 
-	.import __ZEROPAGE_LOAD__
-	.import __ZEROPAGE_SIZE__
+    .import __ZEROPAGE_LOAD__
+    .import __ZEROPAGE_SIZE__
 
-	.zeropage
+    .zeropage
 
 ptr1: .word 0
 ptr2: .word 0
@@ -50,13 +50,13 @@ ptr2: .word 0
     ldx mem_base
     jsr entry_RELOCATE
 
-	; Open the file system image file.
+    ; Open the file system image file.
 
-	lda #$c0			; open file for r/w
-	ldx #<cpmfs_filename
-	ldy #>cpmfs_filename
-	jsr OSFIND
-	sta filehandle
+    lda #$c0            ; open file for r/w
+    ldx #<cpmfs_filename
+    ldy #>cpmfs_filename
+    jsr OSFIND
+    sta filehandle
 
     ; Compute the entry address and jump.
 
@@ -88,7 +88,7 @@ banner:
 banner_end:
 
 cpmfs_filename:
-	.byte "CPMFS", 13
+    .byte "CPMFS", 13
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -134,119 +134,135 @@ biostable_hi:
 ; Blocks and waits for the next keypress; returns it in A.
 
 entry_CONIN:
-	lda pending_key
-	bne @exit
-	jsr OSRDCH
+    lda pending_key
+    bne @exit
+    jsr OSRDCH
 @exit:
-	ldx #0
-	stx pending_key
-	rts
+    ldx #0
+    stx pending_key
+    rts
 
 entry_CONST:
-	lda pending_key
-	bne @yes
-	lda #$81
-	ldx #0
-	ldy #0
-	jsr OSBYTE
-	bcs @no
-	sta pending_key
+    lda pending_key
+    bne @yes
+    lda #$81
+    ldx #0
+    ldy #0
+    jsr OSBYTE
+    bcs @no
+    sta pending_key
 @yes:
-	lda #$ff
-	rts
+    lda #$ff
+    rts
 @no:
-	lda #0
-	rts
+    lda #0
+    rts
 
 ; Sets the current DMA address.
 
 entry_SETDMA:
-	sta dma+0
-	stx dma+1
-	rts
+    sta dma+0
+    stx dma+1
+    rts
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
 
 entry_SELDSK:
+    cmp #0
+    beq :+
+    sec                 ; invalid drive
+    rts
+:
+    lda #<dph
+    ldx #>dph
+    clc
+    rts
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
 entry_SETSEC:
-	sta ptr1+0
-	stx ptr1+1
-	ldy #2
+    sta ptr1+0
+    stx ptr1+1
+    ldy #2
 @loop:
-	lda (ptr1), y
-	sta sector_num, y
-	dey
-	bpl @loop
-	rts
+    lda (ptr1), y
+    sta sector_num, y
+    dey
+    bpl @loop
+    rts
 
 entry_READ:
-	jsr init_control_block
-	lda #3				; read bytes using pointer
-	jmp do_gbpb
+    jsr init_control_block
+    lda #3              ; read bytes using pointer
+    jmp do_gbpb
 
 entry_WRITE:
-	jsr init_control_block
-	lda #1				; write bytes using pointer
+    jsr init_control_block
+    lda #1              ; write bytes using pointer
 do_gbpb:
-	jsr OSGBPB
-	lda #0
-	rol a
-	rts
+    ldx #<osgbpb_block
+    ldy #>osgbpb_block
+    jsr OSGBPB
+    lda #0
+    rol a
+    rts
 
 init_control_block:
-	ldy #(osgbpb_block_end - osgbpb_block - 1)
-	lda #0
+    ldy #(osgbpb_block_end - osgbpb_block - 1)
+    lda #0
 :
-	sta osgbpb_block, y
-	dey
-	bpl :-
+    sta osgbpb_block, y
+    dey
+    bpl :-
 
-	lda filehandle
-	sta osgbpb_block+0
-	lda dma+0
-	sta osgbpb_block+1
-	lda dma+1
-	sta osgbpb_block+2
-	lda #128
-	sta osgbpb_block+5
+    lda filehandle
+    sta osgbpb_block+0
+    lda dma+0
+    sta osgbpb_block+1
+    lda dma+1
+    sta osgbpb_block+2
+    lda #128
+    sta osgbpb_block+5
 
-	ldy #2
+    ldy #2
 :
-	lda sector_num+0, y
-	sta osgbpb_block+9, y
-	dey
-	bpl :-
+    lda sector_num+0, y
+    sta osgbpb_block+10, y
+    dey
+    bpl :-
 
-	clc
-	ldx #3
+    clc
+    ldx #3
 :
-	ror osgbpb_block+8, x
-	dey
-	bpl :-
-	
-	rts
+    ror osgbpb_block+9, x
+    dex
+    bpl :-
+    
+    rts
 
 entry_GETTPA:
-	lda mem_base
-	ldx mem_end
-	rts
+    lda mem_base
+    ldx mem_end
+    rts
 
 entry_SETTPA:
-	sta mem_base
-	stx mem_end
-	rts
+    sta mem_base
+    stx mem_end
+    rts
 
 entry_GETZP:
-	lda zp_base
-	ldx zp_end
-	rts
+    lda zp_base
+    ldx zp_end
+    rts
 
 entry_SETZP:
-	sta zp_base
-	stx zp_end
-	rts
+    sta zp_base
+    stx zp_end
+    rts
 
     ; Relocate an image whose pointer is in XA.
 
@@ -334,17 +350,45 @@ print_h4:
 zp_base: .byte <(__ZEROPAGE_LOAD__ + __ZEROPAGE_SIZE__)
 zp_end:  .byte $90
 
+; DPH for drive 0 (our only drive)
+
+dph:
+    .word 0             ; sector translation table
+    .word 0, 0, 0       ; CP/M workspace
+    .word directory_buffer
+    .word dpb
+    .word checksum_buffer
+    .word allocation_vector
+
+; DPB for drive 0 (our only drive)
+
+dpb:
+    .word 0             ; number of sectors per track (unused)
+    .byte 3             ; block shift
+    .byte %00000111     ; block mask
+    .byte %11111110     ; extent mask
+    .word (40 * 32 * 128 / 1024) - 1 ; number of blocks on the disk
+    .word 63            ; number of directory entries
+    .byte %11000000     ; allocation bitmap byte 0
+    .byte %00000000     ; allocation bitmap byte 1
+    .word (64+3) / 4    ; checksum vector size
+    .word 0             ; number of reserved _sectors_ on disk
+
     .bss
 mem_base: .byte 0
 mem_end:  .byte 0
 
-filehandle: .byte 0		; file handle of disk image
-pending_key: .byte 0	; pending keypress from system
-dma:		.word 0		; current DMA
-sector_num: .res 3		; current absolute sector number
+filehandle: .byte 0     ; file handle of disk image
+pending_key: .byte 0    ; pending keypress from system
+dma:        .word 0     ; current DMA
+sector_num: .res 3      ; current absolute sector number
 
-osgbpb_block:			; block used by entry_READ and entry_WRITE
-	.res $0d
+directory_buffer: .res 128
+checksum_buffer:  .res (64+3) / 4
+allocation_vector: .res ((40 * 32 * 128 / 1024) + 7) / 8
+
+osgbpb_block:           ; block used by entry_READ and entry_WRITE
+    .res $0d
 osgbpb_block_end:
 
 ; vim: filetype=asm sw=4 ts=4 et
