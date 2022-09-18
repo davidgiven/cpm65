@@ -27,7 +27,6 @@ HDR_RELOTABLE_OFFSET = 1
 	conin
 	conout
 	seldsk
-	settrk
 	setsec
 	setdma
 	read
@@ -38,4 +37,6 @@ HDR_RELOTABLE_OFFSET = 1
 	getzp
 	setzp
 .endenum
+
+; vim: filetype=asm sw=4 ts=4 et
 

@@ -18,7 +18,7 @@ $(OBJDIR)/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
 	$(CA65) -o $@ $< -I include --listing $(patsubst %.o,%.lst,$@)
 
 bios.img: $(OBJDIR)/src/bios.o scripts/bios.cfg
-	$(LD65) -C scripts/bios.cfg -o $@ $<
+	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/bios.cfg -o $@ $<
 	
 cpmfs/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/multilink
 	$(OBJDIR)/multilink -o $@ $<
