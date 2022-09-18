@@ -6,9 +6,17 @@
     .import __BSS_RUN__
     .import __BSS_SIZE__
 
+.macro debug s
+    jsr pdebug
+    .byte s
+    .byte 13, 10, 0
+.endmacro
+
     .zeropage
 
 temp:           .res 4      ; temporary storage
+debugp1:        .word 0     ; used for debug strings
+debugp2:        .word 0     ; used for debug strings
 
 ; --- Initialisation --------------------------------------------------------
 ; TODO: figure out how to discard this.
@@ -197,6 +205,7 @@ read_dir_entry:
     ldy #bios::setdma
     jsr callbios
 
+    debug "read dir sector"
     jsr read_sector
     
 @exit:
@@ -354,10 +363,55 @@ setbit:
 
     rts
     
+; Calls the BIOS entrypoint.
+
 callbios:
 bios = callbios + 1
     jmp 0
-    
+
+bios_conout:
+    ldy #bios::conout
+    jmp callbios
+
+; Prints a string.
+
+pdebug:
+    sta debuga
+    stx debugx
+    sty debugy
+
+    tsx
+    lda $101, x
+    sta debugp1+0
+    lda $102, x
+    sta debugp1+1
+
+@loop:
+    inc debugp1+0
+    bne :+
+    inc debugp1+1
+:
+    ldy #0
+    lda (debugp1), y
+    beq @exit
+
+    jsr bios_conout
+    jmp @loop
+
+@exit:
+    pla
+    pla
+
+    lda debugp1+1
+    pha
+    lda debugp1+0
+    pha
+
+    lda debuga
+    ldx debugx
+    ldy debugy
+    rts
+
     .bss
 
 ; State preserved between BDOS invocations.
@@ -402,6 +456,10 @@ bitmap_init:        .word 0
 checksum_vector_size: .word 0
 reserved_sectors:   .word 0
 dpb_copy_end:
+
+debuga:             .byte 0
+debugx:             .byte 0
+debugy:             .byte 0
 
 ; vim: filetype=asm sw=4 ts=4 et
 
