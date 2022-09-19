@@ -443,10 +443,10 @@ dph: define_drive 40*32, 2048, 64, 0
 mem_base: .byte 0
 mem_end:  .byte 0
 
-filehandle: .byte 0     ; file handle of disk image
+filehandle:  .byte 0    ; file handle of disk image
 pending_key: .byte 0    ; pending keypress from system
-dma:        .word 0     ; current DMA
-sector_num: .res 3      ; current absolute sector number
+dma:         .word 0    ; current DMA
+sector_num:  .res 3     ; current absolute sector number
 
 directory_buffer: .res 128
 
