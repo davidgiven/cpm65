@@ -102,5 +102,16 @@ HDR_RELOTABLE_OFFSET = 1
 	setzp
 .endenum
 
+.struct dph
+    xlt    .word
+    cdrmax .word
+    scratch1 .word
+    scratch2 .word
+    dirbuf .word
+    dpb    .word
+    csv    .word
+    alv    .word
+.endstruct
+
 ; vim: filetype=asm sw=4 ts=4 et
 

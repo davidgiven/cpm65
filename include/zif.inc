@@ -18,6 +18,16 @@
 	bcc zendif_label
 .endmacro
 
+.macro zif_mi
+	.scope
+	bpl zendif_label
+.endmacro
+
+.macro zif_pl
+	.scope
+	bmi zendif_label
+.endmacro
+
 .macro zendif
 	zendif_label:
 	.endscope
@@ -40,6 +50,10 @@
 
 .macro zbreakif_eq
 	beq zbreak_label
+.endmacro
+
+.macro zbreakif_cs
+	bcs zbreak_label
 .endmacro
 
 .macro zcontinueif_eq

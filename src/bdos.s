@@ -15,7 +15,14 @@
     .zeropage
 
 current_dirent: .word 0     ; current directory entry
-current_fcb:    .word 0     ; current FCB being worked on
+fcb:            .word 0     ; current FCB being worked on
+dph:            .word 0     ; currently selected DPH
+
+directory_buffer:   .word 0 ; directory buffer from the DPH
+current_dpb:        .word 0 ; currently selected DPB
+checksum_buffer:    .word 0 ; checksum buffer from the DPH
+bitmap:             .word 0 ; allocation bitmap from the DPH
+
 temp:           .res 4      ; temporary storage
 tempb:          .byte 0     ; more temporary storage
 debugp1:        .word 0     ; used for debug strings
@@ -32,6 +39,12 @@ debugp2:        .word 0     ; used for debug strings
     sta bios+0
     stx bios+1
 
+    ; Reset persistent state.
+
+    lda #0
+    sta current_user
+    sta current_drive
+
     ; Update memory region.
 
     ldy #bios::getzp
@@ -41,8 +54,7 @@ debugp2:        .word 0     ; used for debug strings
     ldy #bios::setzp
     jsr callbios
     
-    ldy #bios::gettpa
-    jsr callbios
+    jsr bios_gettpa
     clc
     adc #>(__BSS_RUN__ + __BSS_SIZE__ - __CODE_RUN__ + 255)
     ldy #bios::settpa
@@ -62,23 +74,78 @@ entry_EXIT:
     lda #<ccp_fcb
     ldx #>ccp_fcb
     jsr entry_OPENFILE
-    bcs @noccp
+    zif_cs
+        debug "Couldn't open CCP"
+        jmp *
+    zendif
 
-    debug "CCP file opened"
+    ; Read the CCP into memory.
 
-    jmp *
-    ; TODO: load CCP off disk, run it
-@noccp:
-    ; TODO: no CCP!
-    jmp *
+    jsr bios_gettpa         ; bottom of TPA page number in A
+    sta user_dma+1
+    lda #0
+    sta user_dma+0
+
+    zloop
+        lda #<ccp_fcb
+        ldx #>ccp_fcb
+        jsr internal_READSEQUENTIAL
+        zbreakif_cs
+
+        lda user_dma+0
+        eor #$80
+        sta user_dma+0
+        zif_eq
+            inc user_dma+1
+        zendif
+    zendloop
+
+    ; Patch the BIOS entry vector.
+
+    jsr bios_gettpa         ; bottom of TPA page number in A
+    sta temp+1
+    lda #0
+    sta temp+0
+    
+    ldy #5
+    lda #<ENTRY
+    sta (temp), y
+    iny
+    lda #>ENTRY
+    sta (temp), y
+
+    ; Relocate.
+
+    lda temp+0
+    ldx temp+1
+    ldy #bios::relocate
+    jsr callbios
+
+    ; Execute it.
+
+    lda #7
+    clc
+    adc temp+0
+    sta temp+0
+    zif_cs
+        inc temp+1
+    zendif
+    jmp (temp)
 
     .data
 ccp_fcb:
-    .byte 0                 ; drive
+    .byte 1                 ; drive A:
     .byte "CCP     SYS"     ; filename: CCP.SYS
     .byte 0, 0, 0, 0        ; EX, S1, S2, RC
     .res 16, 0              ; allocation block
     .byte 0
+
+; --- BDOS entrypoint -------------------------------------------------------
+
+.proc ENTRY
+    debug "entry"
+    jmp *
+.endproc
 
 ; --- Reset disk system -----------------------------------------------------
 
@@ -106,44 +173,14 @@ ccp_fcb:
 
 entry_OPENFILE:
     jsr new_user_fcb
-    jmp open_fcb
-    
-; Sets up a user-supplied FCB.
-
-new_user_fcb:
-    sta current_fcb+0
-    stx current_fcb+1
-    
-    ldy #fcb::s2
-    lda #0
-    sta (current_fcb), y
-
-    jsr select_fcb_drive
-
-; Selects the drive referred to in the FCB.
-
-.proc select_fcb_drive
-    ldy #0
-    lda (current_fcb), y        ; get drive byte
-    zif_ne
-        sec
-        sbc #1
-        jmp set_active
-    zendif
-    lda current_drive
-set_active:
-    sta active_drive
-    jmp select_active_drive
-.endproc
-
-.proc open_fcb
+.proc internal_OPENFILE
     lda #15                     ; match 15 bytes of FCB
     jsr find_first
     zif_cc
         ; We have a matching dirent!
 
         ldy #fcb::ex
-        lda (current_fcb), y        ; fetch user extent byte
+        lda (fcb), y        ; fetch user extent byte
         sta tempb
 
         ; Copy the dirent to FCB.
@@ -151,35 +188,191 @@ set_active:
         ldy #31
         zrepeat
             lda (current_dirent), y
-            sta (current_fcb), y
+            sta (fcb), y
             dey
         zuntil_mi
 
         ; Set bit 7 of S2 to indicate that this file hasn't been modified.
 
         ldy #fcb::s2
-        lda (current_fcb), y
+        lda (fcb), y
         ora #$80
-        sta (current_fcb), y
+        sta (fcb), y
 
         ; Compare the user extent byte with the dirent.
 
         ldy #fcb::ex
-        lda (current_fcb), y
-        cmp tempb
-        beq @setrc
-        bcs @user_extent_larger
-        ; user extent smaller
-        lda #$80                    ; middle of the file, record count full
-        jmp @setrc
-    @user_extent_larger:
-        lda #$00                    ; after the end of the file, record count empty
-    @setrc:
-        ldy #fcb::rc
-        sta (current_fcb), y        ; set extent record count
+        lda (fcb), y
+        cmp tempb                   ; dirent extent - fcb extent
+        zif_ne
+            zif_cs
+                ; user extent is larger
+                lda #$00            ; after the end of the file, record count empty
+                jmp setrc
+            zendif
+            ; user extent is smaller
+            lda #$80                ; middle of the file, record count full
+        setrc:
+            ldy #fcb::rc
+            sta (fcb), y            ; set extent record count
+        zendif
 
         clc
     zendif
+    rts
+.endproc
+    
+; Sets up a user-supplied FCB.
+
+.proc new_user_fcb
+    sta fcb+0
+    stx fcb+1
+    
+    ldy #fcb::s2
+    lda #0
+    sta (fcb), y
+
+    jmp select_fcb_drive
+.endproc
+
+; Selects the drive referred to in the FCB.
+
+.proc old_user_fcb
+    sta fcb+0
+    stx fcb+1
+    ; fall through
+.endproc
+.proc select_fcb_drive
+    ldy #fcb::dr
+    lda (fcb), y        ; get drive byte
+    sta old_fcb_drive           ; to restore on exit
+    and #%00011111              ; extract drive
+    tax
+    dex                         ; convert to internal drive numbering
+    zif_mi
+        ldx current_drive       ; override with current drive
+    zendif
+    txa
+    sta active_drive            ; set the active drive
+    ora current_user
+    sta (fcb), y        ; update FCB
+    
+    jmp select_active_drive
+.endproc
+
+
+; --- Read next sequential record -------------------------------------------
+
+.proc entry_READSEQUENTIAL
+    jsr old_user_fcb
+.endproc
+.proc internal_READSEQUENTIAL
+    ldy #fcb::cr
+    lda (fcb), y
+    ldy #fcb::rc
+    cmp (fcb), y
+    zif_eq
+        cpy #$80                ; is this extent full?
+        bne eof                 ; no, we've reached the end of the file
+            
+        debug "end of extent"
+        jmp *
+    zendif
+    
+    jsr get_fcb_block           ; get disk block value in XA
+    sta current_sector+0
+    stx current_sector+1
+    ora current_sector+1
+    beq eof                     ; no block allocated
+
+    lda #0
+    sta current_sector+2
+
+    ; Convert block number to sector number.
+
+    ldx block_shift
+    zrepeat
+        asl current_sector+0
+        rol current_sector+1
+        rol current_sector+2
+        dex
+    zuntil_eq
+
+    ; Add on record number.
+
+    ldy #fcb::cr
+    lda (fcb), y
+    and block_mask              ; get offset in block
+
+    clc
+    adc current_sector+0
+    sta current_sector+0
+    zif_cs
+        inc current_sector+1
+        zif_eq
+            inc current_sector+2
+        zendif
+    zendif
+
+    ; Move the FCB on to the next record, for next time.
+
+    ; ldy #fcb::cr              ; still set from last time
+    lda (fcb), y
+    clc
+    adc #1
+    sta (fcb), y
+
+    ; Actually do the read!
+
+    jsr reset_user_dma
+    jsr read_sector
+    clc
+    rts
+
+eof:
+    lda #1                      ; = EOF
+    sec
+    rts
+.endproc
+
+; Fetch the current block number in the FCB in XA.
+.proc get_fcb_block
+    jsr get_fcb_block_index     ; gets index in Y
+    ldx blocks_on_disk+1        ; are we a big disk?
+    zif_ne                      ; yes
+        lda (fcb), y
+        pha
+        iny
+        lda (fcb), y
+        tax
+        pla
+        rts
+    zendif
+
+    lda (fcb), y
+    ldx #0
+    rts
+.endproc
+
+; Return offset to the current block in the FCB in Y.
+.proc get_fcb_block_index
+    ldy #fcb::cr                ; get current record
+    lda (fcb), y
+
+    ldx block_shift             ; get block index
+    zrepeat
+        lsr a
+        dex
+    zuntil_eq                   ; A = block index
+
+    ldx blocks_on_disk+1        ; are we a big disk?
+    zif_ne                      ; yes
+        asl a                   ; blocks occupy two bytes
+    zendif
+
+    clc
+    adc #fcb::al                ; get offset into allocation map
+    tay
     rts
 .endproc
 
@@ -199,26 +392,28 @@ find_first:
 .proc find_next
     jsr read_dir_entry
     jsr check_dir_pos
-    zif_eq                      ; no more files?
-        jsr reset_dir_pos
-        sec
-        rts
-    zendif
+    beq no_more_files
 
     ; Does the user actually want to see deleted files?
 
     lda #$e5
     ldy #0
-    cmp (current_fcb), y
+    cmp (fcb), y
     zif_ne
-        ; If not, optimise by checking to see if there are no more
-        ; files in the directory.
-        ; TODO: not done yet
+        ; If current_dirent is higher than cdrmax, we know that
+        ; the rest of the directory is empty, so give up now.
+        ldy #dph::cdrmax
+        lda (dph), y
+        cmp current_dirent+0
+        iny
+        lda (dph), y
+        sbc current_dirent+1
+        bcc no_more_files
     zendif
 
     ldy #0
     zrepeat
-        lda (current_fcb), y
+        lda (fcb), y
         cmp #'?'                ; wildcard
         beq @same_characters    ; ...skip comparing this byte
         cpy #fcb::s1            ; don't care about byte 13
@@ -231,7 +426,7 @@ find_first:
         lda extent_mask
         eor #$ff                ; inverted extent mask
         pha
-        and (current_fcb), y    ; mask FCB extent
+        and (fcb), y    ; mask FCB extent
         sta tempb
         pla
         and (current_dirent),y  ; mask dirent extent
@@ -253,6 +448,10 @@ find_first:
     clc
     rts
     
+no_more_files:
+    jsr reset_dir_pos
+    sec
+    rts
 .endproc
     
     .bss
@@ -354,6 +553,7 @@ find_first_count: .byte 0
 
         ldx #1
         jsr update_bitmap_for_dirent
+        jsr update_cdrmax
     zendloop
 
 exit:
@@ -412,6 +612,25 @@ exit:
     lda directory_buffer+1
     adc #0
     sta current_dirent+1
+    rts
+.endproc
+
+; Updates the cdrmax field in the DPH to mark the maximum directory
+; entry for a drive (from current_dirent).
+.proc update_cdrmax
+    ldy #dph::cdrmax
+    lda current_dirent+0
+    cmp (dph), y
+    iny
+    lda current_dirent+1
+    cmp (dph), y
+    zif_cs
+        ; Update cdrmax.
+        sta (dph), y
+        dey
+        lda current_dirent+0
+        sta (dph), y
+    zendif
     rts
 .endproc
 
@@ -563,7 +782,7 @@ check_dir_pos:
 
 .proc home_drive
     lda #0
-    ldy #3
+    ldy #2
     zrepeat
         sta current_sector, y
         dey
@@ -578,24 +797,24 @@ check_dir_pos:
     zif_cc
         ; Copy DPH into local storage.
 
-        sta temp+0
-        stx temp+1
-        ldy #dph_copy_end - dph_copy - 1
-        zrepeat
-            lda (temp), y
-            sta dph_copy, y
-            dey
-        zuntil_mi
+        sta dph+0
+        stx dph+1
+
+        ldy #dph::dirbuf
+        ldx #0
+        zloop
+            lda (dph), y
+            sta directory_buffer, x
+            iny
+            inx
+            cpy #dph::alv+2
+        zuntil_eq
 
         ; Copy DPB into local storage.
 
-        lda dpb+0
-        sta temp+0
-        lda dpb+1
-        sta temp+1
         ldy #dpb_copy_end - dpb_copy - 1
         zrepeat
-            lda (temp), y
+            lda (current_dpb), y
             sta dpb_copy, y
             dey
         zuntil_mi
@@ -697,6 +916,10 @@ bios_conout:
     ldy #bios::conout
     jmp callbios
 
+bios_gettpa:
+    ldy #bios::gettpa
+    jmp callbios
+
 ; Prints a string.
 
 pdebug:
@@ -747,25 +970,15 @@ current_user:   .byte 0     ; current working user
 ; is initialised.
 
 bdos_state_start:
-active_drive:           .byte 0 ; drive current being worked on
+active_drive:           .byte 0 ; drive currently being worked on
+old_drive:              .byte 0 ; if the drive has been overridden by the FCB
+old_fcb_drive:          .byte 0 ; drive in user FCB on entry
 write_protect_vector:   .word 0
 login_vector:           .word 0
 directory_pos:          .word 0
-current_block:          .word 0
 user_dma:               .word 0
+current_sector:         .res 3  ; 24-bit sector number
 bdos_state_end:
-
-; Copy of DPH of currently selected drive.
-
-dph_copy:
-                    .word 0 ; sector translation table (unused)
-scratch1:           .word 0
-current_sector:     .res 4  ; scratch2 / scratch3
-directory_buffer:   .word 0
-dpb:                .word 0
-checksum_buffer:    .word 0
-bitmap:             .word 0
-dph_copy_end:
 
 ; Copy of DPB of currently selected drive.
 
