@@ -1,13 +1,13 @@
     .include "zif.inc"
     .include "mos.inc"
+    .include "cpm65.inc"
 
     .import __ZEROPAGE_LOAD__
     .import __ZEROPAGE_SIZE__
 
     .zeropage
 
-ptr1: .word 0
-ptr2: .word 0
+ptr: .word 0
 
     .code
 
@@ -96,11 +96,11 @@ cpmfs_filename:
 biosentry:
     pha
     lda biostable_lo, y
-    sta ptr1+0
+    sta ptr+0
     lda biostable_hi, y
-    sta ptr1+1
+    sta ptr+1
     pla
-    jmp (ptr1)
+    jmp (ptr)
 
 biostable_lo:
     .lobytes entry_CONST
@@ -133,14 +133,16 @@ biostable_hi:
 
 ; Blocks and waits for the next keypress; returns it in A.
 
-entry_CONIN:
+.proc entry_CONIN
     lda pending_key
-    bne @exit
-    jsr OSRDCH
-@exit:
+    zif_eq
+        jsr OSRDCH
+    zendif
+
     ldx #0
     stx pending_key
     rts
+.endproc
 
 entry_CONST:
     lda pending_key
@@ -170,30 +172,33 @@ entry_SETDMA:
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-entry_SELDSK:
+.proc entry_SELDSK
     cmp #0
-    beq :+
-    sec                 ; invalid drive
-    rts
-:
+    zif_ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
     lda #<dph
     ldx #>dph
     clc
     rts
+.endproc
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
-entry_SETSEC:
-    sta ptr1+0
-    stx ptr1+1
+.proc entry_SETSEC
+    sta ptr+0
+    stx ptr+1
     ldy #2
-@loop:
-    lda (ptr1), y
-    sta sector_num, y
-    dey
-    bpl @loop
+    zrepeat
+        lda (ptr), y
+        sta sector_num, y
+        dey
+    zuntil_mi
     rts
+.endproc
 
 entry_READ:
     jsr init_control_block
@@ -211,13 +216,13 @@ do_gbpb:
     rol a
     rts
 
-init_control_block:
+.proc init_control_block
     ldy #(osgbpb_block_end - osgbpb_block - 1)
     lda #0
-:
-    sta osgbpb_block, y
-    dey
-    bpl :-
+    zrepeat
+        sta osgbpb_block, y
+        dey
+    zuntil_mi
 
     lda filehandle
     sta osgbpb_block+0
@@ -229,20 +234,21 @@ init_control_block:
     sta osgbpb_block+5
 
     ldy #2
-:
-    lda sector_num+0, y
-    sta osgbpb_block+10, y
-    dey
-    bpl :-
+    zrepeat
+        lda sector_num+0, y
+        sta osgbpb_block+10, y
+        dey
+    zuntil_mi
 
     clc
     ldx #3
-:
-    ror osgbpb_block+9, x
-    dex
-    bpl :-
+    zrepeat
+        ror osgbpb_block+9, x
+        dex
+    zuntil_mi
     
     rts
+.endproc
 
 entry_GETTPA:
     lda mem_base
@@ -266,69 +272,69 @@ entry_SETZP:
 
     ; Relocate an image whose pointer is in XA.
 
-entry_RELOCATE:
-    sta ptr1+0
-    stx ptr1+1
+.proc entry_RELOCATE
+    sta ptr+0
+    stx ptr+1
     pha                 ; store pointer for second pass
     txa
     pha
 
-    ldy #2              ; add relocation table offset
+    ldy #comhdr::rel_offset ; add relocation table offset
     clc
-    lda (ptr1), y
-    adc ptr1+0
-    sta ptr2+0
+    lda (ptr), y
+    adc ptr+0
+    sta reloptr+0
     iny
-    lda (ptr1), y
-    adc ptr1+1
-    sta ptr2+1
+    lda (ptr), y
+    adc ptr+1
+    sta reloptr+1
 
     ldx zp_base
     jsr relocate_loop   ; relocate zero page
 
     pla
-    sta ptr1+1
+    sta ptr+1
     pla
-    sta ptr1+0
+    sta ptr+0
     ldx mem_base
     ; fall through
 
-    ; ptr1 points at the beginning of the image
-    ; ptr2 points at the relocation table
+    ; ptr points at the beginning of the image
+    ; reloptr points at the relocation table
     ; x is value to add
 relocate_loop:
     ldy #0
-@loop:
-    lda (ptr2), y       ; get relocation byte
-    inc ptr2+0          ; add one to pointer
-    bne :+
-    inc ptr2+1
-:
-    cmp #$ff
-    beq @done
+    zloop
+        ::reloptr = * + 1
+        lda $ffff           ; get relocation byte
+        inc reloptr+0       ; add one to pointer
+        zif_eq
+            inc reloptr+1
+        zendif
+        cmp #$ff
+        zbreakif_eq
 
-    pha
-    clc
-    adc ptr1+0
-    sta ptr1+0
-    bcc :+
-    inc ptr1+1
-:
-    pla
+        pha
+        clc
+        adc ptr+0
+        sta ptr+0
+        zif_cs
+            inc ptr+1
+        zendif
+        pla
 
-    cmp #$fe
-    beq @loop
+        cmp #$fe
+        zcontinueif_eq
 
-    ; ptr1 is pointing at the address to fix up.
+        ; ptr is pointing at the address to fix up.
 
-    clc
-    txa
-    adc (ptr1), y
-    sta (ptr1), y
-
-    jmp @loop
-@done:
+        clc
+        txa
+        adc (ptr), y
+        sta (ptr), y
+    zendloop
     rts
+.endproc
 
 print_h8:
     pha
