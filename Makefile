@@ -8,9 +8,10 @@ DISKFORMAT = bbc163
 APPS = \
 	cpmfs/nop.com
 
-all: $(OBJDIR)/multilink bios.img bdos.img ccp.img cpmfs.img
+all: $(OBJDIR)/multilink bios.img bdos.img cpmfs.img
 
 $(OBJDIR)/multilink: tools/multilink.cc
+	@mkdir -p $(dir $@)
 	$(CXX) -Os -g -o $@ $< -lfmt
 
 $(OBJDIR)/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc

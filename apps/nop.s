@@ -3,6 +3,6 @@
 	.code
 	CPM65_COM_HEADER
 
-    ldy #bdos::exit
+    ldy #bdos::exit_program
     jmp BDOS
 

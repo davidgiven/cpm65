@@ -64,7 +64,7 @@ entry_EXIT:
     jsr entry_OPENFILE
     bcs @noccp
 
-    debug "failure"
+    debug "CCP file opened"
 
     jmp *
     ; TODO: load CCP off disk, run it
@@ -72,6 +72,7 @@ entry_EXIT:
     ; TODO: no CCP!
     jmp *
 
+    .data
 ccp_fcb:
     .byte 0                 ; drive
     .byte "CCP     SYS"     ; filename: CCP.SYS
@@ -81,20 +82,22 @@ ccp_fcb:
 
 ; --- Reset disk system -----------------------------------------------------
 
-entry_RESETDISK:
+    .code
+.proc entry_RESETDISK
     ; Reset transient BDOS state.
 
     ldy #(bdos_state_end - bdos_state_start - 1)
     lda #0
-:
-    sta bdos_state_start, y
-    dey
-    bpl :-
+    zrepeat
+        sta bdos_state_start, y
+        dey
+    zuntil_mi
     
     ; Log in drive A.
 
     ; A is 0
     jmp entry_LOGINDRIVE
+.endproc
 
 ; --- Open a file -----------------------------------------------------------
 
@@ -119,66 +122,66 @@ new_user_fcb:
 
 ; Selects the drive referred to in the FCB.
 
-select_fcb_drive:
+.proc select_fcb_drive
     ldy #0
     lda (current_fcb), y        ; get drive byte
-    beq @default_drive
-    sec
-    sbc #1
-    jmp @set_active
-
-@default_drive:
+    zif_ne
+        sec
+        sbc #1
+        jmp set_active
+    zendif
     lda current_drive
-@set_active:
+set_active:
     sta active_drive
     jmp select_active_drive
+.endproc
 
-open_fcb:
+.proc open_fcb
     lda #15                     ; match 15 bytes of FCB
     jsr find_first
-    bcs @exit
+    zif_cc
+        ; We have a matching dirent!
 
-    ; We have a matching dirent!
+        ldy #fcb::ex
+        lda (current_fcb), y        ; fetch user extent byte
+        sta tempb
 
-    ldy #fcb::ex
-    lda (current_fcb), y        ; fetch user extent byte
-    sta tempb
+        ; Copy the dirent to FCB.
 
-    ; Copy the dirent to FCB.
+        ldy #31
+        zrepeat
+            lda (current_dirent), y
+            sta (current_fcb), y
+            dey
+        zuntil_mi
 
-    ldy #31
-@loop:
-    lda (current_dirent), y
-    sta (current_fcb), y
-    dey
-    bpl @loop
+        ; Set bit 7 of S2 to indicate that this file hasn't been modified.
 
-    ; Set bit 7 of S2 to indicate that this file hasn't been modified.
+        ldy #fcb::s2
+        lda (current_fcb), y
+        ora #$80
+        sta (current_fcb), y
 
-    ldy #fcb::s2
-    lda (current_fcb), y
-    ora #$80
-    sta (current_fcb), y
+        ; Compare the user extent byte with the dirent.
 
-    ; Compare the user extent byte with the dirent.
+        ldy #fcb::ex
+        lda (current_fcb), y
+        cmp tempb
+        beq @setrc
+        bcs @user_extent_larger
+        ; user extent smaller
+        lda #$80                    ; middle of the file, record count full
+        jmp @setrc
+    @user_extent_larger:
+        lda #$00                    ; after the end of the file, record count empty
+    @setrc:
+        ldy #fcb::rc
+        sta (current_fcb), y        ; set extent record count
 
-    ldy #fcb::ex
-    lda (current_fcb), y
-    cmp tempb
-    beq @setrc
-    bcs @user_extent_larger
-    ; user extent smaller
-    lda #$80                    ; middle of the file, record count full
-    jmp @setrc
-@user_extent_larger:
-    lda #$00                    ; after the end of the file, record count empty
-@setrc:
-    ldy #fcb::rc
-    sta (current_fcb), y        ; set extent record count
-
-    clc
-@exit:
+        clc
+    zendif
     rts
+.endproc
 
 ; --- Directory scanning ----------------------------------------------------
 
@@ -193,66 +196,64 @@ find_first:
     jsr reset_dir_pos
     ; fall through
 
-find_next:
+.proc find_next
     jsr read_dir_entry
     jsr check_dir_pos
-    beq @nomorefiles
+    zif_eq                      ; no more files?
+        jsr reset_dir_pos
+        sec
+        rts
+    zendif
 
     ; Does the user actually want to see deleted files?
 
     lda #$e5
     ldy #0
     cmp (current_fcb), y
-    beq @compare_filenames
+    zif_ne
+        ; If not, optimise by checking to see if there are no more
+        ; files in the directory.
+        ; TODO: not done yet
+    zendif
 
-    ; If not, optimise by checking to see if there are no more
-    ; files in the directory.
-    ; TODO: not done yet
-
-@compare_filenames:
     ldy #0
-@compare_loop:
-    lda (current_fcb), y
-    cmp #'?'                ; wildcard
-    beq @same_characters    ; ...skip comparing this byte
-    cpy #fcb::s1            ; don't care about byte 13
-    beq @same_characters
-    cpy #fcb::ex
-    bne @compare_chars
+    zrepeat
+        lda (current_fcb), y
+        cmp #'?'                ; wildcard
+        beq @same_characters    ; ...skip comparing this byte
+        cpy #fcb::s1            ; don't care about byte 13
+        beq @same_characters
+        cpy #fcb::ex
+        bne @compare_chars
 
-    ; Special logic for comparing extents.
+        ; Special logic for comparing extents.
 
-    lda extent_mask
-    eor #$ff                ; inverted extent mask
-    pha
-    and (current_fcb), y    ; mask FCB extent
-    sta tempb
-    pla
-    and (current_dirent),y  ; mask dirent extent
-    cmp tempb
-    and #$1f                ; only check bits 0..4
-    beq @same_characters    ; they're the same!
-    jmp find_next
-
-@compare_chars:
-    sec
-    sbc (current_dirent), y ; compare the two characters
-    and #$7f                ; ignore top bit
-    bne find_next           ; not the same? give up
-@same_characters:
-    iny
-    cpy find_first_count    ; reached the end of the string?
-    bne @compare_loop
+        lda extent_mask
+        eor #$ff                ; inverted extent mask
+        pha
+        and (current_fcb), y    ; mask FCB extent
+        sta tempb
+        pla
+        and (current_dirent),y  ; mask dirent extent
+        cmp tempb
+        and #$1f                ; only check bits 0..4
+        bne find_next           ; not the same? give up
+    @compare_chars:
+        sec
+        sbc (current_dirent), y ; compare the two characters
+        and #$7f                ; ignore top bit
+        bne find_next           ; not the same? give up
+    @same_characters:
+        iny
+        cpy find_first_count    ; reached the end of the string?
+    zuntil_eq
 
     ; We found a file!
 
     clc
     rts
     
-@nomorefiles:
-    jsr reset_dir_pos
-    sec
-    rts
+.endproc
     
     .bss
 find_first_count: .byte 0
@@ -262,7 +263,7 @@ find_first_count: .byte 0
 ; Logs in active_drive. If the drive was not already logged in, the bitmap
 ; is recomputed. In all cases the drive is selected.
 
-entry_LOGINDRIVE:
+.proc entry_LOGINDRIVE
     ; Select the drive.
 
     jsr select_active_drive
@@ -275,7 +276,7 @@ entry_LOGINDRIVE:
     jsr shiftr              ; flag at bottom of temp+0
 
     ror temp+0
-    bcs @exit
+    bcs exit
 
     ; Not already logged in. Update the login vector.
 
@@ -290,9 +291,9 @@ entry_LOGINDRIVE:
     ldx blocks_on_disk+1
     clc                     ; add 7 to round up
     adc #7
-    bcc :+
-    inx
-:
+    zif_cs
+        inx
+    zendif
     ldy #3
     jsr shiftr              ; XA = temp+0 = number of bytes of bitmap
 
@@ -302,26 +303,26 @@ entry_LOGINDRIVE:
     sta temp+3
 
     ldy #0
-@zeroloop:
-    tya
-    sta (temp+2), y         ; zero a byte
+    zrepeat
+        tya
+        sta (temp+2), y         ; zero a byte
 
-    inc temp+2              ; advance pointer
-    bne :+
-    inc temp+3
-:
+        inc temp+2              ; advance pointer
+        zif_eq
+            inc temp+3
+        zendif
 
-    lda temp+0              ; decrement count
-    sec
-    sbc #1
-    sta temp+0
-    bcs :+
-    dec temp+1
-:
+        lda temp+0              ; decrement count
+        sec
+        sbc #1
+        sta temp+0
+        zif_cc
+            dec temp+1
+        zendif
 
-    lda temp+0
-    ora temp+1
-    bne @zeroloop           ; wait until count is zero
+        lda temp+0
+        ora temp+1
+    zuntil_eq
 
     ; Initialise the bitmap with the directory.
 
@@ -331,52 +332,57 @@ entry_LOGINDRIVE:
     sta temp+3
 
     ldy #1
-:
-    lda bitmap_init+0, y
-    sta (temp+2), y
-    dey
-    bpl :-
+    zrepeat
+        lda bitmap_init+0, y
+        sta (temp+2), y
+        dey
+    zuntil_mi
 
     ; Actually read the disk.
 
     jsr home_drive
     jsr reset_dir_pos
-@readloop:
-    jsr read_dir_entry
-    jsr check_dir_pos
-    beq @exit
+    zloop
+        jsr read_dir_entry
+        jsr check_dir_pos
+        beq exit
 
-    ldy #0
-    lda (current_dirent), y
-    cmp #$e5                    ; is this directory entry in use?
-    beq @readloop
+        ldy #0
+        lda (current_dirent), y
+        cmp #$e5                    ; is this directory entry in use?
+        zbreakif_eq
 
-    ldx #1
-    jsr update_bitmap_for_dirent
+        ldx #1
+        jsr update_bitmap_for_dirent
+    zendloop
 
-    jmp @readloop
-
-@exit:
+exit:
     rts
+.endproc
 
 ; Reads the next directory entry.
 
-read_dir_entry:
+.proc read_dir_entry
     ; Have we run out of directory entries?
 
     lda directory_pos+0         ; is this the last?
     cmp directory_entries+0
-    bne :+
-    lda directory_pos+1
-    cmp directory_entries+1
-    bne :+
-    jmp reset_dir_pos
-:
+    zif_eq
+        lda directory_pos+1
+        cmp directory_entries+1
+        zif_eq
+            jmp reset_dir_pos
+        zendif
+    zendif
 
-    inc directory_pos+0         ; move to next dirent
-    bcc :+
-    inc directory_pos+1
-:
+    ; Move to the next dirent
+
+    inc directory_pos+0
+    zif_cs
+        inc directory_pos+1
+    zendif
+
+    ; Calculate offset in directory record
 
     lda directory_pos+0
     and #3
@@ -387,18 +393,19 @@ read_dir_entry:
     rol a
     rol a
 
-    bne @exit                   ; we still have a valid sector
+    ; If at the beginning of a new record, reload it from disk.
 
-    jsr calculate_dirent_sector
+    zif_eq
+        jsr calculate_dirent_sector
 
-    lda directory_buffer+0
-    ldx directory_buffer+1
-    ldy #bios::setdma
-    jsr callbios
+        lda directory_buffer+0
+        ldx directory_buffer+1
+        ldy #bios::setdma
+        jsr callbios
 
-    jsr read_sector
+        jsr read_sector
+    zendif
     
-@exit:
     clc
     adc directory_buffer+0
     sta current_dirent+0
@@ -406,43 +413,45 @@ read_dir_entry:
     adc #0
     sta current_dirent+1
     rts
+.endproc
 
 ; Marks a dirent's blocks as either used or free in the bitmap.
 ; X=1 to mark as used, X=0 to mark as free.
-update_bitmap_for_dirent:
+.proc update_bitmap_for_dirent
     stx temp+2              ; cache set/free flag
     ldy #16                 ; offset into dirent
-@blockloop:
-    cpy #32
-    bne :+
-    rts
-:
+    zloop
+        cpy #32
+        zif_eq
+            rts
+        zendif
 
-    lda blocks_on_disk+1
-    bne @bigdisk
-    
-    lda (current_dirent), y
-    sta temp+0              ; store low bye
-    lda #0
-    jmp @checkblock
-@bigdisk:
-    lda (current_dirent), y
-    sta temp+0              ; store low byte
-    iny
-    lda (current_dirent), y
-@checkblock:
-    iny
-    sta temp+1              ; store high byte
-    ora temp+0              ; check for zero
-    beq @blockloop
+        lda blocks_on_disk+1
+        bne bigdisk
+        
+        lda (current_dirent), y
+        sta temp+0              ; store low bye
+        lda #0
+        jmp checkblock
+    bigdisk:
+        lda (current_dirent), y
+        sta temp+0              ; store low byte
+        iny
+        lda (current_dirent), y
+    checkblock:
+        iny
+        sta temp+1              ; store high byte
+        ora temp+0              ; check for zero
+        zcontinueif_eq
 
-    sty temp+3
+        sty temp+3
 
-    lda temp+2              ; get set/free flag
-    jsr update_bitmap_status
+        lda temp+2              ; get set/free flag
+        jsr update_bitmap_status
 
-    ldy temp+3
-    jmp @blockloop
+        ldy temp+3
+    zendloop
+.endproc
 
 ; Given a block number in temp+0, return the address of the bitmap byte
 ; in temp+0 and the bit position in A.
@@ -552,47 +561,47 @@ check_dir_pos:
     inx
     rts
 
-home_drive:
+.proc home_drive
     lda #0
     ldy #3
-:
-    sta current_sector, y
-    dey
-    bpl :-
+    zrepeat
+        sta current_sector, y
+        dey
+    zuntil_mi
     rts
+.endproc
 
-select_active_drive:
+.proc select_active_drive
     lda active_drive
     ldy #bios::seldsk
     jsr callbios
-    bcs @exit
+    zif_cc
+        ; Copy DPH into local storage.
 
-    ; Copy DPH into local storage.
+        sta temp+0
+        stx temp+1
+        ldy #dph_copy_end - dph_copy - 1
+        zrepeat
+            lda (temp), y
+            sta dph_copy, y
+            dey
+        zuntil_mi
 
-    sta temp+0
-    stx temp+1
-    ldy #dph_copy_end - dph_copy - 1
-:
-    lda (temp), y
-    sta dph_copy, y
-    dey
-    bpl :-
+        ; Copy DPB into local storage.
 
-    ; Copy DPB into local storage.
-
-    lda dpb+0
-    sta temp+0
-    lda dpb+1
-    sta temp+1
-    ldy #dpb_copy_end - dpb_copy - 1
-:
-    lda (temp), y
-    sta dpb_copy, y
-    dey
-    bpl :-
-
-@exit:
+        lda dpb+0
+        sta temp+0
+        lda dpb+1
+        sta temp+1
+        ldy #dpb_copy_end - dpb_copy - 1
+        zrepeat
+            lda (temp), y
+            sta dpb_copy, y
+            dey
+        zuntil_mi
+    zendif
     rts
+.endproc
     
 ; --- Utilities -------------------------------------------------------------
 

@@ -2,8 +2,10 @@
 	.import __ZEROPAGE_SIZE__
 	.import __CODE_RUN__
 	.import __BSS_RUN__
+    .import __BSS_SIZE__
 
 	.byte <__ZEROPAGE_SIZE__
+    .byte >(__BSS_RUN__ + __BSS_SIZE__ - __CODE_RUN__ + 255)
 	.word __BSS_RUN__ - __CODE_RUN__
 .endmacro
 
@@ -43,7 +45,45 @@ HDR_RELOTABLE_OFFSET = 1
 .endenum
 
 .enum bdos
-	exit
+    exit_program = 0
+    console_input = 1
+    console_output = 2
+    aux_input = 3
+    aux_output = 4
+    printer_output = 5
+    direct_io = 6
+    get_io_byte = 7
+    set_io_byte = 8
+    write_string = 9
+    read_line = 10
+    console_status = 11
+    get_version = 12
+    reset_disks = 13
+    select_disk = 14
+    open_file = 15
+    close_file = 16
+    find_first = 17
+    find_next = 18
+    delete_file = 19
+    read_sequential = 20
+    write_sequential = 21
+    create_file = 22
+    rename_file = 23
+    get_login_bitmap = 24
+    get_current_drive = 25
+    set_dma_address = 26
+    get_allocation_bitmap = 27
+    set_drive_readonly = 28
+    get_readonly_bitmap = 29
+    set_file_attributes = 30
+    get_DPB = 31
+    get_set_user_number = 32
+    read_random = 33
+    write_random = 34
+    compute_file_size = 35
+    compute_random_pointer = 36
+    reset_disk = 37
+    write_random_filled = 40
 .endenum
 
 .enum bios
