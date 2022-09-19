@@ -67,7 +67,7 @@ entry_EXIT:
     ldx #$ff                ; reset stack point
     txs
 
-    jsr entry_RESETDISK
+    jsr entry_RESET
 
     ; Open the CCP.SYS file.
 
@@ -83,7 +83,9 @@ entry_EXIT:
 
     jsr bios_gettpa         ; bottom of TPA page number in A
     sta user_dma+1
+    pha
     lda #0
+    pha
     sta user_dma+0
 
     zloop
@@ -102,12 +104,12 @@ entry_EXIT:
 
     ; Patch the BIOS entry vector.
 
-    jsr bios_gettpa         ; bottom of TPA page number in A
-    sta temp+1
-    lda #0
+    pla
     sta temp+0
+    pla
+    sta temp+1
     
-    ldy #5
+    ldy #comhdr::bdos
     lda #<ENTRY
     sta (temp), y
     iny
@@ -123,13 +125,14 @@ entry_EXIT:
 
     ; Execute it.
 
-    lda #7
+    lda #comhdr::entry
     clc
     adc temp+0
     sta temp+0
     zif_cs
         inc temp+1
     zendif
+calltemp:
     jmp (temp)
 
     .data
@@ -142,15 +145,112 @@ ccp_fcb:
 
 ; --- BDOS entrypoint -------------------------------------------------------
 
+    .code
 .proc ENTRY
-    debug "entry"
+    pha
+    lda jumptable_lo, y
+    sta temp+0
+    lda jumptable_hi, y
+    sta temp+1
+    pla
+    jsr calltemp
+    debug "halt"
     jmp *
+
+unimplemented:
+    debug "unimplemented"
+    jmp *
+
+jumptable_lo:
+    .lobytes entry_EXIT ; exit_program = 0
+    .lobytes unimplemented ; console_input = 1
+    .lobytes unimplemented ; console_output = 2
+    .lobytes unimplemented ; aux_input = 3
+    .lobytes unimplemented ; aux_output = 4
+    .lobytes unimplemented ; printer_output = 5
+    .lobytes unimplemented ; direct_io = 6
+    .lobytes unimplemented ; get_io_byte = 7
+    .lobytes unimplemented ; set_io_byte = 8
+    .lobytes unimplemented ; write_string = 9
+    .lobytes unimplemented ; read_line = 10
+    .lobytes unimplemented ; console_status = 11
+    .lobytes unimplemented ; get_version = 12
+    .lobytes entry_RESET ; reset_disks = 13
+    .lobytes unimplemented ; select_disk = 14
+    .lobytes entry_OPENFILE ; open_file = 15
+    .lobytes unimplemented ; close_file = 16
+    .lobytes unimplemented ; find_first = 17
+    .lobytes unimplemented ; find_next = 18
+    .lobytes unimplemented ; delete_file = 19
+    .lobytes entry_READSEQUENTIAL ; read_sequential = 20
+    .lobytes unimplemented ; write_sequential = 21
+    .lobytes unimplemented ; create_file = 22
+    .lobytes unimplemented ; rename_file = 23
+    .lobytes unimplemented ; get_login_bitmap = 24
+    .lobytes unimplemented ; get_current_drive = 25
+    .lobytes unimplemented ; set_dma_address = 26
+    .lobytes unimplemented ; get_allocation_bitmap = 27
+    .lobytes unimplemented ; set_drive_readonly = 28
+    .lobytes unimplemented ; get_readonly_bitmap = 29
+    .lobytes unimplemented ; set_file_attributes = 30
+    .lobytes unimplemented ; get_DPB = 31
+    .lobytes unimplemented ; get_set_user_number = 32
+    .lobytes unimplemented ; read_random = 33
+    .lobytes unimplemented ; write_random = 34
+    .lobytes unimplemented ; compute_file_size = 35
+    .lobytes unimplemented ; compute_random_pointer = 36
+    .lobytes unimplemented ; reset_disk = 37
+    .lobytes unimplemented ; 38
+    .lobytes unimplemented ; 39
+    .lobytes unimplemented ; write_random_filled = 40
+jumptable_hi:
+    .hibytes entry_EXIT ;exit_program = 0
+    .hibytes unimplemented ; console_input = 1
+    .hibytes unimplemented ; console_output = 2
+    .hibytes unimplemented ; aux_input = 3
+    .hibytes unimplemented ; aux_output = 4
+    .hibytes unimplemented ; printer_output = 5
+    .hibytes unimplemented ; direct_io = 6
+    .hibytes unimplemented ; get_io_byte = 7
+    .hibytes unimplemented ; set_io_byte = 8
+    .hibytes unimplemented ; write_string = 9
+    .hibytes unimplemented ; read_line = 10
+    .hibytes unimplemented ; console_status = 11
+    .hibytes unimplemented ; get_version = 12
+    .hibytes entry_RESET ; reset_disks = 13
+    .hibytes unimplemented ; select_disk = 14
+    .hibytes entry_OPENFILE ; open_file = 15
+    .hibytes unimplemented ; close_file = 16
+    .hibytes unimplemented ; find_first = 17
+    .hibytes unimplemented ; find_next = 18
+    .hibytes unimplemented ; delete_file = 19
+    .hibytes entry_READSEQUENTIAL ; read_sequential = 20
+    .hibytes unimplemented ; write_sequential = 21
+    .hibytes unimplemented ; create_file = 22
+    .hibytes unimplemented ; rename_file = 23
+    .hibytes unimplemented ; get_login_bitmap = 24
+    .hibytes unimplemented ; get_current_drive = 25
+    .hibytes unimplemented ; set_dma_address = 26
+    .hibytes unimplemented ; get_allocation_bitmap = 27
+    .hibytes unimplemented ; set_drive_readonly = 28
+    .hibytes unimplemented ; get_readonly_bitmap = 29
+    .hibytes unimplemented ; set_file_attributes = 30
+    .hibytes unimplemented ; get_DPB = 31
+    .hibytes unimplemented ; get_set_user_number = 32
+    .hibytes unimplemented ; read_random = 33
+    .hibytes unimplemented ; write_random = 34
+    .hibytes unimplemented ; compute_file_size = 35
+    .hibytes unimplemented ; compute_random_pointer = 36
+    .hibytes unimplemented ; reset_disk = 37
+    .hibytes unimplemented ; 38
+    .hibytes unimplemented ; 39
+    .hibytes unimplemented ; write_random_filled = 40
 .endproc
 
 ; --- Reset disk system -----------------------------------------------------
 
     .code
-.proc entry_RESETDISK
+.proc entry_RESET
     ; Reset transient BDOS state.
 
     ldy #(bdos_state_end - bdos_state_start - 1)

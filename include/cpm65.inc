@@ -113,5 +113,14 @@ HDR_RELOTABLE_OFFSET = 1
     alv    .word
 .endstruct
 
+.struct comhdr
+    zp_usage    .byte
+    tpa_usage   .byte
+    rel_offset  .word
+                .byte ; BDOS entrypoint jump
+    bdos        .word
+    entry       .byte
+.endstruct
+
 ; vim: filetype=asm sw=4 ts=4 et
 
