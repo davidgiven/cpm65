@@ -60,8 +60,18 @@
 	beq zloop_label
 .endmacro
 
+.macro zcontinue
+	jmp zloop_label
+.endmacro
+
 .macro zuntil_eq
 	bne zloop_label
+	zbreak_label:
+	.endscope
+.endmacro
+
+.macro zuntil_cc
+	bcs zloop_label
 	zbreak_label:
 	.endscope
 .endmacro

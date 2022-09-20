@@ -15,7 +15,7 @@
     .zeropage
 
 current_dirent: .word 0     ; current directory entry
-fcb:            .word 0     ; current FCB being worked on
+param:          .word 0     ; current user input parameter
 dph:            .word 0     ; currently selected DPH
 
 directory_buffer:   .word 0 ; directory buffer from the DPH
@@ -54,7 +54,7 @@ debugp2:        .word 0     ; used for debug strings
     ldy #bios::setzp
     jsr callbios
     
-    jsr bios_gettpa
+    jsr bios_GETTPA
     clc
     adc #>(__BSS_RUN__ + __BSS_SIZE__ - __CODE_RUN__ + 255)
     ldy #bios::settpa
@@ -67,12 +67,22 @@ entry_EXIT:
     ldx #$ff                ; reset stack point
     txs
 
+    jsr newline
     jsr entry_RESET
 
     ; Open the CCP.SYS file.
 
+    lda #0
+    sta ccp_fcb + fcb::ex
+    sta ccp_fcb + fcb::s2
+    sta ccp_fcb + fcb::cr
+    lda #1
+    sta ccp_fcb + fcb::dr
+
     lda #<ccp_fcb
-    ldx #>ccp_fcb
+    sta param+0
+    lda #>ccp_fcb
+    sta param+1
     jsr entry_OPENFILE
     zif_cs
         debug "Couldn't open CCP"
@@ -81,7 +91,7 @@ entry_EXIT:
 
     ; Read the CCP into memory.
 
-    jsr bios_gettpa         ; bottom of TPA page number in A
+    jsr bios_GETTPA         ; bottom of TPA page number in A
     sta user_dma+1
     pha
     lda #0
@@ -89,8 +99,7 @@ entry_EXIT:
     sta user_dma+0
 
     zloop
-        lda #<ccp_fcb
-        ldx #>ccp_fcb
+        ; param remains set from above
         jsr internal_READSEQUENTIAL
         zbreakif_cs
 
@@ -147,15 +156,18 @@ ccp_fcb:
 
     .code
 .proc ENTRY
-    pha
+    sta param+0
+    stx param+1
+
     lda jumptable_lo, y
     sta temp+0
     lda jumptable_hi, y
     sta temp+1
-    pla
-    jsr calltemp
-    debug "halt"
-    jmp *
+    jsr calltemp            ; preserve carry from this!
+
+    lda param+0
+    ldx param+1
+    rts
 
 unimplemented:
     debug "unimplemented"
@@ -163,16 +175,16 @@ unimplemented:
 
 jumptable_lo:
     .lobytes entry_EXIT ; exit_program = 0
-    .lobytes unimplemented ; console_input = 1
-    .lobytes unimplemented ; console_output = 2
+    .lobytes entry_CONIN ; console_input = 1
+    .lobytes entry_CONOUT ; console_output = 2
     .lobytes unimplemented ; aux_input = 3
     .lobytes unimplemented ; aux_output = 4
     .lobytes unimplemented ; printer_output = 5
     .lobytes unimplemented ; direct_io = 6
     .lobytes unimplemented ; get_io_byte = 7
     .lobytes unimplemented ; set_io_byte = 8
-    .lobytes unimplemented ; write_string = 9
-    .lobytes unimplemented ; read_line = 10
+    .lobytes entry_WRITESTRING ; write_string = 9
+    .lobytes entry_READLINE ; read_line = 10
     .lobytes unimplemented ; console_status = 11
     .lobytes unimplemented ; get_version = 12
     .lobytes entry_RESET ; reset_disks = 13
@@ -205,16 +217,16 @@ jumptable_lo:
     .lobytes unimplemented ; write_random_filled = 40
 jumptable_hi:
     .hibytes entry_EXIT ;exit_program = 0
-    .hibytes unimplemented ; console_input = 1
-    .hibytes unimplemented ; console_output = 2
+    .hibytes entry_CONIN ; console_input = 1
+    .hibytes entry_CONOUT ; console_output = 2
     .hibytes unimplemented ; aux_input = 3
     .hibytes unimplemented ; aux_output = 4
     .hibytes unimplemented ; printer_output = 5
     .hibytes unimplemented ; direct_io = 6
     .hibytes unimplemented ; get_io_byte = 7
     .hibytes unimplemented ; set_io_byte = 8
-    .hibytes unimplemented ; write_string = 9
-    .hibytes unimplemented ; read_line = 10
+    .hibytes entry_WRITESTRING ; write_string = 9
+    .hibytes entry_READLINE ; read_line = 10
     .hibytes unimplemented ; console_status = 11
     .hibytes unimplemented ; get_version = 12
     .hibytes entry_RESET ; reset_disks = 13
@@ -247,6 +259,274 @@ jumptable_hi:
     .hibytes unimplemented ; write_random_filled = 40
 .endproc
 
+; --- Console ---------------------------------------------------------------
+
+    .code
+.proc entry_CONIN
+    lda buffered_key
+    zif_eq
+        jsr bios_CONIN
+        tax
+        jmp exit
+    zendif
+    ldx #0
+    stx buffered_key
+exit:
+    stx param+0
+    cpx #31
+    zif_cs
+        jsr entry_CONOUT
+    zendif
+    rts
+.endproc
+
+    .code
+; Prints the character in param+0.
+.proc entry_CONOUT
+    lda param+0
+    ; fall through
+.endproc
+.proc internal_CONOUT
+    pha
+    jsr bios_CONST
+    cmp #0
+    zif_ne                  ; is there a key pending?
+        jsr bios_CONIN      ; read it
+        cmp #19             ; was it ^S?
+        zif_eq
+            jsr bios_CONIN  ; wait for another key press
+            cmp #3
+            beq reboot
+            jmp continue
+        zendif
+        cmp #3              ; was it ^C?
+        beq reboot
+        sta buffered_key
+    zendif
+continue:
+    pla
+        
+    ; Actually print it.
+
+    jsr bios_CONOUT
+
+    ; Compute column position?
+
+    ldx column_position
+    cmp #8
+    beq backspace
+    cmp #127
+    beq backspace
+    cmp #9
+    zif_eq
+        inx
+        tax
+        and #<~7
+        sta column_position
+        rts
+    zendif
+    cmp #32
+    bcc zero_column
+    inx
+    jmp exit
+
+backspace:
+    dex
+    bpl exit
+zero_column:
+    ldx #0
+exit:
+    stx column_position
+    rts
+reboot:
+    jmp entry_EXIT
+.endproc
+
+.proc entry_WRITESTRING
+    zloop
+        ldy #0
+        lda (param), y
+        zbreakif_eq
+        cmp #'$'
+        zbreakif_eq
+
+        jsr internal_CONOUT
+
+        inc param+0
+        zif_mi
+            inc param+1
+        zendif
+    zendloop
+    rts
+.endproc
+
+; Read a line from the keyboard. Buffer is at param, size at param+0.
+.proc entry_READLINE
+    start_column_position = temp+0
+    buffer_pos = temp+1
+    buffer_max = temp+2
+    count = temp+3
+
+    lda column_position
+    sta start_column_position
+    lda #1
+    sta buffer_pos
+    ldy #0
+    lda (param), y
+    sta buffer_max
+
+    zloop
+        ; Read a key without echo.
+
+        lda buffered_key
+        zif_eq
+            jsr bios_CONIN
+            tax
+        zendif
+        ldx #0
+        stx buffered_key
+        
+        ; Finished?
+
+        cmp #13
+        zbreakif_eq
+        cmp #10
+        zbreakif_eq
+
+        ; Delete?
+
+        cmp #8
+        zif_eq
+            lda #127
+        zendif
+        cmp #127
+        zif_eq
+            ldy buffer_pos
+            cpy #1
+            zif_ne
+                dec buffer_pos
+                dec column_position
+                jsr bios_CONOUT
+            zendif
+            lda #0                  ; ignore
+        zendif
+        
+        ; Reboot?
+
+        cmp #3
+        zif_eq
+            ldy buffer_pos
+            cpy #1
+            zif_eq
+                jmp entry_EXIT
+            zendif
+            lda #0                  ; ignore
+        zendif
+
+        ; Retype line?
+
+        cmp #18
+        zif_eq
+            jsr retype
+            zcontinue
+        zendif
+
+        ; Delete line?
+
+        cmp #21
+        zif_eq
+            jsr deleteline
+            zcontinue
+        zendif
+
+        ; Graphic character?
+
+        cmp #32
+        zif_cs
+            ldy buffer_max
+            cpy buffer_pos
+            zif_cs
+                ldy buffer_pos
+                sta (param), y
+                jsr bios_CONOUT
+                inc buffer_pos
+                inc column_position
+            zendif
+        zendif
+    zendloop
+
+    ldy #0
+    lda buffer_pos
+    sec
+    sbc #1
+    sta (param), y
+    rts
+
+retype:
+    lda #13
+    jsr bios_CONOUT
+    lda #10
+    jsr bios_CONOUT
+    lda #0
+    sta column_position
+    zloop
+        lda column_position
+        cmp start_column_position
+        zbreakif_eq
+        lda #' '
+        jsr bios_CONOUT
+        inc column_position
+    zendloop
+
+    ldy #1
+    sty count
+    zloop
+        ldy count
+        cpy buffer_pos
+        zbreakif_eq
+
+        lda (param), y
+        jsr bios_CONOUT
+        inc column_position
+        inc count
+    zendloop
+    rts
+
+deleteline:
+    lda #13
+    jsr bios_CONOUT
+    lda #10
+    jsr bios_CONOUT
+    lda #0
+    sta column_position
+    zloop
+        lda column_position
+        cmp start_column_position
+        zbreakif_eq
+        lda #' '
+        jsr bios_CONOUT
+        inc column_position
+    zendloop
+    lda column_position
+    zif_ne
+        lda #127
+        jsr bios_CONOUT
+    zendif
+    lda #'\'
+    jsr bios_CONOUT
+
+    lda #1
+    sta buffer_pos
+    rts
+.endproc
+
+.proc newline
+    lda #13
+    jsr internal_CONOUT
+    lda #10
+    jmp internal_CONOUT
+.endproc
+
 ; --- Reset disk system -----------------------------------------------------
 
     .code
@@ -268,7 +548,7 @@ jumptable_hi:
 
 ; --- Open a file -----------------------------------------------------------
 
-; Opens a file; the FCB is in XA.
+; Opens a file; the FCB is in param.
 ; Returns C is error; the code is in A.
 
 entry_OPENFILE:
@@ -280,7 +560,7 @@ entry_OPENFILE:
         ; We have a matching dirent!
 
         ldy #fcb::ex
-        lda (fcb), y        ; fetch user extent byte
+        lda (param), y          ; fetch user extent byte
         sta tempb
 
         ; Copy the dirent to FCB.
@@ -288,21 +568,21 @@ entry_OPENFILE:
         ldy #31
         zrepeat
             lda (current_dirent), y
-            sta (fcb), y
+            sta (param), y
             dey
         zuntil_mi
 
         ; Set bit 7 of S2 to indicate that this file hasn't been modified.
 
         ldy #fcb::s2
-        lda (fcb), y
+        lda (param), y
         ora #$80
-        sta (fcb), y
+        sta (param), y
 
         ; Compare the user extent byte with the dirent.
 
         ldy #fcb::ex
-        lda (fcb), y
+        lda (param), y
         cmp tempb                   ; dirent extent - fcb extent
         zif_ne
             zif_cs
@@ -314,7 +594,7 @@ entry_OPENFILE:
             lda #$80                ; middle of the file, record count full
         setrc:
             ldy #fcb::rc
-            sta (fcb), y            ; set extent record count
+            sta (param), y            ; set extent record count
         zendif
 
         clc
@@ -325,26 +605,17 @@ entry_OPENFILE:
 ; Sets up a user-supplied FCB.
 
 .proc new_user_fcb
-    sta fcb+0
-    stx fcb+1
-    
     ldy #fcb::s2
     lda #0
-    sta (fcb), y
-
-    jmp select_fcb_drive
+    sta (param), y
 .endproc
+    ; falls through
 
 ; Selects the drive referred to in the FCB.
 
-.proc old_user_fcb
-    sta fcb+0
-    stx fcb+1
-    ; fall through
-.endproc
-.proc select_fcb_drive
+.proc convert_user_fcb
     ldy #fcb::dr
-    lda (fcb), y        ; get drive byte
+    lda (param), y        ; get drive byte
     sta old_fcb_drive           ; to restore on exit
     and #%00011111              ; extract drive
     tax
@@ -355,7 +626,7 @@ entry_OPENFILE:
     txa
     sta active_drive            ; set the active drive
     ora current_user
-    sta (fcb), y        ; update FCB
+    sta (param), y        ; update FCB
     
     jmp select_active_drive
 .endproc
@@ -364,13 +635,13 @@ entry_OPENFILE:
 ; --- Read next sequential record -------------------------------------------
 
 .proc entry_READSEQUENTIAL
-    jsr old_user_fcb
+    jsr convert_user_fcb
 .endproc
 .proc internal_READSEQUENTIAL
     ldy #fcb::cr
-    lda (fcb), y
+    lda (param), y
     ldy #fcb::rc
-    cmp (fcb), y
+    cmp (param), y
     zif_eq
         cpy #$80                ; is this extent full?
         bne eof                 ; no, we've reached the end of the file
@@ -401,7 +672,7 @@ entry_OPENFILE:
     ; Add on record number.
 
     ldy #fcb::cr
-    lda (fcb), y
+    lda (param), y
     and block_mask              ; get offset in block
 
     clc
@@ -417,10 +688,10 @@ entry_OPENFILE:
     ; Move the FCB on to the next record, for next time.
 
     ; ldy #fcb::cr              ; still set from last time
-    lda (fcb), y
+    lda (param), y
     clc
     adc #1
-    sta (fcb), y
+    sta (param), y
 
     ; Actually do the read!
 
@@ -431,6 +702,7 @@ entry_OPENFILE:
 
 eof:
     lda #1                      ; = EOF
+    sta param+0                 ; to return
     sec
     rts
 .endproc
@@ -440,16 +712,16 @@ eof:
     jsr get_fcb_block_index     ; gets index in Y
     ldx blocks_on_disk+1        ; are we a big disk?
     zif_ne                      ; yes
-        lda (fcb), y
+        lda (param), y
         pha
         iny
-        lda (fcb), y
+        lda (param), y
         tax
         pla
         rts
     zendif
 
-    lda (fcb), y
+    lda (param), y
     ldx #0
     rts
 .endproc
@@ -457,7 +729,7 @@ eof:
 ; Return offset to the current block in the FCB in Y.
 .proc get_fcb_block_index
     ldy #fcb::cr                ; get current record
-    lda (fcb), y
+    lda (param), y
 
     ldx block_shift             ; get block index
     zrepeat
@@ -498,7 +770,7 @@ find_first:
 
     lda #$e5
     ldy #0
-    cmp (fcb), y
+    cmp (param), y
     zif_ne
         ; If current_dirent is higher than cdrmax, we know that
         ; the rest of the directory is empty, so give up now.
@@ -513,7 +785,7 @@ find_first:
 
     ldy #0
     zrepeat
-        lda (fcb), y
+        lda (param), y
         cmp #'?'                ; wildcard
         beq @same_characters    ; ...skip comparing this byte
         cpy #fcb::s1            ; don't care about byte 13
@@ -526,7 +798,7 @@ find_first:
         lda extent_mask
         eor #$ff                ; inverted extent mask
         pha
-        and (fcb), y    ; mask FCB extent
+        and (param), y    ; mask FCB extent
         sta tempb
         pla
         and (current_dirent),y  ; mask dirent extent
@@ -1012,11 +1284,19 @@ callbios:
 bios = callbios + 1
     jmp 0
 
-bios_conout:
+bios_CONIN:
+    ldy #bios::conin
+    jmp callbios
+
+bios_CONOUT:
     ldy #bios::conout
     jmp callbios
 
-bios_gettpa:
+bios_CONST:
+    ldy #bios::const
+    jmp callbios
+
+bios_GETTPA:
     ldy #bios::gettpa
     jmp callbios
 
@@ -1042,7 +1322,7 @@ pdebug:
     lda (debugp1), y
     beq @exit
 
-    jsr bios_conout
+    jsr bios_CONOUT
     jmp @loop
 
 @exit:
@@ -1078,6 +1358,10 @@ login_vector:           .word 0
 directory_pos:          .word 0
 user_dma:               .word 0
 current_sector:         .res 3  ; 24-bit sector number
+
+buffered_key:           .byte 0
+output_paused:          .byte 0 ; top bit set if paused
+column_position:        .byte 0
 bdos_state_end:
 
 ; Copy of DPB of currently selected drive.

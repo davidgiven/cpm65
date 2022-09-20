@@ -50,6 +50,12 @@ ptr: .word 0
     ldx mem_base
     jsr entry_RELOCATE
 
+    ; Close any existing files.
+
+    lda #0
+    tay
+    jsr OSFIND
+
     ; Open the file system image file.
 
     lda #$c0            ; open file for r/w
@@ -84,7 +90,7 @@ bdos_filename:
     .byte "BDOS", 13
 
 banner:
-    .byte 13, 10, 13, 10, "56-M/PC" ; reversed!
+    .byte 13, 10, "56-M/PC" ; reversed!
 banner_end:
 
 cpmfs_filename:
@@ -136,7 +142,14 @@ biostable_hi:
 .proc entry_CONIN
     lda pending_key
     zif_eq
-        jsr OSRDCH
+        zrepeat
+            lda #$81
+            ldx #$ff
+            ldy #$7f
+            jsr OSBYTE
+        zuntil_cc
+        txa
+        rts
     zendif
 
     ldx #0
@@ -144,7 +157,7 @@ biostable_hi:
     rts
 .endproc
 
-entry_CONST:
+.proc entry_CONST
     lda pending_key
     bne @yes
     lda #$81
@@ -152,13 +165,14 @@ entry_CONST:
     ldy #0
     jsr OSBYTE
     bcs @no
-    sta pending_key
+    stx pending_key
 @yes:
     lda #$ff
     rts
 @no:
     lda #0
     rts
+.endproc
 
 ; Sets the current DMA address.
 
@@ -437,7 +451,7 @@ zp_end:  .byte $90
 
 ; DPH for drive 0 (our only drive)
 
-dph: define_drive 40*32, 2048, 64, 0
+dph: define_drive 40*32, 1024, 64, 0
 
     .bss
 mem_base: .byte 0
