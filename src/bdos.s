@@ -159,14 +159,33 @@ ccp_fcb:
     sta param+0
     stx param+1
 
+    lda #$ff
+    sta old_fcb_drive       ; mark FCB as not fiddled with
+
     lda jumptable_lo, y
     sta temp+0
     lda jumptable_hi, y
     sta temp+1
     jsr calltemp            ; preserve carry from this!
+    php
+    pha
+    txa
+    pha
+    tya
+    pha
 
-    lda param+0
-    ldx param+1
+    lda old_fcb_drive
+    zif_pl
+        ldy #fcb::dr
+        sta (param), y      ; restore user FCB
+    zendif
+
+    pla
+    tay
+    pla
+    tax
+    pla
+    plp
     rts
 
 unimplemented:
@@ -200,7 +219,7 @@ jumptable_lo:
     .lobytes unimplemented ; rename_file = 23
     .lobytes unimplemented ; get_login_bitmap = 24
     .lobytes entry_GETDRIVE ; get_current_drive = 25
-    .lobytes unimplemented ; set_dma_address = 26
+    .lobytes entry_SETDMAADDRESS ; set_dma_address = 26
     .lobytes unimplemented ; get_allocation_bitmap = 27
     .lobytes unimplemented ; set_drive_readonly = 28
     .lobytes unimplemented ; get_readonly_bitmap = 29
@@ -242,7 +261,7 @@ jumptable_hi:
     .hibytes unimplemented ; rename_file = 23
     .hibytes unimplemented ; get_login_bitmap = 24
     .hibytes entry_GETDRIVE ; get_current_drive = 25
-    .hibytes unimplemented ; set_dma_address = 26
+    .hibytes entry_SETDMAADDRESS ; set_dma_address = 26
     .hibytes unimplemented ; get_allocation_bitmap = 27
     .hibytes unimplemented ; set_drive_readonly = 28
     .hibytes unimplemented ; get_readonly_bitmap = 29
@@ -272,8 +291,9 @@ jumptable_hi:
     ldx #0
     stx buffered_key
 exit:
-    stx param+0
-    cpx #31
+    txa
+    pha
+    cmp #31
     zif_cs
         jsr entry_CONOUT
     zendif
@@ -523,6 +543,14 @@ indent_new_line:
     rts
 .endproc
 
+.proc entry_SETDMAADDRESS
+    lda param+0
+    sta user_dma+0
+    lda param+1
+    sta user_dma+1
+    rts
+.endproc
+
 ; --- Open a file -----------------------------------------------------------
 
 ; Opens a file; the FCB is in param.
@@ -589,7 +617,7 @@ entry_OPENFILE:
 
 .proc convert_user_fcb
     ldy #fcb::dr
-    lda (param), y        ; get drive byte
+    lda (param), y              ; get drive byte
     sta old_fcb_drive           ; to restore on exit
     and #%00011111              ; extract drive
     tax
@@ -600,11 +628,10 @@ entry_OPENFILE:
     txa
     sta active_drive            ; set the active drive
     ora current_user
-    sta (param), y        ; update FCB
+    sta (param), y              ; update FCB
     
     jmp select_active_drive
 .endproc
-
 
 ; --- Read next sequential record -------------------------------------------
 
@@ -676,7 +703,6 @@ entry_OPENFILE:
 
 eof:
     lda #1                      ; = EOF
-    sta param+0                 ; to return
     sec
     rts
 .endproc
