@@ -1,34 +1,48 @@
-.macro zif_eq
+.macro zifbase
 	.scope
-	bne zendif_label
+	zhaselse .set 0
+.endmacro
+
+.macro zif_eq
+	zifbase
+	bne zfalse_label
 .endmacro
 
 .macro zif_ne
-	.scope
-	beq zendif_label
+	zifbase
+	beq zfalse_label
 .endmacro
 
 .macro zif_cc
-	.scope
-	bcs zendif_label
+	zifbase
+	bcs zfalse_label
 .endmacro
 
 .macro zif_cs
-	.scope
-	bcc zendif_label
+	zifbase
+	bcc zfalse_label
 .endmacro
 
 .macro zif_mi
-	.scope
-	bpl zendif_label
+	zifbase
+	bpl zfalse_label
 .endmacro
 
 .macro zif_pl
-	.scope
-	bmi zendif_label
+	zifbase
+	bmi zfalse_label
+.endmacro
+
+.macro zelse
+	zhaselse .set 1
+	jmp zendif_label
+	zfalse_label:
 .endmacro
 
 .macro zendif
+	.if zhaselse = 0
+		zfalse_label:
+	.endif
 	zendif_label:
 	.endscope
 .endmacro
@@ -52,6 +66,10 @@
 	beq zbreak_label
 .endmacro
 
+.macro zbreakif_ne
+	bne zbreak_label
+.endmacro
+
 .macro zbreakif_cs
 	bcs zbreak_label
 .endmacro
@@ -66,6 +84,12 @@
 
 .macro zuntil_eq
 	bne zloop_label
+	zbreak_label:
+	.endscope
+.endmacro
+
+.macro zuntil_ne
+	beq zloop_label
 	zbreak_label:
 	.endscope
 .endmacro

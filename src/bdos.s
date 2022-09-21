@@ -67,7 +67,7 @@ entry_EXIT:
     ldx #$ff                ; reset stack point
     txs
 
-    jsr newline
+    jsr bios_NEWLINE
     jsr entry_RESET
 
     ; Open the CCP.SYS file.
@@ -199,7 +199,7 @@ jumptable_lo:
     .lobytes unimplemented ; create_file = 22
     .lobytes unimplemented ; rename_file = 23
     .lobytes unimplemented ; get_login_bitmap = 24
-    .lobytes unimplemented ; get_current_drive = 25
+    .lobytes entry_GETDRIVE ; get_current_drive = 25
     .lobytes unimplemented ; set_dma_address = 26
     .lobytes unimplemented ; get_allocation_bitmap = 27
     .lobytes unimplemented ; set_drive_readonly = 28
@@ -241,7 +241,7 @@ jumptable_hi:
     .hibytes unimplemented ; create_file = 22
     .hibytes unimplemented ; rename_file = 23
     .hibytes unimplemented ; get_login_bitmap = 24
-    .hibytes unimplemented ; get_current_drive = 25
+    .hibytes entry_GETDRIVE ; get_current_drive = 25
     .hibytes unimplemented ; set_dma_address = 26
     .hibytes unimplemented ; get_allocation_bitmap = 27
     .hibytes unimplemented ; set_drive_readonly = 28
@@ -366,9 +366,11 @@ reboot:
     buffer_pos = temp+1
     buffer_max = temp+2
     count = temp+3
+    current_column_position = temp+4
 
     lda column_position
     sta start_column_position
+    sta current_column_position
     lda #1
     sta buffer_pos
     ldy #0
@@ -386,13 +388,6 @@ reboot:
         ldx #0
         stx buffered_key
         
-        ; Finished?
-
-        cmp #13
-        zbreakif_eq
-        cmp #10
-        zbreakif_eq
-
         ; Delete?
 
         cmp #8
@@ -404,11 +399,11 @@ reboot:
             ldy buffer_pos
             cpy #1
             zif_ne
-                dec buffer_pos
-                dec column_position
+                dec z:buffer_pos
+                dec current_column_position
                 jsr bios_CONOUT
             zendif
-            lda #0                  ; ignore
+            zcontinue
         zendif
         
         ; Reboot?
@@ -420,14 +415,26 @@ reboot:
             zif_eq
                 jmp entry_EXIT
             zendif
-            lda #0                  ; ignore
+            zcontinue
         zendif
 
         ; Retype line?
 
         cmp #18
         zif_eq
-            jsr retype
+            jsr indent_new_line
+            ldy #1
+            sty count
+            zloop
+                ldy count
+                cpy buffer_pos
+                zbreakif_eq
+
+                lda (param), y
+                jsr bios_CONOUT
+                inc current_column_position
+                inc count
+            zendloop
             zcontinue
         zendif
 
@@ -435,9 +442,21 @@ reboot:
 
         cmp #21
         zif_eq
-            jsr deleteline
+            lda #'#'
+            jsr bios_CONOUT
+            jsr indent_new_line
+
+            lda #1
+            sta buffer_pos
             zcontinue
         zendif
+
+        ; Finished?
+
+        cmp #13
+        zbreakif_eq
+        cmp #10
+        zbreakif_eq
 
         ; Graphic character?
 
@@ -446,85 +465,37 @@ reboot:
             ldy buffer_max
             cpy buffer_pos
             zif_cs
-                ldy buffer_pos
+                ldy z:buffer_pos
                 sta (param), y
                 jsr bios_CONOUT
-                inc buffer_pos
-                inc column_position
+                inc z:buffer_pos
+                inc current_column_position
             zendif
         zendif
     zendloop
 
+    lda #13
+    jsr internal_CONOUT
     ldy #0
-    lda buffer_pos
-    sec
-    sbc #1
+    ldx buffer_pos
+    dex
+    txa
     sta (param), y
     rts
 
-retype:
-    lda #13
-    jsr bios_CONOUT
-    lda #10
-    jsr bios_CONOUT
+indent_new_line:
+    jsr bios_NEWLINE
     lda #0
-    sta column_position
+    sta current_column_position
     zloop
-        lda column_position
+        lda current_column_position
         cmp start_column_position
         zbreakif_eq
         lda #' '
         jsr bios_CONOUT
-        inc column_position
-    zendloop
-
-    ldy #1
-    sty count
-    zloop
-        ldy count
-        cpy buffer_pos
-        zbreakif_eq
-
-        lda (param), y
-        jsr bios_CONOUT
-        inc column_position
-        inc count
+        inc current_column_position
     zendloop
     rts
-
-deleteline:
-    lda #13
-    jsr bios_CONOUT
-    lda #10
-    jsr bios_CONOUT
-    lda #0
-    sta column_position
-    zloop
-        lda column_position
-        cmp start_column_position
-        zbreakif_eq
-        lda #' '
-        jsr bios_CONOUT
-        inc column_position
-    zendloop
-    lda column_position
-    zif_ne
-        lda #127
-        jsr bios_CONOUT
-    zendif
-    lda #'\'
-    jsr bios_CONOUT
-
-    lda #1
-    sta buffer_pos
-    rts
-.endproc
-
-.proc newline
-    lda #13
-    jsr internal_CONOUT
-    lda #10
-    jmp internal_CONOUT
 .endproc
 
 ; --- Reset disk system -----------------------------------------------------
@@ -544,6 +515,12 @@ deleteline:
 
     ; A is 0
     jmp entry_LOGINDRIVE
+.endproc
+
+.proc entry_GETDRIVE
+    lda current_drive
+    sta param+0
+    rts
 .endproc
 
 ; --- Open a file -----------------------------------------------------------
@@ -585,14 +562,11 @@ entry_OPENFILE:
         lda (param), y
         cmp tempb                   ; dirent extent - fcb extent
         zif_ne
-            zif_cs
-                ; user extent is larger
-                lda #$00            ; after the end of the file, record count empty
-                jmp setrc
+            lda #$00                ; after the end of the file, record count empty
+            zif_cc
+                ; user extent is smaller
+                lda #$80            ; middle of the file, record count full
             zendif
-            ; user extent is smaller
-            lda #$80                ; middle of the file, record count full
-        setrc:
             ldy #fcb::rc
             sta (param), y            ; set extent record count
         zendif
@@ -829,6 +803,7 @@ no_more_files:
     .bss
 find_first_count: .byte 0
     .code
+
 ; --- Login drive -----------------------------------------------------------
 
 ; Logs in active_drive. If the drive was not already logged in, the bitmap
@@ -1284,12 +1259,17 @@ callbios:
 bios = callbios + 1
     jmp 0
 
-bios_CONIN:
-    ldy #bios::conin
-    jmp callbios
-
+bios_NEWLINE:
+    lda #13
+    jsr bios_CONOUT
+    lda #10
+    ; fall through
 bios_CONOUT:
     ldy #bios::conout
+    jmp callbios
+
+bios_CONIN:
+    ldy #bios::conin
     jmp callbios
 
 bios_CONST:
