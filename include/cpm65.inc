@@ -11,6 +11,7 @@
 
 .macro CPM65_COM_HEADER
 	CPM65_BARE_HEADER
+.export BDOS
 BDOS:
 	jmp 0
 ENTRY:

@@ -225,7 +225,7 @@ jumptable_lo:
     .lobytes unimplemented ; get_readonly_bitmap = 29
     .lobytes unimplemented ; set_file_attributes = 30
     .lobytes unimplemented ; get_DPB = 31
-    .lobytes unimplemented ; get_set_user_number = 32
+    .lobytes entry_GETSETUSER ; get_set_user_number = 32
     .lobytes unimplemented ; read_random = 33
     .lobytes unimplemented ; write_random = 34
     .lobytes unimplemented ; compute_file_size = 35
@@ -267,7 +267,7 @@ jumptable_hi:
     .hibytes unimplemented ; get_readonly_bitmap = 29
     .hibytes unimplemented ; set_file_attributes = 30
     .hibytes unimplemented ; get_DPB = 31
-    .hibytes unimplemented ; get_set_user_number = 32
+    .hibytes entry_GETSETUSER ; get_set_user_number = 32
     .hibytes unimplemented ; read_random = 33
     .hibytes unimplemented ; write_random = 34
     .hibytes unimplemented ; compute_file_size = 35
@@ -540,6 +540,16 @@ indent_new_line:
 .proc entry_GETDRIVE
     lda current_drive
     sta param+0
+    rts
+.endproc
+
+.proc entry_GETSETUSER
+    lda param+0
+    zif_mi
+        lda current_user
+        rts
+    zendif
+    sta current_user
     rts
 .endproc
 

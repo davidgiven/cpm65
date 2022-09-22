@@ -1,5 +1,9 @@
 	.include "cpm65.inc"
 	.include "zif.inc"
+	.include "xfcb.inc"
+
+	.import xfcb_open
+	.import xfcb_readsequential
 
 	.zeropage
 cmdoffset:	.byte 0	; current offset into command line (not including size byte)
@@ -139,7 +143,7 @@ msg:
 
 	lda #<userfcb
 	ldx #>userfcb
-	jsr bdos_OPENFILE
+	jsr xfcb_open
 	zif_cs
 		jmp cannot_open
 	zendif
@@ -153,7 +157,7 @@ msg:
 
 		lda #<userfcb
 		ldx #>userfcb
-		jsr bdos_READSEQUENTIAL
+		jsr xfcb_readsequential
 		zbreakif_cs
 
 		ldy #128
@@ -416,14 +420,6 @@ bdos_SETDMA:
 	ldy #bdos::set_dma_address
 	jmp BDOS
 
-bdos_OPENFILE:
-	ldy #bdos::open_file
-	jmp BDOS
-
-bdos_READSEQUENTIAL:
-	ldy #bdos::read_sequential
-	jmp BDOS
-
 bdos_GETDRIVE:
 	ldy #bdos::get_current_drive
 	jmp BDOS
@@ -452,7 +448,7 @@ bdos_WRITESTRING:
 	.bss
 cmdline: .res 128	; command line buffer
 cmdfcb:  .res 33	; FCB of command
-userfcb: .res 33	; parameter FCB
+userfcb: .tag xfcb	; parameter FCB
 
 ; vim; ts=4 sw=4 et filetype=asm
 
