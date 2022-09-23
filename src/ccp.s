@@ -13,10 +13,13 @@ temp:		.word 0
 	.code
 	CPM65_COM_HEADER
 
+	jsr bdos_GETDRIVE
+	sta drive
+
 	zloop
 		; Print prompt.
 
-		jsr bdos_GETDRIVE
+		lda drive
 		clc
 		adc #'A'
 		jsr bdos_CONOUT
@@ -122,7 +125,148 @@ msg:
 .endproc
 
 .proc entry_DIR
-	rts
+	file_counter = temp+2
+	index = temp+3
+
+	; Parse the filename.
+
+	lda #<userfcb
+	ldx #>userfcb
+	jsr parse_fcb
+	zif_cs
+		jmp invalid_filename
+	zendif
+
+	; Just the drive?
+
+	lda userfcb+xfcb::f1
+	cmp #' '
+	zif_eq
+		; If empty FCB, fill with ????...
+
+		ldx #10
+		lda #'?'
+		zrepeat
+			sta userfcb+xfcb::f1, x
+			dex
+		zuntil_mi
+	zendif
+
+	; Set the drive.
+
+	ldx userfcb+xfcb::dr
+	dex
+	zif_mi
+		ldx drive
+	zendif
+	txa
+	jsr bdos_SELECTDISK
+
+	; Start iterating.
+
+	lda #0
+	sta file_counter
+
+	lda #<cmdline
+	ldx #>cmdline
+	jsr bdos_SETDMA
+
+	lda #<userfcb
+	ldx #>userfcb
+	jsr bdos_FINDFIRST
+	bcs exit
+
+	zrepeat
+		; Get the offset of the directory item.
+
+		asl a
+		asl a
+		asl a
+		asl a
+		asl a
+		clc
+		adc #<cmdline
+		sta temp+0
+		ldx #>cmdline
+		zif_cs
+			inx
+		zendif
+		stx temp+1
+
+		; Skip if this is a system file.
+
+		ldy #fcb::t2
+		lda (temp), y
+		and #$80				; check attribute bit
+		zif_eq
+			; Line header.
+
+			ldx file_counter
+			txa
+			inx
+			stx file_counter
+			and #$01
+			zif_eq
+				jsr newline
+
+				jsr bdos_GETDRIVE
+				clc
+				adc #'A'
+				jsr bdos_CONOUT
+			zendif
+
+			lda #':'
+			jsr bdos_CONOUT
+			jsr space
+			
+			; Print the filename.
+
+			lda #8
+			sta index
+			zrepeat
+				inc temp+0
+				zif_eq
+					inc temp+1
+				zendif
+
+				ldy #0
+				lda (temp), y
+				jsr bdos_CONOUT
+
+				dec index
+			zuntil_eq
+
+			jsr space
+
+			; Print the extension.
+
+			lda #3
+			sta index
+			zrepeat
+				inc temp+0
+				zif_eq
+					inc temp+1
+				zendif
+
+				ldy #0
+				lda (temp), y
+				jsr bdos_CONOUT
+
+				dec index
+			zuntil_eq
+
+			jsr space
+		zendif
+
+		; Get the next directory entry.
+
+		lda #<userfcb
+		ldx #>userfcb
+		jsr bdos_FINDNEXT
+	zuntil_cs
+
+exit:
+	jmp newline
 .endproc
 
 .proc entry_ERA
@@ -264,7 +408,7 @@ cmdtable:
 	ldx cmdoffset
 	lda cmdline+1, x			; drive letter
 	zif_eq
-		sec
+		clc
 		rts
 	zendif
 	ldy cmdline+2, x
@@ -420,6 +564,10 @@ bdos_SETDMA:
 	ldy #bdos::set_dma_address
 	jmp BDOS
 
+bdos_SELECTDISK:
+	ldy #bdos::select_disk
+	jmp BDOS
+
 bdos_GETDRIVE:
 	ldy #bdos::get_current_drive
 	jmp BDOS
@@ -427,6 +575,10 @@ bdos_GETDRIVE:
 bdos_CONIN:
 	ldy #bdos::console_input
 	jmp BDOS
+
+space:
+	lda #' '
+	jmp bdos_CONOUT
 
 newline:
 	lda #13
@@ -445,7 +597,16 @@ bdos_WRITESTRING:
 	ldy #bdos::write_string
 	jmp BDOS
 
+bdos_FINDFIRST:
+	ldy #bdos::find_first
+	jmp BDOS
+
+bdos_FINDNEXT:
+	ldy #bdos::find_next
+	jmp BDOS
+
 	.bss
+drive:	 .res 1		; current drive
 cmdline: .res 128	; command line buffer
 cmdfcb:  .res 33	; FCB of command
 userfcb: .tag xfcb	; parameter FCB

@@ -58,6 +58,12 @@
 	.endscope
 .endmacro
 
+.macro zuntil_cs
+	bcc zloop_label
+	zbreak_label:
+	.endscope
+.endmacro
+
 .macro zbreak
 	jmp zbreak_label
 .endmacro

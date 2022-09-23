@@ -207,11 +207,11 @@ jumptable_lo:
     .lobytes unimplemented ; console_status = 11
     .lobytes unimplemented ; get_version = 12
     .lobytes entry_RESET ; reset_disks = 13
-    .lobytes unimplemented ; select_disk = 14
+    .lobytes entry_LOGINDRIVE ; select_disk = 14
     .lobytes entry_OPENFILE ; open_file = 15
     .lobytes unimplemented ; close_file = 16
-    .lobytes unimplemented ; find_first = 17
-    .lobytes unimplemented ; find_next = 18
+    .lobytes entry_FINDFIRST ; find_first = 17
+    .lobytes entry_FINDNEXT ; find_next = 18
     .lobytes unimplemented ; delete_file = 19
     .lobytes entry_READSEQUENTIAL ; read_sequential = 20
     .lobytes unimplemented ; write_sequential = 21
@@ -249,11 +249,11 @@ jumptable_hi:
     .hibytes unimplemented ; console_status = 11
     .hibytes unimplemented ; get_version = 12
     .hibytes entry_RESET ; reset_disks = 13
-    .hibytes unimplemented ; select_disk = 14
+    .hibytes entry_LOGINDRIVE ; select_disk = 14
     .hibytes entry_OPENFILE ; open_file = 15
     .hibytes unimplemented ; close_file = 16
-    .hibytes unimplemented ; find_first = 17
-    .hibytes unimplemented ; find_next = 18
+    .hibytes entry_FINDFIRST ; find_first = 17
+    .hibytes entry_FINDNEXT ; find_next = 18
     .hibytes unimplemented ; delete_file = 19
     .hibytes entry_READSEQUENTIAL ; read_sequential = 20
     .hibytes unimplemented ; write_sequential = 21
@@ -373,7 +373,7 @@ reboot:
         jsr internal_CONOUT
 
         inc param+0
-        zif_mi
+        zif_eq
             inc param+1
         zendif
     zendloop
@@ -534,7 +534,7 @@ indent_new_line:
     ; Log in drive A.
 
     ; A is 0
-    jmp entry_LOGINDRIVE
+    jmp internal_LOGINDRIVE
 .endproc
 
 .proc entry_GETDRIVE
@@ -637,7 +637,7 @@ entry_OPENFILE:
     zendif
     txa
     sta active_drive            ; set the active drive
-    ora current_user
+    lda current_user
     sta (param), y              ; update FCB
     
     jmp select_active_drive
@@ -765,12 +765,92 @@ eof:
 ; searching.
 ; Returns C on error.
 
+entry_FINDFIRST:
+    jsr setup_fcb_for_find
+    bcs find_error
+    ; A = number of bytes to search
+    jsr find_first
+    bcs find_error
+    jmp copy_result_of_find
+
+entry_FINDNEXT:
+    jsr setup_fcb_for_find
+    bcs find_error
+    ; A = number of bytes to search
+    jsr find_next
+    bcs find_error
+    jmp copy_result_of_find
+
+find_error:
+    rts
+
+; Returns the number of bytes to search.
+.proc setup_fcb_for_find
+    ldy #fcb::dr
+    lda (param), y
+    cmp #'?'
+    zif_eq                      ; special wildcard search?
+        sta old_fcb_drive
+
+        lda current_user
+        sta (param), y          ; update FCB
+
+        lda #fcb::dr+1          ; number of bytes to search
+    zelse
+        jsr convert_user_fcb
+        bcs error
+
+        ldy #fcb::ex
+        lda (param), y
+        cmp #'?'
+        zif_eq                  ; get all extents?
+            lda #0
+            ldy #fcb::s2
+            sta (param), y      ; clear module byte in FCB
+        zendif
+
+        lda #fcb::s2+1          ; number of bytes to search
+    zendif
+error:
+    rts
+.endproc
+
+.proc copy_result_of_find
+    zif_cc
+        ; Copy the directory buffer into the DMA buffer.
+
+        lda user_dma+0
+        sta temp+0
+        lda user_dma+1
+        sta temp+1
+
+        ldy #127
+        zrepeat
+            lda (directory_buffer), y
+            sta (temp), y
+            dey
+        zuntil_mi
+
+        ; Calculate the offset into the DMA buffer.
+
+        lda current_dirent+0
+        sec
+        sbc directory_buffer+0
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        clc
+    zendif
+    rts
+.endproc
+
 find_first:
     sta find_first_count
     jsr home_drive
     jsr reset_dir_pos
     ; fall through
-
 .proc find_next
     jsr read_dir_entry
     jsr check_dir_pos
@@ -846,6 +926,9 @@ find_first_count: .byte 0
 ; is recomputed. In all cases the drive is selected.
 
 .proc entry_LOGINDRIVE
+    lda param+0
+.endproc
+.proc internal_LOGINDRIVE
     ; Select the drive.
 
     jsr select_active_drive
@@ -1201,6 +1284,8 @@ check_dir_pos:
             sta dpb_copy, y
             dey
         zuntil_mi
+
+        clc
     zendif
     rts
 .endproc
