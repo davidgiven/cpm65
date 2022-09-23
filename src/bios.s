@@ -350,22 +350,6 @@ relocate_loop:
     rts
 .endproc
 
-print_h8:
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr print_h4
-    pla
-print_h4:
-    and #%00001111
-    ora #'0'
-    cmp #'9'+1
-    bcc :+
-    adc #6
-:   jmp OSWRCH
-
     .data
 zp_base: .byte <(__ZEROPAGE_LOAD__ + __ZEROPAGE_SIZE__)
 zp_end:  .byte $90

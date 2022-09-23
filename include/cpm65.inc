@@ -84,6 +84,7 @@ HDR_RELOTABLE_OFFSET = 1
     compute_file_size = 35
     compute_random_pointer = 36
     reset_disk = 37
+    get_bios = 38
     write_random_filled = 40
 .endenum
 

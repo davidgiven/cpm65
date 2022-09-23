@@ -13,6 +13,11 @@ temp:		.word 0
 	.code
 	CPM65_COM_HEADER
 
+	ldy #bdos::get_bios
+	jsr BDOS
+	sta bios+0
+	stx bios+1
+
 	jsr bdos_GETDRIVE
 	sta drive
 
@@ -104,7 +109,7 @@ commands_lo:
 	.lobytes entry_DIR - 1
 	.lobytes entry_ERA - 1
 	.lobytes entry_TYPE - 1
-	.lobytes entry_SAVE - 1
+	.lobytes entry_FREE - 1
 	.lobytes entry_REN - 1
 	.lobytes entry_USER - 1
 	.lobytes entry_TRANSIENT - 1
@@ -112,7 +117,7 @@ commands_hi:
 	.hibytes entry_DIR - 1
 	.hibytes entry_ERA - 1
 	.hibytes entry_TYPE - 1
-	.hibytes entry_SAVE - 1
+	.hibytes entry_FREE - 1
 	.hibytes entry_REN - 1
 	.hibytes entry_USER - 1
 	.hibytes entry_TRANSIENT - 1
@@ -331,8 +336,70 @@ exit:
 	jmp newline
 .endproc
 
-.proc entry_SAVE
+.proc entry_FREE
+	lda #<msg_zp
+	ldx #>msg_zp
+	jsr bdos_WRITESTRING
+
+	jsr bios_GETZP
+	sta temp+0
+	stx temp+1
+	jsr print_hex_number
+	jsr print_to
+	lda temp+1
+	jsr print_hex_number
+	jsr print_free
+	lda temp+1
+	sec
+	sbc temp+0
+	jsr print_hex_number
+	jsr newline
+
+	lda #<msg_tpa
+	ldx #>msg_tpa
+	jsr bdos_WRITESTRING
+
+	jsr bios_GETTPA
+	sta temp+0
+	stx temp+1
+	jsr print_hex_number
+	jsr print_zero
+	jsr print_to
+	lda temp+1
+	jsr print_hex_number
+	jsr print_zero
+	jsr print_free
+	lda temp+1
+	sec
+	sbc temp+0
+	jsr print_hex_number
+	jsr print_zero
+	jsr newline
+
 	rts
+
+print_zero:
+	lda #0
+	jmp print_hex_number
+
+print_free:
+	lda #<msg_free
+	ldx #>msg_free
+	jmp bdos_WRITESTRING
+
+print_to:
+	lda #<msg_to
+	ldx #>msg_to
+	jmp bdos_WRITESTRING
+
+msg_zp:
+	.byte "Zero page: ", 0
+msg_tpa:
+	.byte "TPA: ", 0
+msg_to:
+	.byte " to ", 0
+msg_free:
+	.byte ". Free: ", 0
 .endproc
 
 .proc entry_REN
@@ -393,7 +460,7 @@ cmdtable:
 	.byte "DIR "
 	.byte "ERA "
 	.byte "TYPE"
-	.byte "SAVE"
+	.byte "FREE"
 	.byte "REN "
 	.byte "USER"
 	.byte 0
@@ -630,6 +697,28 @@ is_valid_filename_char:
 	rts
 .endproc
 
+; Prints an 8-bit hex number in A.
+.proc print_hex_number
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr h4
+    pla
+h4:
+    and #%00001111
+    ora #'0'
+    cmp #'9'+1
+	zif_cs
+		adc #6
+	zendif
+   	pha
+	jsr bdos_CONOUT
+	pla
+	rts
+.endproc
+
 bdos_SETDMA:
 	ldy #bdos::set_dma_address
 	jmp BDOS
@@ -679,7 +768,16 @@ bdos_FINDNEXT:
 	ldy #bdos::find_next
 	jmp BDOS
 
+bios_GETZP:
+    ldy #bios::getzp
+    jmp (bios)
+
+bios_GETTPA:
+    ldy #bios::gettpa
+    jmp (bios)
+
 	.bss
+bios:	 .res 2		; address of BIOS
 drive:	 .res 1		; current drive
 cmdline: .res 128	; command line buffer
 cmdfcb:  .res 33	; FCB of command

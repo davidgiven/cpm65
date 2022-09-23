@@ -231,7 +231,7 @@ jumptable_lo:
     .lobytes unimplemented ; compute_file_size = 35
     .lobytes unimplemented ; compute_random_pointer = 36
     .lobytes unimplemented ; reset_disk = 37
-    .lobytes unimplemented ; 38
+    .lobytes entry_GETBIOS ; get_bios = 38
     .lobytes unimplemented ; 39
     .lobytes unimplemented ; write_random_filled = 40
 jumptable_hi:
@@ -273,9 +273,20 @@ jumptable_hi:
     .hibytes unimplemented ; compute_file_size = 35
     .hibytes unimplemented ; compute_random_pointer = 36
     .hibytes unimplemented ; reset_disk = 37
-    .hibytes unimplemented ; 38
+    .hibytes entry_GETBIOS ; 38
     .hibytes unimplemented ; 39
     .hibytes unimplemented ; write_random_filled = 40
+.endproc
+
+; --- Misc ------------------------------------------------------------------
+
+    .code
+.proc entry_GETBIOS
+    lda bios+0
+    sta param+0
+    ldx bios+1
+    stx param+1
+    rts
 .endproc
 
 ; --- Console ---------------------------------------------------------------
