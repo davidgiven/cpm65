@@ -28,15 +28,14 @@ temp:		.word 0
 		jsr bdos_GETSETUSER
 		cmp #0
 		zif_ne
-			clc
-			adc #'0'
-			jsr bdos_CONOUT
+			jsr print_dec_number
 		zendif
 
 		lda drive
 		clc
 		adc #'A'
 		jsr bdos_CONOUT
+
 		lda #'>'
 		jsr bdos_CONOUT
 
@@ -393,7 +392,7 @@ print_to:
 	jmp bdos_WRITESTRING
 
 msg_zp:
-	.byte "Zero page: ", 0
+	.byte "ZP: ", 0
 msg_tpa:
 	.byte "TPA: ", 0
 msg_to:
@@ -408,6 +407,9 @@ msg_free:
 
 .proc entry_USER
 	jsr parse_number
+	bcs error
+
+	cmp #16
 	bcs error
 
 	jmp bdos_GETSETUSER
@@ -694,6 +696,44 @@ is_valid_filename_char:
 		inx
 	zendloop
 	stx cmdoffset
+	rts
+.endproc
+
+; Prints an 8-bit decimal number in A.
+.proc print_dec_number
+	ldy #0
+	sty zflag
+	ldx #$ff
+	sec
+	zrepeat
+		inx
+		sbc #100
+	zuntil_cc
+	adc #100
+	jsr digit
+
+	ldx #$ff
+	sec
+	zrepeat
+		inx
+		sbc #10
+	zuntil_cc
+	adc #10
+	jsr digit
+	
+	tax
+digit:
+	pha
+	txa
+	zflag = * + 1
+	ora #0
+	zif_ne
+		txa
+		ora #'0'
+		jsr bdos_CONOUT
+		inc zflag
+	zendif
+	pla
 	rts
 .endproc
 
