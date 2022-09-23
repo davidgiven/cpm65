@@ -637,6 +637,7 @@ entry_OPENFILE:
     zendif
     txa
     sta active_drive            ; set the active drive
+
     lda current_user
     sta (param), y              ; update FCB
     

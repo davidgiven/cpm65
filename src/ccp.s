@@ -19,6 +19,15 @@ temp:		.word 0
 	zloop
 		; Print prompt.
 
+		lda #$ff
+		jsr bdos_GETSETUSER
+		cmp #0
+		zif_ne
+			clc
+			adc #'0'
+			jsr bdos_CONOUT
+		zendif
+
 		lda drive
 		clc
 		adc #'A'
@@ -33,6 +42,7 @@ temp:		.word 0
 		lda #<cmdline
 		ldx #>cmdline
 		jsr bdos_READLINE
+		jsr newline
 
 		; Zero terminate it.
 
@@ -64,7 +74,6 @@ temp:		.word 0
 		jsr skip_whitespace			; leaves cmdoffset in X
 		lda cmdline+1, x
 		zif_eq
-			jsr newline
 			zcontinue
 		zendif
 	
@@ -207,8 +216,6 @@ msg:
 			stx file_counter
 			and #$01
 			zif_eq
-				jsr newline
-
 				jsr bdos_GETDRIVE
 				clc
 				adc #'A'
@@ -256,6 +263,12 @@ msg:
 			zuntil_eq
 
 			jsr space
+
+			lda file_counter
+			and #$01
+			zif_eq
+				jsr newline
+			zendif
 		zendif
 
 		; Get the next directory entry.
@@ -274,8 +287,6 @@ exit:
 .endproc
 
 .proc entry_TYPE
-	jsr newline
-
 	lda #<userfcb
 	ldx #>userfcb
 	jsr parse_fcb
@@ -329,7 +340,17 @@ exit:
 .endproc
 
 .proc entry_USER
-	rts
+	jsr parse_number
+	bcs error
+
+	jmp bdos_GETSETUSER
+
+error:
+	lda #<msg
+	ldx #>msg
+	jmp bdos_WRITESTRING
+msg:
+	.byte "Bad number", 13, 10, 0
 .endproc
 
 .proc entry_TRANSIENT
@@ -376,6 +397,55 @@ cmdtable:
 	.byte "REN "
 	.byte "USER"
 	.byte 0
+.endproc
+
+; Parses an 8-bit decimal number from the command line.
+.proc parse_number
+	jsr skip_whitespace
+
+	lda #0
+	sta temp+0
+
+	ldx cmdoffset
+	zloop
+		lda cmdline+1, x
+		beq exit
+		cmp #' '
+		beq exit
+
+		cmp #'0'
+		bcc error
+		cmp #'9'+1
+		bcs error
+
+		sec
+		sbc #'0'
+		tay
+
+		lda temp+0
+		asl a
+		sta temp+0
+		asl a
+		asl a
+		clc
+		adc temp+0
+		sta temp+0
+
+		tya
+		clc
+		adc temp+0
+		sta temp+0
+	
+		inx
+	zendloop
+
+exit:
+	lda temp+0
+	clc
+	rts
+error:
+	sec
+	rts
 .endproc
 
 ; Parses text at cmdoffset into the fcb at XA, which becomes the
@@ -570,6 +640,10 @@ bdos_SELECTDISK:
 
 bdos_GETDRIVE:
 	ldy #bdos::get_current_drive
+	jmp BDOS
+
+bdos_GETSETUSER:
+	ldy #bdos::get_set_user_number
 	jmp BDOS
 
 bdos_CONIN:
