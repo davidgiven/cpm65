@@ -325,29 +325,48 @@ relocate_loop:
         zif_eq
             inc reloptr+1
         zendif
-        cmp #$ff
+
+        sta byte
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        cmp #$0f
         zbreakif_eq
+        jsr relocate
 
-        pha
-        clc
-        adc ptr+0
-        sta ptr+0
-        zif_cs
-            inc ptr+1
-        zendif
-        pla
+        byte = * + 1
+        lda #$ff
+        and #$0f
+        cmp #$0f
+        zbreakif_eq
+        jsr relocate
+    zendloop
+    rts
 
-        cmp #$fe
-        zcontinueif_eq
+; Enter with an offset in A.
+; Preserves x and y.
+relocate:
+    pha
+    clc
+    adc ptr+0
+    sta ptr+0
+    zif_cs
+        inc ptr+1
+    zendif
+    pla
 
+    cmp #$0e
+    zif_ne
         ; ptr is pointing at the address to fix up.
 
         clc
         txa
         adc (ptr), y
         sta (ptr), y
-    zendloop
+    zendif
     rts
+    
 .endproc
 
     .data

@@ -42,22 +42,30 @@ std::pair<std::vector<uint16_t>, uint8_t> compare(const std::string& f1, const s
 
 std::vector<uint8_t> toBytestream(const std::vector<uint16_t>& differences)
 {
-	std::vector<uint8_t> results;
+	std::vector<uint8_t> bytes;
 	uint16_t pos = 0;
 
 	for (uint16_t diff : differences)
 	{
 		uint16_t delta = diff - pos;
-		while (delta >= 0xfe)
+		while (delta >= 0xe)
 		{
-			results.push_back(0xfe);
-			delta -= 0xfe;
+			bytes.push_back(0xe);
+			delta -= 0xe;
 		}
-		results.push_back(delta);
+		bytes.push_back(delta);
 
 		pos = diff;
 	}
+	bytes.push_back(0xf);
 
+	std::vector<uint8_t> results;
+	for (int i=0; i<bytes.size(); i+=2)
+	{
+		uint8_t left = bytes[i];
+		uint8_t right = ((i+1) < bytes.size()) ? bytes[i+1] : 0x00;
+		results.push_back((left<<4) | right);
+	}
 	return results;
 }
 
@@ -113,6 +121,8 @@ int main(int argc, char* const* argv)
 	unsigned reloBytesSize = zpBytes.size() + 1 + memBytes.size();
 
 	std::ofstream outs(outfile);
+	fmt::print("{} code bytes, {} zprelo bytes, {} memrelo bytes\n",
+		coreSize, zpBytes.size(), memBytes.size());
 
 	/* Write the actual code body. */
 
@@ -139,10 +149,8 @@ int main(int argc, char* const* argv)
 
 	for (uint8_t b : zpBytes)
 		outs.put(b);
-	outs.put(0xff);
 	for (uint8_t b : memBytes)
 		outs.put(b);
-	outs.put(0xff);
 
 	/* Remove temporary files. */
 
