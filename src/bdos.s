@@ -102,13 +102,15 @@ entry_EXIT:
     jsr bios_GETZP          ; top of ZP in X
     txa
     sec
-    sbc directory_buffer + comhdr::zp_usage
+    ldy #comhdr::zp_usage
+    sbc (directory_buffer), y
     pha
     
     jsr bios_GETTPA         ; top of TPA page number in X
     txa
     sec
-    sbc directory_buffer + comhdr::tpa_usage
+    ldy #comhdr::tpa_usage
+    sbc (directory_buffer), y
     sta user_dma+1
     pha                     ; store load address for later
     lda #0

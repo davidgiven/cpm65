@@ -436,7 +436,116 @@ msg:
 .endproc
 
 .proc entry_TRANSIENT
-	rts
+	; Check for drive changes.
+
+	lda cmdfcb + xfcb::f1
+	cmp #' '
+	zif_eq
+		lda cmdfcb + xfcb::dr
+		zif_eq
+			sec
+			sbc #1
+			sta drive
+
+			jmp bdos_SELECTDISK
+		zendif
+	zendif
+
+	; If there's no .COM extension, add one.
+
+	lda cmdfcb + xfcb::t1
+	cmp #' '
+	zif_eq
+		ldy #2
+		zrepeat
+			lda com, y
+			sta cmdfcb + xfcb::t1, y
+			dey
+		zuntil_mi
+	zendif
+
+	; Open the command.
+
+	lda #<cmdfcb
+	ldx #>cmdfcb
+	jsr xfcb_open
+	bcs cannot_open
+
+	; Compute the start address.
+
+	jsr bios_GETTPA			; leaves page number in A
+	sta temp+1
+	lda #0
+	sta temp+0
+
+    ; Read the file.
+
+    zloop
+		lda temp+0
+		ldx temp+1
+		jsr bdos_SETDMA
+		lda #<cmdfcb
+		ldx #>cmdfcb
+        jsr bdos_READSEQUENTIAL
+        zbreakif_cs
+
+        lda temp+0
+        eor #$80
+        sta temp+0
+        zif_eq
+            inc temp+1
+        zendif
+    zendloop
+
+	; Relocate the file.
+
+	jsr bios_GETTPA
+	tax
+	lda #0
+	stx temp+1
+	sta temp+0
+	jsr bdos_SETDMA
+	jsr bios_GETZP
+	tax						; ZP base
+	lda temp+1				; memory page number
+	jsr bios_RELOCATE
+
+	; Patch the BDOS jump instruction.
+
+	ldy #comhdr::bdos+0
+	lda BDOS+1
+	sta (temp), y
+	iny
+	lda BDOS+2
+	sta (temp), y
+
+	; Run.
+
+	lda #comhdr::entry
+	sta temp+0
+	jmp (temp)
+
+com:
+	.byte "COM"
+
+cannot_open:
+	ldy #0
+	zrepeat
+		lda cmdfcb + xfcb::f1, y
+		cmp #' '
+		zbreakif_eq
+		iny
+		cpy #8
+	zuntil_eq
+
+	lda #0
+	sta cmdfcb + xfcb::f1, y
+	lda #<(cmdfcb + xfcb::f1)
+	ldx #>(cmdfcb + xfcb::f1)
+	jsr bdos_WRITESTRING
+	lda #'?'
+	jsr bdos_CONOUT
+	jmp newline
 .endproc
 
 ; Decodes the cmdfcb, checking for one of the intrinsic commands.
@@ -828,6 +937,10 @@ bdos_FINDNEXT:
 	ldy #bdos::find_next
 	jmp BDOS
 
+bdos_READSEQUENTIAL:
+	ldy #bdos::read_sequential
+	jmp BDOS
+
 bios_GETZP:
     ldy #bios::getzp
     jmp (bios)
@@ -836,9 +949,13 @@ bios_GETTPA:
     ldy #bios::gettpa
     jmp (bios)
 
+bios_RELOCATE:
+	ldy #bios::relocate
+	jmp (bios)
+
 	.bss
 bios:	 .res 2		; address of BIOS
-drive:	 .res 1		; current drive
+drive:	 .res 1		; current drive, 0-based
 cmdline: .res 128	; command line buffer
 cmdfcb:  .tag xfcb	; FCB of command
 userfcb: .tag xfcb	; parameter FCB
