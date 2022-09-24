@@ -6,7 +6,7 @@
 
 	.byte <__ZEROPAGE_SIZE__
     .byte >(__BSS_RUN__ + __BSS_SIZE__ - __CODE_RUN__ + 255)
-	.byte >(__BSS_RUN__ - __CODE_RUN__ + 255)
+	.word __BSS_RUN__ - __CODE_RUN__
 .endmacro
 
 .macro CPM65_COM_HEADER
@@ -17,9 +17,6 @@ BDOS:
 ENTRY:
 
 .endmacro
-
-HDR_ZPSIZE = 0
-HDR_RELOTABLE_OFFSET = 1
 
 .enum fcb
     dr
@@ -105,20 +102,20 @@ HDR_RELOTABLE_OFFSET = 1
 .endenum
 
 .struct dph
-    xlt    .word
-    cdrmax .word
+    xlt      .word
+    cdrmax   .word
     scratch1 .word
     scratch2 .word
-    dirbuf .word
-    dpb    .word
-    csv    .word
-    alv    .word
+    dirbuf   .word
+    dpb      .word
+    csv      .word
+    alv      .word
 .endstruct
 
 .struct comhdr
     zp_usage    .byte ; bytes of zero page used
-    tpa_usage   .byte ; pages of TPA used
-    rel_offset  .byte ; relative page of relocation data
+    tpa_usage   .byte ; pages of TPA required (including space for relocation)
+    rel_offset  .word ; relative address of relocation data and start of BSS
                 .byte ; BDOS entrypoint jump
     bdos        .word
     entry       .byte

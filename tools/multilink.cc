@@ -151,11 +151,12 @@ int main(int argc, char* const* argv)
 
 	{
 		outs.seekg(1);
-		uint8_t tpaRequired = outs.get();
-		uint8_t relOffset = outs.get();
+		uint16_t tpaRequired = outs.get();
+		uint16_t relOffset = outs.get();
+		relOffset |= outs.get() << 8;
 		tpaRequired = std::max<uint8_t>(
 			tpaRequired,
-			relOffset + (reloBytesSize+255) / 256);
+			(relOffset + reloBytesSize + 255) / 256);
 		outs.seekp(1);
 		outs.put(tpaRequired);
 		outs.seekp(0, std::fstream::end);
@@ -163,7 +164,6 @@ int main(int argc, char* const* argv)
 
 	/* Write the relocation bytes. */
 
-	align(outs, 256);
 	for (uint8_t b : zpBytes)
 		outs.put(b);
 	for (uint8_t b : memBytes)

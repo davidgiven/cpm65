@@ -45,6 +45,7 @@ cpmfs/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
 cpmfs.img: $(wildcard cpmfs/*) $(APPS) cpmfs/ccp.sys
+	rm -f $@
 	mkfs.cpm -f $(DISKFORMAT) $@
 	cpmcp -f $(DISKFORMAT) $@ $^ 0:
 	#cpmchattr -f $(DISKFORMAT) $@ s 0:ccp.sys

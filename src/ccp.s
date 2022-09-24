@@ -11,7 +11,11 @@ fcb:		.word 0 ; current FCB being worked on
 temp:		.word 0
 
 	.code
-	CPM65_COM_HEADER
+	CPM65_BARE_HEADER
+.export BDOS
+BDOS:
+	jmp 0
+ENTRY:
 
 	ldy #bdos::get_bios
 	jsr BDOS
