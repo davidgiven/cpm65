@@ -7,7 +7,7 @@ OBJDIR = .obj
 DISKFORMAT = bbc163
 
 APPS = \
-	cpmfs/nop.com
+	cpmfs/dump.com
 
 LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/clear.o \

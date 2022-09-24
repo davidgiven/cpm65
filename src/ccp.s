@@ -595,8 +595,19 @@ msg:
 
 	; Run.
 
+	jsr bios_GETTPA			; base address in A
+	sta temp+1
 	lda #comhdr::entry
 	sta temp+0
+	jsr calltemp
+
+	; Reload disk.
+
+	jsr bdos_GETDRIVE
+	sta drive
+	rts
+
+calltemp:
 	jmp (temp)
 
 com:
