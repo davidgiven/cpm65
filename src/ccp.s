@@ -517,29 +517,36 @@ error:
 	rts
 .endproc
 
-; Parses text at cmdoffset into the fcb at XA, which becomes the
+; Parses text at cmdoffset into the xfcb at XA, which becomes the
 ; current one.
 .proc parse_fcb
 	sta fcb+0
 	stx fcb+1
 	jsr skip_whitespace
 
+	; Set the user number field in the XFCB.
+
+	lda #$ff
+	jsr bdos_GETSETUSER
+	ldy #xfcb::us
+	sta (fcb), y
+
 	; Wipe FCB.
 
-	ldy #fcb::dr
+	ldy #xfcb::dr
 	tya
 	sta (fcb), y				; drive
 	lda #' '
 	zrepeat						; 11 bytes of filename
 		iny
 		sta (fcb), y
-		cpy #fcb::t3
+		cpy #xfcb::t3
 	zuntil_eq
 	lda #0
 	zrepeat						; 4 bytes of metadata
 		iny
 		sta (fcb), y
-		cpy #fcb::cr
+		cpy #xfcb::cr
 	zuntil_eq
 
 	; Check for drive.
@@ -559,7 +566,7 @@ error:
 		zif_cs          		; out of range drive
 			rts
 		zendif
-		ldy #fcb::dr
+		ldy #xfcb::dr
 		sta (fcb), y			; store
 
 		inx
@@ -569,11 +576,11 @@ error:
 	; Read the filename.
 
 	; x = cmdoffset
-	ldy #fcb::f1
+	ldy #xfcb::f1
 	zloop
 		lda cmdline+1, x		; get a character
 		beq exit				; end of line
-		cpy #fcb::f8+1
+		cpy #xfcb::f8+1
 		zbreakif_eq
 		cmp #' '
 		beq exit
@@ -820,7 +827,7 @@ bios_GETTPA:
 bios:	 .res 2		; address of BIOS
 drive:	 .res 1		; current drive
 cmdline: .res 128	; command line buffer
-cmdfcb:  .res 33	; FCB of command
+cmdfcb:  .tag xfcb	; FCB of command
 userfcb: .tag xfcb	; parameter FCB
 
 ; vim; ts=4 sw=4 et filetype=asm
