@@ -46,8 +46,8 @@ ptr: .word 0
 
     ; Relocate it.
 
-    lda #0
-    ldx mem_base
+    lda mem_base
+    ldx zp_base
     jsr entry_RELOCATE
 
     ; Close any existing files.
@@ -284,15 +284,16 @@ entry_SETZP:
     stx zp_end
     rts
 
-    ; Relocate an image whose pointer is in XA.
+    ; Relocate an image. High byte of memory address is in A,
+    ; zero page address is in X.
 
 .proc entry_RELOCATE
+    pha                 ; store memory start
+    sta ptr+1
+    lda #0
     sta ptr+0
-    stx ptr+1
-    pha                 ; store pointer for second pass
-    txa
-    pha
 
+    ; X preserved in next chunk
     ldy #comhdr::rel_offset ; add relocation table offset
     lda (ptr), y
     clc
@@ -303,14 +304,13 @@ entry_SETZP:
     adc ptr+1
     sta reloptr+1
 
-    ldx zp_base
-    jsr relocate_loop   ; relocate zero page
+    jsr relocate_loop   ; relocate zero page (in X)
 
-    pla
-    sta ptr+1
-    pla
+    lda #0
     sta ptr+0
-    ldx mem_base
+    pla                 ; get memory start
+    sta ptr+1
+    tax
     ; fall through
 
     ; ptr points at the beginning of the image

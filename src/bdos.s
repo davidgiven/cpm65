@@ -89,14 +89,38 @@ entry_EXIT:
         jmp *
     zendif
 
-    ; Read the CCP into memory.
+    ; Read the first sector.
 
-    jsr bios_GETTPA         ; bottom of TPA page number in A
-    sta user_dma+1
-    pha
-    lda #0
-    pha
+    lda directory_buffer+0
     sta user_dma+0
+    lda directory_buffer+1
+    sta user_dma+1
+    jsr internal_READSEQUENTIAL ; load one record
+
+    ; Compute the load address.
+
+    jsr bios_GETZP          ; top of ZP in X
+    txa
+    sec
+    sbc directory_buffer + comhdr::zp_usage
+    pha
+    
+    jsr bios_GETTPA         ; top of TPA page number in X
+    txa
+    sec
+    sbc directory_buffer + comhdr::tpa_usage
+    sta user_dma+1
+    pha                     ; store load address for later
+    lda #0
+    sta user_dma+0
+
+    ; Copy the first record into memory.
+
+    jsr copy_directory_buffer_to_dma
+    lda #$80
+    sta user_dma+0
+
+    ; Read the CCP into memory.
 
     zloop
         ; param remains set from above
@@ -113,7 +137,7 @@ entry_EXIT:
 
     ; Patch the BIOS entry vector.
 
-    pla
+    lda #0                  ; pop start address, saved earlier
     sta temp+0
     pla
     sta temp+1
@@ -127,20 +151,16 @@ entry_EXIT:
 
     ; Relocate.
 
-    lda temp+0
-    ldx temp+1
+    pla                     ; pop start zero page address, saved earlier
+    tax
+    lda temp+1              ; start of TPA, in pages
     ldy #bios::relocate
     jsr callbios
 
     ; Execute it.
 
-    lda #comhdr::entry
-    clc
-    adc temp+0
+    lda #comhdr::entry      ; start address is 256-byte aligned
     sta temp+0
-    zif_cs
-        inc temp+1
-    zendif
 calltemp:
     jmp (temp)
 
@@ -831,17 +851,7 @@ error:
     zif_cc
         ; Copy the directory buffer into the DMA buffer.
 
-        lda user_dma+0
-        sta temp+0
-        lda user_dma+1
-        sta temp+1
-
-        ldy #127
-        zrepeat
-            lda (directory_buffer), y
-            sta (temp), y
-            dey
-        zuntil_mi
+        jsr copy_directory_buffer_to_dma
 
         ; Calculate the offset into the DMA buffer.
 
@@ -855,6 +865,23 @@ error:
         lsr a
         clc
     zendif
+    rts
+.endproc
+
+; This is used twice, so factor it out. That's not a lot, but it's strange it's
+; happened twice.
+.proc copy_directory_buffer_to_dma
+    lda user_dma+0
+    sta temp+0
+    lda user_dma+1
+    sta temp+1
+
+    ldy #127
+    zrepeat
+        lda (directory_buffer), y
+        sta (temp), y
+        dey
+    zuntil_mi
     rts
 .endproc
 
@@ -1411,6 +1438,14 @@ bios_CONST:
 
 bios_GETTPA:
     ldy #bios::gettpa
+    jmp callbios
+
+bios_GETZP:
+    ldy #bios::getzp
+    jmp callbios
+
+bios_SETDMA:
+    ldy #bios::setdma
     jmp callbios
 
 ; Prints a string.

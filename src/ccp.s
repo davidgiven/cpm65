@@ -379,7 +379,14 @@ exit:
 	jsr print_zero
 	jsr newline
 
-	rts
+	lda #<msg_ccp
+	ldx #>msg_ccp
+	jsr bdos_WRITESTRING
+
+	lda #>ENTRY
+	jsr print_hex_number
+	jsr print_zero
+	jmp newline
 
 print_zero:
 	lda #0
@@ -403,6 +410,8 @@ msg_to:
 	.byte " to ", 0
 msg_free:
 	.byte ". Free: ", 0
+msg_ccp:
+	.byte "CCP at: ", 0
 .endproc
 
 .proc entry_REN
