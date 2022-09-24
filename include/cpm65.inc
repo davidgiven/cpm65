@@ -6,7 +6,11 @@
 
 	.byte <__ZEROPAGE_SIZE__
     .byte >(__BSS_RUN__ + __BSS_SIZE__ - __CODE_RUN__ + 255)
-	.word __BSS_RUN__ - __CODE_RUN__
+	.word PBLOCK_START ; relocation data here in the file
+
+    .segment "PBLOCK"
+PBLOCK_START:
+    .code
 .endmacro
 
 .macro CPM65_COM_HEADER
@@ -15,6 +19,11 @@
 BDOS:
 	jmp 0
 ENTRY:
+
+    .segment "PBLOCK"
+FCB:         .res 37
+COMMANDLINE: .res 128
+    .code
 
 .endmacro
 

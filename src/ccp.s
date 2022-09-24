@@ -469,7 +469,25 @@ msg:
 	lda #<cmdfcb
 	ldx #>cmdfcb
 	jsr xfcb_open
-	bcs cannot_open
+	zif_cs
+		ldy #0
+		zrepeat
+			lda cmdfcb + xfcb::f1, y
+			cmp #' '
+			zbreakif_eq
+			iny
+			cpy #8
+		zuntil_eq
+
+		lda #0
+		sta cmdfcb + xfcb::f1, y
+		lda #<(cmdfcb + xfcb::f1)
+		ldx #>(cmdfcb + xfcb::f1)
+		jsr bdos_WRITESTRING
+		lda #'?'
+		jsr bdos_CONOUT
+		jmp newline
+	zendif
 
 	; Compute the start address.
 
@@ -519,6 +537,62 @@ msg:
 	lda BDOS+2
 	sta (temp), y
 
+	; Calculate address of the program's PBLOCK.
+
+	lda #0
+	sta temp+0				; restore temp to beginning of program
+
+	ldy #comhdr::rel_offset+1
+	lda (temp), y
+	tax
+	dey
+	lda (temp), y			; XA = offset to PBLOCK
+
+	sta temp+0
+	stx temp+1
+
+	; Save command line position.
+
+	jsr skip_whitespace
+	lda cmdoffset
+	pha
+
+	; Parse the command line into an FCB, if present.
+
+	lda temp+0
+	ldx temp+1
+	jsr parse_fcb			; first parameter
+	zif_cc
+		lda temp+0
+		clc
+		adc #16
+		ldx temp+1
+		zif_cs
+			inx
+		zendif
+		jsr parse_fcb		; second parameter
+	zendif
+
+	; Copy the command line into the program's PBLOCK.
+
+	pla						; get save command line position
+	sta cmdoffset
+	tax
+	ldy #.sizeof(xfcb) + 1
+	zloop
+		lda cmdline+1, x
+		sta (temp), y
+		zbreakif_eq
+		inx
+		iny
+	zendloop
+
+	txa						; set length of command line
+	sec
+	sbc cmdoffset
+	ldy #.sizeof(xfcb)
+	sta (temp), y
+
 	; Run.
 
 	lda #comhdr::entry
@@ -528,24 +602,6 @@ msg:
 com:
 	.byte "COM"
 
-cannot_open:
-	ldy #0
-	zrepeat
-		lda cmdfcb + xfcb::f1, y
-		cmp #' '
-		zbreakif_eq
-		iny
-		cpy #8
-	zuntil_eq
-
-	lda #0
-	sta cmdfcb + xfcb::f1, y
-	lda #<(cmdfcb + xfcb::f1)
-	ldx #>(cmdfcb + xfcb::f1)
-	jsr bdos_WRITESTRING
-	lda #'?'
-	jsr bdos_CONOUT
-	jmp newline
 .endproc
 
 ; Decodes the cmdfcb, checking for one of the intrinsic commands.
