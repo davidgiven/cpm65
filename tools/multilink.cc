@@ -4,6 +4,7 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 template<typename ...T>
 void error(fmt::format_string<T...> fmt, T&&... args)
@@ -75,9 +76,9 @@ void emitw(std::ostream& s, uint16_t w)
 	s.put(w >> 8);
 }
 
-void align(std::ostream& s)
+void align(std::ostream& s, uint32_t pow2)
 {
-	while (s.tellp() & 127)
+	while (s.tellp() & (pow2-1))
 		s.put(0);
 }
 
@@ -120,7 +121,8 @@ int main(int argc, char* const* argv)
 	
 	unsigned reloBytesSize = zpBytes.size() + 1 + memBytes.size();
 
-	std::ofstream outs(outfile);
+	std::fstream outs(outfile, std::fstream::in
+		| std::fstream::out | std::fstream::trunc | std::fstream::binary);
 	fmt::print("{} code bytes, {} zprelo bytes, {} memrelo bytes\n",
 		coreSize, zpBytes.size(), memBytes.size());
 
@@ -145,8 +147,23 @@ int main(int argc, char* const* argv)
 		}
 	}
 
+	/* Patch the TPA byte to include the relocation data. */
+
+	{
+		outs.seekg(1);
+		uint8_t tpaRequired = outs.get();
+		uint8_t relOffset = outs.get();
+		tpaRequired = std::max<uint8_t>(
+			tpaRequired,
+			relOffset + (reloBytesSize+255) / 256);
+		outs.seekp(1);
+		outs.put(tpaRequired);
+		outs.seekp(0, std::fstream::end);
+	}
+
 	/* Write the relocation bytes. */
 
+	align(outs, 256);
 	for (uint8_t b : zpBytes)
 		outs.put(b);
 	for (uint8_t b : memBytes)

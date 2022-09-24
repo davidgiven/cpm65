@@ -68,7 +68,7 @@ ptr: .word 0
 
     lda mem_base
     pha
-    lda #4-1            ; rts addresses are one before the target
+    lda #3-1            ; rts addresses are one before the target
     pha
 
     lda #<biosentry
@@ -293,13 +293,11 @@ entry_SETZP:
     txa
     pha
 
-    ldy #comhdr::rel_offset ; add relocation table offset
-    clc
-    lda (ptr), y
-    adc ptr+0
+    lda ptr+0
     sta reloptr+0
-    iny
+    ldy #comhdr::rel_offset ; add relocation table offset
     lda (ptr), y
+    clc
     adc ptr+1
     sta reloptr+1
 
