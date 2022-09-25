@@ -237,7 +237,7 @@ jumptable_lo:
     .lobytes unimplemented ; delete_file = 19
     .lobytes entry_READSEQUENTIAL ; read_sequential = 20
     .lobytes unimplemented ; write_sequential = 21
-    .lobytes unimplemented ; create_file = 22
+    .lobytes entry_CREATEFILE ; create_file = 22
     .lobytes unimplemented ; rename_file = 23
     .lobytes unimplemented ; get_login_bitmap = 24
     .lobytes entry_GETDRIVE ; get_current_drive = 25
@@ -263,7 +263,7 @@ jumptable_hi:
     .hibytes unimplemented ; aux_input = 3
     .hibytes unimplemented ; aux_output = 4
     .hibytes unimplemented ; printer_output = 5
-    .hibytes unimplemented ; direct_io = 6
+    .hibytes unimplemented ; direct_console_io = 6
     .hibytes unimplemented ; get_io_byte = 7
     .hibytes unimplemented ; set_io_byte = 8
     .hibytes entry_WRITESTRING ; write_string = 9
@@ -279,7 +279,7 @@ jumptable_hi:
     .hibytes unimplemented ; delete_file = 19
     .hibytes entry_READSEQUENTIAL ; read_sequential = 20
     .hibytes unimplemented ; write_sequential = 21
-    .hibytes unimplemented ; create_file = 22
+    .hibytes entry_CREATEFILE ; create_file = 22
     .hibytes unimplemented ; rename_file = 23
     .hibytes unimplemented ; get_login_bitmap = 24
     .hibytes entry_GETDRIVE ; get_current_drive = 25
@@ -288,7 +288,7 @@ jumptable_hi:
     .hibytes unimplemented ; set_drive_readonly = 28
     .hibytes unimplemented ; get_readonly_bitmap = 29
     .hibytes unimplemented ; set_file_attributes = 30
-    .hibytes unimplemented ; get_DPB = 31
+    .hibytes unimplemented ; get_dpb = 31
     .hibytes entry_GETSETUSER ; get_set_user_number = 32
     .hibytes unimplemented ; read_random = 33
     .hibytes unimplemented ; write_random = 34
@@ -647,6 +647,79 @@ entry_OPENFILE:
     rts
 .endproc
     
+; Creates a file; the FCB is in param.
+; Returns C is error; the code is in A.
+
+.proc entry_CREATEFILE
+    jsr new_user_fcb
+    jsr check_disk_writable
+
+    ; Check to see if the file exists.
+
+    lda #fcb::t3+1
+    jsr find_first
+    zif_cc
+        sec
+        rts
+    zendif
+
+    ; Clear the allocation buffer in the FCB.
+
+    lda #0
+    ldy #fcb::al
+    zrepeat
+        sta (param), y
+        iny
+        cpy #fcb::al+16
+    zuntil_eq
+
+    ; Search for an empty dirent.
+
+    lda #$e5
+    ldy #fcb::dr
+    sta (param), y
+    lda #fcb::dr+1
+    jsr find_first
+    zif_cc
+        ; We found an empty dirent! Copy the user's FCB into it.
+
+        ldy #1
+        zrepeat
+            lda (param), y
+            sta (current_dirent), y
+            iny
+            cpy #fcb::al+16
+        zuntil_eq
+        
+        ; Set the user code correctly.
+
+        lda current_user
+        ldy #fcb::dr
+        sta (current_dirent), y
+        
+        ; We might have extended the directory, so make sure
+        ; the count is updated.
+
+        jsr update_cdrmax
+
+        ; Write the update directory buffer back to disk. find_next left all
+        ; the pointers set correctly for this to work.
+
+        jsr write_sector
+
+        ; Set bit 7 of S2 in the FCB to indicate that this file hasn't been
+        ; modified.
+
+        ldy #fcb::s2
+        lda (param), y
+        ora #$80
+        sta (param), y
+
+        clc
+    zendif
+    rts
+.endproc
+
 ; Sets up a user-supplied FCB.
 
 .proc new_user_fcb
@@ -907,10 +980,10 @@ find_first:
         ; the rest of the directory is empty, so give up now.
         ldy #dph::cdrmax
         lda (dph), y
-        cmp current_dirent+0
+        cmp directory_pos+0
         iny
         lda (dph), y
-        sbc current_dirent+1
+        sbc directory_pos+1
         bcc no_more_files
     zendif
 
@@ -982,7 +1055,9 @@ find_first_count: .byte 0
     jsr shiftr              ; flag at bottom of temp+0
 
     ror temp+0
-    bcs exit
+    zif_cs
+        rts
+    zendif
 
     ; Not already logged in. Update the login vector.
 
@@ -1043,6 +1118,14 @@ find_first_count: .byte 0
         sta (temp+2), y
         dey
     zuntil_mi
+
+    ; Zero cdrmax.
+
+    lda #0
+    ldy #dph::cdrmax+0
+    sta (dph), y
+    iny
+    sta (dph), y
 
     ; Actually read the disk.
 
@@ -1111,6 +1194,7 @@ exit:
         jsr callbios
 
         jsr read_sector
+        lda #0
     zendif
     
     clc
@@ -1123,19 +1207,19 @@ exit:
 .endproc
 
 ; Updates the cdrmax field in the DPH to mark the maximum directory
-; entry for a drive (from current_dirent).
+; entry for a drive (from directory_pos).
 .proc update_cdrmax
     ldy #dph::cdrmax
-    lda current_dirent+0
+    lda directory_pos+0
     cmp (dph), y
     iny
-    lda current_dirent+1
-    cmp (dph), y
+    lda directory_pos+1
+    sbc (dph), y
     zif_cs
         ; Update cdrmax.
         sta (dph), y
         dey
-        lda current_dirent+0
+        lda directory_pos+0
         sta (dph), y
     zendif
     rts
@@ -1243,13 +1327,20 @@ reset_user_dma:
     ldy #bios::setdma
     jmp callbios
 
-read_sector:
+set_current_sector:
     lda #<current_sector
     ldx #>current_sector
     ldy #bios::setsec
-    jsr callbios
+    jmp callbios
 
+read_sector:
+    jsr set_current_sector
     ldy #bios::read
+    jmp callbios
+
+write_sector:
+    jsr set_current_sector
+    ldy #bios::write
     jmp callbios
 
 ; Calculates the block and sector addresses of the dirent in
@@ -1331,6 +1422,10 @@ check_dir_pos:
     rts
 .endproc
     
+.proc check_disk_writable
+    rts
+.endproc
+
 ; --- Utilities -------------------------------------------------------------
 
 ; Shifts XA right Y bits.

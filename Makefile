@@ -7,11 +7,13 @@ OBJDIR = .obj
 DISKFORMAT = bbc163
 
 APPS = \
-	cpmfs/dump.com
+	cpmfs/dump.com \
+	cpmfs/make.com \
 
 LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/clear.o \
 	$(OBJDIR)/lib/xfcb/get.o \
+	$(OBJDIR)/lib/xfcb/make.o \
 	$(OBJDIR)/lib/xfcb/open.o \
 	$(OBJDIR)/lib/xfcb/prepare.o \
 	$(OBJDIR)/lib/xfcb/readseq.o \
