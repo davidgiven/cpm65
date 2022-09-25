@@ -2,8 +2,10 @@
 	.include "zif.inc"
 	.include "xfcb.inc"
 
+	.import xfcb_writesequential
 	.import xfcb_readsequential
 	.import xfcb_make
+	.import xfcb_close
 
 	.zeropage
 
@@ -27,8 +29,29 @@ index:	 .res 1
 	jsr xfcb_make
 	bcs cannot_open
 
+	; Write some garbage to it.
+
+	lda #<testdata
+	ldx #>testdata
+	jsr bdos_SETDMA
+
+	lda #<FCB
+	ldx #>FCB
+	jsr xfcb_writesequential
+
+	; Close the file.
+
+	lda #<FCB
+	ldx #>FCB
+	jsr xfcb_close
+
 	rts
 .endscope
+
+.data
+testdata:
+	.res 128, 'q'
+.code
 
 .proc syntax_error
 	lda #<msg

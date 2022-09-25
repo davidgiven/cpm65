@@ -231,18 +231,18 @@ jumptable_lo:
     .lobytes entry_RESET ; reset_disks = 13
     .lobytes entry_LOGINDRIVE ; select_disk = 14
     .lobytes entry_OPENFILE ; open_file = 15
-    .lobytes unimplemented ; close_file = 16
+    .lobytes entry_CLOSEFILE ; close_file = 16
     .lobytes entry_FINDFIRST ; find_first = 17
     .lobytes entry_FINDNEXT ; find_next = 18
     .lobytes unimplemented ; delete_file = 19
     .lobytes entry_READSEQUENTIAL ; read_sequential = 20
-    .lobytes unimplemented ; write_sequential = 21
+    .lobytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .lobytes entry_CREATEFILE ; create_file = 22
     .lobytes unimplemented ; rename_file = 23
     .lobytes unimplemented ; get_login_bitmap = 24
     .lobytes entry_GETDRIVE ; get_current_drive = 25
     .lobytes entry_SETDMAADDRESS ; set_dma_address = 26
-    .lobytes unimplemented ; get_allocation_bitmap = 27
+    .lobytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
     .lobytes unimplemented ; set_drive_readonly = 28
     .lobytes unimplemented ; get_readonly_bitmap = 29
     .lobytes unimplemented ; set_file_attributes = 30
@@ -273,18 +273,18 @@ jumptable_hi:
     .hibytes entry_RESET ; reset_disks = 13
     .hibytes entry_LOGINDRIVE ; select_disk = 14
     .hibytes entry_OPENFILE ; open_file = 15
-    .hibytes unimplemented ; close_file = 16
+    .hibytes entry_CLOSEFILE ; close_file = 16
     .hibytes entry_FINDFIRST ; find_first = 17
     .hibytes entry_FINDNEXT ; find_next = 18
     .hibytes unimplemented ; delete_file = 19
     .hibytes entry_READSEQUENTIAL ; read_sequential = 20
-    .hibytes unimplemented ; write_sequential = 21
+    .hibytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .hibytes entry_CREATEFILE ; create_file = 22
     .hibytes unimplemented ; rename_file = 23
     .hibytes unimplemented ; get_login_bitmap = 24
     .hibytes entry_GETDRIVE ; get_current_drive = 25
     .hibytes entry_SETDMAADDRESS ; set_dma_address = 26
-    .hibytes unimplemented ; get_allocation_bitmap = 27
+    .hibytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
     .hibytes unimplemented ; set_drive_readonly = 28
     .hibytes unimplemented ; get_readonly_bitmap = 29
     .hibytes unimplemented ; set_file_attributes = 30
@@ -622,10 +622,7 @@ entry_OPENFILE:
 
         ; Set bit 7 of S2 to indicate that this file hasn't been modified.
 
-        ldy #fcb::s2
-        lda (param), y
-        ora #$80
-        sta (param), y
+        jsr fcb_is_not_modified
 
         ; Compare the user extent byte with the dirent.
 
@@ -710,10 +707,7 @@ entry_OPENFILE:
         ; Set bit 7 of S2 in the FCB to indicate that this file hasn't been
         ; modified.
 
-        ldy #fcb::s2
-        lda (param), y
-        ora #$80
-        sta (param), y
+        jsr fcb_is_not_modified
 
         clc
     zendif
@@ -750,6 +744,50 @@ entry_OPENFILE:
     jmp select_active_drive
 .endproc
 
+; --- Close a file (flush the FCB to disk) ----------------------------------
+
+.proc entry_CLOSEFILE
+    jsr convert_user_fcb
+    jsr check_disk_writable
+
+    ; Check that this FCB has actually changed.
+
+    ldy #fcb::s2
+    lda (param), y
+    zif_mi
+        clc                     ; just return if not
+        rts
+    zendif
+
+    ; Find the directory entry for this extent.
+
+    lda #fcb::s2+1
+    jsr find_first
+    bcs exit
+
+    ; Update the directory entry from the FCB.
+
+    ldy #fcb::rc
+    lda (param), y
+    sta (current_dirent), y
+
+    ; Merge the allocation maps.
+
+    jsr merge_fcb_into_dirent
+    bcs exit
+
+    ; Write the dirent back to disk.
+
+    jsr write_sector            ; sector number remains set up from find_first
+    
+    ; Mark the FCB as modified and exit.
+    
+    jsr fcb_is_not_modified
+    clc
+exit:
+    rts
+.endproc
+
 ; --- Read next sequential record -------------------------------------------
 
 .proc entry_READSEQUENTIAL
@@ -769,10 +807,172 @@ entry_OPENFILE:
     zendif
     
     jsr get_fcb_block           ; get disk block value in XA
+    beq eof
+    jsr get_sequential_sector_number
+
+    ; Move the FCB on to the next record, for next time.
+
+    ; ldy #fcb::cr              ; still set from last time
+    lda (param), y
+    clc
+    adc #1
+    sta (param), y
+
+    ; Actually do the read!
+
+    jsr reset_user_dma
+    jsr read_sector
+    clc
+    rts
+
+eof:
+    lda #1                      ; = EOF
+    sec
+    rts
+.endproc
+
+; Fetch the current block number in the FCB in XA.
+; Returns Z if the block number is zero (i.e., there isn't one).
+.proc get_fcb_block
+    jsr get_fcb_block_index     ; gets index in Y
+    ldx blocks_on_disk+1        ; are we a big disk?
+    zif_ne                      ; yes
+        lda (param), y
+        iny
+        ora (param), y          ; check for zero
+        beq exit
+
+        lda (param), y          ; high byte!
+        tax
+        dey
+        lda (param), y          ; low byte
+        rts
+    zendif
+
+exit:
+    ldx #0
+    lda (param), y              ; sets Z if zero
+    rts
+.endproc
+
+; Set the current block number in the FCB to XA.
+.proc set_fcb_block
+    sta temp+0
+    stx temp+1
+
+    jsr get_fcb_block_index     ; gets index in Y
+    lda temp+0                  ; store low byte
+    sta (param), y
+    ldx blocks_on_disk+1        ; are we a big disk?
+    zif_ne                      ; yes
+        iny
+        lda temp+1
+        sta (param), y
+        rts
+    zendif
+
+    rts
+.endproc
+
+; Return offset to the current block in the FCB in Y.
+.proc get_fcb_block_index
+    ldy #fcb::cr                ; get current record
+    lda (param), y
+
+    ldx block_shift             ; get block index
+    zrepeat
+        lsr a
+        dex
+    zuntil_eq                   ; A = block index
+
+    ldx blocks_on_disk+1        ; are we a big disk?
+    zif_ne                      ; yes
+        asl a                   ; blocks occupy two bytes
+    zendif
+
+    clc
+    adc #fcb::al                ; get offset into allocation map
+    tay
+    rts
+.endproc
+
+; When closing the file, we want to merge the allocation map in the
+; FCB with the one in the dirent.
+.proc merge_fcb_into_dirent
+    ldy #fcb::al                ; index into FCB/dirent
+    lda blocks_on_disk+1        ; are we a big disk?
+    zif_ne                      ; yes
+        zrepeat
+            lda (param), y
+            iny
+            ora (param), y
+            zif_eq              ; FCB <- dirent
+                lda (current_dirent), y
+                sta (param), y
+                dey
+                lda (current_dirent), y
+                sta (param), y
+                iny
+            zendif
+
+            lda (current_dirent), y
+            dey
+            ora (current_dirent), y
+            zif_eq              ; FCB -> dirent
+                lda (param), y
+                sta (current_dirent), y
+                iny
+                lda (param), y
+                sta (current_dirent), y
+                dey
+            zendif
+
+            lda (param), y
+            cmp (current_dirent), y
+            iny
+            lda (param), y
+            sbc (current_dirent), y
+            bne merge_error         ; FCB != dirent --- this is bad
+
+            iny
+            cpy #fcb::al+16
+        zuntil_eq
+        clc
+        rts
+    zendif
+
+    zrepeat
+        lda (param), y          ; get FCB block number
+        zif_eq                  ; FCB <- dirent
+            lda (current_dirent), y
+            sta (param), y
+        zendif
+
+        lda (current_dirent), y
+        zif_eq                  ; FCB -> dirent
+            lda (param), y
+            sta (current_dirent), y
+        zendif
+
+        lda (param), y
+        cmp (current_dirent), y
+        bne merge_error         ; FCB != dirent --- this is bad
+
+        iny
+        cpy #fcb::al+16
+    zuntil_eq
+    clc
+    rts
+
+merge_error:
+    sec
+    rts
+.endproc
+
+; Computes the sector number of the block in XA.  XA must not be zero.
+.proc get_sequential_sector_number
     sta current_sector+0
     stx current_sector+1
-    ora current_sector+1
-    beq eof                     ; no block allocated
 
     lda #0
     sta current_sector+2
@@ -803,18 +1003,51 @@ entry_OPENFILE:
         zendif
     zendif
 
+    rts
+.endproc
+
+; --- Write the next sequential record --------------------------------------
+
+.proc entry_WRITESEQUENTIAL
+    jsr convert_user_fcb
+
+    ldy #fcb::cr
+    lda (param), y
+    cpy #$80
+    zif_eq                      ; is this extent full?
+        debug "end of extent"
+        jmp *
+    zendif
+    
+    jsr get_fcb_block           ; get disk block value in XA
+    zif_eq
+        jsr fcb_is_modified
+        jsr allocate_unused_block
+        jsr set_fcb_block
+    zendif
+    jsr get_sequential_sector_number
+
     ; Move the FCB on to the next record, for next time.
 
-    ; ldy #fcb::cr              ; still set from last time
+    ldy #fcb::cr
     lda (param), y
     clc
     adc #1
     sta (param), y
 
-    ; Actually do the read!
+    ; If CR > RC, update RC.
+
+    ldy #fcb::rc
+    cmp (param), y
+    zif_cs
+        sta (param), y
+        jsr fcb_is_modified
+    zendif
+
+    ; Actually do the write!
 
     jsr reset_user_dma
-    jsr read_sector
+    jsr write_sector
     clc
     rts
 
@@ -824,44 +1057,19 @@ eof:
     rts
 .endproc
 
-; Fetch the current block number in the FCB in XA.
-.proc get_fcb_block
-    jsr get_fcb_block_index     ; gets index in Y
-    ldx blocks_on_disk+1        ; are we a big disk?
-    zif_ne                      ; yes
-        lda (param), y
-        pha
-        iny
-        lda (param), y
-        tax
-        pla
-        rts
-    zendif
-
+.proc fcb_is_not_modified
+    ldy #fcb::s2
     lda (param), y
-    ldx #0
+    ora #$80
+    sta (param), y
     rts
 .endproc
 
-; Return offset to the current block in the FCB in Y.
-.proc get_fcb_block_index
-    ldy #fcb::cr                ; get current record
+.proc fcb_is_modified
+    ldy #fcb::s2
     lda (param), y
-
-    ldx block_shift             ; get block index
-    zrepeat
-        lsr a
-        dex
-    zuntil_eq                   ; A = block index
-
-    ldx blocks_on_disk+1        ; are we a big disk?
-    zif_ne                      ; yes
-        asl a                   ; blocks occupy two bytes
-    zendif
-
-    clc
-    adc #fcb::al                ; get offset into allocation map
-    tay
+    and #$7f
+    sta (param), y
     rts
 .endproc
 
@@ -1318,6 +1526,48 @@ update_bitmap_status:
     ldy #0
     sta (temp+0), y         ; update bitmap
     rts
+
+; Finds an unused block from the bitmap and allocates it. Returns it in XA.
+
+.proc allocate_unused_block
+    lda #0                  ; block number
+    sta temp+2
+    sta temp+3
+
+    zloop
+        lda temp+2
+        sta temp+0
+        lda temp+3
+        sta temp+1
+        jsr get_bitmap_status
+        and #$01
+        zbreakif_eq
+
+        inc temp+2
+        zif_eq
+            inc temp+3
+        zendif
+    zendloop
+
+    lda temp+2
+    sta temp+0
+    lda temp+3
+    sta temp+1
+    lda #1
+    jsr update_bitmap_status
+
+    lda temp+2
+    ldx temp+3
+    rts
+.endproc
+
+; Returns a pointer to the allocation bitmap in XA.
+
+.proc entry_GETALLOCATIONBITMAP
+    lda bitmap+0
+    ldx bitmap+1
+    rts
+.endproc
 
 ; --- Drive management ------------------------------------------------------
 
