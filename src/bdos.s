@@ -602,7 +602,7 @@ indent_new_line:
 entry_OPENFILE:
     jsr new_user_fcb
 .proc internal_OPENFILE
-    lda #15                     ; match 15 bytes of FCB
+    lda #fcb::s2+1              ; match 15 bytes of FCB
     jsr find_first
     zif_cc
         ; We have a matching dirent!
@@ -647,18 +647,16 @@ entry_OPENFILE:
 ; Creates a file; the FCB is in param.
 ; Returns C is error; the code is in A.
 
-.proc entry_CREATEFILE
+entry_CREATEFILE:
     jsr new_user_fcb
+.proc internal_CREATEFILE
     jsr check_disk_writable
 
     ; Check to see if the file exists.
 
-    lda #fcb::t3+1
+    lda #fcb::s2+1
     jsr find_first
-    zif_cc
-        sec
-        rts
-    zendif
+    bcc error
 
     ; Clear the allocation buffer in the FCB.
 
@@ -677,40 +675,45 @@ entry_OPENFILE:
     sta (param), y
     lda #fcb::dr+1
     jsr find_first
-    zif_cc
-        ; We found an empty dirent! Copy the user's FCB into it.
+    bcs error
 
-        ldy #1
-        zrepeat
-            lda (param), y
-            sta (current_dirent), y
-            iny
-            cpy #fcb::al+16
-        zuntil_eq
-        
-        ; Set the user code correctly.
+    ; We found an empty dirent! Copy the user's FCB into it.
 
-        lda current_user
-        ldy #fcb::dr
+    ldy #1
+    zrepeat
+        lda (param), y
         sta (current_dirent), y
-        
-        ; We might have extended the directory, so make sure
-        ; the count is updated.
+        iny
+        cpy #fcb::al+16
+    zuntil_eq
+    
+    ; Set the user code correctly.
 
-        jsr update_cdrmax
+    lda current_user
+    ldy #fcb::dr
+    sta (current_dirent), y
+    
+    ; We might have extended the directory, so make sure
+    ; the count is updated.
 
-        ; Write the update directory buffer back to disk. find_next left all
-        ; the pointers set correctly for this to work.
+    jsr update_cdrmax
 
-        jsr write_sector
+    ; Write the update directory buffer back to disk. find_next left all
+    ; the pointers set correctly for this to work.
 
-        ; Set bit 7 of S2 in the FCB to indicate that this file hasn't been
-        ; modified.
+    jsr write_sector
 
-        jsr fcb_is_not_modified
+    ; Set bit 7 of S2 in the FCB to indicate that this file hasn't been
+    ; modified.
 
-        clc
-    zendif
+    jsr fcb_is_not_modified
+
+    clc
+    rts
+
+error:
+    lda #$ff                ; only defined error code
+    sec
     rts
 .endproc
 
@@ -805,29 +808,8 @@ exit:
             
         ; Move to the next extent.
 
-        jsr internal_CLOSEFILE
-
-        ldy #fcb::ex
-        lda (param), y
-        clc
-        adc #1
-        and #$1f
-        sta (param), y
-        zif_eq
-            ldy #fcb::s2
-            lda (param), y
-            and #$7f            ; remove not-modified flag
-            cmp #$7f            ; maximum possible file size?
-            beq eof
-
-            lda (param), y
-            clc
-            adc #1
-            sta (param), y
-        zendif
-        lda #0
-        ldy #fcb::cr
-        sta (param), y
+        jsr close_extent_and_move_to_next_one
+        bcs eof
 
         ; Open it.
 
@@ -856,6 +838,40 @@ exit:
 
 eof:
     lda #1                      ; = EOF
+    sec
+    rts
+.endproc
+
+; Closes the current extent, and move to the next one, but doesn't open it.
+; Sets C on error (like maximum file size).
+.proc close_extent_and_move_to_next_one
+    jsr internal_CLOSEFILE
+
+    ldy #fcb::ex
+    lda (param), y
+    clc
+    adc #1
+    and #$1f
+    sta (param), y
+    zif_eq
+        ldy #fcb::s2
+        lda (param), y
+        and #$7f            ; remove not-modified flag
+        cmp #$7f            ; maximum possible file size?
+        beq eof
+
+        lda (param), y
+        clc
+        adc #1
+        sta (param), y
+    zendif
+    lda #0
+    ldy #fcb::cr
+    sta (param), y
+    clc
+    rts
+
+eof:
     sec
     rts
 .endproc
@@ -1042,10 +1058,28 @@ merge_error:
 
     ldy #fcb::cr
     lda (param), y
-    cpy #$80
+    cmp #$80
     zif_eq                      ; is this extent full?
-        debug "end of extent"
-        jmp *
+        ; Move to the next extent.
+
+        jsr close_extent_and_move_to_next_one
+        lda #2                  ; disk full
+        bcs error
+
+        ; Open it.
+
+        ldy #fcb::rc            ; clear record count
+        lda #0
+        sta (param), y
+
+        jsr internal_OPENFILE
+        zif_cs
+            ; Could not open new extent --- it must not exist.
+
+            jsr internal_CREATEFILE
+            lda #1              ; directory full
+            bcs error
+        zendif
     zendif
     
     jsr get_fcb_block           ; get disk block value in XA
@@ -1077,12 +1111,13 @@ merge_error:
 
     jsr reset_user_dma
     jsr write_sector
+    lda #0
     clc
     rts
 
-eof:
-    lda #1                      ; = EOF
+error:
     sec
+exit:
     rts
 .endproc
 

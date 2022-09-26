@@ -30,6 +30,16 @@ index:	 .res 1
 	jsr xfcb_open
 	bcs cannot_open
 
+	lda #<output_fcb
+	ldx #>output_fcb
+	jsr xfcb_open
+	zif_cs
+		lda #<output_fcb
+		ldx #>output_fcb
+		jsr xfcb_make
+		bcs cannot_open
+	zendif
+
 	; Read all the blocks in the file.
 
 	zrepeat
@@ -43,16 +53,34 @@ index:	 .res 1
 		lda #<FCB
 		ldx #>FCB
 		jsr xfcb_readsequential
+		zbreakif_cs
+
+		lda #<output_fcb
+		ldx #>output_fcb
+		jsr xfcb_writesequential
 	zuntil_cs
 
-	; Close the file.
+	; Close the files.
 
 	lda #<FCB
 	ldx #>FCB
 	jsr xfcb_close
 
+	lda #<output_fcb
+	ldx #>output_fcb
+	jsr xfcb_close
+
 	rts
 .endscope
+
+.data
+output_fcb:
+	.byte 0
+	.byte "OUTPUT  DAT"
+	.byte 0, 0, 0, 0
+	.res 16
+	.byte 0, 0, 0, 0
+	.byte 0				; user area
 
 .bss
 buffer:
