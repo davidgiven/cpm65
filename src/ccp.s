@@ -4,6 +4,7 @@
 
 	.import xfcb_open
 	.import xfcb_readsequential
+	.import xfcb_erase
 
 	.zeropage
 cmdoffset:	.byte 0	; current offset into command line (not including size byte)
@@ -125,6 +126,14 @@ commands_hi:
 	.hibytes entry_USER - 1
 	.hibytes entry_TRANSIENT - 1
 
+.proc parse_valid_user_fcb
+	lda #<userfcb
+	ldx #>userfcb
+	jsr parse_fcb
+	bcs invalid_filename
+	rts
+.endproc
+
 .proc invalid_filename
 	lda #<msg
 	ldx #>msg
@@ -147,12 +156,7 @@ msg:
 
 	; Parse the filename.
 
-	lda #<userfcb
-	ldx #>userfcb
-	jsr parse_fcb
-	zif_cs
-		jmp invalid_filename
-	zendif
+	jsr parse_valid_user_fcb
 
 	; Just the drive?
 
@@ -291,16 +295,17 @@ exit:
 .endproc
 
 .proc entry_ERA
-	rts
+	jsr parse_valid_user_fcb
+
+	; Just delete everything which matches.
+
+	lda #<userfcb
+	ldx #>userfcb
+	jmp xfcb_erase
 .endproc
 
 .proc entry_TYPE
-	lda #<userfcb
-	ldx #>userfcb
-	jsr parse_fcb
-	zif_cs
-		jmp invalid_filename
-	zendif
+	jsr parse_valid_user_fcb
 	
 	; Open the FCB.
 

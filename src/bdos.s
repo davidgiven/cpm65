@@ -234,7 +234,7 @@ jumptable_lo:
     .lobytes entry_CLOSEFILE ; close_file = 16
     .lobytes entry_FINDFIRST ; find_first = 17
     .lobytes entry_FINDNEXT ; find_next = 18
-    .lobytes unimplemented ; delete_file = 19
+    .lobytes entry_DELETEFILE ; delete_file = 19
     .lobytes entry_READSEQUENTIAL ; read_sequential = 20
     .lobytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .lobytes entry_CREATEFILE ; create_file = 22
@@ -276,7 +276,7 @@ jumptable_hi:
     .hibytes entry_CLOSEFILE ; close_file = 16
     .hibytes entry_FINDFIRST ; find_first = 17
     .hibytes entry_FINDNEXT ; find_next = 18
-    .hibytes unimplemented ; delete_file = 19
+    .hibytes entry_DELETEFILE ; delete_file = 19
     .hibytes entry_READSEQUENTIAL ; read_sequential = 20
     .hibytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .hibytes entry_CREATEFILE ; create_file = 22
@@ -796,6 +796,39 @@ entry_CLOSEFILE:
     jsr fcb_is_not_modified
     clc
 exit:
+    rts
+.endproc
+
+; --- Other file manipulation -----------------------------------------------
+
+.proc entry_DELETEFILE
+    jsr convert_user_fcb
+
+    ; Search for and destroy all files matching the filename.
+
+    lda #fcb::t3+1
+    jsr find_first
+    zif_cc
+        zrepeat
+            ; Free all the blocks in the matching dirent.
+
+            ldx #0
+            jsr update_bitmap_for_dirent
+
+            ; Now mark the dirent as deleted.
+
+            lda #$e5
+            ldy #fcb::dr
+            sta (current_dirent), y
+            jsr write_sector
+
+            ; Get the next matching dirent.
+
+            lda #fcb::t3+1
+            jsr find_next
+        zuntil_cs
+    zendif
+
     rts
 .endproc
 

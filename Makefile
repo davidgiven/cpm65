@@ -14,6 +14,7 @@ APPS = \
 LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/clear.o \
 	$(OBJDIR)/lib/xfcb/close.o \
+	$(OBJDIR)/lib/xfcb/erase.o \
 	$(OBJDIR)/lib/xfcb/get.o \
 	$(OBJDIR)/lib/xfcb/make.o \
 	$(OBJDIR)/lib/xfcb/open.o \
