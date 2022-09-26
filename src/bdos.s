@@ -6,6 +6,10 @@
     .import __BSS_RUN__
     .import __BSS_SIZE__
 
+    CPM_MACHINE_TYPE = $f ; 6502!
+    CPM_SYSTEM_TYPE = 0
+    CPM_VERSION = $22 ; CP/M 2.2 (compatible)
+
 .macro debug s
     jsr pdebug
     .byte s
@@ -218,16 +222,16 @@ jumptable_lo:
     .lobytes entry_EXIT ; exit_program = 0
     .lobytes entry_CONIN ; console_input = 1
     .lobytes entry_CONOUT ; console_output = 2
-    .lobytes unimplemented ; aux_input = 3
-    .lobytes unimplemented ; aux_output = 4
-    .lobytes unimplemented ; printer_output = 5
-    .lobytes unimplemented ; direct_io = 6
-    .lobytes unimplemented ; get_io_byte = 7
-    .lobytes unimplemented ; set_io_byte = 8
+    .lobytes entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
+    .lobytes entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
+    .lobytes entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
+    .lobytes entry_DIRECTIO ; direct_io = 6
+    .lobytes entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
+    .lobytes entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
     .lobytes entry_WRITESTRING ; write_string = 9
     .lobytes entry_READLINE ; read_line = 10
-    .lobytes unimplemented ; console_status = 11
-    .lobytes unimplemented ; get_version = 12
+    .lobytes entry_GETCONSOLESTATUS ; console_status = 11
+    .lobytes entry_GETVERSION ; get_version = 12
     .lobytes entry_RESET ; reset_disks = 13
     .lobytes entry_LOGINDRIVE ; select_disk = 14
     .lobytes entry_OPENFILE ; open_file = 15
@@ -239,20 +243,20 @@ jumptable_lo:
     .lobytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .lobytes entry_CREATEFILE ; create_file = 22
     .lobytes unimplemented ; rename_file = 23
-    .lobytes unimplemented ; get_login_bitmap = 24
+    .lobytes entry_GETLOGINBITMAP ; get_login_bitmap = 24
     .lobytes entry_GETDRIVE ; get_current_drive = 25
     .lobytes entry_SETDMAADDRESS ; set_dma_address = 26
     .lobytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
-    .lobytes unimplemented ; set_drive_readonly = 28
-    .lobytes unimplemented ; get_readonly_bitmap = 29
+    .lobytes entry_SETDRIVEREADONLY ; set_drive_readonly = 28
+    .lobytes entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
     .lobytes unimplemented ; set_file_attributes = 30
-    .lobytes unimplemented ; get_DPB = 31
+    .lobytes entry_GETDPB ; get_DPB = 31
     .lobytes entry_GETSETUSER ; get_set_user_number = 32
     .lobytes unimplemented ; read_random = 33
     .lobytes unimplemented ; write_random = 34
     .lobytes unimplemented ; compute_file_size = 35
     .lobytes unimplemented ; compute_random_pointer = 36
-    .lobytes unimplemented ; reset_disk = 37
+    .lobytes entry_RESETDISK ; reset_disk = 37
     .lobytes entry_GETBIOS ; get_bios = 38
     .lobytes unimplemented ; 39
     .lobytes unimplemented ; write_random_filled = 40
@@ -260,16 +264,16 @@ jumptable_hi:
     .hibytes entry_EXIT ;exit_program = 0
     .hibytes entry_CONIN ; console_input = 1
     .hibytes entry_CONOUT ; console_output = 2
-    .hibytes unimplemented ; aux_input = 3
-    .hibytes unimplemented ; aux_output = 4
-    .hibytes unimplemented ; printer_output = 5
-    .hibytes unimplemented ; direct_console_io = 6
-    .hibytes unimplemented ; get_io_byte = 7
-    .hibytes unimplemented ; set_io_byte = 8
+    .hibytes entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
+    .hibytes entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
+    .hibytes entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
+    .hibytes entry_DIRECTIO ; direct_console_io = 6
+    .hibytes entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
+    .hibytes entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
     .hibytes entry_WRITESTRING ; write_string = 9
     .hibytes entry_READLINE ; read_line = 10
-    .hibytes unimplemented ; console_status = 11
-    .hibytes unimplemented ; get_version = 12
+    .hibytes entry_GETCONSOLESTATUS ; console_status = 11
+    .hibytes entry_GETVERSION ; get_version = 12
     .hibytes entry_RESET ; reset_disks = 13
     .hibytes entry_LOGINDRIVE ; select_disk = 14
     .hibytes entry_OPENFILE ; open_file = 15
@@ -281,20 +285,20 @@ jumptable_hi:
     .hibytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .hibytes entry_CREATEFILE ; create_file = 22
     .hibytes unimplemented ; rename_file = 23
-    .hibytes unimplemented ; get_login_bitmap = 24
+    .hibytes entry_GETLOGINBITMAP ; get_login_bitmap = 24
     .hibytes entry_GETDRIVE ; get_current_drive = 25
     .hibytes entry_SETDMAADDRESS ; set_dma_address = 26
     .hibytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
-    .hibytes unimplemented ; set_drive_readonly = 28
-    .hibytes unimplemented ; get_readonly_bitmap = 29
+    .hibytes entry_SETDRIVEREADONLY ; set_drive_readonly = 28
+    .hibytes entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
     .hibytes unimplemented ; set_file_attributes = 30
-    .hibytes unimplemented ; get_dpb = 31
+    .hibytes entry_GETDPB ; get_dpb = 31
     .hibytes entry_GETSETUSER ; get_set_user_number = 32
     .hibytes unimplemented ; read_random = 33
     .hibytes unimplemented ; write_random = 34
     .hibytes unimplemented ; compute_file_size = 35
     .hibytes unimplemented ; compute_random_pointer = 36
-    .hibytes unimplemented ; reset_disk = 37
+    .hibytes entry_RESETDISK ; reset_disk = 37
     .hibytes entry_GETBIOS ; 38
     .hibytes unimplemented ; 39
     .hibytes unimplemented ; write_random_filled = 40
@@ -308,6 +312,23 @@ jumptable_hi:
     sta param+0
     ldx bios+1
     stx param+1
+    rts
+.endproc
+
+.proc entry_GETVERSION
+    lda #CPM_VERSION
+    ldx #(CPM_MACHINE_TYPE<<4) | CPM_SYSTEM_TYPE
+    rts
+.endproc
+
+.proc entry_GETIOBYTE
+    lda #%10010100
+    clc
+    rts
+.endproc
+
+.proc entry_UNIMPLEMENTED
+    sec
     rts
 .endproc
 
@@ -393,6 +414,40 @@ exit:
     rts
 reboot:
     jmp entry_EXIT
+.endproc
+
+.proc entry_GETCONSOLESTATUS
+    lda buffered_key
+    zif_eq
+        jsr bios_CONST
+    zendif
+    rts
+.endproc
+
+; If param+0 == $ff, returns a character without waiting and without echo.
+; If param+0 != $ff, prints it.
+
+.proc entry_DIRECTIO
+    lda param+0
+    cmp #$ff
+    zif_ne
+        jsr bios_CONOUT
+        clc
+        rts
+    zendif
+
+    lda buffered_key
+    ; A is either a character, or zero
+    zif_eq
+        jsr bios_CONST
+        cmp #$ff
+        zif_eq
+            jsr bios_CONIN
+        zendif
+        ; A is either a character, or zero
+    zendif
+    clc
+    rts
 .endproc
 
 .proc entry_WRITESTRING
@@ -568,6 +623,23 @@ indent_new_line:
 
     ; A is 0
     jmp internal_LOGINDRIVE
+.endproc
+
+; Reset the write-protect bits for the drives the user asked for.
+
+.proc entry_RESETDISK
+    lda param+0
+    eor #$ff
+    and write_protect_vector+0
+    sta write_protect_vector+0
+
+    lda param+1
+    eor #$ff
+    and write_protect_vector+1
+    sta write_protect_vector+1
+
+    clc
+    rts
 .endproc
 
 .proc entry_GETDRIVE
@@ -1668,11 +1740,49 @@ update_bitmap_status:
     rts
 .endproc
 
+; Sets a drive as being readonly.
+
+.proc entry_SETDRIVEREADONLY
+    lda #<write_protect_vector
+    ldx #>write_protect_vector
+    ldy current_drive
+    jsr setbit
+    clc
+    rts
+.endproc
+
+; Returns the login bitmap in XA.
+
+.proc entry_GETLOGINBITMAP
+    lda login_vector+0
+    ldx login_vector+1
+    clc
+    rts
+.endproc
+
+; Returns the readonly bitmap in XA.
+
+.proc entry_GETREADONLYBITMAP
+    lda write_protect_vector+0
+    ldx write_protect_vector+1
+    rts
+.endproc
+
 ; Returns a pointer to the allocation bitmap in XA.
 
 .proc entry_GETALLOCATIONBITMAP
     lda bitmap+0
     ldx bitmap+1
+    clc
+    rts
+.endproc
+
+; Returns a pointer to the current drive's DPB.
+
+.proc entry_GETDPB
+    lda current_dpb+0
+    ldx current_dpb+1
+    clc
     rts
 .endproc
 
