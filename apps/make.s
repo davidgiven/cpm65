@@ -5,6 +5,7 @@
 	.import xfcb_writesequential
 	.import xfcb_readsequential
 	.import xfcb_make
+	.import xfcb_open
 	.import xfcb_close
 
 	.zeropage
@@ -22,22 +23,27 @@ index:	 .res 1
 	cmp #' '
 	beq syntax_error
 
-	; Try and create the file.
+	; Try and open the file.
 
 	lda #<FCB
 	ldx #>FCB
-	jsr xfcb_make
+	jsr xfcb_open
 	bcs cannot_open
 
-	; Write some garbage to it.
+	; Read all the blocks in the file.
 
-	lda #<testdata
-	ldx #>testdata
-	jsr bdos_SETDMA
+	zrepeat
+		lda #'.'
+		jsr bdos_CONOUT
 
-	lda #<FCB
-	ldx #>FCB
-	jsr xfcb_writesequential
+		lda #<buffer
+		ldx #>buffer
+		jsr bdos_SETDMA
+
+		lda #<FCB
+		ldx #>FCB
+		jsr xfcb_readsequential
+	zuntil_cs
 
 	; Close the file.
 
@@ -48,9 +54,9 @@ index:	 .res 1
 	rts
 .endscope
 
-.data
-testdata:
-	.res 128, 'q'
+.bss
+buffer:
+	.res 128
 .code
 
 .proc syntax_error
@@ -66,7 +72,7 @@ msg:
 	ldx #>msg
 	jmp bdos_WRITESTRING
 msg:
-	.byte "Cannot create file", 13, 10, 0
+	.byte "Cannot open file", 13, 10, 0
 .endproc
 
 newline:

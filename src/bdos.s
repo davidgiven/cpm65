@@ -746,8 +746,9 @@ entry_OPENFILE:
 
 ; --- Close a file (flush the FCB to disk) ----------------------------------
 
-.proc entry_CLOSEFILE
+entry_CLOSEFILE:
     jsr convert_user_fcb
+.proc internal_CLOSEFILE
     jsr check_disk_writable
 
     ; Check that this FCB has actually changed.
@@ -799,11 +800,39 @@ exit:
     ldy #fcb::rc
     cmp (param), y
     zif_eq
-        cpy #$80                ; is this extent full?
+        cmp #$80                ; is this extent full?
         bne eof                 ; no, we've reached the end of the file
             
-        debug "end of extent"
-        jmp *
+        ; Move to the next extent.
+
+        jsr internal_CLOSEFILE
+
+        ldy #fcb::ex
+        lda (param), y
+        clc
+        adc #1
+        and #$1f
+        sta (param), y
+        zif_eq
+            ldy #fcb::s2
+            lda (param), y
+            and #$7f            ; remove not-modified flag
+            cmp #$7f            ; maximum possible file size?
+            beq eof
+
+            lda (param), y
+            clc
+            adc #1
+            sta (param), y
+        zendif
+        lda #0
+        ldy #fcb::cr
+        sta (param), y
+
+        ; Open it.
+
+        jsr internal_OPENFILE
+        bcs eof
     zendif
     
     jsr get_fcb_block           ; get disk block value in XA
@@ -1199,30 +1228,33 @@ find_first:
     zrepeat
         lda (param), y
         cmp #'?'                ; wildcard
-        beq @same_characters    ; ...skip comparing this byte
+        beq same_characters    ; ...skip comparing this byte
         cpy #fcb::s1            ; don't care about byte 13
-        beq @same_characters
+        beq same_characters
         cpy #fcb::ex
-        bne @compare_chars
+        bne compare_chars
 
         ; Special logic for comparing extents.
 
         lda extent_mask
         eor #$ff                ; inverted extent mask
         pha
-        and (param), y    ; mask FCB extent
+        and (param), y          ; mask FCB extent
         sta tempb
         pla
         and (current_dirent),y  ; mask dirent extent
-        cmp tempb
+        sec
+        sbc tempb
         and #$1f                ; only check bits 0..4
         bne find_next           ; not the same? give up
-    @compare_chars:
+        jmp same_characters
+
+    compare_chars:
         sec
         sbc (current_dirent), y ; compare the two characters
         and #$7f                ; ignore top bit
         bne find_next           ; not the same? give up
-    @same_characters:
+    same_characters:
         iny
         cpy find_first_count    ; reached the end of the string?
     zuntil_eq
