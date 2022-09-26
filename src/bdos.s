@@ -628,16 +628,23 @@ entry_OPENFILE:
 
         ldy #fcb::ex
         lda (param), y
-        cmp tempb                   ; dirent extent - fcb extent
+        cmp tempb                   ; C if ex >= tempb
         zif_ne
             lda #$00                ; after the end of the file, record count empty
-            zif_cc
+            zif_cs
                 ; user extent is smaller
                 lda #$80            ; middle of the file, record count full
             zendif
             ldy #fcb::rc
             sta (param), y            ; set extent record count
         zendif
+
+        ; Set the FCB extent to what the user originally asked for,
+        ; and not the value in the dirent.
+
+        lda tempb
+        ldy #fcb::ex
+        sta (param), y
 
         clc
     zendif
