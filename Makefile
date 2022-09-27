@@ -3,6 +3,8 @@ CA65 = ca65
 LD65 = ld65
 AR65 = ar65
 
+CFLAGS65 = -O
+
 OBJDIR = .obj
 DISKFORMAT = bbc163
 
@@ -10,6 +12,8 @@ APPS = \
 	cpmfs/dump.com \
 	cpmfs/make.com \
 	cpmfs/bitmap.com \
+	cpmfs/submit.com \
+	cpmfs/stat.com \
 
 LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/clear.o \
@@ -41,6 +45,12 @@ $(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
 bios.img: $(OBJDIR)/src/bios.o scripts/bios.cfg
 	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/bios.cfg -o $@ $<
 	
+$(OBJDIR)/apps/%.elf: apps/%.c
+	mos-cpm65-clang $(CFLAGS65) -o $@ $<
+
+cpmfs/%.com: $(OBJDIR)/apps/%.elf
+	elftocpm65 -o $@ $<
+
 cpmfs/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
@@ -60,4 +70,5 @@ clean:
 	rm -rf $(OBJDIR) bios.img bdos.img
 
 .DELETE_ON_ERROR:
+.SECONDARY:
 
