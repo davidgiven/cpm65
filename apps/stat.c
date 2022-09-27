@@ -291,7 +291,7 @@ void file_manipulation(void)
 {
     uint8_t command;
     uint16_t count;
-    uint8_t r;
+    int r;
 
     /* Options are passed as the second word on the command line, which the
      * CPP parses as a filename and writes into cpm_fcb2. There will now be
@@ -306,7 +306,7 @@ void file_manipulation(void)
     cpm_fcb.ex = '?'; /* find all extents, not just the first */
     count = 0;
     r = cpm_findfirst(&cpm_fcb);
-    while (r != 0xff)
+    while (r >= 0)
     {
         DIRE* de = (DIRE*)0x80 + r;
         struct fe* fe = files;

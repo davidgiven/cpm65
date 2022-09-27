@@ -649,6 +649,7 @@ indent_new_line:
 .endproc
 
 .proc entry_GETSETUSER
+    clc
     lda param+0
     zif_mi
         lda current_user

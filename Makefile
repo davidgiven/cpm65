@@ -3,7 +3,7 @@ CA65 = ca65
 LD65 = ld65
 AR65 = ar65
 
-CFLAGS65 = -O
+CFLAGS65 = -Os
 
 OBJDIR = .obj
 DISKFORMAT = bbc163
