@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include "lib/printi.h"
 
 #define FCB_COUNT 256
 
@@ -67,36 +68,6 @@ void printx(const char* s)
 {
     print(s);
     crlf();
-}
-
-/* 
- * Prints a 16-bit decimal number with optional left padding and configurable
- * precision. *.
- */
-void printip(uint16_t v, bool pad, uint16_t precision)
-{
-    bool zerosup = true;
-    while (precision)
-    {
-        uint8_t d = v / precision;
-        v %= precision;
-        precision /= 10;
-        if (precision && zerosup && !d)
-        {
-            if (pad)
-                cpm_conout(' ');
-        }
-        else
-        {
-            zerosup = false;
-            cpm_conout('0' + d);
-        }
-    }
-}
-
-void printi(uint16_t v)
-{
-    printip(v, false, 10000);
 }
 
 /* Compares the accumulator with an array of uint8_t[4] words. Returns the
@@ -225,7 +196,7 @@ void scan(void)
 
 void printipadded(uint16_t value)
 {
-    printip(value, true, 10000);
+    printip(value, ' ');
 }
 
 void get_detailed_drive_status(void)
@@ -396,7 +367,7 @@ void file_manipulation(void)
                 cpm_conout(' ');
                 printipadded(f->blocks << (dpb->bsh - 3));
                 print("kB ");
-                printip(f->extents, true, 1000);
+                printipadded(f->extents);
                 print((f->filename[8] & 0x80) ? " R/O " : " R/W ");
                 cpm_conout(current_drive);
                 cpm_conout(':');

@@ -45,8 +45,8 @@ $(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
 bios.img: $(OBJDIR)/src/bios.o scripts/bios.cfg
 	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/bios.cfg -o $@ $<
 	
-$(OBJDIR)/apps/%.elf: apps/%.c
-	mos-cpm65-clang $(CFLAGS65) -o $@ $<
+$(OBJDIR)/apps/%.elf: apps/%.c lib/printi.S
+	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 cpmfs/%.com: $(OBJDIR)/apps/%.elf
 	elftocpm65 -o $@ $<
