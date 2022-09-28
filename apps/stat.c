@@ -217,7 +217,7 @@ void get_detailed_drive_status(void)
     }
 
     printipadded(count_space());
-    printx(": kilobyte drive capacity");
+    printx(": kilobyte free drive capacity");
 
     printipadded(dpb->drm+1);
     printx(": 32 byte directory entries");
@@ -226,7 +226,7 @@ void get_detailed_drive_status(void)
     printx(": checked directory entries");
 
     printipadded((dpb->exm+1)*128);
-    printx(": records per extent");
+    printx(": records per directory entry");
 
     printipadded(dpb->spt);
     printx(": sectors per track");
@@ -244,11 +244,9 @@ int index_sort_cb(const void* left, const void* right)
 
 void print_filename(uint8_t* filename)
 {
-    uint8_t i;
-
-    for (i=0; i<11; i++)
+    for (uint8_t i=0; i<11; i++)
     {
-        uint8_t b = *filename++ & 0x7f;
+        uint8_t b = filename[i] & 0x7f;
         if (b != ' ')
         {
             if (i == 8)
@@ -276,10 +274,11 @@ void file_manipulation(void)
     select_fcb_disk();
     cpm_fcb.ex = '?'; /* find all extents, not just the first */
     count = 0;
+	cpm_set_dma(cpm_default_dma);
     r = cpm_findfirst(&cpm_fcb);
     while (r >= 0)
     {
-        DIRE* de = (DIRE*)0x80 + r;
+        DIRE* de = (DIRE*)cpm_default_dma + r;
         struct fe* fe = files;
         uint8_t j;
 
@@ -310,8 +309,12 @@ void file_manipulation(void)
             }
         }
 
-        fe->extents++;
-        fe->records += de->rc + (de->ex & dpb->exm)*128;
+		if (de->ex >= fe->extents)
+		{
+			fe->extents = de->ex + 1;
+			fe->records = (de->ex * 128) + de->rc;
+		}
+
         if (dpb->dsm < 256)
         {
             /* 8-bit allocation map. */
@@ -347,7 +350,7 @@ void file_manipulation(void)
             current_drive = 'A' + cpm_get_current_drive();
             if (command == LIST_WITH_SIZE)
                 print("  Size");
-            printx(" Recs   Bytes  Ext Acc");
+            printx(" Recs   Bytes   Ext Acc");
             fep = findex;
             while (count--)
             {
@@ -377,8 +380,6 @@ void file_manipulation(void)
                 if (f->filename[9] & 0x80)
                     cpm_conout(')');
                 crlf();
-                if (cpm_const())
-                    return;
             }
             print("Bytes remaining on ");
             cpm_conout(current_drive);
@@ -413,8 +414,6 @@ void file_manipulation(void)
                 cpm_conout(*p++);
                 cpm_conout(*p);
                 crlf();
-                if (cpm_const())
-                    return;
 
                 fe++;
             }
@@ -556,8 +555,6 @@ void show_user_numbers(void)
 {
     static uint8_t users[32];
     static FCB wildcard_fcb;
-    uint8_t r;
-    uint8_t i;
     DIRE* data;
 
     print("Active user: ");
@@ -570,8 +567,8 @@ void show_user_numbers(void)
     memset(users, 0, sizeof(users));
 
     memcpy(&wildcard_fcb, &wildcard_fcb_template, sizeof(FCB));
-    r = cpm_findfirst(&wildcard_fcb);
-    while (r != 0xff)
+    int r = cpm_findfirst(&wildcard_fcb);
+    while (r >= 0)
     {
         DIRE* found = &data[r];
         /* On disk, dr contains the user number */
@@ -580,7 +577,7 @@ void show_user_numbers(void)
         r = cpm_findnext(&wildcard_fcb);
     }
 
-    for (i=0; i<32; i++)
+    for (uint8_t i=0; i<32; i++)
     {
         if (users[i])
         {

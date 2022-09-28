@@ -421,6 +421,7 @@ reboot:
     zif_eq
         jsr bios_CONST
     zendif
+    clc
     rts
 .endproc
 
@@ -1299,57 +1300,21 @@ exit:
 ; searching.
 ; Returns C on error.
 
-entry_FINDFIRST:
+.scope
+::entry_FINDFIRST:
     jsr setup_fcb_for_find
     bcs find_error
     ; A = number of bytes to search
     jsr find_first
-    bcs find_error
     jmp copy_result_of_find
 
-entry_FINDNEXT:
+::entry_FINDNEXT:
     jsr setup_fcb_for_find
     bcs find_error
     ; A = number of bytes to search
     jsr find_next
-    bcs find_error
-    jmp copy_result_of_find
-
-find_error:
-    rts
-
-; Returns the number of bytes to search.
-.proc setup_fcb_for_find
-    ldy #fcb::dr
-    lda (param), y
-    cmp #'?'
-    zif_eq                      ; special wildcard search?
-        sta old_fcb_drive
-
-        lda current_user
-        sta (param), y          ; update FCB
-
-        lda #fcb::dr+1          ; number of bytes to search
-    zelse
-        jsr convert_user_fcb
-        bcs error
-
-        ldy #fcb::ex
-        lda (param), y
-        cmp #'?'
-        zif_eq                  ; get all extents?
-            lda #0
-            ldy #fcb::s2
-            sta (param), y      ; clear module byte in FCB
-        zendif
-
-        lda #fcb::s2+1          ; number of bytes to search
-    zendif
-error:
-    rts
-.endproc
-
-.proc copy_result_of_find
+    ; fall through
+copy_result_of_find:
     zif_cc
         ; Copy the directory buffer into the DMA buffer.
 
@@ -1367,6 +1332,35 @@ error:
         lsr a
         clc
     zendif
+find_error:
+    rts
+.endscope
+
+
+; Returns the number of bytes to search.
+.proc setup_fcb_for_find
+    ldy #fcb::dr
+    lda (param), y
+    cmp #'?'
+    zif_eq
+        lda #fcb::dr+1          ; number of bytes to search
+    zelse
+        jsr convert_user_fcb
+        bcs error
+
+        ldy #fcb::ex
+        lda (param), y
+        cmp #'?'
+        zif_eq                  ; get all extents?
+            lda #0
+            ldy #fcb::s2
+            sta (param), y      ; clear module byte in FCB
+        zendif
+
+        lda #fcb::s2+1          ; number of bytes to search
+    zendif
+    clc
+error:
     rts
 .endproc
 
@@ -1598,7 +1592,7 @@ exit:
     ; Move to the next dirent
 
     inc directory_pos+0
-    zif_cs
+    zif_eq
         inc directory_pos+1
     zendif
 
