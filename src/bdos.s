@@ -242,7 +242,7 @@ jumptable_lo:
     .lobytes entry_READSEQUENTIAL ; read_sequential = 20
     .lobytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .lobytes entry_CREATEFILE ; create_file = 22
-    .lobytes unimplemented ; rename_file = 23
+    .lobytes entry_RENAMEFILE ; rename_file = 23
     .lobytes entry_GETLOGINBITMAP ; get_login_bitmap = 24
     .lobytes entry_GETDRIVE ; get_current_drive = 25
     .lobytes entry_SETDMAADDRESS ; set_dma_address = 26
@@ -284,7 +284,7 @@ jumptable_hi:
     .hibytes entry_READSEQUENTIAL ; read_sequential = 20
     .hibytes entry_WRITESEQUENTIAL ; write_sequential = 21
     .hibytes entry_CREATEFILE ; create_file = 22
-    .hibytes unimplemented ; rename_file = 23
+    .hibytes entry_RENAMEFILE ; rename_file = 23
     .hibytes entry_GETLOGINBITMAP ; get_login_bitmap = 24
     .hibytes entry_GETDRIVE ; get_current_drive = 25
     .hibytes entry_SETDMAADDRESS ; set_dma_address = 26
@@ -893,6 +893,48 @@ exit:
             lda #$e5
             ldy #fcb::dr
             sta (current_dirent), y
+            jsr write_sector
+
+            ; Get the next matching dirent.
+
+            lda #fcb::t3+1
+            jsr find_next
+        zuntil_cs
+    zendif
+
+    rts
+.endproc
+
+.proc entry_RENAMEFILE
+    jsr convert_user_fcb
+
+    ; Rename all files matching the filename.
+
+    lda #fcb::t3+1
+    jsr find_first
+    zif_cc
+        zrepeat
+            ; Replace the filename in the dirent with the new one.
+
+            lda #fcb::f1
+            sta temp+0      ; dirent index
+            lda #16+fcb::f1
+            sta temp+1      ; filename index
+            zrepeat
+                ldy temp+1
+                lda (param), y
+
+                ldy temp+0
+                sta (current_dirent), y
+
+                inc temp+0
+                inc temp+1
+                lda temp+0
+                cmp #fcb::t3+1
+            zuntil_eq
+
+            ; Write back to disk.
+
             jsr write_sector
 
             ; Get the next matching dirent.

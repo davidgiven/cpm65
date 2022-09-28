@@ -18,6 +18,8 @@ temp:		.word 0
 BDOS:
 	jmp 0
 ENTRY:
+	tsx
+	stx stackptr
 
 	ldy #bdos::get_bios
 	jsr BDOS
@@ -37,6 +39,7 @@ ENTRY:
 		sta submit_fcb+xfcb::dr
 	zendif
 
+MAINLOOP:
 	zloop
 		; Print prompt.
 
@@ -225,9 +228,17 @@ msg:
 	.byte "Bad $$$.SUB", 13, 10, 0
 .endproc
 
-.proc parse_valid_user_fcb
+.proc parse_valid_userfcb
 	lda #<userfcb
 	ldx #>userfcb
+	jsr parse_fcb
+	bcs invalid_filename
+	rts
+.endproc
+
+.proc parse_valid_userfcb2
+	lda #<(userfcb2)
+	ldx #>(userfcb2)
 	jsr parse_fcb
 	bcs invalid_filename
 	rts
@@ -236,17 +247,27 @@ msg:
 .proc invalid_filename
 	lda #<msg
 	ldx #>msg
-	jmp bdos_WRITESTRING
+	jmp error
 msg:
-	.byte "Invalid filename", 13, 10, 0
+	.byte "Invalid filename", 0
 .endproc
 
 .proc cannot_open
 	lda #<msg
 	ldx #>msg
-	jmp bdos_WRITESTRING
+	jmp error
 msg:
-	.byte "Cannot open file", 13, 10, 0
+	.byte "Cannot open file", 0
+.endproc
+
+; Prints the message in XA and returns to the main loop.
+
+.proc error
+	jsr bdos_WRITESTRING
+	jsr newline
+	ldx stackptr
+	txs
+	jmp MAINLOOP
 .endproc
 
 .proc entry_DIR
@@ -255,7 +276,7 @@ msg:
 
 	; Parse the filename.
 
-	jsr parse_valid_user_fcb
+	jsr parse_valid_userfcb
 
 	; Just the drive?
 
@@ -394,7 +415,7 @@ exit:
 .endproc
 
 .proc entry_ERA
-	jsr parse_valid_user_fcb
+	jsr parse_valid_userfcb
 
 	; Just delete everything which matches.
 
@@ -404,7 +425,7 @@ exit:
 .endproc
 
 .proc entry_TYPE
-	jsr parse_valid_user_fcb
+	jsr parse_valid_userfcb
 	
 	; Open the FCB.
 
@@ -519,7 +540,27 @@ msg_ccp:
 .endproc
 
 .proc entry_REN
-	rts
+	jsr parse_valid_userfcb2
+	jsr parse_valid_userfcb
+
+	lda userfcb+xfcb::f1
+	cmp #' '
+	beq error
+
+	lda userfcb2+xfcb::f1
+	cmp #' '
+	beq error
+
+	lda #<userfcb
+	ldx #>userfcb
+	jmp bdos_RENAME
+
+error:
+	lda #<msg
+	ldx #>msg
+	jmp bdos_WRITESTRING
+msg:
+	.byte "Bad filename", 13, 10, 0
 .endproc
 
 .proc entry_USER
@@ -839,7 +880,7 @@ error:
 	zrepeat						; 4 bytes of metadata
 		iny
 		sta (fcb), y
-		cpy #xfcb::cr
+		cpy #xfcb::rc+1
 	zuntil_eq
 
 	; Check for drive.
@@ -875,8 +916,8 @@ error:
 		beq exit				; end of line
 		cpy #xfcb::f8+1
 		zbreakif_eq
-		cmp #' '
-		beq exit
+		jsr is_terminator_char
+		bcs exit
 		cmp #'.'
 		zbreakif_eq
 		cmp #'*'
@@ -886,7 +927,7 @@ error:
 			dex					; reread the * again next time
 		zendif
 		jsr is_valid_filename_char
-		bcs invalid_fcb
+		bcs return_with_carry
 		sta (fcb), y
 		iny
 		inx
@@ -896,19 +937,17 @@ error:
 
 	; Skip non-dot filename characters.
 
-	zloop
+	zrepeat
 		cmp #'.'
 		zbreakif_eq
+		jsr is_terminator_char
+		bcs exit
+		jsr is_valid_filename_char
+		bcs return_with_carry
 
 		inx
 		lda cmdline+1, x
-		beq exit
-		cmp #' '
-		beq exit
-
-		jsr is_valid_filename_char
-		bcs invalid_fcb
-	zendloop
+	zuntil_eq
 	; A is the character just read
 	; X is cmdoffset
 
@@ -921,10 +960,8 @@ error:
 		beq exit				; end of line
 		cpy #fcb::t3+1
 		zbreakif_eq
-		cmp #' '
-		beq exit
-		cmp #'.'
-		zbreakif_eq
+		jsr is_terminator_char
+		bcs exit
 		cmp #'*'
 		zif_eq
 			; Turn "ABC.X*" -> "ABC.X*"
@@ -932,7 +969,7 @@ error:
 			dex					; reread the * again next time
 		zendif
 		jsr is_valid_filename_char
-		bcs invalid_fcb
+		bcs return_with_carry
 		sta (fcb), y
 		iny
 		inx
@@ -940,19 +977,15 @@ error:
 		
 	; Discard any remaining filename characters.
 
-	zloop
-		cmp #'.'
-		zbreakif_eq
+	zrepeat
+		jsr is_terminator_char
+		zbreakif_cs
+		jsr is_valid_filename_char
+		bcs return_with_carry
 
 		inx
 		lda cmdline+1, x
-		beq exit
-		cmp #' '
-		beq exit
-
-		jsr is_valid_filename_char
-		bcs invalid_fcb
-	zendloop
+	zuntil_eq
 
 	; Now A contains the terminating character --- either a space or \0.  We
 	; have a valid FCB!
@@ -962,28 +995,38 @@ exit:
 	clc
 	rts
 
-invalid_fcb:
+return_with_carry:
 	sec
 	rts
 
-is_valid_filename_char:
-	cmp #32
-	bcc invalid_fcb
-	cmp #127
-	bcs invalid_fcb
-	cmp #'='
-	beq invalid_fcb
-	cmp #':'
-	beq invalid_fcb
-	cmp #';'
-	beq invalid_fcb
-	cmp #'<'
-	beq invalid_fcb
-	cmp #'>'
-	beq invalid_fcb
+return_without_carry:
 	clc
 	rts
 
+.proc is_terminator_char
+	cmp #' '
+	beq return_with_carry
+	cmp #'='
+	beq return_with_carry
+	clc
+	rts
+.endproc
+
+is_valid_filename_char:
+	cmp #32
+	bcc return_with_carry
+	cmp #127
+	bcs return_with_carry
+	cmp #':'
+	beq return_with_carry
+	cmp #';'
+	beq return_with_carry
+	cmp #'<'
+	beq return_with_carry
+	cmp #'>'
+	beq return_with_carry
+	clc
+	rts
 .endproc
 
 ; Leaves the updated cmdoffset in X.
@@ -992,7 +1035,10 @@ is_valid_filename_char:
 	zloop
 		lda cmdline+1, x
 		cmp #' '
-		zbreakif_ne
+		zif_ne
+			cmp #'='
+			zbreakif_ne
+		zendif
 		inx
 	zendloop
 	stx cmdoffset
@@ -1112,6 +1158,10 @@ bdos_FINDNEXT:
 	ldy #bdos::find_next
 	jmp BDOS
 
+bdos_RENAME:
+	ldy #bdos::rename_file
+	jmp BDOS
+
 bdos_READSEQUENTIAL:
 	ldy #bdos::read_sequential
 	jmp BDOS
@@ -1141,11 +1191,13 @@ submit_fcb:
 	.byte 0				; user
 
 	.bss
+stackptr: .res 1	; stack pointer on startup
 bios:	 .res 2		; address of BIOS
 drive:	 .res 1		; current drive, 0-based
 cmdline: .res 128	; command line buffer
 cmdfcb:  .tag xfcb	; FCB of command
 userfcb: .tag xfcb	; parameter FCB
+userfcb2 = userfcb + 16
 
 ; vim; ts=4 sw=4 et filetype=asm
 
