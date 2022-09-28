@@ -3,6 +3,7 @@
 	.include "xfcb.inc"
 
 	.import xfcb_open
+	.import xfcb_close
 	.import xfcb_readsequential
 	.import xfcb_erase
 
@@ -26,6 +27,16 @@ ENTRY:
 	jsr bdos_GETDRIVE
 	sta drive
 
+	; Try and open the $$$.SUB file.
+
+	lda #<submit_fcb
+	ldx #>submit_fcb
+	jsr xfcb_open
+	zif_cs
+		lda #$ff
+		sta submit_fcb+xfcb::dr
+	zendif
+
 	zloop
 		; Print prompt.
 
@@ -46,12 +57,12 @@ ENTRY:
 
 		; Read command line.
 
-		lda #127
-		sta cmdline
-		lda #<cmdline
-		ldx #>cmdline
-		jsr bdos_READLINE
-		jsr newline
+		lda submit_fcb+xfcb::dr
+		zif_mi
+			jsr read_command_from_keyboard
+		zelse
+			jsr read_command_from_submit_file
+		zendif
 
 		; Zero terminate it.
 
@@ -125,6 +136,94 @@ commands_hi:
 	.hibytes entry_REN - 1
 	.hibytes entry_USER - 1
 	.hibytes entry_TRANSIENT - 1
+
+.proc read_command_from_keyboard
+	; Read from keyboard.
+
+	lda #127
+	sta cmdline
+	lda #<cmdline
+	ldx #>cmdline
+	jsr bdos_READLINE
+	jmp newline
+.endproc
+
+.proc read_command_from_submit_file
+	; Read from submit file.
+
+	ldx submit_fcb+xfcb::rc
+	zif_eq
+		; File empty --- delete it.
+
+		jsr remove_sub_file
+
+		; Mark the submit file as not used.
+
+		lda #$ff
+		sta submit_fcb+xfcb::dr
+
+		jmp read_command_from_keyboard
+	zendif
+
+	; Read the command.
+
+	; x = record count
+	dex
+	stx submit_fcb+xfcb::cr
+
+	lda #<cmdline
+	ldx #>cmdline
+	jsr bdos_SETDMA
+
+	lda #<submit_fcb
+	ldx #>submit_fcb
+	jsr xfcb_readsequential
+
+	; Shorten the file.
+
+	ldx submit_fcb+xfcb::rc		; write back update record count
+	dex
+	stx submit_fcb+xfcb::rc
+	lda submit_fcb+xfcb::s2		; mark FCB as modified
+	and #$7f
+	sta submit_fcb+xfcb::s2
+
+	lda #<cmdline
+	ldx #>cmdline
+	jsr xfcb_close
+
+	; Print the command.
+
+	lda #0
+	sta temp
+	zloop
+		ldx temp
+		cpx cmdline+0
+		zbreakif_eq
+
+		lda cmdline+1, x
+		jsr bdos_CONOUT
+
+		inc temp
+	zendloop
+	jmp newline
+
+error:
+	jsr remove_sub_file
+
+	lda #<msg
+	ldx #>msg
+	jsr bdos_WRITESTRING
+	jmp bdos_EXIT
+
+remove_sub_file:
+	lda #<submit_fcb
+	ldx #>submit_fcb
+	jmp xfcb_erase
+
+msg:
+	.byte "Bad $$$.SUB", 13, 10, 0
+.endproc
 
 .proc parse_valid_user_fcb
 	lda #<userfcb
@@ -960,6 +1059,10 @@ h4:
 	rts
 .endproc
 
+bdos_EXIT:
+	ldy #bdos::exit_program
+	jmp BDOS
+
 bdos_SETDMA:
 	ldy #bdos::set_dma_address
 	jmp BDOS
@@ -1024,6 +1127,18 @@ bios_GETTPA:
 bios_RELOCATE:
 	ldy #bios::relocate
 	jmp (bios)
+
+	.data
+
+; Submit file FCB.
+submit_fcb:
+	.byte 1			    ; A:
+	.byte "$$$     SUB" ; filename
+	.byte 0, 0, 0, 0    ; metadata
+	.res 16			    ; allocation map
+	.byte 0				; cr
+	.byte 0, 0, 0		; r
+	.byte 0				; user
 
 	.bss
 bios:	 .res 2		; address of BIOS
