@@ -260,7 +260,6 @@ void file_manipulation(void)
 {
     uint8_t command;
     uint16_t count;
-    int r;
 
     /* Options are passed as the second word on the command line, which the
      * CPP parses as a filename and writes into cpm_fcb2. There will now be
@@ -275,8 +274,8 @@ void file_manipulation(void)
     cpm_fcb.ex = '?'; /* find all extents, not just the first */
     count = 0;
 	cpm_set_dma(cpm_default_dma);
-    r = cpm_findfirst(&cpm_fcb);
-    while (r >= 0)
+    uint8_t r = cpm_findfirst(&cpm_fcb);
+    while (r != 0xff)
     {
         DIRE* de = (DIRE*)cpm_default_dma + r;
         struct fe* fe = files;
@@ -568,8 +567,8 @@ void show_user_numbers(void)
     memset(users, 0, sizeof(users));
 
     memcpy(&wildcard_fcb, &wildcard_fcb_template, sizeof(FCB));
-    int r = cpm_findfirst(&wildcard_fcb);
-    while (r >= 0)
+    uint8_t r = cpm_findfirst(&wildcard_fcb);
+    while (r != 0xff)
     {
         DIRE* found = &data[r];
         /* On disk, dr contains the user number */

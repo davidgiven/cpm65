@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
     gargv = argv;
 
     memcpy(&cpm_fcb.f[8], "SUB", 3);
-    if (cpm_open_file(&cpm_fcb) < 0)
+    if (cpm_open_file(&cpm_fcb) != 0)
         fatal("could not open input file");
 
     record_ptr = cpm_ram;
@@ -175,11 +175,13 @@ int main(int argc, char* argv[])
         uint8_t i;
 
         cpm_set_dma(&buffer);
-        int r = cpm_read_sequential(&cpm_fcb);
-        if (r == -1) /* EOF */
-            goto eof;
-        if (r < 0)
+        uint8_t r = cpm_read_sequential(&cpm_fcb);
+		if (r)
+		{
+			if (cpm_errno == CPME_NOBLOCK)
+				goto eof;
             fatal("read error");
+		}
 
         for (uint8_t i=0; i<128; i++)
         {
@@ -192,18 +194,18 @@ int main(int argc, char* argv[])
 eof:
 
     cpm_delete_file(&out_fcb);
-    if (cpm_make_file(&out_fcb) < 0)
+    if (cpm_make_file(&out_fcb) != 0)
         fatal("could not open output file");
 
     while (record_ptr != cpm_ram)
     {
         record_ptr -= 128;
         cpm_set_dma(record_ptr);
-        if (cpm_write_sequential(&out_fcb) < 0)
+        if (cpm_write_sequential(&out_fcb) != 0)
             fatal("error writing output file");
     }
 
-    if (cpm_close_file(&out_fcb) < 0)
+    if (cpm_close_file(&out_fcb) != 0)
         fatal("error writing output file");
 
     /* Force a CP/M restart so the file gets invoked */
