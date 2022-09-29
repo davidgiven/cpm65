@@ -66,10 +66,10 @@ cpmfs.img: $(wildcard cpmfs/*) $(APPS) cpmfs/ccp.sys
 	rm -f $@
 	mkfs.cpm -f $(DISKFORMAT) $@
 	cpmcp -f $(DISKFORMAT) $@ $^ 0:
-	#cpmchattr -f $(DISKFORMAT) $@ s 0:ccp.sys
+	cpmchattr -f $(DISKFORMAT) $@ s 0:ccp.sys
 
 clean:
-	rm -rf $(OBJDIR) bios.img bdos.img
+	rm -rf $(OBJDIR) bios.img bdos.img cpmfs.img $(APPS)
 
 .DELETE_ON_ERROR:
 .SECONDARY:

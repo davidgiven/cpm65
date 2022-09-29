@@ -454,7 +454,7 @@ zp_end:  .byte $90
 
 ; DPH for drive 0 (our only drive)
 
-dph: define_drive 40*32, 2048, 64, 0
+dph: define_drive $600, 1024, 64, 0
 
     .bss
 mem_base: .byte 0
