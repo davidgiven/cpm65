@@ -10,12 +10,6 @@
     CPM_SYSTEM_TYPE = 0
     CPM_VERSION = $22 ; CP/M 2.2 (compatible)
 
-.macro debug s
-    jsr pdebug
-    .byte s
-    .byte 13, 10, 0
-.endmacro
-
     .zeropage
 
 current_dirent: .word 0     ; current directory entry
@@ -29,8 +23,6 @@ bitmap:             .word 0 ; allocation bitmap from the DPH
 
 temp:           .res 4      ; temporary storage
 tempb:          .byte 0     ; more temporary storage
-debugp1:        .word 0     ; used for debug strings
-debugp2:        .word 0     ; used for debug strings
 
 ; --- Initialisation --------------------------------------------------------
 ; TODO: figure out how to discard this.
@@ -89,8 +81,12 @@ entry_EXIT:
     sta param+1
     jsr entry_OPENFILE
     zif_cs
-        debug "Couldn't open CCP"
+        lda #<no_ccp
+        ldx #>no_ccp
+        jsr internal_WRITESTRING
         jmp *
+    no_ccp:
+        .byte "Couldn't open CCP", 13, 10, 0
     zendif
 
     ; Read the first sector.
@@ -215,7 +211,6 @@ ccp_fcb:
     rts
 
 unimplemented:
-    debug "unimplemented"
     jmp *
 
 jumptable_lo:
@@ -253,7 +248,7 @@ jumptable_lo:
     .lobytes entry_GETDPB ; get_DPB = 31
     .lobytes entry_GETSETUSER ; get_set_user_number = 32
     .lobytes unimplemented ; read_random = 33
-    .lobytes unimplemented ; write_random = 34
+    .lobytes entry_WRITERANDOM ; write_random = 34
     .lobytes unimplemented ; compute_file_size = 35
     .lobytes unimplemented ; compute_random_pointer = 36
     .lobytes entry_RESETDISK ; reset_disk = 37
@@ -295,7 +290,7 @@ jumptable_hi:
     .hibytes entry_GETDPB ; get_dpb = 31
     .hibytes entry_GETSETUSER ; get_set_user_number = 32
     .hibytes unimplemented ; read_random = 33
-    .hibytes unimplemented ; write_random = 34
+    .hibytes entry_WRITERANDOM ; write_random = 34
     .hibytes unimplemented ; compute_file_size = 35
     .hibytes unimplemented ; compute_random_pointer = 36
     .hibytes entry_RESETDISK ; reset_disk = 37
@@ -451,6 +446,9 @@ reboot:
     rts
 .endproc
 
+internal_WRITESTRING:
+    sta param+0
+    stx param+1
 .proc entry_WRITESTRING
     zloop
         ldy #0
@@ -698,7 +696,8 @@ entry_OPENFILE:
 
         jsr fcb_is_not_modified
 
-        ; Compare the user extent byte with the dirent.
+        ; Compare the user extent byte with the dirent to determine
+        ; if we're at the end of the file or not.
 
         ldy #fcb::ex
         lda (param), y
@@ -853,6 +852,10 @@ entry_CLOSEFILE:
     ; Update the directory entry from the FCB.
 
     ldy #fcb::rc
+    lda (param), y
+    sta (current_dirent), y
+
+    ldy #fcb::ex
     lda (param), y
     sta (current_dirent), y
 
@@ -1057,27 +1060,45 @@ exit:
 .endproc
 
 ; Set the current block number in the FCB to XA.
+; Preserves XA.
 .proc set_fcb_block
     sta temp+0
     stx temp+1
 
     jsr get_fcb_block_index     ; gets index in Y
-    lda temp+0                  ; store low byte
+    lda temp+0                  ; fetch low byte
     sta (param), y
     ldx blocks_on_disk+1        ; are we a big disk?
     zif_ne                      ; yes
         iny
-        lda temp+1
+        lda temp+1              ; fetch high byte
         sta (param), y
-        rts
     zendif
 
+    lda temp+0
+    ldx temp+1
     rts
 .endproc
 
 ; Return offset to the current block in the FCB in Y.
+; Uses temp+2.
 .proc get_fcb_block_index
+    lda #7
+    sec
+    sbc block_shift 
+    tax                         ; x = how much to shift extent number
+
+    lda extent_mask
+    ldy #fcb::ex                ; get current extent
+    and (param), y              ; extent offset into dirent
+    zrepeat                     ; shift extent to get allocation map start
+        asl a
+        dex
+    zuntil_eq
+    sta temp+2
+
     ldy #fcb::cr                ; get current record
+    clc
     lda (param), y
 
     ldx block_shift             ; get block index
@@ -1085,6 +1106,9 @@ exit:
         lsr a
         dex
     zuntil_eq                   ; A = block index
+
+    clc
+    adc temp+2                  ; add extent start index
 
     ldx blocks_on_disk+1        ; are we a big disk?
     zif_ne                      ; yes
@@ -1237,15 +1261,9 @@ merge_error:
             bcs error
         zendif
     zendif
-    
-    jsr get_fcb_block           ; get disk block value in XA
-    zif_eq
-        jsr fcb_is_modified
-        jsr allocate_unused_block
-        jsr set_fcb_block
-    zendif
-    jsr get_sequential_sector_number
 
+    jsr seek_to_block
+    
     ; Move the FCB on to the next record, for next time.
 
     ldy #fcb::cr
@@ -1254,7 +1272,7 @@ merge_error:
     adc #1
     sta (param), y
 
-    ; If CR > RC, update RC.
+    ; If (CR+1) > RC, update RC.
 
     ldy #fcb::rc
     cmp (param), y
@@ -1277,6 +1295,18 @@ exit:
     rts
 .endproc
 
+; Sets the current sector to the block pointed to by the FCB.
+
+.proc seek_to_block
+    jsr get_fcb_block           ; get disk block value in XA
+    zif_eq
+        jsr fcb_is_modified
+        jsr allocate_unused_block
+        jsr set_fcb_block
+    zendif
+    jmp get_sequential_sector_number
+.endproc
+
 .proc fcb_is_not_modified
     ldy #fcb::s2
     lda (param), y
@@ -1290,6 +1320,101 @@ exit:
     lda (param), y
     and #$7f
     sta (param), y
+    rts
+.endproc
+
+; --- Write to a random record ----------------------------------------------
+
+.proc entry_WRITERANDOM
+    jsr convert_user_fcb
+
+    ; Convert random access record number to M/E/R.
+
+    ldy #fcb::r0
+    lda (param), y
+    and #$7f
+    ldy #fcb::cr
+    sta (param), y          ; new current record
+
+    ldy #fcb::r0
+    lda (param), y          ; get low byte
+    rol a                   ; top bit into carry
+    iny
+    lda (param), y          ; get high byte
+    rol a                   ; carry into bottom bit and x2
+    and #$1f
+    sta temp+1              ; new extent
+
+    ldy #fcb::r1
+    lda (param), y          ; get high byte
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    sta temp+2              ; new module
+
+    ; Do we need to switch to a different extent?
+
+    ldy #fcb::s2
+    lda (param), y          ; compare S2
+    and #$7f                ; ...ignoring not-modified bit
+    cmp temp+2
+    zif_eq
+        ldy #fcb::ex
+        lda (param), y
+        cmp temp+1
+    zendif
+    zif_ne
+        lda temp+1
+        pha                     ; push EX
+        lda temp+2
+        pha                     ; push S2
+
+        jsr internal_CLOSEFILE
+
+        ldy #fcb::s2
+        pla
+        sta (param), y          ; update S2
+
+        ldy #fcb::ex
+        pla
+        sta (param), y          ; update EX
+
+        jsr internal_OPENFILE
+        zif_cs
+            ; Could not open new extent --- it must not exist.
+
+            jsr internal_CREATEFILE
+            lda #1              ; directory full
+            bcs error
+        zendif
+    zendif
+
+    ; If (CR+1) > RC, update RC.
+
+    ldy #fcb::cr
+    lda (param), y
+    clc
+    adc #1
+    ldy #fcb::rc
+    cmp (param), y
+    zif_cs
+        sta (param), y
+        jsr fcb_is_modified
+    zendif
+
+    ; Actually do the write!
+
+    jsr seek_to_block
+    jsr reset_user_dma
+    jsr write_sector
+    lda #0
+    clc
+    rts
+
+error:
+    sec
+exit:
     rts
 .endproc
 
@@ -1352,9 +1477,8 @@ find_error:
         lda (param), y
         cmp #'?'
         zif_eq                  ; get all extents?
-            lda #0
             ldy #fcb::s2
-            sta (param), y      ; clear module byte in FCB
+            sta (param), y      ; module number should be a wildcard
         zendif
 
         lda #fcb::s2+1          ; number of bytes to search
@@ -2048,45 +2172,6 @@ bios_GETZP:
 bios_SETDMA:
     ldy #bios::setdma
     jmp callbios
-
-; Prints a string.
-
-pdebug:
-    sta debuga
-    stx debugx
-    sty debugy
-
-    tsx
-    lda $101, x
-    sta debugp1+0
-    lda $102, x
-    sta debugp1+1
-
-@loop:
-    inc debugp1+0
-    bne :+
-    inc debugp1+1
-:
-    ldy #0
-    lda (debugp1), y
-    beq @exit
-
-    jsr bios_CONOUT
-    jmp @loop
-
-@exit:
-    pla
-    pla
-
-    lda debugp1+1
-    pha
-    lda debugp1+0
-    pha
-
-    lda debuga
-    ldx debugx
-    ldy debugy
-    rts
 
     .bss
 

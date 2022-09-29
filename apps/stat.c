@@ -25,7 +25,7 @@ uint16_t bpb; /* bytes per block */
 struct __attribute__((packed)) fe
 {
     uint8_t filename[11];
-    uint8_t extents;
+    uint16_t extents;
     uint16_t blocks;
     uint16_t records;
 };
@@ -309,10 +309,11 @@ void file_manipulation(void)
             }
         }
 
-		if (de->ex >= fe->extents)
+		uint16_t extents = de->s2*32 + de->ex;
+		if (extents >= fe->extents)
 		{
-			fe->extents = de->ex + 1;
-			fe->records = (de->ex * 128) + de->rc;
+			fe->extents = extents + 1;
+			fe->records = (extents * 128) + de->rc;
 		}
 
         if (dpb->dsm < 256)

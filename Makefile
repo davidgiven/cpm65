@@ -10,10 +10,10 @@ DISKFORMAT = bbc163
 
 APPS = \
 	cpmfs/dump.com \
-	cpmfs/make.com \
 	cpmfs/bitmap.com \
 	cpmfs/submit.com \
 	cpmfs/stat.com \
+	cpmfs/rand.com \
 
 LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/clear.o \
@@ -23,9 +23,11 @@ LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/make.o \
 	$(OBJDIR)/lib/xfcb/open.o \
 	$(OBJDIR)/lib/xfcb/prepare.o \
+	$(OBJDIR)/lib/xfcb/readrand.o \
 	$(OBJDIR)/lib/xfcb/readseq.o \
 	$(OBJDIR)/lib/xfcb/set.o \
 	$(OBJDIR)/lib/xfcb/vars.o \
+	$(OBJDIR)/lib/xfcb/writerand.o \
 	$(OBJDIR)/lib/xfcb/writeseq.o \
 
 all: $(OBJDIR)/multilink bios.img bdos.img cpmfs.img $(OBJDIR)/libxfcb.a
