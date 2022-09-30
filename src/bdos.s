@@ -250,7 +250,7 @@ jumptable_lo:
     .lobytes entry_READRANDOM ; read_random = 33
     .lobytes entry_WRITERANDOM ; write_random = 34
     .lobytes unimplemented ; compute_file_size = 35
-    .lobytes unimplemented ; compute_random_pointer = 36
+    .lobytes entry_COMPUTEPOINTER ; compute_random_pointer = 36
     .lobytes entry_RESETDISK ; reset_disk = 37
     .lobytes entry_GETBIOS ; get_bios = 38
     .lobytes unimplemented ; 39
@@ -292,7 +292,7 @@ jumptable_hi:
     .hibytes entry_READRANDOM ; read_random = 33
     .hibytes entry_WRITERANDOM ; write_random = 34
     .hibytes unimplemented ; compute_file_size = 35
-    .hibytes unimplemented ; compute_random_pointer = 36
+    .hibytes entry_COMPUTEPOINTER ; compute_random_pointer = 36
     .hibytes entry_RESETDISK ; reset_disk = 37
     .hibytes entry_GETBIOS ; 38
     .hibytes unimplemented ; 39
@@ -1030,7 +1030,7 @@ exit:
     rts
 
 eof:
-    lda #1                      ; = EOF
+    lda #cpme::nodata           ; = EOF
     sec
     rts
 .endproc
@@ -1060,6 +1060,12 @@ eof:
     zendif
     lda #0
     ldy #fcb::cr
+    sta (param), y
+    ; We also want to clear the record count, to avoid a nasty edge
+    ; case where we've just moved to a non-existent record. This
+    ; causes subsequent reads to fail with EOF rather than just
+    ; reading garbage.
+    ldy #fcb::rc
     sta (param), y
     clc
     rts
@@ -1503,6 +1509,36 @@ nodata:
     zendif
     clc
 exit:
+    rts
+.endproc
+
+; Sets the random access pointer to whereever the FCB is currently
+; pointing.
+
+.proc entry_COMPUTEPOINTER
+    ldy #fcb::ex
+    lda (param), y              ; get EX
+    lsr a                       ; bottom bit -> C
+    sta temp+1                  ; store high byte
+    lda #0
+    ror a                       ; C -> top bit
+    ; low byte in A (the top bit)
+
+    ldy #fcb::cr
+    ora (param), y              ; merge in record count
+    ldy #fcb::r0
+    sta (param), y              ; finished with low byte
+
+    ldy #fcb::s2                ; get S2
+    lda (param), y
+    asl a
+    asl a
+    asl a
+    asl a
+    ora temp+1
+    ldy #fcb::r1
+    sta (param), y
+
     rts
 .endproc
 
