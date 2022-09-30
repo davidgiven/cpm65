@@ -110,6 +110,17 @@ COMMANDLINE: .res 128
 	setzp
 .endenum
 
+.enum cpme
+    ok        = $00 ; success (usually)
+    nodata    = $01 ; or EOF
+    diskfull  = $02 ; no free blocks on disk
+    cantclose = $03 ; can't write extent back to disk
+    noextent  = $04 ; only on random access reads
+    dirfull   = $05 ; no free dirents on disk
+    badfcb    = $09 ; FCB couldn't be parsed
+    failed    = $ff ; general purpose failure code
+.endenum
+
 .struct dph
     xlt      .word
     cdrmax   .word

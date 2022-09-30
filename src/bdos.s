@@ -247,7 +247,7 @@ jumptable_lo:
     .lobytes unimplemented ; set_file_attributes = 30
     .lobytes entry_GETDPB ; get_DPB = 31
     .lobytes entry_GETSETUSER ; get_set_user_number = 32
-    .lobytes unimplemented ; read_random = 33
+    .lobytes entry_READRANDOM ; read_random = 33
     .lobytes entry_WRITERANDOM ; write_random = 34
     .lobytes unimplemented ; compute_file_size = 35
     .lobytes unimplemented ; compute_random_pointer = 36
@@ -289,7 +289,7 @@ jumptable_hi:
     .hibytes unimplemented ; set_file_attributes = 30
     .hibytes entry_GETDPB ; get_dpb = 31
     .hibytes entry_GETSETUSER ; get_set_user_number = 32
-    .hibytes unimplemented ; read_random = 33
+    .hibytes entry_READRANDOM ; read_random = 33
     .hibytes entry_WRITERANDOM ; write_random = 34
     .hibytes unimplemented ; compute_file_size = 35
     .hibytes unimplemented ; compute_random_pointer = 36
@@ -1262,7 +1262,7 @@ merge_error:
         zendif
     zendif
 
-    jsr seek_to_block
+    jsr seek_to_block_and_create
     
     ; Move the FCB on to the next record, for next time.
 
@@ -1295,9 +1295,10 @@ exit:
     rts
 .endproc
 
-; Sets the current sector to the block pointed to by the FCB.
+; Sets the current sector to the block pointed to by the FCB,
+; creating a new one if necessary.
 
-.proc seek_to_block
+.proc seek_to_block_and_create
     jsr get_fcb_block           ; get disk block value in XA
     zif_eq
         jsr fcb_is_modified
@@ -1323,11 +1324,91 @@ exit:
     rts
 .endproc
 
-; --- Write to a random record ----------------------------------------------
+; --- Random access ---------------------------------------------------------
 
 .proc entry_WRITERANDOM
     jsr convert_user_fcb
+    jsr seek_to_random_location
+    zif_cs
+        ; Do we need a new extent?
 
+        cmp #cpme::noextent
+        bne error           ; fail
+            
+        ; Could not open new extent --- it must not exist.
+
+        jsr internal_CREATEFILE
+        lda #cpme::dirfull
+        bcs error
+    zendif
+
+    bcs exit
+
+    ; If (CR+1) > RC, update RC.
+
+    ldy #fcb::cr
+    lda (param), y
+    clc
+    adc #1
+    ldy #fcb::rc
+    cmp (param), y
+    zif_cs
+        sta (param), y
+        jsr fcb_is_modified
+    zendif
+
+    ; Actually do the write!
+
+    jsr seek_to_block_and_create
+    jsr reset_user_dma
+    jsr write_sector
+    lda #0
+    clc
+    rts
+
+error:
+    sec
+exit:
+    rts
+.endproc
+
+.proc entry_READRANDOM
+    jsr convert_user_fcb
+    jsr seek_to_random_location
+    bcs exit
+
+    ; If CR > RC, fail.
+
+    ldy #fcb::cr
+    lda (param), y
+    ldy #fcb::rc
+    cmp (param), y
+    bcs nodata
+
+    ; Actually do the read!
+
+    jsr get_fcb_block           ; get disk block value in XA
+    beq nodata
+    jsr get_sequential_sector_number
+
+    ; Actually do the read!
+
+    jsr reset_user_dma
+    jsr read_sector
+    lda #0
+    clc
+exit:
+    rts
+nodata:
+    lda #cpme::nodata
+    sec
+    rts
+.endproc
+
+; Adjust the FCB to point to the random access location, shifting
+; extents as necessary. Returns C on error.
+
+.proc seek_to_random_location
     ; Convert random access record number to M/E/R.
 
     ldy #fcb::r0
@@ -1371,6 +1452,8 @@ exit:
         pha                     ; push S2
 
         jsr internal_CLOSEFILE
+        lda #cpme::cantclose
+        bcs exit
 
         ldy #fcb::s2
         pla
@@ -1381,39 +1464,10 @@ exit:
         sta (param), y          ; update EX
 
         jsr internal_OPENFILE
-        zif_cs
-            ; Could not open new extent --- it must not exist.
-
-            jsr internal_CREATEFILE
-            lda #1              ; directory full
-            bcs error
-        zendif
+        lda #cpme::noextent
+        bcs exit
     zendif
-
-    ; If (CR+1) > RC, update RC.
-
-    ldy #fcb::cr
-    lda (param), y
     clc
-    adc #1
-    ldy #fcb::rc
-    cmp (param), y
-    zif_cs
-        sta (param), y
-        jsr fcb_is_modified
-    zendif
-
-    ; Actually do the write!
-
-    jsr seek_to_block
-    jsr reset_user_dma
-    jsr write_sector
-    lda #0
-    clc
-    rts
-
-error:
-    sec
 exit:
     rts
 .endproc
