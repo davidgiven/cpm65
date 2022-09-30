@@ -249,7 +249,7 @@ jumptable_lo:
     .lobytes entry_GETSETUSER ; get_set_user_number = 32
     .lobytes entry_READRANDOM ; read_random = 33
     .lobytes entry_WRITERANDOM ; write_random = 34
-    .lobytes unimplemented ; compute_file_size = 35
+    .lobytes entry_COMPUTEFILESIZE ; compute_file_size = 35
     .lobytes entry_COMPUTEPOINTER ; compute_random_pointer = 36
     .lobytes entry_RESETDISK ; reset_disk = 37
     .lobytes entry_GETBIOS ; get_bios = 38
@@ -291,7 +291,7 @@ jumptable_hi:
     .hibytes entry_GETSETUSER ; get_set_user_number = 32
     .hibytes entry_READRANDOM ; read_random = 33
     .hibytes entry_WRITERANDOM ; write_random = 34
-    .hibytes unimplemented ; compute_file_size = 35
+    .hibytes entry_COMPUTEFILESIZE ; compute_file_size = 35
     .hibytes entry_COMPUTEPOINTER ; compute_random_pointer = 36
     .hibytes entry_RESETDISK ; reset_disk = 37
     .hibytes entry_GETBIOS ; 38
@@ -1536,9 +1536,123 @@ exit:
     asl a
     asl a
     ora temp+1
-    ldy #fcb::r1
+    ldy #fcb::r1                ; finished with high byte
     sta (param), y
 
+    clc
+    rts
+.endproc
+
+; Determines the size of a file and seeks to the end.
+
+.proc entry_COMPUTEFILESIZE
+    jsr new_user_fcb
+
+    ; temp+0/1 are used by find_first
+    lda #0
+    sta temp+2                  ; file size accumulator
+    sta temp+3
+
+    lda #fcb::t3+1              ; match just the filename
+    jsr find_first
+    zif_cc
+        zrepeat
+            ; Check for a maximum-possible-length file,
+            ; resulting in file size overflow.
+
+            ldy #fcb::rc
+            lda (current_dirent), y
+            cmp #$80            ; maximum possible RC
+            zif_eq
+                ldy #fcb::ex
+                lda (current_dirent), y
+                cmp #$1f        ; maximum possible EX
+                zif_eq
+                    ldy #fcb::s2
+                    lda (current_dirent), y
+                    cmp #$0f    ; maximum possible S2
+                    zif_eq
+                        ; This file is the maximum possible length!
+                        ; We can just stop here.
+
+                        ldy #fcb::r0
+                        lda #0
+                        sta (param), y  ; 0 -> r0
+                        iny
+                        sta (param), y  ; 0 -> r1
+                        lda #1
+                        iny
+                        sta (param), y  ; 0 -> r2
+                        clc
+                        rts
+                    zendif
+                zendif
+            zendif
+
+            ; We now know that the file size can't overflow.
+            ; *But*, the current dirent may still have a size
+            ; of 128 records...
+
+            ; Calculate the size of the file.
+
+            ldy #fcb::s2                ; get S2
+            lda (current_dirent), y
+            asl a
+            asl a
+            asl a
+            asl a
+            sta tempb
+
+            ldy #fcb::ex
+            lda (current_dirent), y      ; get EX
+            lsr a
+            ora tempb
+            tax
+
+            lda #0
+            ror a                       ; $00 or $80, from LSB of EX
+
+            ldy #fcb::rc
+            clc
+            adc (current_dirent), y     ; add in record count
+            zif_cs
+                inx
+            zendif
+
+            ; high byte of file size -> x
+            ; low byte of file size -> a
+
+            cpx temp+3
+            zif_cs
+                zif_eq
+                    cmp temp+2
+                zendif
+            zendif
+            zif_ne
+                ; Update the file size accumulator.
+
+                sta temp+2
+                stx temp+3
+            zendif
+
+            lda #fcb::t3+1
+            jsr find_next
+        zuntil_cs
+    zendif
+
+    ; temp+2/3 now contains the record count of the file.
+
+    lda #0
+    ldy #fcb::r2
+    sta (param), y
+    dey
+    lda temp+3
+    sta (param), y              ; r1
+    dey
+    lda temp+2
+    sta (param), y              ; r0
+
+    clc
     rts
 .endproc
 
@@ -2335,10 +2449,6 @@ bitmap_init:        .word 0
 checksum_vector_size: .word 0
 reserved_sectors:   .word 0
 dpb_copy_end:
-
-debuga:             .byte 0
-debugx:             .byte 0
-debugy:             .byte 0
 
 ; vim: filetype=asm sw=4 ts=4 et
 
