@@ -244,7 +244,7 @@ jumptable_lo:
     .lobytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
     .lobytes entry_SETDRIVEREADONLY ; set_drive_readonly = 28
     .lobytes entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
-    .lobytes unimplemented ; set_file_attributes = 30
+    .lobytes entry_SETFILEATTRS ; set_file_attributes = 30
     .lobytes entry_GETDPB ; get_DPB = 31
     .lobytes entry_GETSETUSER ; get_set_user_number = 32
     .lobytes entry_READRANDOM ; read_random = 33
@@ -286,7 +286,7 @@ jumptable_hi:
     .hibytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
     .hibytes entry_SETDRIVEREADONLY ; set_drive_readonly = 28
     .hibytes entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
-    .hibytes unimplemented ; set_file_attributes = 30
+    .hibytes entry_SETFILEATTRS ; set_file_attributes = 30
     .hibytes entry_GETDPB ; get_dpb = 31
     .hibytes entry_GETSETUSER ; get_set_user_number = 32
     .hibytes entry_READRANDOM ; read_random = 33
@@ -935,6 +935,40 @@ exit:
                 inc temp+1
                 lda temp+0
                 cmp #fcb::t3+1
+            zuntil_eq
+
+            ; Write back to disk.
+
+            jsr write_sector
+
+            ; Get the next matching dirent.
+
+            lda #fcb::t3+1
+            jsr find_next
+        zuntil_cs
+    zendif
+
+    rts
+.endproc
+
+.proc entry_SETFILEATTRS
+    jsr convert_user_fcb
+
+    ; Update the filename (and attribute bits) of all files matching the
+    ; filename.
+
+    lda #fcb::t3+1
+    jsr find_first
+    zif_cc
+        zrepeat
+            ; Replace the filename in the dirent with the new one.
+
+            ldy #fcb::f1    ; FCB/dirent index
+            zrepeat
+                lda (param), y
+                sta (current_dirent), y
+                iny
+                cpy #fcb::t3+1
             zuntil_eq
 
             ; Write back to disk.
