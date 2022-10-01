@@ -184,6 +184,11 @@ ccp_fcb:
     lda #$ff
     sta old_fcb_drive       ; mark FCB as not fiddled with
 
+    ; Reset per-system-call state
+
+    lda #0
+    sta block_needs_clearing
+
     lda jumptable_lo, y
     sta temp+0
     lda jumptable_hi, y
@@ -254,7 +259,7 @@ jumptable_lo:
     .lobytes entry_RESETDISK ; reset_disk = 37
     .lobytes entry_GETBIOS ; get_bios = 38
     .lobytes unimplemented ; 39
-    .lobytes unimplemented ; write_random_filled = 40
+    .lobytes entry_WRITERANDOMFILLED ; write_random_filled = 40
 jumptable_hi:
     .hibytes entry_EXIT ;exit_program = 0
     .hibytes entry_CONIN ; console_input = 1
@@ -296,7 +301,7 @@ jumptable_hi:
     .hibytes entry_RESETDISK ; reset_disk = 37
     .hibytes entry_GETBIOS ; 38
     .hibytes unimplemented ; 39
-    .hibytes unimplemented ; write_random_filled = 40
+    .hibytes entry_WRITERANDOMFILLED ; write_random_filled = 40
 .endproc
 
 ; --- Misc ------------------------------------------------------------------
@@ -1344,6 +1349,46 @@ exit:
         jsr fcb_is_modified
         jsr allocate_unused_block
         jsr set_fcb_block
+        jsr get_sequential_sector_number
+
+        lda block_needs_clearing
+        zif_ne
+            ; Wipe the new block.
+
+            ldy #0
+            tya
+            zrepeat
+                sta (directory_buffer), y
+                iny
+                cpy #128
+            zuntil_eq
+
+            ; Now write zeroes until the block is full.
+
+            lda directory_buffer+0
+            ldx directory_buffer+1
+            ldy #bios::setdma
+            jsr callbios
+
+            zrepeat
+                jsr write_sector
+
+                inc current_sector+0
+                zif_eq
+                    inc current_sector+1
+                    zif_eq
+                        inc current_sector+2
+                    zendif
+                zendif
+                
+                lda current_sector+0
+                and block_mask
+            zuntil_eq
+        zendif
+
+        ; Get the block number again for get_sequential_sector_number.
+
+        jsr get_fcb_block
     zendif
     jmp get_sequential_sector_number
 .endproc
@@ -1410,6 +1455,12 @@ error:
     sec
 exit:
     rts
+.endproc
+
+.proc entry_WRITERANDOMFILLED
+    lda #1
+    sta block_needs_clearing
+    jmp entry_WRITERANDOM
 .endproc
 
 .proc entry_READRANDOM
@@ -2430,6 +2481,7 @@ login_vector:           .word 0
 directory_pos:          .word 0
 user_dma:               .word 0
 current_sector:         .res 3  ; 24-bit sector number
+block_needs_clearing:   .byte 0 ; if set, any new block that's created will be zeroed
 
 buffered_key:           .byte 0
 output_paused:          .byte 0 ; top bit set if paused
