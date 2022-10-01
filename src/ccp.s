@@ -315,7 +315,9 @@ msg:
 	lda #<userfcb
 	ldx #>userfcb
 	jsr bdos_FINDFIRST
-	bcs exit
+	zif_cs
+		jmp newline
+	zendif
 
 	zrepeat
 		; Get the offset of the directory item.
@@ -361,40 +363,12 @@ msg:
 			; Print the filename.
 
 			lda #8
-			sta index
-			zrepeat
-				inc temp+0
-				zif_eq
-					inc temp+1
-				zendif
-
-				ldy #0
-				lda (temp), y
-				jsr bdos_CONOUT
-
-				dec index
-			zuntil_eq
-
-			jsr space
+			jsr print_filename_bytes
 
 			; Print the extension.
 
 			lda #3
-			sta index
-			zrepeat
-				inc temp+0
-				zif_eq
-					inc temp+1
-				zendif
-
-				ldy #0
-				lda (temp), y
-				jsr bdos_CONOUT
-
-				dec index
-			zuntil_eq
-
-			jsr space
+			jsr print_filename_bytes
 
 			lda file_counter
 			and #$01
@@ -412,6 +386,24 @@ msg:
 
 exit:
 	jmp newline
+
+; Prints A bytes at 'temp', followed by a space.
+print_filename_bytes:
+	sta index
+	zrepeat
+		inc temp+0
+		zif_eq
+			inc temp+1
+		zendif
+
+		ldy #0
+		lda (temp), y
+		and #$7f			; mask off file status bits
+		jsr bdos_CONOUT
+
+		dec index
+	zuntil_eq
+	jmp space
 .endproc
 
 .proc entry_ERA

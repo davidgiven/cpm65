@@ -59,6 +59,11 @@ tempb:          .byte 0     ; more temporary storage
 
 ; --- Warm start ------------------------------------------------------------
 
+; Prints the message in XA and performs a warm boot.
+
+harderror:
+    jsr internal_WRITESTRING
+    ; fall through
 entry_EXIT:
     ldx #$ff                ; reset stack point
     txs
@@ -216,7 +221,8 @@ ccp_fcb:
     rts
 
 unimplemented:
-    jmp *
+    clc
+    rts
 
 jumptable_lo:
     .lobytes entry_EXIT ; exit_program = 0
@@ -837,6 +843,7 @@ error:
 entry_CLOSEFILE:
     jsr convert_user_fcb
 .proc internal_CLOSEFILE
+    jsr check_fcb_writable
     jsr check_disk_writable
 
     ; Check that this FCB has actually changed.
@@ -885,12 +892,14 @@ exit:
 
 .proc entry_DELETEFILE
     jsr convert_user_fcb
+    jsr check_disk_writable
 
     ; Search for and destroy all files matching the filename.
 
     lda #fcb::t3+1
     jsr find_first
     zif_cc
+        jsr check_dirent_writable
         zrepeat
             ; Free all the blocks in the matching dirent.
 
@@ -916,12 +925,14 @@ exit:
 
 .proc entry_RENAMEFILE
     jsr convert_user_fcb
+    jsr check_disk_writable
 
     ; Rename all files matching the filename.
 
     lda #fcb::t3+1
     jsr find_first
     zif_cc
+        jsr check_dirent_writable
         zrepeat
             ; Replace the filename in the dirent with the new one.
 
@@ -1280,6 +1291,8 @@ merge_error:
 
 .proc entry_WRITESEQUENTIAL
     jsr convert_user_fcb
+    jsr check_fcb_writable
+    jsr check_disk_writable
 
     ldy #fcb::cr
     lda (param), y
@@ -1413,6 +1426,9 @@ exit:
 
 .proc entry_WRITERANDOM
     jsr convert_user_fcb
+    jsr check_fcb_writable
+    jsr check_disk_writable
+
     jsr seek_to_random_location
     zif_cs
         ; Do we need a new extent?
@@ -1750,7 +1766,6 @@ find_error:
     rts
 .endscope
 
-
 ; Returns the number of bytes to search.
 .proc setup_fcb_for_find
     ldy #fcb::dr
@@ -1870,6 +1885,30 @@ no_more_files:
     .bss
 find_first_count: .byte 0
     .code
+
+; Check that the currently opened FCB is r/w.
+
+.proc check_fcb_writable
+    ldy #fcb::t1
+    lda (param), y
+    bmi not_writable_error
+    rts
+.endproc
+
+.proc check_dirent_writable
+    ldy #fcb::t1
+    lda (current_dirent), y
+    bmi not_writable_error
+    rts
+.endproc 
+
+.proc not_writable_error
+    lda #<msg
+    ldx #>msg
+    jmp harderror
+msg:
+    .byte "BDOS: file is R/O", 13, 10, 0
+.endproc
 
 ; --- Login drive -----------------------------------------------------------
 
@@ -2339,8 +2378,24 @@ check_dir_pos:
     rts
 .endproc
     
+; Checks that the current disk isn't in the read-only vector.
+
 .proc check_disk_writable
+    lda write_protect_vector+0
+    ldx write_protect_vector+1
+    ldy active_drive
+    jsr shiftr              ; flag at bottom of temp+0
+
+    ror temp+0
+    zif_cs
+        lda #<msg
+        ldx #>msg
+        jmp harderror
+    zendif
     rts
+
+msg:
+    .byte "BDOS: disk is R/O", 13, 10, 0
 .endproc
 
 ; --- Utilities -------------------------------------------------------------
@@ -2486,6 +2541,7 @@ block_needs_clearing:   .byte 0 ; if set, any new block that's created will be z
 buffered_key:           .byte 0
 output_paused:          .byte 0 ; top bit set if paused
 column_position:        .byte 0
+entry_stack:            .byte 0 ; saved stack on system call entry
 bdos_state_end:
 
 ; Copy of DPB of currently selected drive.
