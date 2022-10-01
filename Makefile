@@ -30,7 +30,7 @@ LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/writerand.o \
 	$(OBJDIR)/lib/xfcb/writeseq.o \
 
-all: $(OBJDIR)/multilink bios.img bdos.img cpmfs.img $(OBJDIR)/libxfcb.a
+all: $(OBJDIR)/multilink bbcmicro.img c64.d64 bdos.img cpmfs.img $(OBJDIR)/libxfcb.a
 
 $(OBJDIR)/multilink: tools/multilink.cc
 	@mkdir -p $(dir $@)
@@ -44,8 +44,11 @@ $(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
 	@mkdir -p $(dir $@)
 	$(AR65) r $@ $^
 
-bios.img: $(OBJDIR)/src/bios.o scripts/bios.cfg
-	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/bios.cfg -o $@ $<
+bbcmicro.img: $(OBJDIR)/src/bbcmicro.o scripts/bbcmicro.cfg
+	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/bbcmicro.cfg -o $@ $<
+	
+c64.img: $(OBJDIR)/src/c64.o scripts/c64.cfg
+	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/c64.cfg -o $@ $<
 	
 $(OBJDIR)/apps/%.elf: apps/%.c lib/printi.S
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
@@ -63,10 +66,18 @@ cpmfs/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
 cpmfs.img: $(wildcard cpmfs/*) $(APPS) cpmfs/ccp.sys
-	rm -f $@
+	@rm -f $@
 	mkfs.cpm -f $(DISKFORMAT) $@
 	cpmcp -f $(DISKFORMAT) $@ $^ 0:
 	cpmchattr -f $(DISKFORMAT) $@ s 0:ccp.sys
+
+c64.d64: c64.img bdos.img cpmfs.img
+	c1541 -format cpm65,id d64 c64.d64 \
+		-attach c64.d64 \
+		-write c64.img cpm \
+		-write bdos.img bdos \
+		-write cpmfs.img cpmfs,l,128 \
+		> /dev/null
 
 clean:
 	rm -rf $(OBJDIR) bios.img bdos.img cpmfs.img $(APPS)

@@ -141,5 +141,84 @@ COMMANDLINE: .res 128
     entry       .byte
 .endstruct
 
+.macro define_drive sectors, blocksize, dirents, reserved
+    .scope
+        .word 0, 0, 0, 0    ; CP/M workspace
+        .word directory_buffer
+        .word dpb
+        .word checksum_buffer
+        .word allocation_vector
+
+        .if blocksize = 1024
+            block_shift = 3
+        .elseif blocksize = 2048
+            block_shift = 4
+        .elseif blocksize = 4096
+            block_shift = 5
+        .elseif blocksize = 8192
+            block_shift = 6
+        .elseif blocksize = 16384
+            block_shift = 7
+        .else
+            .fatal "Invalid block size!"
+        .endif
+
+        checksum_buffer_size = (dirents+3) / 4
+        blocks_on_disk = sectors * 128 / blocksize
+        allocation_vector_size = (blocks_on_disk + 7) / 8
+        directory_blocks = (dirents * 32) / blocksize
+
+        .if directory_blocks = 0
+            .fatal "Directory must be at least one block in size!"
+        .endif
+        .if ((dirents * 32) .mod blocksize) <> 0
+            .fatal "Directory is not an even number of blocks in size!"
+        .endif
+
+        .if blocks_on_disk < 256
+            .if blocksize = 1024
+                extent_mask = %00000000
+            .elseif blocksize = 2048
+                extent_mask = %00000001
+            .elseif blocksize = 4096
+                extent_mask = %00000011
+            .elseif blocksize = 8192
+                extent_mask = %00000111
+            .elseif blocksize = 16384
+                extent_mask = %00001111
+            .endif
+        .else
+            .if blocksize = 1024
+                .fatal "Can't use a block size of 1024 on a large disk"
+            .elseif blocksize = 2048
+                extent_mask = %00000000
+            .elseif blocksize = 4096
+                extent_mask = %00000001
+            .elseif blocksize = 8192
+                extent_mask = %00000011
+            .elseif blocksize = 16384
+                extent_mask = %00000111
+            .endif
+        .endif
+    dpb:
+        .word 0             ; unused
+        .byte block_shift   ; block shift
+        .byte (1<<block_shift)-1 ; block mask
+        .byte extent_mask   ; extent mask
+        .word blocks_on_disk - 1 ; number of blocks on the disk
+        .word dirents - 1   ; number of directory entries
+        .dbyt ($ffff << (16 - directory_blocks)) & $ffff ; allocation bitmap
+        .word checksum_buffer_size ; checksum vector size
+        .word reserved      ; number of reserved _sectors_ on disk
+
+        .pushseg
+        .bss
+        checksum_buffer: .res checksum_buffer_size
+        allocation_vector: .res allocation_vector_size
+
+        .popseg
+    .endscope
+.endmacro
+
 ; vim: filetype=asm sw=4 ts=4 et
 

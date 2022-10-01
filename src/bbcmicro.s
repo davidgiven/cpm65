@@ -230,6 +230,8 @@ do_gbpb:
     rol a
     rts
 
+.include "relocate.inc" ; standard entry_RELOCATE
+
 .proc init_control_block
     ldy #(osgbpb_block_end - osgbpb_block - 1)
     lda #0
@@ -284,173 +286,9 @@ entry_SETZP:
     stx zp_end
     rts
 
-    ; Relocate an image. High byte of memory address is in A,
-    ; zero page address is in X.
-
-.proc entry_RELOCATE
-    pha                 ; store memory start
-    sta ptr+1
-    lda #0
-    sta ptr+0
-
-    ; X preserved in next chunk
-    ldy #comhdr::rel_offset ; add relocation table offset
-    lda (ptr), y
-    clc
-    adc ptr+0
-    sta reloptr+0
-    iny
-    lda (ptr), y
-    adc ptr+1
-    sta reloptr+1
-
-    jsr relocate_loop   ; relocate zero page (in X)
-
-    lda #0
-    sta ptr+0
-    pla                 ; get memory start
-    sta ptr+1
-    tax
-    ; fall through
-
-    ; ptr points at the beginning of the image
-    ; reloptr points at the relocation table
-    ; x is value to add
-relocate_loop:
-    ldy #0
-    zloop
-        ::reloptr = * + 1
-        lda $ffff           ; get relocation byte
-        inc reloptr+0       ; add one to pointer
-        zif_eq
-            inc reloptr+1
-        zendif
-
-        sta byte
-        lsr a
-        lsr a
-        lsr a
-        lsr a
-        cmp #$0f
-        zbreakif_eq
-        jsr relocate
-
-        byte = * + 1
-        lda #$ff
-        and #$0f
-        cmp #$0f
-        zbreakif_eq
-        jsr relocate
-    zendloop
-    rts
-
-; Enter with an offset in A.
-; Preserves x and y.
-relocate:
-    pha
-    clc
-    adc ptr+0
-    sta ptr+0
-    zif_cs
-        inc ptr+1
-    zendif
-    pla
-
-    cmp #$0e
-    zif_ne
-        ; ptr is pointing at the address to fix up.
-
-        clc
-        txa
-        adc (ptr), y
-        sta (ptr), y
-    zendif
-    rts
-    
-.endproc
-
     .data
 zp_base: .byte <(__ZEROPAGE_LOAD__ + __ZEROPAGE_SIZE__)
 zp_end:  .byte $90
-
-.macro define_drive sectors, blocksize, dirents, reserved
-    .scope
-        .word 0, 0, 0, 0    ; CP/M workspace
-        .word directory_buffer
-        .word dpb
-        .word checksum_buffer
-        .word allocation_vector
-
-        .if blocksize = 1024
-            block_shift = 3
-        .elseif blocksize = 2048
-            block_shift = 4
-        .elseif blocksize = 4096
-            block_shift = 5
-        .elseif blocksize = 8192
-            block_shift = 6
-        .elseif blocksize = 16384
-            block_shift = 7
-        .else
-            .fatal "Invalid block size!"
-        .endif
-
-        checksum_buffer_size = (dirents+3) / 4
-        blocks_on_disk = sectors * 128 / blocksize
-        allocation_vector_size = (blocks_on_disk + 7) / 8
-        directory_blocks = (dirents * 32) / blocksize
-
-        .if directory_blocks = 0
-            .fatal "Directory must be at least one block in size!"
-        .endif
-        .if ((dirents * 32) .mod blocksize) <> 0
-            .fatal "Directory is not an even number of blocks in size!"
-        .endif
-
-        .if blocks_on_disk < 256
-            .if blocksize = 1024
-                extent_mask = %00000000
-            .elseif blocksize = 2048
-                extent_mask = %00000001
-            .elseif blocksize = 4096
-                extent_mask = %00000011
-            .elseif blocksize = 8192
-                extent_mask = %00000111
-            .elseif blocksize = 16384
-                extent_mask = %00001111
-            .endif
-        .else
-            .if blocksize = 1024
-                .fatal "Can't use a block size of 1024 on a large disk"
-            .elseif blocksize = 2048
-                extent_mask = %00000000
-            .elseif blocksize = 4096
-                extent_mask = %00000001
-            .elseif blocksize = 8192
-                extent_mask = %00000011
-            .elseif blocksize = 16384
-                extent_mask = %00000111
-            .endif
-        .endif
-    dpb:
-        .word 0             ; unused
-        .byte block_shift   ; block shift
-        .byte (1<<block_shift)-1 ; block mask
-        .byte extent_mask   ; extent mask
-        .word blocks_on_disk - 1 ; number of blocks on the disk
-        .word dirents - 1   ; number of directory entries
-        .dbyt ($ffff << (16 - directory_blocks)) & $ffff ; allocation bitmap
-        .word checksum_buffer_size ; checksum vector size
-        .word reserved      ; number of reserved _sectors_ on disk
-
-        .pushseg
-        .bss
-        checksum_buffer: .res checksum_buffer_size
-        allocation_vector: .res allocation_vector_size
-
-        .popseg
-    .endscope
-.endmacro
 
 ; DPH for drive 0 (our only drive)
 
