@@ -335,8 +335,6 @@ entry_WRITE:
     jsr CHROUT
     tya
     jsr CHROUT
-    lda #1
-    jsr CHROUT
 
     jsr CLRCHN
 
