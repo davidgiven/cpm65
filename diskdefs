@@ -1,4 +1,4 @@
-diskdef bbc163
+diskdef bbc192
     seclen 128
     tracks 96 ; 0x600 128-byte sectors
     sectrk 16
