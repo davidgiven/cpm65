@@ -12,9 +12,6 @@ APPS = \
 	$(OBJDIR)/bitmap.com \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
-	$(OBJDIR)/rand.com \
-	os3bdos.asm \
-	cpmfs/test.sub \
 	cpmfs/readme.txt
 
 LIBXFCB_OBJS = \
@@ -51,10 +48,10 @@ $(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
 	$(AR65) r $@ $^
 
 $(OBJDIR)/bbcmicro.exe: $(OBJDIR)/src/bbcmicro.o scripts/bbcmicro.cfg
-	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/bbcmicro.cfg -o $@ $<
+	$(LD65) -m $(patsubst %.exe,%.map,$@) -vm -C scripts/bbcmicro.cfg -o $@ $<
 	
 $(OBJDIR)/c64.exe: $(OBJDIR)/src/c64.o scripts/c64.cfg
-	$(LD65) -m $(patsubst %.img,%.map,$@) -vm -C scripts/c64.cfg -o $@ $<
+	$(LD65) -m $(patsubst %.exe,%.map,$@) -vm -C scripts/c64.cfg -o $@ $<
 	
 $(OBJDIR)/apps/%.elf: apps/%.c lib/printi.S
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
@@ -79,7 +76,7 @@ $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmicrofs.img $(OBJDIR)/mkdfs
 	$(OBJDIR)/mkdfs -O $@ \
 		-N CP/M-65 \
-		-f bbc/\!boot -l 0x400 -e 0x400 -B 2 \
+		-f $(OBJDIR)/bbcmicro.exe -n \!boot -l 0x400 -e 0x400 -B 2 \
 		-f $(OBJDIR)/bdos.img -n bdos \
 		-f $(OBJDIR)/bbcmicrofs.img -n cpmfs
 

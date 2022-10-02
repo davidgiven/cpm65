@@ -36,7 +36,14 @@ ptr: .word 0
     sty mem_base
 
     lda #$84
+    ldy #0
     jsr OSBYTE
+    cpy #$4
+    zif_eq              ; Tube present?
+        ldy #$f8        ; override mem_end
+        lda #$ee
+        sta zp_end      ; override zp_end
+    zendif
     sty mem_end
 
     ; Load the BDOS image.
