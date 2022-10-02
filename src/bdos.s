@@ -2039,11 +2039,11 @@ msg:
         ldy #0
         lda (current_dirent), y
         cmp #$e5                    ; is this directory entry in use?
-        zbreakif_eq
-
-        ldx #1
-        jsr update_bitmap_for_dirent
-        jsr update_cdrmax
+        zif_ne
+            ldx #1
+            jsr update_bitmap_for_dirent
+            jsr update_cdrmax
+        zendif
     zendloop
 
 exit:
