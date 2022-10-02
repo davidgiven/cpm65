@@ -24,7 +24,7 @@ diskdef c1541
 	sectrk 10
 	blocksize 1024
 	maxdir 64
-	boottrk 3
+	boottrk 0
 	os 2.2
 end
 

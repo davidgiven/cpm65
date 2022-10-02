@@ -42,34 +42,30 @@ dma:        .word 0    ; current DMA
 entry:
     jsr init_system
 
-    ; Load the BDOS.
+    ; Load the BDOS (using DOS).
 
-    ldx #0
-    stx sector_num
-    stx dma+0
-    lda #>top
-    sta dma+1
+    lda #1              ; file number
+    ldx #8              ; device
+    ldy #0              ; secondary address
+    jsr SETLFS
 
-    zrepeat
-        lda #'.'
-        jsr CHROUT
+    ldx #<bdos_filename
+    ldy #>bdos_filename
+    lda #bdos_filename_end - bdos_filename
+    jsr SETNAM
 
-        lda sector_num
-        ldx #0
-        jsr read_sector
-
-        ldy #0
-        zrepeat
-            lda disk_buffer, y
-            sta (dma), y
-            iny
-        zuntil_eq
-
-        inc dma+1
-        inc sector_num
-        lda sector_num
-        cmp #14
-    zuntil_eq
+    lda #0
+    ldx #<(top+2)       ; LOAD skips the first two bytes
+    ldy #>(top+2)       ; (which, luckily, we don't need)
+    jsr LOAD ; load
+    zif_cs
+        lda #<msg
+        ldx #>msg
+        jsr print
+        jmp *
+    msg:
+        .byte "Cannot load BDOS", 0
+    zendif
 
     ; Relocate the BDOS.
 
@@ -87,6 +83,10 @@ entry:
     lda #<biosentry
     ldx #>biosentry
     rts                 ; indirect jump
+
+bdos_filename:
+    .byte "BDOS"
+bdos_filename_end:
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -692,7 +692,7 @@ mem_end:    .byte >$d000
 
 ; DPH for drive 0 (our only drive)
 
-dph: define_drive 133*10, 1024, 64, 30
+dph: define_drive 136*10, 1024, 64, 0
 
 .bss
 
