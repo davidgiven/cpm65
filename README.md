@@ -23,7 +23,7 @@ run natively for full native development support.
 No, it won't let you run 8080 programs on the 6502!
 
 <div style="text-align: center">
-<a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Master"></a>
+<a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Micro"></a>
 <a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 </div>
 
