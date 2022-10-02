@@ -17,3 +17,14 @@ diskdef bbc327
     boottrk 0
     os 2.2
 end
+
+diskdef c1541
+	seclen 128
+	tracks 136
+	sectrk 10
+	blocksize 1024
+	maxdir 64
+	boottrk 3
+	os 2.2
+end
+

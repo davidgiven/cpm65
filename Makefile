@@ -71,13 +71,18 @@ cpmfs.img: $(wildcard cpmfs/*) $(APPS) cpmfs/ccp.sys
 	cpmcp -f $(DISKFORMAT) $@ $^ 0:
 	cpmchattr -f $(DISKFORMAT) $@ s 0:ccp.sys
 
-c64.d64: c64.img bdos.img cpmfs.img
-	c1541 -format cpm65,id d64 c64.d64 \
-		-attach c64.d64 \
-		-write c64.img cpm \
-		-write bdos.img bdos \
-		-write cpmfs.img cpmfs,l,128 \
-		> /dev/null
+c64.d64: c64.img bdos.img cpmfs.img Makefile $(wildcard cpmfs/*) $(APPS) cpmfs/ccp.sys
+	@rm -f $@
+	cc1541 -q -n "cp/m-65" $@
+	mkfs.cpm -f c1541 -b bdos.img $@
+	cc1541 -q \
+		-t -u 0 \
+		-r 18 -E -s 1 -f cpm -w c64.img \
+		$@
+	cpmcp -f c1541 $@ /dev/null 0:cbm.sys
+	echo "f0f: 18 55 56 57" | xxd -r - $@
+	cpmcp -f c1541 $@ $(wildcard cpmfs/*) 0:
+	cpmchattr -f $(DISKFORMAT) $@ s 0:ccp.sys 0:cbm.sys
 
 clean:
 	rm -rf $(OBJDIR) bios.img bdos.img cpmfs.img $(APPS)

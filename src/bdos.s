@@ -55,7 +55,7 @@ tempb:          .byte 0     ; more temporary storage
     adc #>(__BSS_RUN__ + __BSS_SIZE__ - __CODE_RUN__ + 255)
     ldy #bios::settpa
     jsr callbios
-    ; fall through to entry_EXIT
+    jmp entry_EXIT
 
 ; --- Warm start ------------------------------------------------------------
 
@@ -792,6 +792,7 @@ entry_CREATEFILE:
     ; Write the update directory buffer back to disk. find_next left all
     ; the pointers set correctly for this to work.
 
+    lda #1
     jsr write_sector
 
     ; Set bit 7 of S2 in the FCB to indicate that this file hasn't been
@@ -878,6 +879,7 @@ entry_CLOSEFILE:
 
     ; Write the dirent back to disk.
 
+    lda #1
     jsr write_sector            ; sector number remains set up from find_first
     
     ; Mark the FCB as modified and exit.
@@ -911,6 +913,7 @@ exit:
             lda #$e5
             ldy #fcb::dr
             sta (current_dirent), y
+            lda #1
             jsr write_sector
 
             ; Get the next matching dirent.
@@ -955,6 +958,7 @@ exit:
 
             ; Write back to disk.
 
+            lda #1
             jsr write_sector
 
             ; Get the next matching dirent.
@@ -989,6 +993,7 @@ exit:
 
             ; Write back to disk.
 
+            lda #1
             jsr write_sector
 
             ; Get the next matching dirent.
@@ -1284,6 +1289,18 @@ merge_error:
         zendif
     zendif
 
+    ; Add on reserved sector count.
+
+    clc
+    lda current_sector+0
+    adc reserved_sectors+0
+    sta current_sector+0
+    lda current_sector+1
+    adc reserved_sectors+1
+    sta current_sector+1
+    zif_cs
+        inc current_sector+2
+    zendif
     rts
 .endproc
 
@@ -1342,6 +1359,7 @@ merge_error:
     ; Actually do the write!
 
     jsr reset_user_dma
+    lda #0
     jsr write_sector
     lda #0
     clc
@@ -1384,6 +1402,7 @@ exit:
             jsr callbios
 
             zrepeat
+                lda #2
                 jsr write_sector
 
                 inc current_sector+0
@@ -1462,6 +1481,7 @@ exit:
 
     jsr seek_to_block_and_create
     jsr reset_user_dma
+    lda #0
     jsr write_sector
     lda #0
     clc
@@ -2294,8 +2314,12 @@ read_sector:
     ldy #bios::read
     jmp callbios
 
+; A=0, 1 or 2 as for bios::write on entry.
+
 write_sector:
+    pha
     jsr set_current_sector
+    pla
     ldy #bios::write
     jmp callbios
 
@@ -2307,8 +2331,15 @@ calculate_dirent_sector:
     ldx directory_pos+1
     ldy #2
     jsr shiftr                  ; 4 dirents per sector
+
+    clc
+    adc reserved_sectors+0
     sta current_sector+0
-    stx current_sector+1
+
+    txa
+    adc reserved_sectors+1
+    sta current_sector+1
+
     lda #0
     sta current_sector+2
     rts

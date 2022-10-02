@@ -17,13 +17,13 @@ LOAD = $ffd5
 SAVE = $ffd8
 CLALL = $ffe7
 SETMSG = $ff90
-IECIN = $ffa5
-IECOUT = $ffa8
+ACPTR = $ffa5
+CIOUT = $ffa8
 UNTALK = $ffab
-UNLSTN = $ffae
+UNLSN = $ffae
 LISTEN = $ffb1
 TALK = $ffb4
-LSTNSA = $ff93
+SECOND = $ff93
 TALKSA = $ff96
 CLRCHN = $ffcc
 GETIN = $ffe4
@@ -42,64 +42,34 @@ dma:        .word 0    ; current DMA
 entry:
     jsr init_system
 
-    ; Open the CPMFS image.
-
-    lda #2              ; file number
-    ldx #8              ; device
-    ldy #2              ; secondary address
-    jsr SETLFS
-
-    ldx #<cpmfs_filename
-    ldy #>cpmfs_filename
-    lda #cpmfs_filename_end - cpmfs_filename
-    jsr SETNAM
-
-    jsr OPEN
-    zif_cs
-        lda #<msg
-        ldx #>msg
-        jsr print
-        jmp *
-    msg:
-        .byte "Cannot open CPMFS", 0
-    zendif
-
-    ; Open the command channel.
-
-    lda #15             ; file number
-    ldx #8              ; device
-    ldy #15             ; secondary address
-    jsr SETLFS
-
-    lda #0              ; filename length
-    jsr SETNAM
-
-    jsr OPEN            ; always succeeds
-
     ; Load the BDOS.
 
-    lda #1              ; file number
-    ldx #8              ; device
-    ldy #0              ; secondary address
-    jsr SETLFS
+    ldx #0
+    stx sector_num
+    stx dma+0
+    lda #>top
+    sta dma+1
 
-    ldx #<bdos_filename
-    ldy #>bdos_filename
-    lda #bdos_filename_end - bdos_filename
-    jsr SETNAM
+    zrepeat
+        lda #'.'
+        jsr CHROUT
 
-    lda #0
-    ldx #<(top+2)       ; LOAD skips the first two bytes
-    ldy #>(top+2)       ; (which, luckily, we don't need)
-    jsr LOAD ; load
-    zif_cs
-        lda #<msg
-        ldx #>msg
-        jsr print
-        jmp *
-    msg:
-        .byte "Cannot load BDOS", 0
-    zendif
+        lda sector_num
+        ldx #0
+        jsr read_sector
+
+        ldy #0
+        zrepeat
+            lda disk_buffer, y
+            sta (dma), y
+            iny
+        zuntil_eq
+
+        inc dma+1
+        inc sector_num
+        lda sector_num
+        cmp #14
+    zuntil_eq
 
     ; Relocate the BDOS.
 
@@ -274,88 +244,352 @@ entry_SETZP:
     rts
 
 entry_READ:
-    jsr seek
-    jsr seek
+    jsr change_sectors
 
-    ldx #2                  ; set data channel as input
-    jsr CHKIN
+    lda sector_num+0
+    ror a               ; bottom bit -> C
+    lda #0
+    ror a               ; C -> top bit, producing $00 or $80
+    tax
 
     ldy #0
     zrepeat
-        jsr CHRIN
+        lda disk_buffer, x
         sta (dma), y
-
         iny
-        cpy #128
+        inx
+        cpy #$80
     zuntil_eq
-
-    jsr CLRCHN
 
     clc
     rts
 
-entry_WRITE:
-    jsr seek
-    jsr seek
+; On entry, A=0 for a normal write; A=1 to always flush to disk.
 
-    ldx #2                  ; set data channel as input
-    jsr CHKOUT
+entry_WRITE:
+    pha
+    jsr change_sectors
+
+    lda sector_num+0
+    ror a               ; bottom bit -> C
+    lda #0
+    ror a               ; C -> top bit, producing $00 or $80
+    tax
 
     ldy #0
     zrepeat
         lda (dma), y
-        jsr CHROUT
-
+        sta disk_buffer, x
         iny
-        cpy #128
+        inx
+        cpy #$80
     zuntil_eq
 
-    jsr CLRCHN
+    lda #$80
+    sta buffer_dirty
+
+    pla
+    zif_ne
+        jsr flush_buffered_sector
+    zendif
 
     clc
     rts
 
-; Seeks the REL file to the appropriate record.
+.proc change_sectors
+    ; If the buffered sector is the one we want, just return.
 
-.proc seek
-    ldx #15 
-    jsr CHKOUT              ; set command channel as output
-
-    lda #'P'
-    jsr CHROUT
-    lda #2                  ; channel
-    jsr CHROUT
-    ldx sector_num+0
-    ldy sector_num+1
-    inx
+    lda sector_num+0
+    and #$fe
+    cmp buffered_sector+0
     zif_eq
-        iny
+        lda sector_num+1
+        cmp buffered_sector+1
+        zif_eq
+            lda sector_num+2
+            cmp buffered_sector+2
+            zif_eq
+                rts
+            zendif
+        zendif
     zendif
-    txa
-    jsr CHROUT
-    tya
-    jsr CHROUT
 
-    jsr CLRCHN
+    ; We need to change sectors. Flush the current one?
 
+    jsr flush_buffered_sector
+
+    ; Now read the new one.
+
+    lda sector_num+0
+    and #$fe
+    sta buffered_sector+0
+    lda sector_num+1
+    sta buffered_sector+1
+    lda sector_num+2
+    sta buffered_sector+2
+
+    jsr buffered_sector_to_lba
+    jmp read_sector
+.endproc
+
+; Compute the current LBA sector number in XA for the buffered sector.
+
+.proc buffered_sector_to_lba
+    lda buffered_sector+1
+    lsr a
+    tax
+    lda buffered_sector+0
+    ror
     rts
 .endproc
 
-.proc getstatus
-    ldx #15
-    jsr CHKIN
+; Flush the current buffer to disk, if necessary.
 
-    zrepeat
-        jsr CHRIN
-        jsr CHROUT
-        cmp #13
-    zuntil_eq
+.proc flush_buffered_sector
+    lda buffer_dirty
+    zif_mi
+        jsr buffered_sector_to_lba
+        jsr write_sector
 
-    jsr CLRCHN
+        lda #0
+        sta buffer_dirty
+    zendif
     rts
 .endproc
 
 .include "relocate.inc" ; standard entry_RELOCATE
+
+; Reads a 256-byte sector whose LBA index is in XA.
+
+.proc read_sector
+    jsr convert_to_ts
+    pha
+    tya
+    pha
+
+    lda #8
+    jsr LISTEN
+    lda #$6f
+    jsr SECOND
+
+    lda #'U'
+    jsr CIOUT
+    lda #'1'
+    jsr CIOUT
+    lda #2
+    jsr decimal_out
+    lda #0
+    jsr decimal_out
+    pla                 ; get sector
+    jsr decimal_out
+    pla                 ; get track
+    jsr decimal_out
+
+    jsr UNLSN
+
+    ;jsr get_status
+
+    lda #8
+    jsr TALK
+    lda #$62
+    jsr TALKSA
+
+    ldy #0
+    zrepeat
+        jsr ACPTR
+        sta disk_buffer, y
+        iny
+    zuntil_eq
+
+    jsr UNTALK
+    rts
+.endproc
+
+; Writes a 256-byte sector whose LBA index is in XA.
+
+.proc write_sector
+    jsr convert_to_ts
+    pha
+    tya
+    pha
+
+    ; Reset buffer pointer.
+
+    lda #8
+    jsr LISTEN
+    lda #$6f
+    jsr SECOND
+
+    lda #<reset_buffer_pointer_command
+    ldx #>reset_buffer_pointer_command
+    jsr string_out
+
+    jsr UNLSN
+
+    ; Write bytes.
+
+    lda #8
+    jsr LISTEN
+    lda #$62
+    jsr SECOND
+
+    ldy #0
+    zrepeat
+        lda disk_buffer, y
+        jsr CIOUT
+        iny
+    zuntil_eq
+
+    jsr UNLSN
+
+    ; Write buffer to disk.
+
+    lda #8
+    jsr LISTEN
+    lda #$6f
+    jsr SECOND
+
+    lda #'U'
+    jsr CIOUT
+    lda #'2'
+    jsr CIOUT
+    lda #2
+    jsr decimal_out
+    lda #0
+    jsr decimal_out
+    pla                 ; get sector
+    jsr decimal_out
+    pla                 ; get track
+    jsr decimal_out
+    lda #13
+    jsr CIOUT
+
+    jsr UNLSN
+
+    ; jsr get_status
+
+    rts
+
+reset_buffer_pointer_command:
+    .byte "B-P 2 0", 13, 0
+.endproc
+
+; Prints an 8-bit hex number in A.
+.proc print_hex_number
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr h4
+    pla
+h4:
+    and #%00001111
+    ora #'0'
+    cmp #'9'+1
+	zif_cs
+		adc #6
+	zendif
+   	pha
+	jsr CHROUT
+	pla
+	rts
+.endproc
+
+.proc get_status
+    lda #8
+    jsr TALK
+    lda #$6f
+    jsr TALKSA
+
+    zrepeat
+        jsr ACPTR
+        jsr CHROUT
+        cmp #13
+    zuntil_eq
+
+    jsr UNTALK
+    rts
+.endproc
+
+; Converts an LBA sector number in XA to track/sector in Y, A.
+
+.proc convert_to_ts
+    ldy #0
+    zloop
+        cpx #0
+        zif_eq
+            cmp track_size_table, y
+            zif_cc
+                iny     ; tracks are one-based.
+                rts
+            zendif
+        zendif
+
+        sec
+        sbc track_size_table, y
+        zif_cc
+            dex
+        zendif
+        iny
+    zendloop
+
+track_size_table:
+    .res 17, 21
+    .res 7, 19
+    .res 6, 18
+    .res 10, 17
+.endproc
+
+; Prints a decimal number in A to the IEC output.
+
+.proc decimal_out
+    pha
+    lda #' '
+    jsr CIOUT
+    pla
+
+    ldx #$ff
+    sec
+    zrepeat
+        inx
+        sbc #100
+    zuntil_cc
+    adc #100
+    jsr digit
+
+    ldx #$ff
+    sec
+    zrepeat
+        inx
+        sbc #10
+    zuntil_cc
+    adc #10
+    jsr digit
+    tax
+digit:
+    pha
+    txa
+    ora #'0'
+    jsr CIOUT
+    pla
+    rts
+.endproc
+
+.proc string_out
+    sta ptr+0
+    stx ptr+1
+
+    ldy #0
+    zloop
+        lda (ptr), y
+        zif_eq
+            rts
+        zendif
+        jsr CIOUT
+        iny
+    zendloop
+.endproc
 
 ; Prints the string at XA with the kernel.
 
@@ -412,7 +646,6 @@ swapcase:
     lda #$36
     sta 1                   ; map Basic out
     lda #0
-    sta pending_key
     sta 53280               ; black border
     sta 53281               ; black background
 
@@ -425,19 +658,30 @@ swapcase:
         jsr CHROUT
         iny
     zendloop
+
+    ; General initialisation.
+
+    lda #0
+    sta pending_key
+    sta buffer_dirty
+    lda #$ff
+    sta buffered_sector+0
+    sta buffered_sector+1
+    sta buffered_sector+2
+
+    lda #8
+    jsr LISTEN
+    lda #$f2
+    jsr SECOND
+    lda #'#'
+    jsr CIOUT
+    jsr UNLSN
+
     rts
 .endproc
 
 loading_msg:
     .byte 147, 14, 5, 13, "cp/m-65", 13, 13, 0
-
-bdos_filename:
-    .byte "BDOS"
-bdos_filename_end:
-
-cpmfs_filename:
-    .byte "CPMFS,L,", 128
-cpmfs_filename_end:
 
 .data
 
@@ -448,14 +692,17 @@ mem_end:    .byte >$d000
 
 ; DPH for drive 0 (our only drive)
 
-dph: define_drive $600, 1024, 64, 0
+dph: define_drive 133*10, 1024, 64, 30
 
 .bss
 
 pending_key: .byte 0    ; pending keypress from system
 sector_num:  .res 3     ; current absolute sector number
+buffered_sector: .res 3 ; sector currently in disk buffer
+buffer_dirty: .res 1    ; non-zero if sector needs flushing
 
 directory_buffer: .res 128
+disk_buffer: .res 256
 
 top = (* + $ff) & ~$ff
 
