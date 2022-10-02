@@ -29,7 +29,7 @@ LIBXFCB_OBJS = \
 	$(OBJDIR)/lib/xfcb/writerand.o \
 	$(OBJDIR)/lib/xfcb/writeseq.o \
 
-all: $(OBJDIR)/multilink bbcmicro.img c64.d64 bdos.img bbcmicro.ssd $(OBJDIR)/libxfcb.a
+all: c64.d64 bbcmicro.ssd
 
 $(OBJDIR)/multilink: tools/multilink.cc
 	@mkdir -p $(dir $@)
@@ -86,7 +86,7 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f c1541 $@
 	cc1541 -q \
 		-t -u 0 \
-		-r 18 -f cpm -w c64.img \
+		-r 18 -f cpm -w $(OBJDIR)/c64.exe \
 		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	cpmcp -f c1541 $@ /dev/null 0:cbm.sys
