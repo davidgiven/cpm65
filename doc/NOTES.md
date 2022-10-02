@@ -1,26 +1,7 @@
-ffe0 system call entrypoints
-f800 I/O ports
-c000 kernel ROM
-8000 application ROM
-.... video memory
-7c00 HIMEM
-     CCP
-     ....
-     TPA
-     BDOS
-1900 PAGE
-....
-0800 filesystem storage
-0400 language workspace
-0200 OS gubbins
-0100 stack
-0000 zero page
-
-
 BDOS system calls: https://www.seasip.info/Cpm/bdos.html
 Point to the BDOS entrypoint is passed to the application at header+4 (after a
 JMP instruction, so making the entrypoint JSRable). Pass the function code in Y
-and the parameter in XA.
+and the parameter in XA. C is set on error.
 
 0: exit program
 1: console input
@@ -60,34 +41,38 @@ and the parameter in XA.
 35: compute file size
 36: compute random access pointer
 37: reset some drives
+38: get BDOS entrypoint
 40: write random with zero fill
 
-BIOS system calls: https://www.seasip.info/Cpm/bios.html
-Pointer to the BIOS entrypoint is passed to the BDOS init entrypoint in XA.
-Call with the function code in Y and the parameter in XA.
+BIOS system calls: https://www.seasip.info/Cpm/bios.html The entrypoint can be
+fetched with BDOS call 38 (which is new).  Call with the function code in Y and
+the parameter in XA. C is set on error.
 
 0: CONST: console status
 1: CONIN: console input
 2: CONOUT: console output
 3: SELDSK: select disk drive
-4: SETTRK: select track
-5: SETSEC: select sector
-6: SETDMA: set DMA address
-7: READ: read a sector
-8: WRITE: write a sector
-9: RELOCATE: relocate a binary
-10: GETTPA: get TPA bounds
-11: SETTPA: set TPA bounds
-12: GETZP: get ZP bounds
-13: SETZP: set ZP bounds
+4: SETSEC: select sector (parameter is a _pointer_ to a 24-bit number)
+5: SETDMA: set DMA address
+6: READ: read a sector
+7: WRITE: write a sector
+8: RELOCATE: relocate a binary
+9: GETTPA: get TPA bounds
+10: SETTPA: set TPA bounds
+11: GETZP: get ZP bounds
+12: SETZP: set ZP bounds
 
 Executable format:
 
 byte 0000 number of zero page bytes required
-word 0001 offset of relocation table
-code 0003 JMP instruction to BDOS (only COM files)
-code 0006 entrypoint
+byte 0001 number of TPA memory pages required
+word 0002 offset of relocation table
+byte 0004 must be $4c
+word 0005 address of bDOS entrypoint
+code 0007 entrypoint
 ...
-relocation bytes: two zero-terminated strings of incremental offsets from the
-beginning of the file; 0xff advances pointer but does nothing; first one is for
-ZP, second is for high byte of memory
+
+relocation bytes: two strings of nibbles, in MSB/LSB order, representing
+incremental offsets from the beginning of the file; 0xe advances pointer but
+does nothing and 0xf terminates the stream (any trailing 0 is ignored). The
+first one is for ZP, second is for high byte of any addresses.
