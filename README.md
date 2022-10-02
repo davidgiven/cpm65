@@ -22,6 +22,11 @@ run natively for full native development support.
 
 No, it won't let you run 8080 programs on the 6502!
 
+<div style="text-align: center">
+<a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Master"></a>
+<a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
+</div>
+
 
 Why?
 ----
@@ -83,6 +88,9 @@ In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
 questionable utility, but there's a new `FREE` command which shows memory
 usage.
 
+Pokey the Penguin loves to read your [pull
+requests](https://github.com/davidgiven/cpm65/compare)!
+
 
 Who?
 ----
@@ -96,7 +104,7 @@ License
 -------
 
 Everything here so far is © 2022 David Given, and is licensed under the
-two-clause BSD open source license. Please see [COPYING](COPYING) for the full
+two-clause BSD open source license. Please see [LICENSE](LICENSE) for the full
 text. The tl;dr is: you can do what you like with it provided you don't claim
 you wrote it.
 
