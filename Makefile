@@ -9,7 +9,6 @@ OBJDIR = .obj
 
 APPS = \
 	$(OBJDIR)/dump.com \
-	$(OBJDIR)/bitmap.com \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
 	cpmfs/readme.txt
