@@ -2,8 +2,6 @@
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
-.section .text.printi
-
 .global printi
 .global printip
 
@@ -11,6 +9,7 @@ pad = __rc2
 num = __rc3
 save = __rc5
 
+.section .text.printi
 ; void printi(uint16_t value)
 printi:
 	ldy #0

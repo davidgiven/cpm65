@@ -14,20 +14,25 @@ APPS = \
 	$(OBJDIR)/stat.com \
 	cpmfs/readme.txt
 
+LIBCPM_OBJS = \
+	$(OBJDIR)/llvm/lib/printi.o \
+	$(OBJDIR)/llvm/lib/bdos.o \
+	$(OBJDIR)/llvm/lib/xfcb.o \
+
 LIBXFCB_OBJS = \
-	$(OBJDIR)/lib/xfcb/clear.o \
-	$(OBJDIR)/lib/xfcb/close.o \
-	$(OBJDIR)/lib/xfcb/erase.o \
-	$(OBJDIR)/lib/xfcb/get.o \
-	$(OBJDIR)/lib/xfcb/make.o \
-	$(OBJDIR)/lib/xfcb/open.o \
-	$(OBJDIR)/lib/xfcb/prepare.o \
-	$(OBJDIR)/lib/xfcb/readrand.o \
-	$(OBJDIR)/lib/xfcb/readseq.o \
-	$(OBJDIR)/lib/xfcb/set.o \
-	$(OBJDIR)/lib/xfcb/vars.o \
-	$(OBJDIR)/lib/xfcb/writerand.o \
-	$(OBJDIR)/lib/xfcb/writeseq.o \
+	$(OBJDIR)/cc65/lib/xfcb/clear.o \
+	$(OBJDIR)/cc65/lib/xfcb/close.o \
+	$(OBJDIR)/cc65/lib/xfcb/erase.o \
+	$(OBJDIR)/cc65/lib/xfcb/get.o \
+	$(OBJDIR)/cc65/lib/xfcb/make.o \
+	$(OBJDIR)/cc65/lib/xfcb/open.o \
+	$(OBJDIR)/cc65/lib/xfcb/prepare.o \
+	$(OBJDIR)/cc65/lib/xfcb/readrand.o \
+	$(OBJDIR)/cc65/lib/xfcb/readseq.o \
+	$(OBJDIR)/cc65/lib/xfcb/set.o \
+	$(OBJDIR)/cc65/lib/xfcb/vars.o \
+	$(OBJDIR)/cc65/lib/xfcb/writerand.o \
+	$(OBJDIR)/cc65/lib/xfcb/writeseq.o \
 
 all: c64.d64 bbcmicro.ssd
 
@@ -39,33 +44,48 @@ $(OBJDIR)/mkdfs: tools/mkdfs.c
 	@mkdir -p $(dir $@)
 	$(CXX) -Os -g -o $@ $<
 
-$(OBJDIR)/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
+$(OBJDIR)/cc65/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
 	@mkdir -p $(dir $@)
-	$(CA65) -o $@ $< -I include -I lib/xfcb --listing $(patsubst %.o,%.lst,$@)
+	$(CA65) -DCA65 -o $@ $< -I include -I lib/xfcb --listing $(patsubst %.o,%.lst,$@)
+
+$(OBJDIR)/llvm/%.o: %.S include/zif_llvm.inc include/mos.inc include/cpm65_llvm.inc
+	@mkdir -p $(dir $@)
+	mos-cpm65-clang -c -o $@ $< -I include
 
 $(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
 	@mkdir -p $(dir $@)
 	$(AR65) r $@ $^
 
-$(OBJDIR)/bbcmicro.exe: $(OBJDIR)/src/bbcmicro.o scripts/bbcmicro.cfg
+$(OBJDIR)/llvm/libcpm.a: $(LIBCPM_OBJS)
+	@mkdir -p $(dir $@)
+	llvm-ar rs $@ $^
+
+$(OBJDIR)/bbcmicro.exe: $(OBJDIR)/cc65/src/bbcmicro.o scripts/bbcmicro.cfg
+	@mkdir -p $(dir $@)
 	$(LD65) -m $(patsubst %.exe,%.map,$@) -vm -C scripts/bbcmicro.cfg -o $@ $<
 	
-$(OBJDIR)/c64.exe: $(OBJDIR)/src/c64.o scripts/c64.cfg
+$(OBJDIR)/c64.exe: $(OBJDIR)/cc65/src/c64.o scripts/c64.cfg
+	@mkdir -p $(dir $@)
 	$(LD65) -m $(patsubst %.exe,%.map,$@) -vm -C scripts/c64.cfg -o $@ $<
 	
-$(OBJDIR)/apps/%.elf: apps/%.c lib/printi.S
+$(OBJDIR)/llvm/%.o: %.c
+	@mkdir -p $(dir $@)
+	mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
+
+$(OBJDIR)/apps/%.elf: $(OBJDIR)/llvm/apps/%.o $(OBJDIR)/llvm/libcpm.a
+	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/%.com: $(OBJDIR)/apps/%.elf
 	elftocpm65 -o $@ $<
 
-$(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
+$(OBJDIR)/%.com: $(OBJDIR)/cc65/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
-$(OBJDIR)/bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/multilink
+$(OBJDIR)/bdos.img: $(OBJDIR)/cc65/src/bdos.o $(OBJDIR)/multilink
 	$(OBJDIR)/multilink -o $@ $<
 
-$(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
+$(OBJDIR)/ccp.sys: $(OBJDIR)/cc65/src/ccp.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys

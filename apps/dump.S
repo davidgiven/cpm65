@@ -2,32 +2,27 @@
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
-	.include "cpm65.inc"
-	.include "zif.inc"
-	.include "xfcb.inc"
+#include "cpm65_llvm.inc"
+#include "zif_llvm.inc"
 
-	.import xfcb_readsequential
-	.import xfcb_open
+	.text
 
-	.zeropage
+ZEROPAGE
 
-address: .res 3
-index:	 .res 1
+address: .fill 3
+index:   .fill 1
 
-	.code
-	CPM65_COM_HEADER
-
-.scope
+zproc main
 	; Did we get a parameter?
 
-	lda FCB+xfcb::f1
+	lda cpm_fcb + FCB_F1
 	cmp #' '
 	beq syntax_error
 
 	; Try and open the file.
 
-	lda #<FCB
-	ldx #>FCB
+	lda #<cpm_fcb
+	ldx #>cpm_fcb
 	jsr xfcb_open
 	bcs cannot_open
 
@@ -39,12 +34,12 @@ index:	 .res 1
 	sta address+2
 
 	zloop
-		lda #<COMMANDLINE
-		ldx #>COMMANDLINE
+		lda #<cpm_default_dma
+		ldx #>cpm_default_dma
 		jsr bdos_SETDMA
 
-		lda #<FCB
-		ldx #>FCB
+		lda #<cpm_fcb
+		ldx #>cpm_fcb
 		jsr xfcb_readsequential
 		zbreakif_cs
 
@@ -55,25 +50,29 @@ index:	 .res 1
 		zuntil_eq
 	zendloop
 	rts
-.endscope
+zendproc
 
-.proc syntax_error
-	lda #<msg
-	ldx #>msg
+zproc syntax_error
+	lda #<1f
+	ldx #>1f
 	jmp bdos_WRITESTRING
-msg:
-	.byte "Syntax error", 13, 10, 0
-.endproc
 
-.proc cannot_open
-	lda #<msg
-	ldx #>msg
+1:
+	.ascii "Syntax error"
+	.byte 13, 10, 0
+zendproc
+
+zproc cannot_open
+	lda #<1f
+	ldx #>1f
 	jmp bdos_WRITESTRING
-msg:
-	.byte "Cannot open file", 13, 10, 0
-.endproc
 
-.proc dump_line
+1:
+	.ascii "Cannot open file"
+	.byte 13, 10, 0
+zendproc
+
+zproc dump_line
 	; Print the address.
 
 	lda address+2
@@ -94,7 +93,7 @@ msg:
 		ora index
 		tax
 
-		lda COMMANDLINE, x
+		lda cpm_default_dma, x
 		jsr print_hex_number
 		jsr space
 
@@ -115,7 +114,7 @@ msg:
 		ora index
 		tax
 
-		lda COMMANDLINE, x
+		lda cpm_default_dma, x
 		cmp #32
 		zif_cc
 			lda #'.'
@@ -145,19 +144,19 @@ msg:
 	zendif
 
 	jmp newline
-.endproc
+zendproc
 
 ; Prints an 8-bit hex number in A.
-.proc print_hex_number
+zproc print_hex_number
     pha
     lsr a
     lsr a
     lsr a
     lsr a
-    jsr h4
+    jsr 1f
     pla
-h4:
-    and #%00001111
+1:
+    and #0x0f
     ora #'0'
     cmp #'9'+1
 	zif_cs
@@ -167,26 +166,17 @@ h4:
 	jsr bdos_CONOUT
 	pla
 	rts
-.endproc
+zendproc
 
-space:
+zproc space
 	lda #' '
 	jmp bdos_CONOUT
+zendproc
 
-newline:
+zproc newline
 	lda #13
 	jsr bdos_CONOUT
 	lda #10
-	; fall through
-bdos_CONOUT:
-	ldy #bdos::console_output
-	jmp BDOS
-
-bdos_SETDMA:
-	ldy #bdos::set_dma_address
-	jmp BDOS
-
-bdos_WRITESTRING:
-	ldy #bdos::write_string
-	jmp BDOS
+	jmp bdos_CONOUT
+zendproc
 
