@@ -61,10 +61,19 @@
     .set zloopsp, zloopsp - 1
 .endm
 
-.macro zbreakif_cs
-    _zgetframe zloopstack, %zloopsp
-    _zget zloopstack, %ZF, break, bcs
+.macro _zmake_break cond
+    .macro zbreakif_\cond
+        _zgetframe zloopstack, %zloopsp
+        _zget zloopstack, %ZF, break, b\cond
+    .endm
 .endm
+
+_zmake_break cs
+_zmake_break cc
+_zmake_break eq
+_zmake_break ne
+_zmake_break mi
+_zmake_break pl
 
 .macro zrepeat
     .set zloopsp, zloopsp + 1
@@ -79,29 +88,20 @@
     .set zloopsp, zloopsp - 1
 .endm
 
-.macro zif_eq
-    .set zifsp, zifsp + 1
-    _zframe zifstack, %zifsp
-    _zget zifstack, %ZF, end, bne
+.macro _zmake_if pos, neg
+    .macro zif_\pos
+        .set zifsp, zifsp + 1
+        _zframe zifstack, %zifsp
+        _zget zifstack, %ZF, end, b\neg
+    .endm
 .endm
 
-.macro zif_ne
-    .set zifsp, zifsp + 1
-    _zframe zifstack, %zifsp
-    _zget zifstack, %ZF, end, beq
-.endm
-
-.macro zif_cc
-    .set zifsp, zifsp + 1
-    _zframe zifstack, %zifsp
-    _zget zifstack, %ZF, end, bcs
-.endm
-
-.macro zif_cs
-    .set zifsp, zifsp + 1
-    _zframe zifstack, %zifsp
-    _zget zifstack, %ZF, end, bcc
-.endm
+_zmake_if eq, ne
+_zmake_if ne, eq
+_zmake_if cc, cs
+_zmake_if cs, cc
+_zmake_if pl, mi
+_zmake_if mi, pl
 
 .macro zendif
     _zgetframe zifstack, %zifsp
