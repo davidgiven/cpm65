@@ -6,6 +6,17 @@
     .section .zp, "zax", @nobits
 .endm
 
+.macro NOINIT
+    .section .noinit, "ax", @nobits
+.endm
+
+#define COMHDR_ZP_USAGE   0 /* bytes of zero page used */
+#define COMHDR_TPA_USAGE  1 /* pages of TPA required (including space for relocation) */
+#define COMHDR_REL_OFFSET 2 /* relative address of relocation data (and start of BSS) */
+#define COMHDR_BDOS_JMP   4 /* jump instruction for calling BDOS */
+#define COMHDR_BDOS       5 /* BDOS entrypoint address */
+#define COMHDR_ENTRY      7 /* program entrypoint */
+
 #define FCB_DR 0x00
 #define FCB_F1 0x01
 #define FCB_F2 0x02
@@ -70,6 +81,20 @@
 #define BDOS_RESET_DISK 37
 #define BDOS_GET_BIOS 38
 #define BDOS_WRITE_RANDOM_FILLED 40
+
+#define BIOS_CONST 0
+#define BIOS_CONIN 1
+#define BIOS_CONOUT 2
+#define BIOS_SELDSK 3
+#define BIOS_SETSEC 4
+#define BIOS_SETDMA 5
+#define BIOS_READ 6
+#define BIOS_WRITE 7
+#define BIOS_RELOCATE 8
+#define BIOS_GETTPA 9
+#define BIOS_SETTPA 10
+#define BIOS_GETZP 11
+#define BIOS_SETZP 12
 
 ; vim: filetype=asm sw=4 ts=4 et
 

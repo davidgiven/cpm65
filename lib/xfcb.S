@@ -42,6 +42,20 @@ zproc xfcb_open
 	jmp BDOS
 zendproc
 
+zproc xfcb_close
+	jsr xfcb_prepare
+	jsr xfcb_clear
+	ldy #BDOS_CLOSE_FILE
+	jmp BDOS
+zendproc
+
+zproc xfcb_erase
+	jsr xfcb_prepare
+	jsr xfcb_clear
+	ldy #BDOS_DELETE_FILE
+	jmp BDOS
+zendproc
+
 zproc xfcb_readsequential
 	jsr xfcb_prepare
 	ldy #BDOS_READ_SEQUENTIAL

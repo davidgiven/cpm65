@@ -11,6 +11,7 @@ APPS = \
 	$(OBJDIR)/dump.com \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
+	$(OBJDIR)/rawdisk.com \
 	cpmfs/readme.txt
 
 LIBCPM_OBJS = \
@@ -49,7 +50,7 @@ $(OBJDIR)/cc65/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
 
 $(OBJDIR)/llvm/%.o: %.S include/zif_llvm.inc include/mos.inc include/cpm65_llvm.inc
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang -c -o $@ $< -I include
+	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 
 $(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
 	@mkdir -p $(dir $@)
@@ -71,12 +72,9 @@ $(OBJDIR)/llvm/%.o: %.c
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
 
-$(OBJDIR)/apps/%.elf: $(OBJDIR)/llvm/apps/%.o $(OBJDIR)/llvm/libcpm.a
+$(OBJDIR)/%.com: $(OBJDIR)/llvm/apps/%.o $(OBJDIR)/llvm/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
-
-$(OBJDIR)/%.com: $(OBJDIR)/apps/%.elf
-	elftocpm65 -o $@ $<
 
 $(OBJDIR)/%.com: $(OBJDIR)/cc65/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
@@ -84,8 +82,9 @@ $(OBJDIR)/%.com: $(OBJDIR)/cc65/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 $(OBJDIR)/bdos.img: $(OBJDIR)/cc65/src/bdos.o $(OBJDIR)/multilink
 	$(OBJDIR)/multilink -o $@ $<
 
-$(OBJDIR)/ccp.sys: $(OBJDIR)/cc65/src/ccp.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
-	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
+$(OBJDIR)/ccp.sys: $(OBJDIR)/llvm/src/ccp.o $(OBJDIR)/llvm/libcpm.a
+	@mkdir -p $(dir $@)
+	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@

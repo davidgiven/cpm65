@@ -44,6 +44,12 @@
     .set \stack\()_\sp\()_\name, \val
 .endm
 
+.macro _zsetifnotset stack, sp, name, val
+    .ifndef \stack\()_\sp\()_\name
+        .set \stack\()_\sp\()_\name, \val
+    .endif
+.endm
+
 .macro _zget stack, label, var, insn
     \insn \stack\()_\label\()_\var
 .endm
@@ -61,38 +67,43 @@
     .set zloopsp, zloopsp - 1
 .endm
 
-.macro _zmake_break cond
-    .macro zbreakif_\cond
-        _zgetframe zloopstack, %zloopsp
-        _zget zloopstack, %ZF, break, b\cond
-    .endm
-.endm
-
-_zmake_break cs
-_zmake_break cc
-_zmake_break eq
-_zmake_break ne
-_zmake_break mi
-_zmake_break pl
-
 .macro zrepeat
     .set zloopsp, zloopsp + 1
     _zframe zloopstack, %zloopsp
     _zset zloopstack, %ZF, continue, .
 .endm
 
-.macro zuntil_eq
-    _zgetframe zloopstack, %zloopsp
-    _zget zloopstack, %ZF, continue, bne
-    _zset zloopstack, %ZF, break, .
-    .set zloopsp, zloopsp - 1
+.macro _zmake_loops pos, neg
+    .macro zbreakif_\pos
+        _zgetframe zloopstack, %zloopsp
+        _zget zloopstack, %ZF, break, b\pos
+    .endm
+
+    .macro zcontinueif_\pos
+        _zgetframe zloopstack, %zloopsp
+        _zget zloopstack, %ZF, continue, b\pos
+    .endm
+
+    .macro zuntil_\pos
+        _zgetframe zloopstack, %zloopsp
+        _zget zloopstack, %ZF, continue, b\neg
+        _zset zloopstack, %ZF, break, .
+        .set zloopsp, zloopsp - 1
+    .endm
 .endm
+
+_zmake_loops eq, ne
+_zmake_loops ne, eq
+_zmake_loops cc, cs
+_zmake_loops cs, cc
+_zmake_loops pl, mi
+_zmake_loops mi, pl
 
 .macro _zmake_if pos, neg
     .macro zif_\pos
         .set zifsp, zifsp + 1
         _zframe zifstack, %zifsp
-        _zget zifstack, %ZF, end, b\neg
+        _zget zifstack, %ZF, false, b\neg
     .endm
 .endm
 
@@ -103,8 +114,15 @@ _zmake_if cs, cc
 _zmake_if pl, mi
 _zmake_if mi, pl
 
+.macro zelse
+    _zgetframe zifstack, %zifsp
+    _zget zifstack, %ZF, end, jmp
+    _zset zifstack, %ZF, false, .
+.endm
+    
 .macro zendif
     _zgetframe zifstack, %zifsp
+    _zsetifnotset zifstack, %ZF, false, .
     _zset zifstack, %ZF, end, .
     .set zifsp, zifsp - 1
 .endm
