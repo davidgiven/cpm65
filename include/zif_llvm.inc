@@ -22,14 +22,6 @@
     .endif
 .endm
 
-.macro _zlabel n
-    100\n:
-.endm
-
-.macro _zlabelref insn, n
-    \insn 100\n
-.endm
-
 .macro _zgetframe kind, sp
     .set ZF, \kind\sp
 .endm
@@ -41,17 +33,17 @@
 .endm
 
 .macro _zset stack, sp, name, val
-    .set \stack\()_\sp\()_\name, \val
+    .set .L\stack\()_\sp\()_\name, \val
 .endm
 
 .macro _zsetifnotset stack, sp, name, val
-    .ifndef \stack\()_\sp\()_\name
-        .set \stack\()_\sp\()_\name, \val
+    .ifndef .L\stack\()_\sp\()_\name
+        .set .L\stack\()_\sp\()_\name, \val
     .endif
 .endm
 
 .macro _zget stack, label, var, insn
-    \insn \stack\()_\label\()_\var
+    \insn .L\stack\()_\label\()_\var
 .endm
 
 .macro zloop
@@ -71,6 +63,11 @@
     .set zloopsp, zloopsp + 1
     _zframe zloopstack, %zloopsp
     _zset zloopstack, %ZF, continue, .
+.endm
+
+.macro zcontinue
+    _zgetframe zloopstack, %zloopsp
+    _zget zloopstack, %ZF, continue, jmp
 .endm
 
 .macro _zmake_loops pos, neg

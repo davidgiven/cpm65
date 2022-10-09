@@ -2,38 +2,32 @@
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
-    .include "cpm65.inc"
-    .include "zif.inc"
 
-    .import __ZEROPAGE_SIZE__
-    .import __CODE_RUN__
-    .import __BSS_RUN__
-    .import __BSS_SIZE__
+#include "cpm65_llvm.inc"
+#include "zif_llvm.inc"
 
-    CPM_MACHINE_TYPE = $f ; 6502!
-    CPM_SYSTEM_TYPE = 0
-    CPM_VERSION = $22 ; CP/M 2.2 (compatible)
+CPM_MACHINE_TYPE = $f ; 6502!
+CPM_SYSTEM_TYPE = 0
+CPM_VERSION = $22 ; CP/M 2.2 (compatible)
 
-    .zeropage
+ZEROPAGE
 
-current_dirent: .word 0     ; current directory entry
-param:          .word 0     ; current user input parameter
-dph:            .word 0     ; currently selected DPH
+current_dirent:   .word 0 ; current directory entry
+param:            .word 0 ; current user input parameter
+dph:              .word 0 ; currently selected DPH
 
-directory_buffer:   .word 0 ; directory buffer from the DPH
-current_dpb:        .word 0 ; currently selected DPB
-checksum_buffer:    .word 0 ; checksum buffer from the DPH
-bitmap:             .word 0 ; allocation bitmap from the DPH
+directory_buffer: .word 0 ; directory buffer from the DPH
+current_dpb:      .word 0 ; currently selected DPB
+checksum_buffer:  .word 0 ; checksum buffer from the DPH
+bitmap:           .word 0 ; allocation bitmap from the DPH
 
-temp:           .res 4      ; temporary storage
-tempb:          .byte 0     ; more temporary storage
+temp:             .fill 4 ; temporary storage
+tempb:            .byte 0 ; more temporary storage
 
 ; --- Initialisation --------------------------------------------------------
 ; TODO: figure out how to discard this.
 
-    .code
-    CPM65_BARE_HEADER
-
+zproc main
     ; Store BIOS entrypoint pointer.
 
     sta bios+0
@@ -47,19 +41,20 @@ tempb:          .byte 0     ; more temporary storage
 
     ; Update memory region.
 
-    ldy #bios::getzp
+    ldy #BIOS_GETZP
     jsr callbios
     clc
-    adc #<__ZEROPAGE_SIZE__
-    ldy #bios::setzp
+    adc cpm_header + COMHDR_ZP_USAGE
+    ldy #BIOS_SETZP
     jsr callbios
     
     jsr bios_GETTPA
     clc
-    adc #>(__BSS_RUN__ + __BSS_SIZE__ - __CODE_RUN__ + 255)
-    ldy #bios::settpa
+    adc cpm_header + COMHDR_TPA_USAGE
+    ldy #BIOS_SETTPA
     jsr callbios
     jmp entry_EXIT
+zendproc
 
 ; --- Warm start ------------------------------------------------------------
 
@@ -78,11 +73,11 @@ entry_EXIT:
     ; Open the CCP.SYS file.
 
     lda #0
-    sta ccp_fcb + fcb::ex
-    sta ccp_fcb + fcb::s2
-    sta ccp_fcb + fcb::cr
+    sta ccp_fcb + FCB_EX
+    sta ccp_fcb + FCB_S2
+    sta ccp_fcb + FCB_CR
     lda #1
-    sta ccp_fcb + fcb::dr
+    sta ccp_fcb + FCB_DR
 
     lda #<ccp_fcb
     sta param+0
@@ -90,12 +85,13 @@ entry_EXIT:
     sta param+1
     jsr entry_OPENFILE
     zif_cs
-        lda #<no_ccp
-        ldx #>no_ccp
+        lda #<1f
+        ldx #>1f
         jsr internal_WRITESTRING
-        jmp *
-    no_ccp:
-        .byte "Couldn't open CCP", 13, 10, 0
+        jmp .
+    1:
+        .ascii "Couldn't open CCP"
+        .byte 13, 10, 0
     zendif
 
     ; Read the first sector.
@@ -111,14 +107,14 @@ entry_EXIT:
     jsr bios_GETZP          ; top of ZP in X
     txa
     sec
-    ldy #comhdr::zp_usage
+    ldy #COMHDR_ZP_USAGE
     sbc (directory_buffer), y
     pha
     
     jsr bios_GETTPA         ; top of TPA page number in X
     txa
     sec
-    ldy #comhdr::tpa_usage
+    ldy #COMHDR_TPA_USAGE
     sbc (directory_buffer), y
     sta user_dma+1
     pha                     ; store load address for later
@@ -153,7 +149,7 @@ entry_EXIT:
     pla
     sta temp+1
     
-    ldy #comhdr::bdos
+    ldy #COMHDR_BDOS
     lda #<ENTRY
     sta (temp), y
     iny
@@ -165,12 +161,12 @@ entry_EXIT:
     pla                     ; pop start zero page address, saved earlier
     tax
     lda temp+1              ; start of TPA, in pages
-    ldy #bios::relocate
+    ldy #BIOS_RELOCATE
     jsr callbios
 
     ; Execute it.
 
-    lda #comhdr::entry      ; start address is 256-byte aligned
+    lda #COMHDR_ENTRY      ; start address is 256-byte aligned
     sta temp+0
 calltemp:
     jmp (temp)
@@ -178,15 +174,14 @@ calltemp:
     .data
 ccp_fcb:
     .byte 1                 ; drive A:
-    .byte "CCP     SYS"     ; filename: CCP.SYS
+    .ascii "CCP     SYS"    ; filename: CCP.SYS
     .byte 0, 0, 0, 0        ; EX, S1, S2, RC
-    .res 16, 0              ; allocation block
-    .byte 0
+    .fill 16, 1, 0          ; allocation block
+    .byte 0                 ; CR
 
 ; --- BDOS entrypoint -------------------------------------------------------
 
-    .code
-.proc ENTRY
+zproc ENTRY
     sta param+0
     stx param+1
 
@@ -212,7 +207,7 @@ ccp_fcb:
 
     lda old_fcb_drive
     zif_pl
-        ldy #fcb::dr
+        ldy #FCB_DR
         sta (param), y      ; restore user FCB
     zendif
 
@@ -229,132 +224,129 @@ unimplemented:
     rts
 
 jumptable_lo:
-    .lobytes entry_EXIT ; exit_program = 0
-    .lobytes entry_CONIN ; console_input = 1
-    .lobytes entry_CONOUT ; console_output = 2
-    .lobytes entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
-    .lobytes entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
-    .lobytes entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
-    .lobytes entry_DIRECTIO ; direct_io = 6
-    .lobytes entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
-    .lobytes entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
-    .lobytes entry_WRITESTRING ; write_string = 9
-    .lobytes entry_READLINE ; read_line = 10
-    .lobytes entry_GETCONSOLESTATUS ; console_status = 11
-    .lobytes entry_GETVERSION ; get_version = 12
-    .lobytes entry_RESET ; reset_disks = 13
-    .lobytes entry_LOGINDRIVE ; select_disk = 14
-    .lobytes entry_OPENFILE ; open_file = 15
-    .lobytes entry_CLOSEFILE ; close_file = 16
-    .lobytes entry_FINDFIRST ; find_first = 17
-    .lobytes entry_FINDNEXT ; find_next = 18
-    .lobytes entry_DELETEFILE ; delete_file = 19
-    .lobytes entry_READSEQUENTIAL ; read_sequential = 20
-    .lobytes entry_WRITESEQUENTIAL ; write_sequential = 21
-    .lobytes entry_CREATEFILE ; create_file = 22
-    .lobytes entry_RENAMEFILE ; rename_file = 23
-    .lobytes entry_GETLOGINBITMAP ; get_login_bitmap = 24
-    .lobytes entry_GETDRIVE ; get_current_drive = 25
-    .lobytes entry_SETDMAADDRESS ; set_dma_address = 26
-    .lobytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
-    .lobytes entry_SETDRIVEREADONLY ; set_drive_readonly = 28
-    .lobytes entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
-    .lobytes entry_SETFILEATTRS ; set_file_attributes = 30
-    .lobytes entry_GETDPB ; get_DPB = 31
-    .lobytes entry_GETSETUSER ; get_set_user_number = 32
-    .lobytes entry_READRANDOM ; read_random = 33
-    .lobytes entry_WRITERANDOM ; write_random = 34
-    .lobytes entry_COMPUTEFILESIZE ; compute_file_size = 35
-    .lobytes entry_COMPUTEPOINTER ; compute_random_pointer = 36
-    .lobytes entry_RESETDISK ; reset_disk = 37
-    .lobytes entry_GETBIOS ; get_bios = 38
-    .lobytes unimplemented ; 39
-    .lobytes entry_WRITERANDOMFILLED ; write_random_filled = 40
+    .byte entry_EXIT@mos16lo ; exit_program = 0
+    .byte entry_CONIN@mos16lo ; console_input = 1
+    .byte entry_CONOUT@mos16lo ; console_output = 2
+    .byte entry_UNIMPLEMENTED@mos16lo ; aux_input = 3 UNSUPPORTED
+    .byte entry_UNIMPLEMENTED@mos16lo ; aux_output = 4 UNSUPPORTED
+    .byte entry_UNIMPLEMENTED@mos16lo ; printer_output = 5 UNSUPPORTED
+    .byte entry_DIRECTIO@mos16lo ; direct_io = 6
+    .byte entry_GETIOBYTE@mos16lo ; get_io_byte = 7 UNSUPPORTED
+    .byte entry_UNIMPLEMENTED@mos16lo ; set_io_byte = 8 UNSUPPORTED
+    .byte entry_WRITESTRING@mos16lo ; write_string = 9
+    .byte entry_READLINE@mos16lo ; read_line = 10
+    .byte entry_GETCONSOLESTATUS@mos16lo ; console_status = 11
+    .byte entry_GETVERSION@mos16lo ; get_version = 12
+    .byte entry_RESET@mos16lo ; reset_disks = 13
+    .byte entry_LOGINDRIVE@mos16lo ; select_disk = 14
+    .byte entry_OPENFILE@mos16lo ; open_file = 15
+    .byte entry_CLOSEFILE@mos16lo ; close_file = 16
+    .byte entry_FINDFIRST@mos16lo ; find_first = 17
+    .byte entry_FINDNEXT@mos16lo ; find_next = 18
+    .byte entry_DELETEFILE@mos16lo ; delete_file = 19
+    .byte entry_READSEQUENTIAL@mos16lo ; read_sequential = 20
+    .byte entry_WRITESEQUENTIAL@mos16lo ; write_sequential = 21
+    .byte entry_CREATEFILE@mos16lo ; create_file = 22
+    .byte entry_RENAMEFILE@mos16lo ; rename_file = 23
+    .byte entry_GETLOGINBITMAP@mos16lo ; get_login_bitmap = 24
+    .byte entry_GETDRIVE@mos16lo ; get_current_drive = 25
+    .byte entry_SETDMAADDRESS@mos16lo ; set_dma_address = 26
+    .byte entry_GETALLOCATIONBITMAP@mos16lo ; get_allocation_bitmap = 27
+    .byte entry_SETDRIVEREADONLY@mos16lo ; set_drive_readonly = 28
+    .byte entry_GETREADONLYBITMAP@mos16lo ; get_readonly_bitmap = 29
+    .byte entry_SETFILEATTRS@mos16lo ; set_file_attributes = 30
+    .byte entry_GETDPB@mos16lo ; get_DPB = 31
+    .byte entry_GETSETUSER@mos16lo ; get_set_user_number = 32
+    .byte entry_READRANDOM@mos16lo ; read_random = 33
+    .byte entry_WRITERANDOM@mos16lo ; write_random = 34
+    .byte entry_COMPUTEFILESIZE@mos16lo ; compute_file_size = 35
+    .byte entry_COMPUTEPOINTER@mos16lo ; compute_random_pointer = 36
+    .byte entry_RESETDISK@mos16lo ; reset_disk = 37
+    .byte entry_GETBIOS@mos16lo ; get_bios = 38
+    .byte unimplemented@mos16lo ; 39
+    .byte entry_WRITERANDOMFILLED@mos16lo ; write_random_filled = 40
 jumptable_hi:
-    .hibytes entry_EXIT ;exit_program = 0
-    .hibytes entry_CONIN ; console_input = 1
-    .hibytes entry_CONOUT ; console_output = 2
-    .hibytes entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
-    .hibytes entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
-    .hibytes entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
-    .hibytes entry_DIRECTIO ; direct_console_io = 6
-    .hibytes entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
-    .hibytes entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
-    .hibytes entry_WRITESTRING ; write_string = 9
-    .hibytes entry_READLINE ; read_line = 10
-    .hibytes entry_GETCONSOLESTATUS ; console_status = 11
-    .hibytes entry_GETVERSION ; get_version = 12
-    .hibytes entry_RESET ; reset_disks = 13
-    .hibytes entry_LOGINDRIVE ; select_disk = 14
-    .hibytes entry_OPENFILE ; open_file = 15
-    .hibytes entry_CLOSEFILE ; close_file = 16
-    .hibytes entry_FINDFIRST ; find_first = 17
-    .hibytes entry_FINDNEXT ; find_next = 18
-    .hibytes entry_DELETEFILE ; delete_file = 19
-    .hibytes entry_READSEQUENTIAL ; read_sequential = 20
-    .hibytes entry_WRITESEQUENTIAL ; write_sequential = 21
-    .hibytes entry_CREATEFILE ; create_file = 22
-    .hibytes entry_RENAMEFILE ; rename_file = 23
-    .hibytes entry_GETLOGINBITMAP ; get_login_bitmap = 24
-    .hibytes entry_GETDRIVE ; get_current_drive = 25
-    .hibytes entry_SETDMAADDRESS ; set_dma_address = 26
-    .hibytes entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
-    .hibytes entry_SETDRIVEREADONLY ; set_drive_readonly = 28
-    .hibytes entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
-    .hibytes entry_SETFILEATTRS ; set_file_attributes = 30
-    .hibytes entry_GETDPB ; get_dpb = 31
-    .hibytes entry_GETSETUSER ; get_set_user_number = 32
-    .hibytes entry_READRANDOM ; read_random = 33
-    .hibytes entry_WRITERANDOM ; write_random = 34
-    .hibytes entry_COMPUTEFILESIZE ; compute_file_size = 35
-    .hibytes entry_COMPUTEPOINTER ; compute_random_pointer = 36
-    .hibytes entry_RESETDISK ; reset_disk = 37
-    .hibytes entry_GETBIOS ; 38
-    .hibytes unimplemented ; 39
-    .hibytes entry_WRITERANDOMFILLED ; write_random_filled = 40
-.endproc
+    .byte entry_EXIT@mos16hi ;exit_program = 0
+    .byte entry_CONIN@mos16hi ; console_input = 1
+    .byte entry_CONOUT@mos16hi ; console_output = 2
+    .byte entry_UNIMPLEMENTED@mos16hi ; aux_input = 3 UNSUPPORTED
+    .byte entry_UNIMPLEMENTED@mos16hi ; aux_output = 4 UNSUPPORTED
+    .byte entry_UNIMPLEMENTED@mos16hi ; printer_output = 5 UNSUPPORTED
+    .byte entry_DIRECTIO@mos16hi ; direct_console_io = 6
+    .byte entry_GETIOBYTE@mos16hi ; get_io_byte = 7 UNSUPPORTED
+    .byte entry_UNIMPLEMENTED@mos16hi ; set_io_byte = 8 UNSUPPORTED
+    .byte entry_WRITESTRING@mos16hi ; write_string = 9
+    .byte entry_READLINE@mos16hi ; read_line = 10
+    .byte entry_GETCONSOLESTATUS@mos16hi ; console_status = 11
+    .byte entry_GETVERSION@mos16hi ; get_version = 12
+    .byte entry_RESET@mos16hi ; reset_disks = 13
+    .byte entry_LOGINDRIVE@mos16hi ; select_disk = 14
+    .byte entry_OPENFILE@mos16hi ; open_file = 15
+    .byte entry_CLOSEFILE@mos16hi ; close_file = 16
+    .byte entry_FINDFIRST@mos16hi ; find_first = 17
+    .byte entry_FINDNEXT@mos16hi ; find_next = 18
+    .byte entry_DELETEFILE@mos16hi ; delete_file = 19
+    .byte entry_READSEQUENTIAL@mos16hi ; read_sequential = 20
+    .byte entry_WRITESEQUENTIAL@mos16hi ; write_sequential = 21
+    .byte entry_CREATEFILE@mos16hi ; create_file = 22
+    .byte entry_RENAMEFILE@mos16hi ; rename_file = 23
+    .byte entry_GETLOGINBITMAP@mos16hi ; get_login_bitmap = 24
+    .byte entry_GETDRIVE@mos16hi ; get_current_drive = 25
+    .byte entry_SETDMAADDRESS@mos16hi ; set_dma_address = 26
+    .byte entry_GETALLOCATIONBITMAP@mos16hi ; get_allocation_bitmap = 27
+    .byte entry_SETDRIVEREADONLY@mos16hi ; set_drive_readonly = 28
+    .byte entry_GETREADONLYBITMAP@mos16hi ; get_readonly_bitmap = 29
+    .byte entry_SETFILEATTRS@mos16hi ; set_file_attributes = 30
+    .byte entry_GETDPB@mos16hi ; get_dpb = 31
+    .byte entry_GETSETUSER@mos16hi ; get_set_user_number = 32
+    .byte entry_READRANDOM@mos16hi ; read_random = 33
+    .byte entry_WRITERANDOM@mos16hi ; write_random = 34
+    .byte entry_COMPUTEFILESIZE@mos16hi ; compute_file_size = 35
+    .byte entry_COMPUTEPOINTER@mos16hi ; compute_random_pointer = 36
+    .byte entry_RESETDISK@mos16hi ; reset_disk = 37
+    .byte entry_GETBIOS@mos16hi ; 38
+    .byte unimplemented@mos16hi ; 39
+    .byte entry_WRITERANDOMFILLED@mos16hi ; write_random_filled = 40
+zendproc
 
 ; --- Misc ------------------------------------------------------------------
 
-    .code
-.proc entry_GETBIOS
+zproc entry_GETBIOS
     lda bios+0
     sta param+0
     ldx bios+1
     stx param+1
     rts
-.endproc
+zendproc
 
-.proc entry_GETVERSION
+zproc entry_GETVERSION
     lda #CPM_VERSION
     ldx #(CPM_MACHINE_TYPE<<4) | CPM_SYSTEM_TYPE
     rts
-.endproc
+zendproc
 
-.proc entry_GETIOBYTE
-    lda #%10010100
+zproc entry_GETIOBYTE
+    lda #0x94               ; %10010100
     clc
     rts
-.endproc
+zendproc
 
-.proc entry_UNIMPLEMENTED
+zproc entry_UNIMPLEMENTED
     sec
     rts
-.endproc
+zendproc
 
 ; --- Console ---------------------------------------------------------------
 
-    .code
-.proc entry_CONIN
+zproc entry_CONIN
     lda buffered_key
     zif_eq
         jsr bios_CONIN
         tax
-        jmp exit
+    zelse
+        ldx #0
+        stx buffered_key
     zendif
-    ldx #0
-    stx buffered_key
-exit:
     txa
     pha
     cmp #31
@@ -362,15 +354,14 @@ exit:
         jsr entry_CONOUT
     zendif
     rts
-.endproc
+zendproc
 
-    .code
 ; Prints the character in param+0.
-.proc entry_CONOUT
+zproc entry_CONOUT
     lda param+0
     ; fall through
-.endproc
-.proc internal_CONOUT
+zendproc
+zproc internal_CONOUT
     pha
     jsr bios_CONST
     cmp #0
@@ -380,14 +371,14 @@ exit:
         zif_eq
             jsr bios_CONIN  ; wait for another key press
             cmp #3
-            beq reboot
-            jmp continue
+            beq reboot$
+            jmp continue$
         zendif
         cmp #3              ; was it ^C?
-        beq reboot
+        beq reboot$
         sta buffered_key
     zendif
-continue:
+continue$:
     pla
         
     ; Actually print it.
@@ -398,9 +389,9 @@ continue:
 
     ldx column_position
     cmp #8
-    beq backspace
+    beq backspace$
     cmp #127
-    beq backspace
+    beq backspace$
     cmp #9
     zif_eq
         inx
@@ -410,35 +401,35 @@ continue:
         rts
     zendif
     cmp #32
-    bcc zero_column
+    bcc zero_column$
     inx
-    jmp exit
+    jmp exit$
 
-backspace:
+backspace$:
     dex
-    bpl exit
-zero_column:
+    bpl exit$
+zero_column$:
     ldx #0
-exit:
+exit$:
     stx column_position
     rts
-reboot:
+reboot$:
     jmp entry_EXIT
-.endproc
+zendproc
 
-.proc entry_GETCONSOLESTATUS
+zproc entry_GETCONSOLESTATUS
     lda buffered_key
     zif_eq
         jsr bios_CONST
     zendif
     clc
     rts
-.endproc
+zendproc
 
 ; If param+0 == $ff, returns a character without waiting and without echo.
 ; If param+0 != $ff, prints it.
 
-.proc entry_DIRECTIO
+zproc entry_DIRECTIO
     lda param+0
     cmp #$ff
     zif_ne
@@ -459,12 +450,12 @@ reboot:
     zendif
     clc
     rts
-.endproc
+zendproc
 
 internal_WRITESTRING:
     sta param+0
     stx param+1
-.proc entry_WRITESTRING
+zproc entry_WRITESTRING
     zloop
         ldy #0
         lda (param), y
@@ -480,10 +471,10 @@ internal_WRITESTRING:
         zendif
     zendloop
     rts
-.endproc
+zendproc
 
 ; Read a line from the keyboard. Buffer is at param, size at param+0.
-.proc entry_READLINE
+zproc entry_READLINE
     start_column_position = temp+0
     buffer_pos = temp+1
     buffer_max = temp+2
@@ -521,7 +512,7 @@ internal_WRITESTRING:
             ldy buffer_pos
             cpy #1
             zif_ne
-                dec z:buffer_pos
+                dec buffer_pos
                 dec current_column_position
                 jsr bios_CONOUT
             zendif
@@ -587,10 +578,10 @@ internal_WRITESTRING:
             ldy buffer_max
             cpy buffer_pos
             zif_cs
-                ldy z:buffer_pos
+                ldy buffer_pos
                 sta (param), y
                 jsr bios_CONOUT
-                inc z:buffer_pos
+                inc buffer_pos
                 inc current_column_position
             zendif
         zendif
@@ -618,12 +609,11 @@ indent_new_line:
         inc current_column_position
     zendloop
     rts
-.endproc
+zendproc
 
 ; --- Reset disk system -----------------------------------------------------
 
-    .code
-.proc entry_RESET
+zproc entry_RESET
     ; Reset transient BDOS state.
 
     ldy #(bdos_state_end - bdos_state_start - 1)
@@ -637,11 +627,11 @@ indent_new_line:
 
     ; A is 0
     jmp internal_LOGINDRIVE
-.endproc
+zendproc
 
 ; Reset the write-protect bits for the drives the user asked for.
 
-.proc entry_RESETDISK
+zproc entry_RESETDISK
     lda param+0
     eor #$ff
     and write_protect_vector+0
@@ -654,15 +644,15 @@ indent_new_line:
 
     clc
     rts
-.endproc
+zendproc
 
-.proc entry_GETDRIVE
+zproc entry_GETDRIVE
     lda current_drive
     sta param+0
     rts
-.endproc
+zendproc
 
-.proc entry_GETSETUSER
+zproc entry_GETSETUSER
     clc
     lda param+0
     zif_mi
@@ -671,15 +661,15 @@ indent_new_line:
     zendif
     sta current_user
     rts
-.endproc
+zendproc
 
-.proc entry_SETDMAADDRESS
+zproc entry_SETDMAADDRESS
     lda param+0
     sta user_dma+0
     lda param+1
     sta user_dma+1
     rts
-.endproc
+zendproc
 
 ; --- Open a file -----------------------------------------------------------
 
@@ -688,13 +678,13 @@ indent_new_line:
 
 entry_OPENFILE:
     jsr new_user_fcb
-.proc internal_OPENFILE
-    lda #fcb::s2+1              ; match 15 bytes of FCB
+zproc internal_OPENFILE
+    lda #FCB_S2+1              ; match 15 bytes of FCB
     jsr find_first
     zif_cc
         ; We have a matching dirent!
 
-        ldy #fcb::ex
+        ldy #FCB_EX
         lda (param), y          ; fetch user extent byte
         sta tempb
 
@@ -714,7 +704,7 @@ entry_OPENFILE:
         ; Compare the user extent byte with the dirent to determine
         ; if we're at the end of the file or not.
 
-        ldy #fcb::ex
+        ldy #FCB_EX
         lda (param), y
         cmp tempb                   ; C if ex >= tempb
         zif_ne
@@ -723,7 +713,7 @@ entry_OPENFILE:
                 ; user extent is smaller
                 lda #$80            ; middle of the file, record count full
             zendif
-            ldy #fcb::rc
+            ldy #FCB_RC
             sta (param), y            ; set extent record count
         zendif
 
@@ -731,46 +721,46 @@ entry_OPENFILE:
         ; and not the value in the dirent.
 
         lda tempb
-        ldy #fcb::ex
+        ldy #FCB_EX
         sta (param), y
 
         clc
     zendif
     rts
-.endproc
+zendproc
     
 ; Creates a file; the FCB is in param.
 ; Returns C is error; the code is in A.
 
 entry_CREATEFILE:
     jsr new_user_fcb
-.proc internal_CREATEFILE
+zproc internal_CREATEFILE
     jsr check_disk_writable
 
     ; Check to see if the file exists.
 
-    lda #fcb::s2+1
+    lda #FCB_S2+1
     jsr find_first
-    bcc error
+    bcc error$
 
     ; Clear the allocation buffer in the FCB.
 
     lda #0
-    ldy #fcb::al
+    ldy #FCB_AL
     zrepeat
         sta (param), y
         iny
-        cpy #fcb::al+16
+        cpy #FCB_AL+16
     zuntil_eq
 
     ; Search for an empty dirent.
 
     lda #$e5
-    ldy #fcb::dr
+    ldy #FCB_DR
     sta (param), y
-    lda #fcb::dr+1
+    lda #FCB_DR+1
     jsr find_first
-    bcs error
+    bcs error$
 
     ; We found an empty dirent! Copy the user's FCB into it.
 
@@ -779,13 +769,13 @@ entry_CREATEFILE:
         lda (param), y
         sta (current_dirent), y
         iny
-        cpy #fcb::al+16
+        cpy #FCB_AL+16
     zuntil_eq
     
     ; Set the user code correctly.
 
     lda current_user
-    ldy #fcb::dr
+    ldy #FCB_DR
     sta (current_dirent), y
     
     ; We might have extended the directory, so make sure
@@ -807,28 +797,28 @@ entry_CREATEFILE:
     clc
     rts
 
-error:
+error$:
     lda #$ff                ; only defined error code
     sec
     rts
-.endproc
+zendproc
 
 ; Sets up a user-supplied FCB.
 
-.proc new_user_fcb
-    ldy #fcb::s2
+zproc new_user_fcb
+    ldy #FCB_S2
     lda #0
     sta (param), y
-.endproc
+zendproc
     ; falls through
 
 ; Selects the drive referred to in the FCB.
 
-.proc convert_user_fcb
-    ldy #fcb::dr
+zproc convert_user_fcb
+    ldy #FCB_DR
     lda (param), y              ; get drive byte
     sta old_fcb_drive           ; to restore on exit
-    and #%00011111              ; extract drive
+    and #$0f                    ; extract drive
     tax
     dex                         ; convert to internal drive numbering
     zif_mi
@@ -841,19 +831,19 @@ error:
     sta (param), y              ; update FCB
     
     jmp select_active_drive
-.endproc
+zendproc
 
 ; --- Close a file (flush the FCB to disk) ----------------------------------
 
 entry_CLOSEFILE:
     jsr convert_user_fcb
-.proc internal_CLOSEFILE
+zproc internal_CLOSEFILE
     jsr check_fcb_writable
     jsr check_disk_writable
 
     ; Check that this FCB has actually changed.
 
-    ldy #fcb::s2
+    ldy #FCB_S2
     lda (param), y
     zif_mi
         clc                     ; just return if not
@@ -862,24 +852,28 @@ entry_CLOSEFILE:
 
     ; Find the directory entry for this extent.
 
-    lda #fcb::s2+1
+    lda #FCB_S2+1
     jsr find_first
-    bcs exit
+    zif_cs
+        rts
+    zendif
 
     ; Update the directory entry from the FCB.
 
-    ldy #fcb::rc
+    ldy #FCB_RC
     lda (param), y
     sta (current_dirent), y
 
-    ldy #fcb::ex
+    ldy #FCB_EX
     lda (param), y
     sta (current_dirent), y
 
     ; Merge the allocation maps.
 
     jsr merge_fcb_into_dirent
-    bcs exit
+    zif_cs
+        rts
+    zendif
 
     ; Write the dirent back to disk.
 
@@ -890,19 +884,18 @@ entry_CLOSEFILE:
     
     jsr fcb_is_not_modified
     clc
-exit:
     rts
-.endproc
+zendproc
 
 ; --- Other file manipulation -----------------------------------------------
 
-.proc entry_DELETEFILE
+zproc entry_DELETEFILE
     jsr convert_user_fcb
     jsr check_disk_writable
 
     ; Search for and destroy all files matching the filename.
 
-    lda #fcb::t3+1
+    lda #FCB_T3+1
     jsr find_first
     zif_cc
         jsr check_dirent_writable
@@ -915,37 +908,37 @@ exit:
             ; Now mark the dirent as deleted.
 
             lda #$e5
-            ldy #fcb::dr
+            ldy #FCB_DR
             sta (current_dirent), y
             lda #1
             jsr write_sector
 
             ; Get the next matching dirent.
 
-            lda #fcb::t3+1
+            lda #FCB_T3+1
             jsr find_next
         zuntil_cs
     zendif
 
     rts
-.endproc
+zendproc
 
-.proc entry_RENAMEFILE
+zproc entry_RENAMEFILE
     jsr convert_user_fcb
     jsr check_disk_writable
 
     ; Rename all files matching the filename.
 
-    lda #fcb::t3+1
+    lda #FCB_T3+1
     jsr find_first
     zif_cc
         jsr check_dirent_writable
         zrepeat
             ; Replace the filename in the dirent with the new one.
 
-            lda #fcb::f1
+            lda #FCB_F1
             sta temp+0      ; dirent index
-            lda #16+fcb::f1
+            lda #16+FCB_F1
             sta temp+1      ; filename index
             zrepeat
                 ldy temp+1
@@ -957,7 +950,7 @@ exit:
                 inc temp+0
                 inc temp+1
                 lda temp+0
-                cmp #fcb::t3+1
+                cmp #FCB_T3+1
             zuntil_eq
 
             ; Write back to disk.
@@ -967,32 +960,32 @@ exit:
 
             ; Get the next matching dirent.
 
-            lda #fcb::t3+1
+            lda #FCB_T3+1
             jsr find_next
         zuntil_cs
     zendif
 
     rts
-.endproc
+zendproc
 
-.proc entry_SETFILEATTRS
+zproc entry_SETFILEATTRS
     jsr convert_user_fcb
 
     ; Update the filename (and attribute bits) of all files matching the
     ; filename.
 
-    lda #fcb::t3+1
+    lda #FCB_T3+1
     jsr find_first
     zif_cc
         zrepeat
             ; Replace the filename in the dirent with the new one.
 
-            ldy #fcb::f1    ; FCB/dirent index
+            ldy #FCB_F1    ; FCB/dirent index
             zrepeat
                 lda (param), y
                 sta (current_dirent), y
                 iny
-                cpy #fcb::t3+1
+                cpy #FCB_T3+1
             zuntil_eq
 
             ; Write back to disk.
@@ -1002,46 +995,46 @@ exit:
 
             ; Get the next matching dirent.
 
-            lda #fcb::t3+1
+            lda #FCB_T3+1
             jsr find_next
         zuntil_cs
     zendif
 
     rts
-.endproc
+zendproc
 
 ; --- Read next sequential record -------------------------------------------
 
-.proc entry_READSEQUENTIAL
+zproc entry_READSEQUENTIAL
     jsr convert_user_fcb
-.endproc
-.proc internal_READSEQUENTIAL
-    ldy #fcb::cr
+zendproc
+zproc internal_READSEQUENTIAL
+    ldy #FCB_CR
     lda (param), y
-    ldy #fcb::rc
+    ldy #FCB_RC
     cmp (param), y
     zif_eq
         cmp #$80                ; is this extent full?
-        bne eof                 ; no, we've reached the end of the file
+        bne eof$                ; no, we've reached the end of the file
             
         ; Move to the next extent.
 
         jsr close_extent_and_move_to_next_one
-        bcs eof
+        bcs eof$
 
         ; Open it.
 
         jsr internal_OPENFILE
-        bcs eof
+        bcs eof$
     zendif
     
     jsr get_fcb_block           ; get disk block value in XA
-    beq eof
+    beq eof$
     jsr get_sequential_sector_number
 
     ; Move the FCB on to the next record, for next time.
 
-    ; ldy #fcb::cr              ; still set from last time
+    ldy #FCB_CR
     lda (param), y
     clc
     adc #1
@@ -1054,25 +1047,25 @@ exit:
     clc
     rts
 
-eof:
-    lda #cpme::nodata           ; = EOF
+eof$:
+    lda #CPME_NODATA           ; = EOF
     sec
     rts
-.endproc
+zendproc
 
 ; Closes the current extent, and move to the next one, but doesn't open it.
 ; Sets C on error (like maximum file size).
-.proc close_extent_and_move_to_next_one
+zproc close_extent_and_move_to_next_one
     jsr internal_CLOSEFILE
 
-    ldy #fcb::ex
+    ldy #FCB_EX
     lda (param), y
     clc
     adc #1
     and #$1f
     sta (param), y
     zif_eq
-        ldy #fcb::s2
+        ldy #FCB_S2
         lda (param), y
         and #$7f            ; remove not-modified flag
         cmp #$7f            ; maximum possible file size?
@@ -1084,13 +1077,13 @@ eof:
         sta (param), y
     zendif
     lda #0
-    ldy #fcb::cr
+    ldy #FCB_CR
     sta (param), y
     ; We also want to clear the record count, to avoid a nasty edge
     ; case where we've just moved to a non-existent record. This
     ; causes subsequent reads to fail with EOF rather than just
     ; reading garbage.
-    ldy #fcb::rc
+    ldy #FCB_RC
     sta (param), y
     clc
     rts
@@ -1098,35 +1091,34 @@ eof:
 eof:
     sec
     rts
-.endproc
+zendproc
 
 ; Fetch the current block number in the FCB in XA.
 ; Returns Z if the block number is zero (i.e., there isn't one).
-.proc get_fcb_block
+zproc get_fcb_block
     jsr get_fcb_block_index     ; gets index in Y
     ldx blocks_on_disk+1        ; are we a big disk?
     zif_ne                      ; yes
         lda (param), y
         iny
         ora (param), y          ; check for zero
-        beq exit
-
-        lda (param), y          ; high byte!
-        tax
-        dey
-        lda (param), y          ; low byte
-        rts
+        zif_ne
+            lda (param), y          ; high byte!
+            tax
+            dey
+            lda (param), y          ; low byte
+            rts
+        zendif
     zendif
 
-exit:
     ldx #0
     lda (param), y              ; sets Z if zero
     rts
-.endproc
+zendproc
 
 ; Set the current block number in the FCB to XA.
 ; Preserves XA.
-.proc set_fcb_block
+zproc set_fcb_block
     sta temp+0
     stx temp+1
 
@@ -1143,18 +1135,18 @@ exit:
     lda temp+0
     ldx temp+1
     rts
-.endproc
+zendproc
 
 ; Return offset to the current block in the FCB in Y.
 ; Uses temp+2.
-.proc get_fcb_block_index
+zproc get_fcb_block_index
     lda #7
     sec
     sbc block_shift 
     tax                         ; x = how much to shift extent number
 
     lda extent_mask
-    ldy #fcb::ex                ; get current extent
+    ldy #FCB_EX                ; get current extent
     and (param), y              ; extent offset into dirent
     zrepeat                     ; shift extent to get allocation map start
         asl a
@@ -1162,7 +1154,7 @@ exit:
     zuntil_eq
     sta temp+2
 
-    ldy #fcb::cr                ; get current record
+    ldy #FCB_CR                ; get current record
     clc
     lda (param), y
 
@@ -1181,15 +1173,15 @@ exit:
     zendif
 
     clc
-    adc #fcb::al                ; get offset into allocation map
+    adc #FCB_AL                ; get offset into allocation map
     tay
     rts
-.endproc
+zendproc
 
 ; When closing the file, we want to merge the allocation map in the
 ; FCB with the one in the dirent.
-.proc merge_fcb_into_dirent
-    ldy #fcb::al                ; index into FCB/dirent
+zproc merge_fcb_into_dirent
+    ldy #FCB_AL                ; index into FCB/dirent
     lda blocks_on_disk+1        ; are we a big disk?
     zif_ne                      ; yes
         zrepeat
@@ -1225,7 +1217,7 @@ exit:
             bne merge_error         ; FCB != dirent --- this is bad
 
             iny
-            cpy #fcb::al+16
+            cpy #FCB_AL+16
         zuntil_eq
         clc
         rts
@@ -1249,7 +1241,7 @@ exit:
         bne merge_error         ; FCB != dirent --- this is bad
 
         iny
-        cpy #fcb::al+16
+        cpy #FCB_AL+16
     zuntil_eq
     clc
     rts
@@ -1257,10 +1249,10 @@ exit:
 merge_error:
     sec
     rts
-.endproc
+zendproc
 
 ; Computes the sector number of the block in XA.  XA must not be zero.
-.proc get_sequential_sector_number
+zproc get_sequential_sector_number
     sta current_sector+0
     stx current_sector+1
 
@@ -1279,7 +1271,7 @@ merge_error:
 
     ; Add on record number.
 
-    ldy #fcb::cr
+    ldy #FCB_CR
     lda (param), y
     and block_mask              ; get offset in block
 
@@ -1306,16 +1298,16 @@ merge_error:
         inc current_sector+2
     zendif
     rts
-.endproc
+zendproc
 
 ; --- Write the next sequential record --------------------------------------
 
-.proc entry_WRITESEQUENTIAL
+zproc entry_WRITESEQUENTIAL
     jsr convert_user_fcb
     jsr check_fcb_writable
     jsr check_disk_writable
 
-    ldy #fcb::cr
+    ldy #FCB_CR
     lda (param), y
     cmp #$80
     zif_eq                      ; is this extent full?
@@ -1323,11 +1315,13 @@ merge_error:
 
         jsr close_extent_and_move_to_next_one
         lda #2                  ; disk full
-        bcs error
+        zif_cs
+            rts
+        zendif
 
         ; Open it.
 
-        ldy #fcb::rc            ; clear record count
+        ldy #FCB_RC            ; clear record count
         lda #0
         sta (param), y
 
@@ -1337,7 +1331,9 @@ merge_error:
 
             jsr internal_CREATEFILE
             lda #1              ; directory full
-            bcs error
+            zif_cs
+                rts
+            zendif
         zendif
     zendif
 
@@ -1345,7 +1341,7 @@ merge_error:
     
     ; Move the FCB on to the next record, for next time.
 
-    ldy #fcb::cr
+    ldy #FCB_CR
     lda (param), y
     clc
     adc #1
@@ -1353,7 +1349,7 @@ merge_error:
 
     ; If (CR+1) > RC, update RC.
 
-    ldy #fcb::rc
+    ldy #FCB_RC
     cmp (param), y
     zif_cs
         sta (param), y
@@ -1368,17 +1364,12 @@ merge_error:
     lda #0
     clc
     rts
-
-error:
-    sec
-exit:
-    rts
-.endproc
+zendproc
 
 ; Sets the current sector to the block pointed to by the FCB,
 ; creating a new one if necessary.
 
-.proc seek_to_block_and_create
+zproc seek_to_block_and_create
     jsr get_fcb_block           ; get disk block value in XA
     zif_eq
         jsr fcb_is_modified
@@ -1402,7 +1393,7 @@ exit:
 
             lda directory_buffer+0
             ldx directory_buffer+1
-            ldy #bios::setdma
+            ldy #BIOS_SETDMA
             jsr callbios
 
             zrepeat
@@ -1427,27 +1418,27 @@ exit:
         jsr get_fcb_block
     zendif
     jmp get_sequential_sector_number
-.endproc
+zendproc
 
-.proc fcb_is_not_modified
-    ldy #fcb::s2
+zproc fcb_is_not_modified
+    ldy #FCB_S2
     lda (param), y
     ora #$80
     sta (param), y
     rts
-.endproc
+zendproc
 
-.proc fcb_is_modified
-    ldy #fcb::s2
+zproc fcb_is_modified
+    ldy #FCB_S2
     lda (param), y
     and #$7f
     sta (param), y
     rts
-.endproc
+zendproc
 
 ; --- Random access ---------------------------------------------------------
 
-.proc entry_WRITERANDOM
+zproc entry_WRITERANDOM
     jsr convert_user_fcb
     jsr check_fcb_writable
     jsr check_disk_writable
@@ -1456,99 +1447,95 @@ exit:
     zif_cs
         ; Do we need a new extent?
 
-        cmp #cpme::noextent
-        bne error           ; fail
+        cmp #CPME_NOEXTENT
+        zif_eq
+            sec
+            rts
+        zendif
             
         ; Could not open new extent --- it must not exist.
 
         jsr internal_CREATEFILE
-        lda #cpme::dirfull
-        bcs error
+        lda #CPME_DIRFULL
+        sec
     zendif
+    zif_cc
+        ; If (CR+1) > RC, update RC.
 
-    bcs exit
+        ldy #FCB_CR
+        lda (param), y
+        clc
+        adc #1
+        ldy #FCB_RC
+        cmp (param), y
+        zif_cs
+            sta (param), y
+            jsr fcb_is_modified
+        zendif
 
-    ; If (CR+1) > RC, update RC.
+        ; Actually do the write!
 
-    ldy #fcb::cr
-    lda (param), y
-    clc
-    adc #1
-    ldy #fcb::rc
-    cmp (param), y
-    zif_cs
-        sta (param), y
-        jsr fcb_is_modified
+        jsr seek_to_block_and_create
+        jsr reset_user_dma
+        lda #0
+        jsr write_sector
+        lda #0
+        clc
     zendif
-
-    ; Actually do the write!
-
-    jsr seek_to_block_and_create
-    jsr reset_user_dma
-    lda #0
-    jsr write_sector
-    lda #0
-    clc
     rts
+zendproc
 
-error:
-    sec
-exit:
-    rts
-.endproc
-
-.proc entry_WRITERANDOMFILLED
+zproc entry_WRITERANDOMFILLED
     lda #1
     sta block_needs_clearing
     jmp entry_WRITERANDOM
-.endproc
+zendproc
 
-.proc entry_READRANDOM
+zproc entry_READRANDOM
     jsr convert_user_fcb
     jsr seek_to_random_location
-    bcs exit
+    zif_cc
+        ; If CR > RC, fail.
 
-    ; If CR > RC, fail.
+        ldy #FCB_CR
+        lda (param), y
+        ldy #FCB_RC
+        cmp (param), y
+        bcs nodata
 
-    ldy #fcb::cr
-    lda (param), y
-    ldy #fcb::rc
-    cmp (param), y
-    bcs nodata
+        ; Actually do the read!
 
-    ; Actually do the read!
+        jsr get_fcb_block           ; get disk block value in XA
+        beq nodata
+        jsr get_sequential_sector_number
 
-    jsr get_fcb_block           ; get disk block value in XA
-    beq nodata
-    jsr get_sequential_sector_number
+        ; Actually do the read!
 
-    ; Actually do the read!
-
-    jsr reset_user_dma
-    jsr read_sector
-    lda #0
-    clc
-exit:
+        jsr reset_user_dma
+        jsr read_sector
+        lda #0
+        clc
+    zendif
     rts
 nodata:
-    lda #cpme::nodata
+    lda #CPME_NODATA
     sec
     rts
-.endproc
+zendproc
 
 ; Adjust the FCB to point to the random access location, shifting
 ; extents as necessary. Returns C on error.
 
-.proc seek_to_random_location
+zproc seek_to_random_location
     ; Convert random access record number to M/E/R.
 
-    ldy #fcb::r0
+    ldy #FCB_R0
     lda (param), y
     and #$7f
-    ldy #fcb::cr
+    ldy #FCB_CR
     sta (param), y          ; new current record
 
-    ldy #fcb::r0
+    ldy #FCB_R0
     lda (param), y          ; get low byte
     rol a                   ; top bit into carry
     iny
@@ -1557,7 +1544,7 @@ nodata:
     and #$1f
     sta temp+1              ; new extent
 
-    ldy #fcb::r1
+    ldy #FCB_R1
     lda (param), y          ; get high byte
     lsr a
     lsr a
@@ -1567,12 +1554,12 @@ nodata:
 
     ; Do we need to switch to a different extent?
 
-    ldy #fcb::s2
+    ldy #FCB_S2
     lda (param), y          ; compare S2
     and #$7f                ; ...ignoring not-modified bit
     cmp temp+2
     zif_eq
-        ldy #fcb::ex
+        ldy #FCB_EX
         lda (param), y
         cmp temp+1
     zendif
@@ -1583,31 +1570,32 @@ nodata:
         pha                     ; push S2
 
         jsr internal_CLOSEFILE
-        lda #cpme::cantclose
-        bcs exit
+        lda #CPME_CANTCLOSE
+        bcs 1f
 
-        ldy #fcb::s2
+        ldy #FCB_S2
         pla
         sta (param), y          ; update S2
 
-        ldy #fcb::ex
+        ldy #FCB_EX
         pla
         sta (param), y          ; update EX
 
         jsr internal_OPENFILE
-        lda #cpme::noextent
-        bcs exit
+        lda #CPME_NOEXTENT
+        bcs 1f
     zendif
     clc
-exit:
+1:
     rts
-.endproc
+
+zendproc
 
 ; Sets the random access pointer to whereever the FCB is currently
 ; pointing.
 
-.proc entry_COMPUTEPOINTER
-    ldy #fcb::ex
+zproc entry_COMPUTEPOINTER
+    ldy #FCB_EX
     lda (param), y              ; get EX
     lsr a                       ; bottom bit -> C
     sta temp+1                  ; store high byte
@@ -1615,28 +1603,28 @@ exit:
     ror a                       ; C -> top bit
     ; low byte in A (the top bit)
 
-    ldy #fcb::cr
+    ldy #FCB_CR
     ora (param), y              ; merge in record count
-    ldy #fcb::r0
+    ldy #FCB_R0
     sta (param), y              ; finished with low byte
 
-    ldy #fcb::s2                ; get S2
+    ldy #FCB_S2                ; get S2
     lda (param), y
     asl a
     asl a
     asl a
     asl a
     ora temp+1
-    ldy #fcb::r1                ; finished with high byte
+    ldy #FCB_R1                ; finished with high byte
     sta (param), y
 
     clc
     rts
-.endproc
+zendproc
 
 ; Determines the size of a file and seeks to the end.
 
-.proc entry_COMPUTEFILESIZE
+zproc entry_COMPUTEFILESIZE
     jsr new_user_fcb
 
     ; temp+0/1 are used by find_first
@@ -1644,29 +1632,29 @@ exit:
     sta temp+2                  ; file size accumulator
     sta temp+3
 
-    lda #fcb::t3+1              ; match just the filename
+    lda #FCB_T3+1              ; match just the filename
     jsr find_first
     zif_cc
         zrepeat
             ; Check for a maximum-possible-length file,
             ; resulting in file size overflow.
 
-            ldy #fcb::rc
+            ldy #FCB_RC
             lda (current_dirent), y
             cmp #$80            ; maximum possible RC
             zif_eq
-                ldy #fcb::ex
+                ldy #FCB_EX
                 lda (current_dirent), y
                 cmp #$1f        ; maximum possible EX
                 zif_eq
-                    ldy #fcb::s2
+                    ldy #FCB_S2
                     lda (current_dirent), y
                     cmp #$0f    ; maximum possible S2
                     zif_eq
                         ; This file is the maximum possible length!
                         ; We can just stop here.
 
-                        ldy #fcb::r0
+                        ldy #FCB_R0
                         lda #0
                         sta (param), y  ; 0 -> r0
                         iny
@@ -1686,7 +1674,7 @@ exit:
 
             ; Calculate the size of the file.
 
-            ldy #fcb::s2                ; get S2
+            ldy #FCB_S2                ; get S2
             lda (current_dirent), y
             asl a
             asl a
@@ -1694,7 +1682,7 @@ exit:
             asl a
             sta tempb
 
-            ldy #fcb::ex
+            ldy #FCB_EX
             lda (current_dirent), y      ; get EX
             lsr a
             ora tempb
@@ -1703,7 +1691,7 @@ exit:
             lda #0
             ror a                       ; $00 or $80, from LSB of EX
 
-            ldy #fcb::rc
+            ldy #FCB_RC
             clc
             adc (current_dirent), y     ; add in record count
             zif_cs
@@ -1726,7 +1714,7 @@ exit:
                 stx temp+3
             zendif
 
-            lda #fcb::t3+1
+            lda #FCB_T3+1
             jsr find_next
         zuntil_cs
     zendif
@@ -1734,7 +1722,7 @@ exit:
     ; temp+2/3 now contains the record count of the file.
 
     lda #0
-    ldy #fcb::r2
+    ldy #FCB_R2
     sta (param), y
     dey
     lda temp+3
@@ -1745,7 +1733,7 @@ exit:
 
     clc
     rts
-.endproc
+zendproc
 
 ; --- Directory scanning ----------------------------------------------------
 
@@ -1754,15 +1742,15 @@ exit:
 ; searching.
 ; Returns C on error.
 
-.scope
-::entry_FINDFIRST:
+zproc entry_FINDFIRST
     jsr setup_fcb_for_find
     bcs find_error
     ; A = number of bytes to search
     jsr find_first
     jmp copy_result_of_find
+zendproc
 
-::entry_FINDNEXT:
+zproc entry_FINDNEXT
     jsr setup_fcb_for_find
     bcs find_error
     ; A = number of bytes to search
@@ -1788,37 +1776,37 @@ copy_result_of_find:
     zendif
 find_error:
     rts
-.endscope
+zendproc
 
 ; Returns the number of bytes to search.
-.proc setup_fcb_for_find
-    ldy #fcb::dr
+zproc setup_fcb_for_find
+    ldy #FCB_DR
     lda (param), y
     cmp #'?'
     zif_eq
-        lda #fcb::dr+1          ; number of bytes to search
+        lda #FCB_DR+1          ; number of bytes to search
     zelse
         jsr convert_user_fcb
         bcs error
 
-        ldy #fcb::ex
+        ldy #FCB_EX
         lda (param), y
         cmp #'?'
         zif_eq                  ; get all extents?
-            ldy #fcb::s2
+            ldy #FCB_S2
             sta (param), y      ; module number should be a wildcard
         zendif
 
-        lda #fcb::s2+1          ; number of bytes to search
+        lda #FCB_S2+1          ; number of bytes to search
     zendif
     clc
 error:
     rts
-.endproc
+zendproc
 
 ; This is used twice, so factor it out. That's not a lot, but it's strange it's
 ; happened twice.
-.proc copy_directory_buffer_to_dma
+zproc copy_directory_buffer_to_dma
     lda user_dma+0
     sta temp+0
     lda user_dma+1
@@ -1831,14 +1819,14 @@ error:
         dey
     zuntil_mi
     rts
-.endproc
+zendproc
 
 find_first:
     sta find_first_count
     jsr home_drive
     jsr reset_dir_pos
     ; fall through
-.proc find_next
+zproc find_next
     jsr read_dir_entry
     jsr check_dir_pos
     beq no_more_files
@@ -1851,7 +1839,7 @@ find_first:
     zif_ne
         ; If current_dirent is higher than cdrmax, we know that
         ; the rest of the directory is empty, so give up now.
-        ldy #dph::cdrmax
+        ldy #DPH_CDRMAX
         lda (dph), y
         cmp directory_pos+0
         iny
@@ -1865,9 +1853,9 @@ find_first:
         lda (param), y
         cmp #'?'                ; wildcard
         beq same_characters    ; ...skip comparing this byte
-        cpy #fcb::s1            ; don't care about byte 13
+        cpy #FCB_S1            ; don't care about byte 13
         beq same_characters
-        cpy #fcb::ex
+        cpy #FCB_EX
         bne compare_chars
 
         ; Special logic for comparing extents.
@@ -1904,45 +1892,42 @@ no_more_files:
     jsr reset_dir_pos
     sec
     rts
-.endproc
+zendproc
     
-    .bss
-find_first_count: .byte 0
-    .code
-
 ; Check that the currently opened FCB is r/w.
 
-.proc check_fcb_writable
-    ldy #fcb::t1
+zproc check_fcb_writable
+    ldy #FCB_T1
     lda (param), y
     bmi not_writable_error
     rts
-.endproc
+zendproc
 
-.proc check_dirent_writable
-    ldy #fcb::t1
+zproc check_dirent_writable
+    ldy #FCB_T1
     lda (current_dirent), y
     bmi not_writable_error
     rts
-.endproc 
+zendproc 
 
-.proc not_writable_error
+zproc not_writable_error
     lda #<msg
     ldx #>msg
     jmp harderror
 msg:
-    .byte "BDOS: file is R/O", 13, 10, 0
-.endproc
+    .ascii "BDOS: file is R/O"
+    .byte 13, 10, 0
+zendproc
 
 ; --- Login drive -----------------------------------------------------------
 
 ; Logs in active_drive. If the drive was not already logged in, the bitmap
 ; is recomputed. In all cases the drive is selected.
 
-.proc entry_LOGINDRIVE
+zproc entry_LOGINDRIVE
     lda param+0
-.endproc
-.proc internal_LOGINDRIVE
+zendproc
+zproc internal_LOGINDRIVE
     ; Select the drive.
 
     jsr select_active_drive
@@ -2022,7 +2007,7 @@ msg:
     ; Zero cdrmax.
 
     lda #0
-    ldy #dph::cdrmax+0
+    ldy #DPH_CDRMAX+0
     sta (dph), y
     iny
     sta (dph), y
@@ -2034,7 +2019,7 @@ msg:
     zloop
         jsr read_dir_entry
         jsr check_dir_pos
-        beq exit
+        zbreakif_eq
 
         ldy #0
         lda (current_dirent), y
@@ -2046,13 +2031,12 @@ msg:
         zendif
     zendloop
 
-exit:
     rts
-.endproc
+zendproc
 
 ; Reads the next directory entry.
 
-.proc read_dir_entry
+zproc read_dir_entry
     ; Have we run out of directory entries?
 
     lda directory_pos+0         ; is this the last?
@@ -2090,7 +2074,7 @@ exit:
 
         lda directory_buffer+0
         ldx directory_buffer+1
-        ldy #bios::setdma
+        ldy #BIOS_SETDMA
         jsr callbios
 
         jsr read_sector
@@ -2104,12 +2088,12 @@ exit:
     adc #0
     sta current_dirent+1
     rts
-.endproc
+zendproc
 
 ; Updates the cdrmax field in the DPH to mark the maximum directory
 ; entry for a drive (from directory_pos).
-.proc update_cdrmax
-    ldy #dph::cdrmax
+zproc update_cdrmax
+    ldy #DPH_CDRMAX
     lda directory_pos+0
     cmp (dph), y
     iny
@@ -2123,11 +2107,11 @@ exit:
         sta (dph), y
     zendif
     rts
-.endproc
+zendproc
 
 ; Marks a dirent's blocks as either used or free in the bitmap.
 ; X=1 to mark as used, X=0 to mark as free.
-.proc update_bitmap_for_dirent
+zproc update_bitmap_for_dirent
     stx temp+2              ; cache set/free flag
     ldy #16                 ; offset into dirent
     zloop
@@ -2161,7 +2145,7 @@ exit:
 
         ldy temp+3
     zendloop
-.endproc
+zendproc
 
 ; Given a block number in temp+0, return the address of the bitmap byte
 ; in temp+0 and the bit position in A.
@@ -2190,38 +2174,40 @@ get_bitmap_location:
 
 ; Given a block number in temp+0, return the rotated block status in A.
 
-get_bitmap_status:
+zproc get_bitmap_status
     jsr get_bitmap_location
     tax
     ldy #0
     lda (temp+0), y
     jmp rotater8
+zendproc
 
 ; Given a block number in temp+0 and a single-bit block status in A,
 ; sets it.
 
-update_bitmap_status:
-    sta @value
+zproc update_bitmap_status
+    sta value
     jsr get_bitmap_location
-    sta @bitpos
+    sta bitpos
     tax
 
     ldy #0
     lda (temp+0), y
     jsr rotater8            ; get rotated status
     and #$fe                ; mask off bit we care about
-@value = *+1
+value = .+1
     ora #$00                ; or in the new status
-@bitpos = *+1
+bitpos = .+1
     ldx #$00
     jsr rotatel8            ; unrotate
     ldy #0
     sta (temp+0), y         ; update bitmap
     rts
+zendproc
 
 ; Finds an unused block from the bitmap and allocates it. Returns it in XA.
 
-.proc allocate_unused_block
+zproc allocate_unused_block
     lda #0                  ; block number
     sta temp+2
     sta temp+3
@@ -2251,80 +2237,80 @@ update_bitmap_status:
     lda temp+2
     ldx temp+3
     rts
-.endproc
+zendproc
 
 ; Sets a drive as being readonly.
 
-.proc entry_SETDRIVEREADONLY
+zproc entry_SETDRIVEREADONLY
     lda #<write_protect_vector
     ldx #>write_protect_vector
     ldy current_drive
     jsr setbit
     clc
     rts
-.endproc
+zendproc
 
 ; Returns the login bitmap in XA.
 
-.proc entry_GETLOGINBITMAP
+zproc entry_GETLOGINBITMAP
     lda login_vector+0
     ldx login_vector+1
     clc
     rts
-.endproc
+zendproc
 
 ; Returns the readonly bitmap in XA.
 
-.proc entry_GETREADONLYBITMAP
+zproc entry_GETREADONLYBITMAP
     lda write_protect_vector+0
     ldx write_protect_vector+1
     rts
-.endproc
+zendproc
 
 ; Returns a pointer to the allocation bitmap in XA.
 
-.proc entry_GETALLOCATIONBITMAP
+zproc entry_GETALLOCATIONBITMAP
     lda bitmap+0
     ldx bitmap+1
     clc
     rts
-.endproc
+zendproc
 
 ; Returns a pointer to the current drive's DPB.
 
-.proc entry_GETDPB
+zproc entry_GETDPB
     lda current_dpb+0
     ldx current_dpb+1
     clc
     rts
-.endproc
+zendproc
 
 ; --- Drive management ------------------------------------------------------
 
 reset_user_dma:
     lda user_dma+0
     ldx user_dma+1
-    ldy #bios::setdma
+    ldy #BIOS_SETDMA
     jmp callbios
 
 set_current_sector:
     lda #<current_sector
     ldx #>current_sector
-    ldy #bios::setsec
+    ldy #BIOS_SETSEC
     jmp callbios
 
 read_sector:
     jsr set_current_sector
-    ldy #bios::read
+    ldy #BIOS_READ
     jmp callbios
 
-; A=0, 1 or 2 as for bios::write on entry.
+; A=0, 1 or 2 as for BIOS_WRITE on entry.
 
 write_sector:
     pha
     jsr set_current_sector
     pla
-    ldy #bios::write
+    ldy #BIOS_WRITE
     jmp callbios
 
 ; Calculates the block and sector addresses of the dirent in
@@ -2362,14 +2348,14 @@ reset_dir_pos:
 check_dir_pos:
     ldx directory_pos+0
     cpx directory_pos+1
-    beq @yes                ; bytes are the same
-    ldx #1
-    rts
-@yes:
-    inx
+    zif_ne                      ; if not the same, cannot be 0xffff
+        ldx #1
+        rts
+    zendif
+    inx                         ; they are the same, so test one byte for 0xff
     rts
 
-.proc home_drive
+zproc home_drive
     lda #0
     ldy #2
     zrepeat
@@ -2377,11 +2363,11 @@ check_dir_pos:
         dey
     zuntil_mi
     rts
-.endproc
+zendproc
 
-.proc select_active_drive
+zproc select_active_drive
     lda active_drive
-    ldy #bios::seldsk
+    ldy #BIOS_SELDSK
     jsr callbios
     zif_cc
         ; Copy DPH into local storage.
@@ -2389,14 +2375,14 @@ check_dir_pos:
         sta dph+0
         stx dph+1
 
-        ldy #dph::dirbuf
+        ldy #DPH_DIRBUF
         ldx #0
         zloop
             lda (dph), y
             sta directory_buffer, x
             iny
             inx
-            cpy #dph::alv+2
+            cpy #DPH_ALV+2
         zuntil_eq
 
         ; Copy DPB into local storage.
@@ -2411,11 +2397,11 @@ check_dir_pos:
         clc
     zendif
     rts
-.endproc
+zendproc
     
 ; Checks that the current disk isn't in the read-only vector.
 
-.proc check_disk_writable
+zproc check_disk_writable
     lda write_protect_vector+0
     ldx write_protect_vector+1
     ldy active_drive
@@ -2423,57 +2409,60 @@ check_dir_pos:
 
     ror temp+0
     zif_cs
-        lda #<msg
-        ldx #>msg
+        lda #<1f
+        ldx #>1f
         jmp harderror
     zendif
     rts
 
-msg:
-    .byte "BDOS: disk is R/O", 13, 10, 0
-.endproc
+1:
+    .ascii "BDOS: disk is R/O"
+    .byte 13, 10, 0
+zendproc
 
 ; --- Utilities -------------------------------------------------------------
 
 ; Shifts XA right Y bits.
 ; Uses temp. Leaves the shifted value in temp+0.
 
-shiftr:
+zproc shiftr
     sta temp+0
     stx temp+1
 shiftr_temp0:
     iny
-@loop:
-    dey
-    beq shift_exit
-    clc
-    ror temp+1
-    ror temp+0
-    jmp @loop
+    zloop
+        dey
+        beq shift_exit
+        clc
+        ror temp+1
+        ror temp+0
+    zendloop
 shift_exit:
     lda temp+0
     ldx temp+1
     rts
+zendproc
     
 ; Shifts XA left Y bits.
 ; Uses temp. Leaves the shifted value in temp+0.
 
-shiftl:
+zproc shiftl
     sta temp+0
     stx temp+1
     iny
-@loop:
-    dey
-    beq shift_exit
-    clc
-    rol temp+0
-    rol temp+1
-    jmp @loop
+    zloop
+        dey
+        beq shift_exit
+        clc
+        rol temp+0
+        rol temp+1
+    zendloop
+zendproc
 
 ; Sets bit Y of (XA).
 ; Uses temp.
 
-setbit:
+zproc setbit
     sta temp+2
     stx temp+3
 
@@ -2482,40 +2471,41 @@ setbit:
     jsr shiftl      ; shift it left by Y
 
     ldy #1
-:
-    lda (temp+2), y
-    ora temp+0, y
-    sta (temp+2), y
-    dey
-    bpl :-
+    zrepeat
+        lda (temp+2), y
+        ora temp+0, y
+        sta (temp+2), y
+        dey
+    zuntil_mi
 
     rts
+zendproc
 
 ; Rotate A right X times.
-rotater8:
+zproc rotater8
     inx
-@loop:
-    dex
-    beq @exit
-    lsr a
-    bcc :+
-    ora #$80
-:
-    jmp @loop
-@exit:
+    zloop
+        dex
+        zbreakif_eq
+        lsr a
+        zif_cs
+            ora #$80
+        zendif
+    zendloop
     rts
+zendproc
 
 ; Rotate A left X times.
-rotatel8:
+zproc rotatel8
     inx
-@loop:
-    dex
-    beq @exit
-    asl a
-    adc #0
-    jmp @loop
-@exit:
+    zloop
+        dex
+        zbreakif_eq
+        asl a
+        adc #0
+    zendloop
     rts
+zendproc
     
 ; Calls the BIOS entrypoint.
 
@@ -2529,30 +2519,30 @@ bios_NEWLINE:
     lda #10
     ; fall through
 bios_CONOUT:
-    ldy #bios::conout
+    ldy #BIOS_CONOUT
     jmp callbios
 
 bios_CONIN:
-    ldy #bios::conin
+    ldy #BIOS_CONIN
     jmp callbios
 
 bios_CONST:
-    ldy #bios::const
+    ldy #BIOS_CONST
     jmp callbios
 
 bios_GETTPA:
-    ldy #bios::gettpa
+    ldy #BIOS_GETTPA
     jmp callbios
 
 bios_GETZP:
-    ldy #bios::getzp
+    ldy #BIOS_GETZP
     jmp callbios
 
 bios_SETDMA:
-    ldy #bios::setdma
+    ldy #BIOS_SETDMA
     jmp callbios
 
-    .bss
+NOINIT
 
 ; State preserved between BDOS invocations.
 
@@ -2563,6 +2553,7 @@ current_user:   .byte 0     ; current working user
 ; is initialised.
 
 bdos_state_start:
+find_first_count:       .byte 0
 active_drive:           .byte 0 ; drive currently being worked on
 old_drive:              .byte 0 ; if the drive has been overridden by the FCB
 old_fcb_drive:          .byte 0 ; drive in user FCB on entry
@@ -2570,7 +2561,7 @@ write_protect_vector:   .word 0
 login_vector:           .word 0
 directory_pos:          .word 0
 user_dma:               .word 0
-current_sector:         .res 3  ; 24-bit sector number
+current_sector:         .fill 3  ; 24-bit sector number
 block_needs_clearing:   .byte 0 ; if set, any new block that's created will be zeroed
 
 buffered_key:           .byte 0

@@ -79,8 +79,9 @@ $(OBJDIR)/%.com: $(OBJDIR)/llvm/apps/%.o $(OBJDIR)/llvm/libcpm.a
 $(OBJDIR)/%.com: $(OBJDIR)/cc65/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
-$(OBJDIR)/bdos.img: $(OBJDIR)/cc65/src/bdos.o $(OBJDIR)/multilink
-	$(OBJDIR)/multilink -o $@ $<
+$(OBJDIR)/bdos.img: $(OBJDIR)/llvm/src/bdos.o $(OBJDIR)/llvm/libcpm.a
+	@mkdir -p $(dir $@)
+	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/ccp.sys: $(OBJDIR)/llvm/src/ccp.o $(OBJDIR)/llvm/libcpm.a
 	@mkdir -p $(dir $@)

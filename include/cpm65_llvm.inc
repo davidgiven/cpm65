@@ -10,36 +10,43 @@
     .section .noinit, "ax", @nobits
 .endm
 
+/* Layout of the CP/M-65 relocatable header. */
+
 #define COMHDR_ZP_USAGE   0 /* bytes of zero page used */
 #define COMHDR_TPA_USAGE  1 /* pages of TPA required (including space for relocation) */
 #define COMHDR_REL_OFFSET 2 /* relative address of relocation data (and start of BSS) */
-#define COMHDR_BDOS_JMP   4 /* jump instruction for calling BDOS */
+#define COMHDR_BDOS_JMP   4 /* jump instruction for calling BDOS: $4c for the 6502 */
 #define COMHDR_BDOS       5 /* BDOS entrypoint address */
 #define COMHDR_ENTRY      7 /* program entrypoint */
 
-#define FCB_DR 0x00
-#define FCB_F1 0x01
-#define FCB_F2 0x02
-#define FCB_F3 0x03
-#define FCB_F4 0x04
-#define FCB_F5 0x05
-#define FCB_F6 0x06
-#define FCB_F7 0x07
-#define FCB_F8 0x08
-#define FCB_T1 0x09
-#define FCB_T2 0x0a
-#define FCB_T3 0x0b
-#define FCB_EX 0x0c
-#define FCB_S1 0x0d
-#define FCB_S2 0x0e
-#define FCB_RC 0x0f
-#define FCB_AL 0x10
-#define FCB_CR 0x20
-#define FCB_R0 0x21
-#define FCB_R1 0x22
-#define FCB_R2 0x23
-#define XFCB_US 0x24
+/* FCB layout (and XFCB). */
+
+#define FCB_DR     0x00
+#define FCB_F1     0x01
+#define FCB_F2     0x02
+#define FCB_F3     0x03
+#define FCB_F4     0x04
+#define FCB_F5     0x05
+#define FCB_F6     0x06
+#define FCB_F7     0x07
+#define FCB_F8     0x08
+#define FCB_T1     0x09
+#define FCB_T2     0x0a
+#define FCB_T3     0x0b
+#define FCB_EX     0x0c
+#define FCB_S1     0x0d
+#define FCB_S2     0x0e
+#define FCB_RC     0x0f
+#define FCB_AL     0x10
+#define FCB_CR     0x20
+#define FCB_R0     0x21
+#define FCB_R1     0x22
+#define FCB_R2     0x23
+#define FCB__SIZE  0x24
+#define XFCB_US    0x24
 #define XFCB__SIZE 0x25
+
+/* BDOS entrypoints. */
 
 #define BDOS_EXIT_PROGRAM 0
 #define BDOS_CONSOLE_INPUT 1
@@ -82,6 +89,19 @@
 #define BDOS_GET_BIOS 38
 #define BDOS_WRITE_RANDOM_FILLED 40
 
+/* Error codes returned by various BDOS entrypoints. */
+
+#define CPME_OK        $00 /* success (usually) */
+#define CPME_NODATA    $01 /* or EOF */
+#define CPME_DISKFULL  $02 /* no free blocks on disk */
+#define CPME_CANTCLOSE $03 /* can't write extent back to disk */
+#define CPME_NOEXTENT  $04 /* only on random access reads */
+#define CPME_DIRFULL   $05 /* no free dirents on disk */
+#define CPME_BADFCB    $09 /* FCB couldn't be parsed */
+#define CPME_FAILED    $ff /* general purpose failure code */
+
+/* BIOS entrypoints. */
+
 #define BIOS_CONST 0
 #define BIOS_CONIN 1
 #define BIOS_CONOUT 2
@@ -95,6 +115,17 @@
 #define BIOS_SETTPA 10
 #define BIOS_GETZP 11
 #define BIOS_SETZP 12
+
+/* DPH structure layout. */
+
+#define DPH_XLT      0   /* unused in CP/M-65 */
+#define DPH_CDRMAX   2   /* number of used dirents */
+#define DPH_SCRATCH1 4   /* unused in CP/M-65 */
+#define DPH_SCRATCH2 6   /* unused in CP/M-65 */
+#define DPH_DIRBUF   8   /* pointer to 128-byte directory buffer */
+#define DPH_DPB      10  /* pointer to DPB for this drive */
+#define DPH_CSV      12  /* pointer to checksum vector */
+#define DPH_ALV      14  /* pointer to allocation vector */
 
 ; vim: filetype=asm sw=4 ts=4 et
 
