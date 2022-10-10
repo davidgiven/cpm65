@@ -60,10 +60,6 @@ $(OBJDIR)/llvm/libcpm.a: $(LIBCPM_OBJS)
 	@mkdir -p $(dir $@)
 	llvm-ar rs $@ $^
 
-$(OBJDIR)/bbcmicro.exe: $(OBJDIR)/cc65/src/bbcmicro.o scripts/bbcmicro.cfg
-	@mkdir -p $(dir $@)
-	$(LD65) -m $(patsubst %.exe,%.map,$@) -vm -C scripts/bbcmicro.cfg -o $@ $<
-	
 $(OBJDIR)/c64.exe: $(OBJDIR)/cc65/src/c64.o scripts/c64.cfg
 	@mkdir -p $(dir $@)
 	$(LD65) -m $(patsubst %.exe,%.map,$@) -vm -C scripts/c64.cfg -o $@ $<
@@ -87,6 +83,12 @@ $(OBJDIR)/ccp.sys: $(OBJDIR)/llvm/src/ccp.o $(OBJDIR)/llvm/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
+$(OBJDIR)/bbcmicro.exe: $(OBJDIR)/llvm/src/bbcmicro.o $(OBJDIR)/llvm/src/relocate.o scripts/bbcmicro.ld
+	@mkdir -p $(dir $@)
+	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/bbcmicro.ld -o $@ \
+		$(OBJDIR)/llvm/src/bbcmicro.o \
+		$(OBJDIR)/llvm/src/relocate.o \
+	
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
 	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) 0:

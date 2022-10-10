@@ -2,32 +2,29 @@
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
-    .include "zif.inc"
-    .include "mos.inc"
-    .include "cpm65.inc"
+#include "zif_llvm.inc"
+#include "mos.inc"
+#include "cpm65_llvm.inc"
 
-    .import __ZEROPAGE_LOAD__
-    .import __ZEROPAGE_SIZE__
+ZEROPAGE
 
-    .zeropage
-
+.global ptr
 ptr: .word 0
-
-    .code
 
 ; --- Initialisation code ---------------------------------------------------
 
 ; Called once on startup and then never again.
 ; TODO: figure out a way to discard this after startup.
 
+zproc _start
     ; Print banner.
 
     ldy #banner_end - banner
-:
-    lda banner - 1, y
-    jsr OSWRCH
-    dey
-    bne :-
+    zrepeat
+        lda banner - 1, y
+        jsr OSWRCH
+        dey
+    zuntil_eq
 
     ; Figure out the start and end of the TPA.
 
@@ -79,12 +76,13 @@ ptr: .word 0
 
     lda mem_base
     pha
-    lda #4-1            ; rts addresses are one before the target
+    lda #COMHDR_ENTRY-1 ; rts addresses are one before the target
     pha
 
     lda #<biosentry
     ldx #>biosentry
     rts                 ; indirect jump
+zendproc
 
 bdos_osfile_block:
     .word bdos_filename ; filename
@@ -98,14 +96,17 @@ bdos_osfile_block:
     .word 0             ; attrs high
     
 bdos_filename:
-    .byte "BDOS", 13
+    .ascii "BDOS"
+    .byte 13
 
-banner:
-    .byte 13, 10, "56-M/PC" ; reversed!
+banner: ; reversed!
+    .byte 13, 10
+    .ascii "56-M/PC"
 banner_end:
 
 cpmfs_filename:
-    .byte "CPMFS", 13
+    .ascii "CPMFS"
+    .byte 13
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -120,37 +121,37 @@ biosentry:
     jmp (ptr)
 
 biostable_lo:
-    .lobytes entry_CONST
-    .lobytes entry_CONIN
-    .lobytes OSWRCH
-    .lobytes entry_SELDSK
-    .lobytes entry_SETSEC
-    .lobytes entry_SETDMA
-    .lobytes entry_READ
-    .lobytes entry_WRITE
-    .lobytes entry_RELOCATE
-    .lobytes entry_GETTPA
-    .lobytes entry_SETTPA
-    .lobytes entry_GETZP
-    .lobytes entry_SETZP
+    .byte entry_CONST@mos16lo
+    .byte entry_CONIN@mos16lo
+    .byte OSWRCH@mos16lo
+    .byte entry_SELDSK@mos16lo
+    .byte entry_SETSEC@mos16lo
+    .byte entry_SETDMA@mos16lo
+    .byte entry_READ@mos16lo
+    .byte entry_WRITE@mos16lo
+    .byte entry_RELOCATE@mos16lo
+    .byte entry_GETTPA@mos16lo
+    .byte entry_SETTPA@mos16lo
+    .byte entry_GETZP@mos16lo
+    .byte entry_SETZP@mos16lo
 biostable_hi:
-    .hibytes entry_CONST
-    .hibytes entry_CONIN
-    .hibytes OSWRCH
-    .hibytes entry_SELDSK
-    .hibytes entry_SETSEC
-    .hibytes entry_SETDMA
-    .hibytes entry_READ
-    .hibytes entry_WRITE
-    .hibytes entry_RELOCATE
-    .hibytes entry_GETTPA
-    .hibytes entry_SETTPA
-    .hibytes entry_GETZP
-    .hibytes entry_SETZP
+    .byte entry_CONST@mos16hi
+    .byte entry_CONIN@mos16hi
+    .byte OSWRCH@mos16hi
+    .byte entry_SELDSK@mos16hi
+    .byte entry_SETSEC@mos16hi
+    .byte entry_SETDMA@mos16hi
+    .byte entry_READ@mos16hi
+    .byte entry_WRITE@mos16hi
+    .byte entry_RELOCATE@mos16hi
+    .byte entry_GETTPA@mos16hi
+    .byte entry_SETTPA@mos16hi
+    .byte entry_GETZP@mos16hi
+    .byte entry_SETZP@mos16hi
 
 ; Blocks and waits for the next keypress; returns it in A.
 
-.proc entry_CONIN
+zproc entry_CONIN
     lda pending_key
     zif_eq
         zrepeat
@@ -166,38 +167,39 @@ biostable_hi:
     ldx #0
     stx pending_key
     rts
-.endproc
+zendproc
 
-.proc entry_CONST
+zproc entry_CONST
     lda pending_key
-    bne @yes
-    lda #$81
-    ldx #0
-    ldy #0
-    jsr OSBYTE
-    bcs @no
-    stx pending_key
-@yes:
+    zif_eq
+        lda #$81
+        ldx #0
+        ldy #0
+        jsr OSBYTE
+        zif_cs
+            lda #0
+            rts
+        zendif
+        stx pending_key
+    zendif
     lda #$ff
     rts
-@no:
-    lda #0
-    rts
-.endproc
+zendproc
 
 ; Sets the current DMA address.
 
-entry_SETDMA:
+zproc entry_SETDMA
     sta dma+0
     stx dma+1
     rts
+zendproc
 
 ; Select a disk.
 ; A is the disk number.
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-.proc entry_SELDSK
+zproc entry_SELDSK
     cmp #0
     zif_ne
         sec                 ; invalid drive
@@ -208,12 +210,12 @@ entry_SETDMA:
     ldx #>dph
     clc
     rts
-.endproc
+zendproc
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
-.proc entry_SETSEC
+zproc entry_SETSEC
     sta ptr+0
     stx ptr+1
     ldy #2
@@ -223,7 +225,7 @@ entry_SETDMA:
         dey
     zuntil_mi
     rts
-.endproc
+zendproc
 
 entry_READ:
     jsr init_control_block
@@ -241,9 +243,7 @@ do_gbpb:
     rol a
     rts
 
-.include "relocate.inc" ; standard entry_RELOCATE
-
-.proc init_control_block
+zproc init_control_block
     ldy #(osgbpb_block_end - osgbpb_block - 1)
     lda #0
     zrepeat
@@ -275,49 +275,54 @@ do_gbpb:
     zuntil_mi
     
     rts
-.endproc
+zendproc
 
-entry_GETTPA:
+zproc entry_GETTPA
     lda mem_base
     ldx mem_end
     rts
+zendproc
 
-entry_SETTPA:
+zproc entry_SETTPA
     sta mem_base
     stx mem_end
     rts
+zendproc
 
-entry_GETZP:
+zproc entry_GETZP
     lda zp_base
     ldx zp_end
     rts
+zendproc
 
-entry_SETZP:
+zproc entry_SETZP
     sta zp_base
     stx zp_end
     rts
+zendproc
 
     .data
-zp_base: .byte <(__ZEROPAGE_LOAD__ + __ZEROPAGE_SIZE__)
-zp_end:  .byte $90
+zp_base: .byte __USERZEROPAGE_START__
+zp_end:  .byte __USERZEROPAGE_END__
 
 ; DPH for drive 0 (our only drive)
 
-dph: define_drive $600, 1024, 64, 0
+define_drive dph, $600, 1024, 64, 0
 
-    .bss
+NOINIT
+
 mem_base: .byte 0
 mem_end:  .byte 0
 
 filehandle:  .byte 0    ; file handle of disk image
 pending_key: .byte 0    ; pending keypress from system
 dma:         .word 0    ; current DMA
-sector_num:  .res 3     ; current absolute sector number
+sector_num:  .fill 3    ; current absolute sector number
 
-directory_buffer: .res 128
+directory_buffer: .fill 128
 
 osgbpb_block:           ; block used by entry_READ and entry_WRITE
-    .res $0d
+    .fill $0d
 osgbpb_block_end:
 
 ; vim: filetype=asm sw=4 ts=4 et
