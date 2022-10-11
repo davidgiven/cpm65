@@ -115,6 +115,7 @@ static void process_byte(uint8_t b)
 
         record_ptr += 128;
         record_fill = 0;
+		lineno++;
     }
     else if (b != '\n')
     {
