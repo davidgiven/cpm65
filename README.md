@@ -43,11 +43,10 @@ It's [open source on GitHub!](https://github.com/davidgiven/cpm65)
 How?
 ----
 
-Currently you need a bit of a mess of toolchains: cc65, cc1541, and [a patched
-version of llvm-mos](https://github.com/davidgiven/llvm-mos-sdk). Once done,
-you should just be able to run the Makefile and you'll get bootable disk images
-for the Commodore 64 (with 1541 drive) and BBC Micro (producing a 200kB SSSD
-DFS disk).
+You will need the [llvm-mos](https://llvm-mos.org) toolchain. CP/M-65 support
+is available out of the box. Once installed, you should just be able to run the
+Makefile and you'll get bootable disk images for the Commodore 64 (with 1541
+drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 BBC Micro notes:
 
@@ -78,10 +77,10 @@ Commodore 64 notes:
 
 Supported programs:
 
-You don't get a lot. As transients, you get `DUMP`, `STAT` and `SUBMIT`.
-There's also a `BITMAP`, which is for debugging and I'm going to remove it. I'd
-love more --- send me pull requests! The build system supports cc65 assembler
-and llvm-mos C programs.
+You don't get a lot right now. As transients, you get `DUMP`, `STAT` and
+`SUBMIT`.  There's also a `BITMAP`, which is for debugging and I'm going to
+remove it. I'd love more --- send me pull requests! The build system supports
+cc65 assembler and llvm-mos C programs.
 
 In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
 `SAVE` as on the relocatable CP/M-65 system, assembling images in memory is of

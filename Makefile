@@ -1,7 +1,4 @@
 CXX = g++
-CA65 = ca65
-LD65 = ld65
-AR65 = ar65
 
 CFLAGS65 = -Os
 
@@ -15,24 +12,9 @@ APPS = \
 	cpmfs/readme.txt
 
 LIBCPM_OBJS = \
-	$(OBJDIR)/llvm/lib/printi.o \
-	$(OBJDIR)/llvm/lib/bdos.o \
-	$(OBJDIR)/llvm/lib/xfcb.o \
-
-LIBXFCB_OBJS = \
-	$(OBJDIR)/cc65/lib/xfcb/clear.o \
-	$(OBJDIR)/cc65/lib/xfcb/close.o \
-	$(OBJDIR)/cc65/lib/xfcb/erase.o \
-	$(OBJDIR)/cc65/lib/xfcb/get.o \
-	$(OBJDIR)/cc65/lib/xfcb/make.o \
-	$(OBJDIR)/cc65/lib/xfcb/open.o \
-	$(OBJDIR)/cc65/lib/xfcb/prepare.o \
-	$(OBJDIR)/cc65/lib/xfcb/readrand.o \
-	$(OBJDIR)/cc65/lib/xfcb/readseq.o \
-	$(OBJDIR)/cc65/lib/xfcb/set.o \
-	$(OBJDIR)/cc65/lib/xfcb/vars.o \
-	$(OBJDIR)/cc65/lib/xfcb/writerand.o \
-	$(OBJDIR)/cc65/lib/xfcb/writeseq.o \
+	$(OBJDIR)/lib/printi.o \
+	$(OBJDIR)/lib/bdos.o \
+	$(OBJDIR)/lib/xfcb.o \
 
 all: c64.d64 bbcmicro.ssd
 
@@ -44,11 +26,7 @@ $(OBJDIR)/mkdfs: tools/mkdfs.c
 	@mkdir -p $(dir $@)
 	$(CXX) -Os -g -o $@ $<
 
-$(OBJDIR)/cc65/%.o: %.s include/zif.inc include/mos.inc include/cpm65.inc
-	@mkdir -p $(dir $@)
-	$(CA65) -DCA65 -o $@ $< -I include -I lib/xfcb --listing $(patsubst %.o,%.lst,$@)
-
-$(OBJDIR)/llvm/%.o: %.S include/zif_llvm.inc include/mos.inc include/cpm65_llvm.inc
+$(OBJDIR)/%.o: %.S include/zif_llvm.inc include/mos.inc include/cpm65_llvm.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 
@@ -56,40 +34,40 @@ $(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
 	@mkdir -p $(dir $@)
 	$(AR65) r $@ $^
 
-$(OBJDIR)/llvm/libcpm.a: $(LIBCPM_OBJS)
+$(OBJDIR)/libcpm.a: $(LIBCPM_OBJS)
 	@mkdir -p $(dir $@)
 	llvm-ar rs $@ $^
 
-$(OBJDIR)/c64.exe: $(OBJDIR)/llvm/src/c64.o $(OBJDIR)/llvm/src/relocate.o scripts/c64.ld
+$(OBJDIR)/c64.exe: $(OBJDIR)/src/c64.o $(OBJDIR)/src/relocate.o scripts/c64.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/c64.ld -o $@ \
-		$(OBJDIR)/llvm/src/c64.o \
-		$(OBJDIR)/llvm/src/relocate.o \
+		$(OBJDIR)/src/c64.o \
+		$(OBJDIR)/src/relocate.o \
 	
-$(OBJDIR)/llvm/%.o: %.c
+$(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
 
-$(OBJDIR)/%.com: $(OBJDIR)/llvm/apps/%.o $(OBJDIR)/llvm/libcpm.a
+$(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/%.com: $(OBJDIR)/cc65/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
 	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
-$(OBJDIR)/bdos.img: $(OBJDIR)/llvm/src/bdos.o $(OBJDIR)/llvm/libcpm.a
+$(OBJDIR)/bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
-$(OBJDIR)/ccp.sys: $(OBJDIR)/llvm/src/ccp.o $(OBJDIR)/llvm/libcpm.a
+$(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
-$(OBJDIR)/bbcmicro.exe: $(OBJDIR)/llvm/src/bbcmicro.o $(OBJDIR)/llvm/src/relocate.o scripts/bbcmicro.ld
+$(OBJDIR)/bbcmicro.exe: $(OBJDIR)/src/bbcmicro.o $(OBJDIR)/src/relocate.o scripts/bbcmicro.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/bbcmicro.ld -o $@ \
-		$(OBJDIR)/llvm/src/bbcmicro.o \
-		$(OBJDIR)/llvm/src/relocate.o \
+		$(OBJDIR)/src/bbcmicro.o \
+		$(OBJDIR)/src/relocate.o \
 	
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
