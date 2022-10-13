@@ -2,11 +2,8 @@
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
-.include "zif.inc"
-.include "cpm65.inc"
-
-.import __ZEROPAGE_LOAD__
-.import __ZEROPAGE_SIZE__
+#include "zif_llvm.inc"
+#include "cpm65_llvm.inc"
 
 READST = $ffb7
 SETLFS = $ffba
@@ -31,45 +28,74 @@ SECOND = $ff93
 TALKSA = $ff96
 CLRCHN = $ffcc
 GETIN = $ffe4
+STATUS = $90
 
-    .zeropage
+ZEROPAGE
 
+.global ptr
 ptr:        .word 0
 dma:        .word 0    ; current DMA
 
-    .code
+    .text
 
     .word $0801
-    .word :+, 1
-    .byte $9e, "2061", 0
-:   .word 0
-entry:
+    .word 1f, 1
+    .byte $9e
+    .asciz "2061"
+1:
+    .word 0
+zproc _start
     jsr init_system
 
-    ; Load the BDOS (using DOS).
+    ; Open the BDOS file (using low level disk access).
 
-    lda #1              ; file number
-    ldx #8              ; device
-    ldy #0              ; secondary address
-    jsr SETLFS
+    lda #8
+    jsr LISTEN
+    lda #$f0            ; open channel 0
+    jsr SECOND
 
-    ldx #<bdos_filename
-    ldy #>bdos_filename
-    lda #bdos_filename_end - bdos_filename
-    jsr SETNAM
+    ldx #0x100 - bdos_filename_len
+    zrepeat
+        lda bdos_filename_end - 0x100, x
+        jsr CIOUT
 
-    lda #0
-    ldx #<(top+2)       ; LOAD skips the first two bytes
-    ldy #>(top+2)       ; (which, luckily, we don't need)
-    jsr LOAD ; load
-    zif_cs
-        lda #<msg
-        ldx #>msg
-        jsr print
-        jmp *
-    msg:
-        .byte "Cannot load BDOS", 0
-    zendif
+        inx
+    zuntil_eq
+
+    jsr UNLSN
+
+    ; Read the data.
+
+    lda #<__USERTPA_START__
+    sta ptr+0
+    lda #>__USERTPA_START__
+    sta ptr+1
+
+    lda #8
+    jsr TALK
+    lda #$60            ; emit channel 0
+    jsr TALKSA
+
+    ldy #0
+    zrepeat
+        sty STATUS
+        jsr ACPTR       ; read a byte
+        sta (ptr), y
+
+        inc ptr+0
+        zif_eq
+            inc ptr+1
+        zendif
+
+        lda STATUS      ; check for EOF
+    zuntil_ne
+    ; The drive will UNTALK automatically on EOF.
+
+    lda #8
+    jsr LISTEN
+    lda #$e0            ; close channel 0
+    jsr SECOND
+    jsr UNLSN
 
     ; Relocate the BDOS.
 
@@ -81,7 +107,7 @@ entry:
 
     lda mem_base
     pha
-    lda #4-1            ; rts addresses are one before the target
+    lda #COMHDR_ENTRY-1 ; rts addresses are one before the target
     pha
 
     lda #<biosentry
@@ -89,8 +115,10 @@ entry:
     rts                 ; indirect jump
 
 bdos_filename:
-    .byte "BDOS"
+    .ascii "BDOS,P,R"
 bdos_filename_end:
+bdos_filename_len = bdos_filename_end - bdos_filename
+zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -105,37 +133,37 @@ biosentry:
     jmp (ptr)
 
 biostable_lo:
-    .lobytes entry_CONST
-    .lobytes entry_CONIN
-    .lobytes entry_CONOUT
-    .lobytes entry_SELDSK
-    .lobytes entry_SETSEC
-    .lobytes entry_SETDMA
-    .lobytes entry_READ
-    .lobytes entry_WRITE
-    .lobytes entry_RELOCATE
-    .lobytes entry_GETTPA
-    .lobytes entry_SETTPA
-    .lobytes entry_GETZP
-    .lobytes entry_SETZP
+    .byte entry_CONST    @mos16lo
+    .byte entry_CONIN    @mos16lo
+    .byte entry_CONOUT   @mos16lo
+    .byte entry_SELDSK   @mos16lo
+    .byte entry_SETSEC   @mos16lo
+    .byte entry_SETDMA   @mos16lo
+    .byte entry_READ     @mos16lo
+    .byte entry_WRITE    @mos16lo
+    .byte entry_RELOCATE @mos16lo
+    .byte entry_GETTPA   @mos16lo
+    .byte entry_SETTPA   @mos16lo
+    .byte entry_GETZP    @mos16lo
+    .byte entry_SETZP    @mos16lo
 biostable_hi:
-    .hibytes entry_CONST
-    .hibytes entry_CONIN
-    .hibytes entry_CONOUT
-    .hibytes entry_SELDSK
-    .hibytes entry_SETSEC
-    .hibytes entry_SETDMA
-    .hibytes entry_READ
-    .hibytes entry_WRITE
-    .hibytes entry_RELOCATE
-    .hibytes entry_GETTPA
-    .hibytes entry_SETTPA
-    .hibytes entry_GETZP
-    .hibytes entry_SETZP
+    .byte entry_CONST    @mos16hi
+    .byte entry_CONIN    @mos16hi
+    .byte entry_CONOUT   @mos16hi
+    .byte entry_SELDSK   @mos16hi
+    .byte entry_SETSEC   @mos16hi
+    .byte entry_SETDMA   @mos16hi
+    .byte entry_READ     @mos16hi
+    .byte entry_WRITE    @mos16hi
+    .byte entry_RELOCATE @mos16hi
+    .byte entry_GETTPA   @mos16hi
+    .byte entry_SETTPA   @mos16hi
+    .byte entry_GETZP    @mos16hi
+    .byte entry_SETZP    @mos16hi
 
 ; Blocks and waits for the next keypress; returns it in A.
 
-.proc entry_CONIN
+zproc entry_CONIN
     lda pending_key
     zif_eq
         zrepeat
@@ -153,48 +181,47 @@ biostable_hi:
 
     clc
     rts
-.endproc
+zendproc
 
-.proc entry_CONOUT
+zproc entry_CONOUT
     jsr topetscii
     jsr CHROUT
     clc
     rts
-.endproc
+zendproc
 
-.proc entry_CONST
+zproc entry_CONST
     lda pending_key
-    bne yes
+    zif_eq
+        jsr GETIN
+        sta pending_key
+        zif_eq
+            lda #0
+            clc
+            rts
+        zendif
+    zendif
 
-    jsr GETIN
-    sta pending_key
-    beq no
-yes:
     lda #$ff
     clc
     rts
-
-no:
-    lda #0
-    clc
-    rts
-.endproc
+zendproc
 
 ; Sets the current DMA address.
 
-.proc entry_SETDMA
+zproc entry_SETDMA
     sta dma+0
     stx dma+1
     clc
     rts
-.endproc
+zendproc
 
 ; Select a disk.
 ; A is the disk number.
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-.proc entry_SELDSK
+zproc entry_SELDSK
     cmp #0
     zif_ne
         sec                 ; invalid drive
@@ -205,12 +232,12 @@ no:
     ldx #>dph
     clc
     rts
-.endproc
+zendproc
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
-.proc entry_SETSEC
+zproc entry_SETSEC
     sta ptr+0
     stx ptr+1
     ldy #2
@@ -221,7 +248,7 @@ no:
     zuntil_mi
     clc
     rts
-.endproc
+zendproc
 
 entry_GETTPA:
     lda mem_base
@@ -247,7 +274,7 @@ entry_SETZP:
     clc
     rts
 
-entry_READ:
+zproc entry_READ
     jsr change_sectors
 
     lda sector_num+0
@@ -267,10 +294,11 @@ entry_READ:
 
     clc
     rts
+zendproc
 
 ; On entry, A=0 for a normal write; A=1 to always flush to disk.
 
-entry_WRITE:
+zproc entry_WRITE
     pha
     jsr change_sectors
 
@@ -299,8 +327,9 @@ entry_WRITE:
 
     clc
     rts
+zendproc
 
-.proc change_sectors
+zproc change_sectors
     ; If the buffered sector is the one we want, just return.
 
     lda sector_num+0
@@ -334,22 +363,22 @@ entry_WRITE:
 
     jsr buffered_sector_to_lba
     jmp read_sector
-.endproc
+zendproc
 
 ; Compute the current LBA sector number in XA for the buffered sector.
 
-.proc buffered_sector_to_lba
+zproc buffered_sector_to_lba
     lda buffered_sector+1
     lsr a
     tax
     lda buffered_sector+0
     ror
     rts
-.endproc
+zendproc
 
 ; Flush the current buffer to disk, if necessary.
 
-.proc flush_buffered_sector
+zproc flush_buffered_sector
     lda buffer_dirty
     zif_mi
         jsr buffered_sector_to_lba
@@ -359,13 +388,11 @@ entry_WRITE:
         sta buffer_dirty
     zendif
     rts
-.endproc
-
-.include "relocate.inc" ; standard entry_RELOCATE
+zendproc
 
 ; Reads a 256-byte sector whose LBA index is in XA.
 
-.proc read_sector
+zproc read_sector
     jsr convert_to_ts
     pha
     tya
@@ -407,11 +434,11 @@ entry_WRITE:
 
     jsr UNTALK
     rts
-.endproc
+zendproc
 
 ; Writes a 256-byte sector whose LBA index is in XA.
 
-.proc write_sector
+zproc write_sector
     jsr convert_to_ts
     pha
     tya
@@ -475,11 +502,12 @@ entry_WRITE:
     rts
 
 reset_buffer_pointer_command:
-    .byte "B-P 2 0", 13, 0
-.endproc
+    .ascii "B-P 2 0"
+    .byte 13, 0
+zendproc
 
 ; Prints an 8-bit hex number in A.
-.proc print_hex_number
+zproc print_hex_number
     pha
     lsr a
     lsr a
@@ -488,7 +516,7 @@ reset_buffer_pointer_command:
     jsr h4
     pla
 h4:
-    and #%00001111
+    and #0x0f ; %00001111
     ora #'0'
     cmp #'9'+1
 	zif_cs
@@ -498,9 +526,9 @@ h4:
 	jsr CHROUT
 	pla
 	rts
-.endproc
+zendproc
 
-.proc get_status
+zproc get_status
     lda #8
     jsr TALK
     lda #$6f
@@ -514,11 +542,11 @@ h4:
 
     jsr UNTALK
     rts
-.endproc
+zendproc
 
 ; Converts an LBA sector number in XA to track/sector in Y, A.
 
-.proc convert_to_ts
+zproc convert_to_ts
     ldy #0
     zloop
         cpx #0
@@ -539,15 +567,15 @@ h4:
     zendloop
 
 track_size_table:
-    .res 17, 21
-    .res 7, 19
-    .res 6, 18
-    .res 10, 17
-.endproc
+    .fill 17, 1, 21
+    .fill 7, 1, 19
+    .fill 6, 1, 18
+    .fill 10, 1, 17
+zendproc
 
 ; Prints a decimal number in A to the IEC output.
 
-.proc decimal_out
+zproc decimal_out
     pha
     lda #' '
     jsr CIOUT
@@ -578,9 +606,9 @@ digit:
     jsr CIOUT
     pla
     rts
-.endproc
+zendproc
 
-.proc string_out
+zproc string_out
     sta ptr+0
     stx ptr+1
 
@@ -593,11 +621,11 @@ digit:
         jsr CIOUT
         iny
     zendloop
-.endproc
+zendproc
 
 ; Prints the string at XA with the kernel.
 
-.proc print
+zproc print
     sta ptr+0
     stx ptr+1
 
@@ -612,11 +640,11 @@ digit:
         iny
     zendloop
     rts
-.endproc
+zendproc
 
 ; Converts ASCII to PETSCII for printing.
 
-.proc topetscii
+zproc topetscii
     cmp #8
     zif_eq
         lda #20
@@ -644,9 +672,9 @@ digit:
 swapcase:
     eor #$20
     rts
-.endproc
+zendproc
 
-.proc init_system
+zproc init_system
     lda #$36
     sta 1                   ; map Basic out
     lda #0
@@ -682,33 +710,33 @@ swapcase:
     jsr UNLSN
 
     rts
-.endproc
+zendproc
 
 loading_msg:
-    .byte 147, 14, 5, 13, "cp/m-65", 13, 13, 0
+    .byte 147, 14, 5, 13
+    .ascii "cp/m-65"
+    .byte 13, 13, 0
 
 .data
 
-zp_base:    .byte <(__ZEROPAGE_LOAD__ + __ZEROPAGE_SIZE__)
-zp_end:     .byte $90
-mem_base:   .byte >top
-mem_end:    .byte >$d000
+zp_base:    .byte __USERZEROPAGE_START__
+zp_end:     .byte __USERZEROPAGE_END__
+mem_base:   .byte __USERTPA_START__@mos16hi
+mem_end:    .byte __USERTPA_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-dph: define_drive 136*10, 1024, 64, 0
+define_drive dph, 136*10, 1024, 64, 0
 
-.bss
+NOINIT
 
-pending_key: .byte 0    ; pending keypress from system
-sector_num:  .res 3     ; current absolute sector number
-buffered_sector: .res 3 ; sector currently in disk buffer
-buffer_dirty: .res 1    ; non-zero if sector needs flushing
+pending_key:     .byte 0 ; pending keypress from system
+sector_num:      .fill 3 ; current absolute sector number
+buffered_sector: .fill 3 ; sector currently in disk buffer
+buffer_dirty:    .fill 1 ; non-zero if sector needs flushing
 
-directory_buffer: .res 128
-disk_buffer: .res 256
-
-top = (* + $ff) & ~$ff
+directory_buffer: .fill 128
+disk_buffer: .fill 256
 
 ; vim: sw=4 ts=4 et ft=asm
 

@@ -95,6 +95,7 @@ _zmake_loops cc, cs
 _zmake_loops cs, cc
 _zmake_loops pl, mi
 _zmake_loops mi, pl
+_zmake_loops vs, vc
 
 .macro _zmake_if pos, neg
     .macro zif_\pos

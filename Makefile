@@ -60,9 +60,11 @@ $(OBJDIR)/llvm/libcpm.a: $(LIBCPM_OBJS)
 	@mkdir -p $(dir $@)
 	llvm-ar rs $@ $^
 
-$(OBJDIR)/c64.exe: $(OBJDIR)/cc65/src/c64.o scripts/c64.cfg
+$(OBJDIR)/c64.exe: $(OBJDIR)/llvm/src/c64.o $(OBJDIR)/llvm/src/relocate.o scripts/c64.ld
 	@mkdir -p $(dir $@)
-	$(LD65) -m $(patsubst %.exe,%.map,$@) -vm -C scripts/c64.cfg -o $@ $<
+	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/c64.ld -o $@ \
+		$(OBJDIR)/llvm/src/c64.o \
+		$(OBJDIR)/llvm/src/relocate.o \
 	
 $(OBJDIR)/llvm/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -122,6 +124,7 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	echo "16574: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	echo "16584: 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	-cpmcp -f c1541 $@ cpmfs/yeses 0:
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:cbm.sys
 
 clean:
