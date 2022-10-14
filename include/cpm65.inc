@@ -102,19 +102,25 @@
 
 /* BIOS entrypoints. */
 
-#define BIOS_CONST 0
-#define BIOS_CONIN 1
-#define BIOS_CONOUT 2
-#define BIOS_SELDSK 3
-#define BIOS_SETSEC 4
-#define BIOS_SETDMA 5
-#define BIOS_READ 6
-#define BIOS_WRITE 7
-#define BIOS_RELOCATE 8
-#define BIOS_GETTPA 9
-#define BIOS_SETTPA 10
-#define BIOS_GETZP 11
-#define BIOS_SETZP 12
+#define BIOS_CONST     0 /* get console status */
+#define BIOS_CONIN     1 /* blocking read character */
+#define BIOS_CONOUT    2 /* blocking write character */
+#define BIOS_SELDSK    3 /* select disk and return DPH pointer */
+#define BIOS_SETSEC    4 /* set sector; XA is pointer to 24-bit int */
+#define BIOS_SETDMA    5 /* set DMA address */
+#define BIOS_READ      6 /* read sector */
+#define BIOS_WRITE     7 /* write sector: A=0 for normal, 1 for directory, 2 to suppress read */
+#define BIOS_RELOCATE  8 /* relocates a binary: A=TPA page, X=ZP base */
+#define BIOS_GETTPA    9 /* gets TPA bounds: A=lo, X=hi */
+#define BIOS_SETTPA   10 /* sets TPA bounds: A=lo, X=hi */
+#define BIOS_GETZP    11 /* gets ZP bounds: A=lo, X=hi */
+#define BIOS_SETZP    12 /* sets ZP bounds: A=lo, X=hi */
+#define BIOS_SETBANK  13 /* sets current memory bank */
+
+/* Memory banks. */
+
+#define BANK_MAIN    0   /* normal bank */
+#define BANK_EXTRA   1   /* used for the BDOS and CCP */
 
 /* DPH structure layout. */
 

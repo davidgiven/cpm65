@@ -146,6 +146,7 @@ biostable_lo:
     .byte entry_SETTPA   @mos16lo
     .byte entry_GETZP    @mos16lo
     .byte entry_SETZP    @mos16lo
+    .byte entry_SETBANK  @mos16lo
 biostable_hi:
     .byte entry_CONST    @mos16hi
     .byte entry_CONIN    @mos16hi
@@ -160,6 +161,7 @@ biostable_hi:
     .byte entry_SETTPA   @mos16hi
     .byte entry_GETZP    @mos16hi
     .byte entry_SETZP    @mos16hi
+    .byte entry_SETBANK  @mos16hi
 
 ; Blocks and waits for the next keypress; returns it in A.
 
@@ -250,29 +252,37 @@ zproc entry_SETSEC
     rts
 zendproc
 
-entry_GETTPA:
+zproc entry_GETTPA
     lda mem_base
     ldx mem_end
     clc
     rts
+zendproc
 
-entry_SETTPA:
+zproc entry_SETTPA
     sta mem_base
     stx mem_end
     clc
     rts
+zendproc
 
-entry_GETZP:
+zproc entry_GETZP
     lda zp_base
     ldx zp_end
     clc
     rts
+zendproc
 
-entry_SETZP:
+zproc entry_SETZP
     sta zp_base
     stx zp_end
     clc
     rts
+zendproc
+
+zproc entry_SETBANK
+    rts
+zendproc
 
 zproc entry_READ
     jsr change_sectors

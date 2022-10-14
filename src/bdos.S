@@ -41,6 +41,10 @@ zproc main
 
     ; Update memory region.
 
+    ldy #BIOS_SETBANK
+    lda #BANK_EXTRA
+    jsr callbios
+
     ldy #BIOS_GETZP
     jsr callbios
     clc
@@ -104,6 +108,10 @@ entry_EXIT:
 
     ; Compute the load address.
 
+    ldy #BIOS_SETBANK
+    lda #BANK_EXTRA
+    jsr callbios
+
     jsr bios_GETZP          ; top of ZP in X
     txa
     sec
@@ -165,6 +173,10 @@ entry_EXIT:
     jsr callbios
 
     ; Execute it.
+
+    ldy #BIOS_SETBANK
+    lda #BANK_MAIN
+    jsr callbios
 
     lda #COMHDR_ENTRY      ; start address is 256-byte aligned
     sta temp+0
