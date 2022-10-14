@@ -16,6 +16,9 @@ LIBCPM_OBJS = \
 	$(OBJDIR)/lib/bdos.o \
 	$(OBJDIR)/lib/xfcb.o \
 
+LIBBIOS_OBJS = \
+	$(OBJDIR)/src/bios/relocate.o
+
 all: c64.d64 bbcmicro.ssd
 
 $(OBJDIR)/multilink: tools/multilink.cc
@@ -30,20 +33,14 @@ $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 
-$(OBJDIR)/libxfcb.a: $(LIBXFCB_OBJS)
+$(OBJDIR)/libbios.a: $(LIBBIOS_OBJS)
 	@mkdir -p $(dir $@)
-	$(AR65) r $@ $^
+	llvm-ar rs $@ $^
 
 $(OBJDIR)/libcpm.a: $(LIBCPM_OBJS)
 	@mkdir -p $(dir $@)
 	llvm-ar rs $@ $^
 
-$(OBJDIR)/c64.exe: $(OBJDIR)/src/c64.o $(OBJDIR)/src/relocate.o scripts/c64.ld
-	@mkdir -p $(dir $@)
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/c64.ld -o $@ \
-		$(OBJDIR)/src/c64.o \
-		$(OBJDIR)/src/relocate.o \
-	
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
@@ -51,9 +48,6 @@ $(OBJDIR)/%.o: %.c
 $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
-
-$(OBJDIR)/%.com: $(OBJDIR)/cc65/apps/%.o $(OBJDIR)/multilink $(OBJDIR)/libxfcb.a
-	$(OBJDIR)/multilink -o $@ $< $(OBJDIR)/libxfcb.a
 
 $(OBJDIR)/bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
@@ -63,11 +57,9 @@ $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
-$(OBJDIR)/bbcmicro.exe: $(OBJDIR)/src/bbcmicro.o $(OBJDIR)/src/relocate.o scripts/bbcmicro.ld
+$(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/bbcmicro.ld -o $@ \
-		$(OBJDIR)/src/bbcmicro.o \
-		$(OBJDIR)/src/relocate.o \
+	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a
 	
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
@@ -102,7 +94,6 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	echo "16574: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	echo "16584: 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	-cpmcp -f c1541 $@ cpmfs/yeses 0:
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:cbm.sys
 
 clean:
