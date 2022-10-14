@@ -1,5 +1,5 @@
-#include "cpm65_llvm.inc"
-#include "zif_llvm.inc"
+#include "cpm65.inc"
+#include "zif.inc"
 
 ZEROPAGE
 __fcb: .fill 2
@@ -68,4 +68,5 @@ zproc xfcb_writesequential
 	jmp BDOS
 zendproc
 
+; vim: sw=4 ts=4 et ft=asm
 

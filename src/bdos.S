@@ -3,8 +3,8 @@
 ; see the COPYING file in the root project directory for the full text.
 
 
-#include "cpm65_llvm.inc"
-#include "zif_llvm.inc"
+#include "cpm65.inc"
+#include "zif.inc"
 
 CPM_MACHINE_TYPE = $f ; 6502!
 CPM_SYSTEM_TYPE = 0

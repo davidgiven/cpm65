@@ -26,7 +26,7 @@ $(OBJDIR)/mkdfs: tools/mkdfs.c
 	@mkdir -p $(dir $@)
 	$(CXX) -Os -g -o $@ $<
 
-$(OBJDIR)/%.o: %.S include/zif_llvm.inc include/mos.inc include/cpm65_llvm.inc
+$(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 

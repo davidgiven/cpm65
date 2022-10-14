@@ -68,3 +68,5 @@ tens:
 	.short 1000
 	.short 10000
 
+; vim: sw=4 ts=4 et ft=asm
+

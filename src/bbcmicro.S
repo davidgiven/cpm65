@@ -2,9 +2,9 @@
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
-#include "zif_llvm.inc"
+#include "zif.inc"
 #include "mos.inc"
-#include "cpm65_llvm.inc"
+#include "cpm65.inc"
 
 ZEROPAGE
 
