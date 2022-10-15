@@ -903,7 +903,7 @@ zproc parse_fcb
     zrepeat                     ; 4 bytes of metadata
         iny
         sta (fcb), y
-        cpy #FCB_RC+1
+        cpy #FCB_RC
     zuntil_eq
 
     ; Check for drive.
