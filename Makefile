@@ -8,7 +8,6 @@ APPS = \
 	$(OBJDIR)/dump.com \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
-	$(OBJDIR)/rawdisk.com \
 	cpmfs/readme.txt
 
 LIBCPM_OBJS = \
@@ -17,9 +16,10 @@ LIBCPM_OBJS = \
 	$(OBJDIR)/lib/xfcb.o \
 
 LIBBIOS_OBJS = \
-	$(OBJDIR)/src/bios/relocate.o
+	$(OBJDIR)/src/bios/relocate.o \
+	$(OBJDIR)/src/bios/petscii.o \
 
-all: c64.d64 bbcmicro.ssd
+all: c64.d64 bbcmicro.ssd x16.img
 
 $(OBJDIR)/multilink: tools/multilink.cc
 	@mkdir -p $(dir $@)
@@ -96,8 +96,17 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:cbm.sys
 
+$(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
+	@rm -f $@
+	mkfs.cpm -f generic-1m $@
+	cpmcp -f generic-1m $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f generic-1m $@ s 0:ccp.sys
+
+x16.img: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img Makefile
+	touch x16.img
+
 clean:
-	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd
+	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.img
 
 .DELETE_ON_ERROR:
 .SECONDARY:

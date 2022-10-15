@@ -10,6 +10,7 @@ ZEROPAGE
 cmdoffset:  .byte 0 ; current offset into command line (not including size byte)
 fcb:        .word 0 ; current FCB being worked on
 temp:       .word 0
+temp2:      .byte 0
 
 zproc main
     tsx
@@ -235,6 +236,22 @@ zproc cannot_open
     jmp error
 1:
     .asciz "Cannot open file"
+zendproc
+
+zproc bad_command
+    lda #<1f
+    ldx #>1f
+    jmp error
+1:
+    .asciz "Bad command"
+zendproc
+
+zproc no_room
+    lda #<1f
+    ldx #>1f
+    jmp error
+1:
+    .asciz "No room"
 zendproc
 
 ; Prints the message in XA and returns to the main loop.
@@ -608,24 +625,44 @@ zproc entry_TRANSIENT
     lda #0
     sta temp+0
 
+    ; Read the first sector to get the header.
+
+    jsr read_command_sector
+    zif_cs
+        jmp bad_command
+    zendif
+    lda #0
+    sta temp+0              ; set pointer to beginning of file
+
+    ; Check that there's room.
+
+    jsr bios_GETTPA
+    stx temp2
+    ldy #COMHDR_TPA_USAGE
+    clc
+    adc (temp), y
+    cmp temp2
+    zif_cs
+        jmp no_room
+    zendif
+
+    jsr bios_GETZP
+    stx temp2
+    ldy #COMHDR_ZP_USAGE
+    clc
+    adc (temp), y
+    cmp temp2
+    zif_cs
+        jmp no_room
+    zendif
+
     ; Read the file.
 
-    zloop
-        lda temp+0
-        ldx temp+1
-        jsr bdos_SETDMA
-        lda #<cmdfcb
-        ldx #>cmdfcb
-        jsr bdos_READSEQUENTIAL
-        zbreakif_cs
-
-        lda temp+0
-        eor #$80
-        sta temp+0
-        zif_eq
-            inc temp+1
-        zendif
-    zendloop
+    lda #$80                ; this is always true
+    sta temp+0
+    zrepeat
+        jsr read_command_sector
+    zuntil_cs
 
     ; Relocate the file.
 
@@ -721,6 +758,25 @@ zproc entry_TRANSIENT
 
 calltemp:
     jmp (temp)
+
+read_command_sector:
+    lda temp+0
+    ldx temp+1
+    jsr bdos_SETDMA
+    lda #<cmdfcb
+    ldx #>cmdfcb
+    jsr bdos_READSEQUENTIAL
+    bcs 1f
+
+    lda temp+0
+    eor #$80
+    sta temp+0
+    zif_eq
+        inc temp+1
+    zendif
+    clc
+1:
+    rts
 
 com:
     .ascii "COM"
@@ -835,7 +891,7 @@ zproc parse_fcb
     ; Wipe FCB.
 
     ldy #FCB_DR
-    tya
+    lda #0
     sta (fcb), y                ; drive
     lda #' '
     zrepeat                     ; 11 bytes of filename

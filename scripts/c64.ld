@@ -7,7 +7,7 @@ SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
 		__USERZEROPAGE_START__ = .;
-		__USERZEROPAGE_END__ = 0x8e;
+		__USERZEROPAGE_END__ = 0x90;
 	} >zp
 
 	.text : {

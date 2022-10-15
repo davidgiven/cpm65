@@ -1975,7 +1975,7 @@ zproc internal_LOGINDRIVE
     ldy #3
     jsr shiftr              ; XA = temp+0 = number of bytes of bitmap
 
-    lda bitmap+0
+    lda bitmap+0            ; pointer to bitmap into temp
     sta temp+2
     lda bitmap+1
     sta temp+3
@@ -1983,14 +1983,14 @@ zproc internal_LOGINDRIVE
     ldy #0
     zrepeat
         tya
-        sta (temp+2), y         ; zero a byte
+        sta (temp+2), y     ; zero a byte
 
-        inc temp+2              ; advance pointer
+        inc temp+2          ; advance pointer
         zif_eq
             inc temp+3
         zendif
 
-        lda temp+0              ; decrement count
+        lda temp+0          ; decrement count
         sec
         sbc #1
         sta temp+0
@@ -2004,7 +2004,7 @@ zproc internal_LOGINDRIVE
 
     ; Initialise the bitmap with the directory.
 
-    lda bitmap+0
+    lda bitmap+0            ; reset temporary pointer to the beginning of the bitmap
     sta temp+2
     lda bitmap+1
     sta temp+3

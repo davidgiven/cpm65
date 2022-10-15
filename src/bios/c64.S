@@ -652,38 +652,6 @@ zproc print
     rts
 zendproc
 
-; Converts ASCII to PETSCII for printing.
-
-zproc topetscii
-    cmp #8
-    zif_eq
-        lda #20
-        rts
-    zendif
-    cmp #127
-    zif_eq
-        lda #20
-        rts
-    zendif
-
-    cmp #'A'
-    zif_cs
-        cmp #'Z'+1
-        bcc swapcase
-    zendif
-
-    cmp #'a'
-    zif_cs
-        cmp #'z'+1
-        bcc swapcase
-    zendif
-    rts
-
-swapcase:
-    eor #$20
-    rts
-zendproc
-
 zproc init_system
     lda #$36
     sta 1                   ; map Basic out
