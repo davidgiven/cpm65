@@ -9,6 +9,7 @@ to the 6502. So far it runs on:
 
   - BBC Micro (and Master, and Tube)
   - Commodore 64
+  - Commander X16
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -64,6 +65,8 @@ BBC Micro notes:
 
 Commodore 64 notes:
 
+  - load and run the `CPM` program to start.
+
   - it's excruciatingly slow as it uses normal 1541 disk accesses at 300 bytes
 	per second. Everything works, but you won't enjoy it. At some point I want
 	to add a fastloader.
@@ -75,11 +78,23 @@ Commodore 64 notes:
   - disk accesses are done using direct block access, so it _won't_ work on
 	anything other than a 1541. Sorry.
 
+Commander X16 notes:
+
+  - to use, place the contents of the `x16.zip` file on the X16's SD card. Load
+	and run the `CPM` program to start.
+
+  - the CP/M filesystem is stored in a big file called CPMFS. It needs support
+	for the Position command in order to seek within the file. `x16emu`
+	currently doesn't support this in its host filesystem, so you'll need to
+	use an actual SD card image. (I have a [pull request
+	outstanding](https://github.com/commanderx16/x16-emulator/pull/435) to add
+	support. An SD2IEC should work too, as these support the same commands.
+	However a real Commodore disk drive _will not work_.
+
 Supported programs:
 
 You don't get a lot right now. As transients, you get `DUMP`, `STAT` and
-`SUBMIT`.  There's also a `BITMAP`, which is for debugging and I'm going to
-remove it. I'd love more --- send me pull requests! The build system supports
+`SUBMIT`. I'd love more --- send me pull requests! The build system supports
 cc65 assembler and llvm-mos C programs.
 
 In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no

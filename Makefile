@@ -19,7 +19,7 @@ LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/relocate.o \
 	$(OBJDIR)/src/bios/petscii.o \
 
-all: c64.d64 bbcmicro.ssd x16.img
+all: c64.d64 bbcmicro.ssd x16.zip
 
 $(OBJDIR)/multilink: tools/multilink.cc
 	@mkdir -p $(dir $@)
@@ -102,11 +102,15 @@ $(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
 	cpmcp -f generic-1m $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f generic-1m $@ s 0:ccp.sys
 
-x16.img: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img Makefile
-	touch x16.img
+x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
+	@rm -f $@
+	zip -9 $@ -j $^
+	printf "@ x16.exe\n@=CPM\n" | zipnote -w $@
+	printf "@ bdos.img\n@=BDOS\n" | zipnote -w $@
+	printf "@ generic-1m-cpmfs.img\n@=CPMFS\n" | zipnote -w $@
 
 clean:
-	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.img
+	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.zip
 
 .DELETE_ON_ERROR:
 .SECONDARY:
