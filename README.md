@@ -94,9 +94,9 @@ Commander X16 notes:
 
 Supported programs:
 
-You don't get a lot right now. As transients, you get `DUMP`, `STAT` and
-`SUBMIT`. I'd love more --- send me pull requests! The build system supports
-cc65 assembler and llvm-mos C programs.
+You don't get a lot right now. As transients, you get `DUMP`, `STAT`, `COPY`
+and `SUBMIT`. I'd love more --- send me pull requests! The build system
+supports cc65 assembler and llvm-mos C programs.
 
 In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
 `SAVE` as on the relocatable CP/M-65 system, assembling images in memory is of

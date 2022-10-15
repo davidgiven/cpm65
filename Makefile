@@ -8,6 +8,7 @@ APPS = \
 	$(OBJDIR)/dump.com \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
+	$(OBJDIR)/copy.com \
 	cpmfs/readme.txt
 
 LIBCPM_OBJS = \
