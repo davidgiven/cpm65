@@ -163,14 +163,9 @@ _start:
     ldx #__ZP1_START__
     jsr entry_RELOCATE
 	
-	; Other initialisation.
-
-	lda #0
-	sta pending_key
-
     ; Compute the entry address and jump.
 
-    lda bank1_mem_base
+    lda #>__TPA1_START__
     pha
     lda #COMHDR_ENTRY-1 ; rts addresses are one before the target
     pha
@@ -344,34 +339,39 @@ zproc entry_SETSEC
 zendproc
 
 zproc entry_GETTPA
-    lda bank0_mem_base
-    ldx bank0_mem_end
+	ldy current_bank
+    lda mem_base, y
+    ldx mem_end, y
     clc
     rts
 zendproc
 
 zproc entry_SETTPA
-    sta bank0_mem_base
-    stx bank0_mem_end
+	ldy current_bank
+    sta mem_base, y
+    stx mem_end, y
     clc
     rts
 zendproc
 
 zproc entry_GETZP
-    lda bank0_zp_base
-    ldx bank0_zp_end
+	ldy current_bank
+    lda zp_base, y
+    ldx zp_end, y
     clc
     rts
 zendproc
 
 zproc entry_SETZP
-    sta bank0_zp_base
-    stx bank0_zp_end
+	ldy current_bank
+    sta zp_base, y
+    stx zp_end, y
     clc
     rts
 zendproc
 
 zproc entry_SETBANK
+	sta current_bank
     rts
 zendproc
 
@@ -448,15 +448,13 @@ zendproc
 
 .data
 
-bank0_zp_base:    .byte __ZP0_START__
-bank0_zp_end:     .byte __ZP0_END__
-bank0_mem_base:   .byte __TPA0_START__@mos16hi
-bank0_mem_end:    .byte __TPA0_END__@mos16hi
+pending_key:	  .byte 0
+current_bank:     .byte 0
 
-bank1_zp_base:    .byte __ZP1_START__
-bank1_zp_end:     .byte __ZP1_END__
-bank1_mem_base:   .byte __TPA1_START__@mos16hi
-bank1_mem_end:    .byte __TPA1_END__@mos16hi
+zp_base:    .byte __ZP0_START__,          __ZP1_START__
+zp_end:     .byte __ZP0_END__,            __ZP1_END__
+mem_base:   .byte __TPA0_START__@mos16hi, __TPA1_START__@mos16hi
+mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
@@ -464,7 +462,6 @@ define_drive dph, 128*64, 2048, 128, 0
 
 NOINIT
 
-pending_key:	  .fill 1
 cpmfs_offset:     .fill 4 ; offset of sector in CPMFS file
 
 directory_buffer: .fill 128
