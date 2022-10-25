@@ -20,7 +20,7 @@ LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/relocate.o \
 	$(OBJDIR)/src/bios/petscii.o \
 
-all: c64.d64 bbcmicro.ssd x16.zip
+all: c64.d64 bbcmicro.ssd x16.zip atari.atr
 
 $(OBJDIR)/multilink: tools/multilink.cc
 	@mkdir -p $(dir $@)
@@ -61,11 +61,15 @@ $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a
-	
+
+atari.atr: $(OBJDIR)/atari.exe $(OBJDIR)/bdos.img Makefile
+	echo "TODO"
+
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
 	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f bbc192 $@ s 0:ccp.sys
+
 
 bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmicrofs.img $(OBJDIR)/mkdfs
 	$(OBJDIR)/mkdfs -O $@ \
@@ -111,7 +115,7 @@ x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
 	printf "@ generic-1m-cpmfs.img\n@=CPMFS\n" | zipnote -w $@
 
 clean:
-	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.zip
+	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.zip atari.atr
 
 .DELETE_ON_ERROR:
 .SECONDARY:

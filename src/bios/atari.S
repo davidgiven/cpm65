@@ -1,0 +1,128 @@
+; CP/M-65 Copyright © 2022 David Given
+; This file is licensed under the terms of the 2-clause BSD license. Please
+; see the COPYING file in the root project directory for the full text.
+
+#include "zif.inc"
+#include "cpm65.inc"
+#include <atari.inc>
+
+EOL = $9B                       ; ATASCII EOL character
+
+;   VECTOR TABLE
+EDITRV = $E400                  ; Editor Vector
+SCRENV = $E410                  ; Screen Vector
+KEYBDV = $E420                  ; Keyboard Vector
+MEMTOP = $02E5                  ; Top of available memory
+MEMLO  = $02E7                  ; Bottom of available memory
+COLOR1 = $2C5                   ; Foreground color (luminance)
+COLOR2 = $2C6                   ; Foreground color (hue)
+COLOR4 = $2C8                   ; Background color
+
+ICHID  = $0340                  ; Hander identifier
+ICDNO  = ICHID + 1              ; Device number
+ICCOM  = ICHID + 2              ; Command
+ICSTA  = ICHID + 3              ; Status
+ICBAL  = ICHID + 4              ; Buffer address (low byte)
+ICBAH  = ICHID + 5              ; Buffer address (high byte)
+ICPTL  = ICHID + 6              ; Put address (low byte)
+ICPTH  = ICHID + 7              ; Put address (high byte)
+ICBLL  = ICHID + 8              ; Buffer length (low byte)
+ICBLH  = ICHID + 9              ; Buffer length (high byte)
+ICAX1  = ICHID + 10             ; Auxiliary information
+
+; IOCB Offsets
+IOCB0  = $00
+IOCB1  = $10
+IOCB2  = $20
+IOCB3  = $30
+IOCB4  = $40
+IOCB5  = $50
+IOCB6  = $60
+IOCB7  = $70
+
+
+; CIO Commands
+CIO_OPEN   = $03
+CIO_CLOSE  = $0C
+CIO_GET    = $07
+CIO_PUT    = $09
+CIO_INPUT  = $05
+CIO_PRINT  = $09
+CIO_STATUS = $0D
+
+; CIO Directions
+CIO_READ      = $04
+CIO_WRITE     = $08
+CIO_READWRITE = $0C
+
+ZEROPAGE
+
+.global ptr
+ptr:    .word 0
+
+zproc _start
+    ; Set screen color to white on black
+    lda #0
+    sta COLOR4                  ; Black background
+    sta COLOR2                  ; Grey hue
+    lda #$0F                    ; Highest luminance
+
+    ; Get an IOCB for the screen editor device
+    jsr get_free_iocb
+    stx editor_iocb
+
+    ; Load "E:" as the device name
+    lda #<editor_device
+    sta ICBAL,x
+    lda #>editor_decice
+    sta ICBAH,x
+
+
+
+loop:
+    jmp loop
+    rts
+zendproc
+
+zproc init_system
+
+zendproc
+
+
+; Finds a free IOCB and returns it in X. Returns $ff if there are no fre IOCBs.
+zproc get_free_iocb
+    ldy #0
+
+    zloop
+        tya                     ; Calculate IOCB offset
+        rol                     ; (y * 16)
+        rol
+        rol
+        rol
+        tax
+        lda ICHID,x             ; Load the IOCB handler
+
+        cmp #$ff                ;If the ID is $ff, it's available
+        zif_eq
+            rts
+        zendif
+
+        iny
+        cmp #$07
+        zif_eq
+            ldx #$ff            ; All channels are taken.
+            rts
+        zendif
+    zendloop
+zendproc
+
+editor_device:
+    .byte $45, $3A, EOL         ; ATASCII for 'E:\n'
+
+    .data
+zp_base:    .byte __USERZEROPAGE_START__
+zp_end:     .byte __USERZEROPAGE_END__
+
+NOINIT
+
+editor_iocb:    .byte 0         ; IOCB for screen editor
