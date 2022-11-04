@@ -11,7 +11,10 @@ SECTIONS {
 		__USERZEROPAGE_END__ = 0x100;
 	} >zp
 
-	.text : { *(.text .text.*) } >ram
+	.text : {
+          __text_start = .;
+          *(.text .text.*)
+    } >ram
 	.data : {
           *(.data .data.* .rodata .rodata.*)
           __data_end = .;
@@ -29,7 +32,7 @@ OUTPUT_FORMAT {
     /* Segment to be loaded to Run vector. */
     SHORT(_start)
     /* Address where first byte of main segment should be loaded. */
-    SHORT(0x2000)
+    SHORT(0x600)
     /* Address of last byte of main segment.
        -- is a hack to force the early evalutation of __data_end; otherwise the
        -1 offset may be interpreted as requesting the end of the containing

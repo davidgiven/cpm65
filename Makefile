@@ -30,6 +30,10 @@ $(OBJDIR)/mkdfs: tools/mkdfs.c
 	@mkdir -p $(dir $@)
 	$(CXX) -Os -g -o $@ $<
 
+$(OBJDIR)/mkatr: tools/mkatr.c
+	@mkdir -p $(dir $@)
+	$(CXX) -Os -g -o $@ $<
+
 $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
@@ -62,7 +66,7 @@ $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a
 
-atari.atr: $(OBJDIR)/atari.exe $(OBJDIR)/bdos.img Makefile
+atari.atr: $(OBJDIR)/atari.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/mkatr
 	echo "TODO"
 
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
