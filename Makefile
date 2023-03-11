@@ -1,6 +1,8 @@
 CXX = g++
+CC = gcc
 
-CFLAGS65 = -Os
+CFLAGS = -O0 -g -I.
+CFLAGS65 = -Os -g
 
 OBJDIR = .obj
 
@@ -9,7 +11,8 @@ APPS = \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/copy.com \
-	cpmfs/readme.txt
+	cpmfs/readme.txt \
+	cpmfs/hello.asm \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
@@ -20,15 +23,42 @@ LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/relocate.o \
 	$(OBJDIR)/src/bios/petscii.o \
 
-all: c64.d64 bbcmicro.ssd x16.zip
+CPMEMU_OBJS = \
+	$(OBJDIR)/tools/cpmemu/main.o \
+	$(OBJDIR)/tools/cpmemu/emulator.o \
+	$(OBJDIR)/tools/cpmemu/fileio.o \
+	$(OBJDIR)/tools/cpmemu/biosbdos.o \
+	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-$(OBJDIR)/multilink: tools/multilink.cc
-	@mkdir -p $(dir $@)
-	$(CXX) -Os -g -o $@ $< -lfmt
+all: c64.d64 bbcmicro.ssd x16.zip bin/cpmemu
 
-$(OBJDIR)/mkdfs: tools/mkdfs.c
+$(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
-	$(CXX) -Os -g -o $@ $<
+	$(CXX) $(CFLAGS) -o $@ $< -lfmt
+
+$(OBJDIR)/mkdfs: $(OBJDIR)/tools/mkdfs.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -o $@ $<
+
+bin/cpmemu: $(CPMEMU_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
+
+$(OBJDIR)/third_party/%.o: third_party/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/third_party/%.o: third_party/%.cc
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/tools/%.o: tools/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/tools/%.o: tools/%.cc
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -c -o $@ $<
 
 $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc
 	@mkdir -p $(dir $@)
