@@ -4,6 +4,14 @@
 #include <stdbool.h>
 #include "third_party/lib6502/lib6502.h"
 
+#define TPA_BASE 0x0200
+#define TPA_END 0xff00
+#define ZP_BASE 0x00
+#define ZP_END 0x00
+#define BDOS_ADDRESS (TPA_END + 0x00)
+#define BIOS_ADDRESS (TPA_END + 0x01)
+#define EXIT_ADDRESS (TPA_END + 0x02)
+
 extern M6502* cpu;
 extern uint8_t ram[0x10000];
 

@@ -12,12 +12,6 @@
 #include <errno.h>
 #include "globals.h"
 
-#define LOAD_ADDRESS 0x0200
-#define ZP_ADDRESS 0x00
-#define BDOS_ADDRESS 0xff00
-#define BIOS_ADDRESS 0xff01
-#define EXIT_ADDRESS 0xff02
-
 static uint16_t dma;
 static uint8_t current_disk;
 static int exitcode = 0;
@@ -35,10 +29,11 @@ struct fcb
 };
 
 static void bios_getchar(void);
+static struct fcb* fcb_at(uint16_t address);
 
 static uint16_t get_xa(void)
 {
-    return (cpu->registers->x << 8) | cpu->registers->y;
+    return (cpu->registers->x << 8) | cpu->registers->a;
 }
 
 static void set_xa(uint16_t xa)
@@ -56,23 +51,6 @@ static void set_result(uint16_t xa, bool succeeded)
         cpu->registers->p |= 0x01;
 }
 
-static int bdos_cb(M6502* mpu, uint16_t address, uint8_t data)
-{
-    bdos_entry(cpu->registers->y);
-    return 0;
-}
-
-static int bios_cb(M6502* mpu, uint16_t address, uint8_t data)
-{
-    bios_entry(cpu->registers->y);
-    return 0;
-}
-
-static int exit_cb(M6502* mpu, uint16_t address, uint8_t data)
-{
-    exit(0);
-}
-
 void bios_coldboot(void) {}
 
 static uint16_t do_relocation_item(uint16_t address, uint8_t n, uint8_t addend)
@@ -85,7 +63,7 @@ static uint16_t do_relocation_item(uint16_t address, uint8_t n, uint8_t addend)
 
 static uint16_t do_relocation(uint16_t relotable, uint8_t addend)
 {
-    uint16_t address = LOAD_ADDRESS;
+    uint16_t address = TPA_BASE;
     for (;;)
     {
         uint8_t b = ram[relotable++];
@@ -103,8 +81,49 @@ static uint16_t do_relocation(uint16_t relotable, uint8_t addend)
 
 static void relocate(uint16_t relotable)
 {
-    relotable = do_relocation(relotable, ZP_ADDRESS);
-    do_relocation(relotable, LOAD_ADDRESS >> 8);
+    relotable = do_relocation(relotable, ZP_BASE);
+    do_relocation(relotable, TPA_BASE >> 8);
+}
+
+static void makefcb(uint16_t address, const char* word)
+{
+		if (!word)
+			word = "";
+
+        struct fcb* fcb = fcb_at(address);
+        memset(fcb, 0, sizeof(struct fcb));
+        memset(fcb->filename.bytes, ' ', 11);
+
+        if (word[0] && (word[1] == ':'))
+        {
+            fcb->filename.drive = toupper(word[0]) - '@';
+            word += 2;
+        }
+
+        int offset = 0;
+        while (offset < 8)
+        {
+            uint8_t c = toupper(*word++);
+            if (!c)
+                break;
+            if (c == '.')
+                break;
+            fcb->filename.bytes[offset++] = c;
+        }
+
+        if (*word == '.')
+            word++;
+        if (offset && (word[-1] == '.'))
+        {
+            offset = 8;
+            while (offset < 11)
+            {
+                uint8_t c = toupper(*word++);
+                if (!c)
+                    break;
+                fcb->filename.bytes[offset++] = c;
+            }
+        }
 }
 
 void bios_warmboot(void)
@@ -118,25 +137,28 @@ void bios_warmboot(void)
             exit(exitcode);
         terminate_next_time = true;
 
-        cpu->callbacks->call[BDOS_ADDRESS] = bdos_cb;
-        cpu->callbacks->call[BIOS_ADDRESS] = bios_cb;
-        cpu->callbacks->call[EXIT_ADDRESS] = exit_cb;
-
         /* Push the return address onto the stack. */
-        ram[0x01fe] = EXIT_ADDRESS & 0xff;
-        ram[0x01ff] = EXIT_ADDRESS >> 8;
+        ram[0x01fe] = (EXIT_ADDRESS-1) & 0xff;
+        ram[0x01ff] = (EXIT_ADDRESS-1) >> 8;
         cpu->registers->s = 0xfd;
 
         int fd = open(user_command_line[0], O_RDONLY);
         if (fd == -1)
             fatal("couldn't open program: %s", strerror(errno));
-        read(fd, &ram[LOAD_ADDRESS], BDOS_ADDRESS - LOAD_ADDRESS);
+        read(fd, &ram[TPA_BASE], TPA_END - TPA_BASE);
         close(fd);
 
         uint16_t relotable =
-            (ram[LOAD_ADDRESS + 2] | (ram[LOAD_ADDRESS + 3] << 8)) +
-            LOAD_ADDRESS;
+            (ram[TPA_BASE + 2] | (ram[TPA_BASE + 3] << 8)) + TPA_BASE;
         relocate(relotable);
+
+		/* Parse the first word of the command line into the primary FCB. */
+
+		makefcb(relotable, user_command_line[1]);
+		if (user_command_line[1])
+			makefcb(relotable+16, user_command_line[2]);
+
+		/* Generate the command line. */
 
         dma = relotable + 37; /* leave space for the FCBs */
 
@@ -161,9 +183,9 @@ void bios_warmboot(void)
         ram[dma] = offset - 1;
         ram[dma + offset] = 0xe5; /* deliberately not zero-terminated */
 
-        ram[LOAD_ADDRESS + 5] = BDOS_ADDRESS & 0xff;
-        ram[LOAD_ADDRESS + 6] = BDOS_ADDRESS >> 8;
-        cpu->registers->pc = LOAD_ADDRESS + 7;
+        ram[TPA_BASE + 5] = BDOS_ADDRESS & 0xff;
+        ram[TPA_BASE + 6] = BDOS_ADDRESS >> 8;
+        cpu->registers->pc = TPA_BASE + 7;
     }
     else
     {
@@ -250,7 +272,7 @@ static void bdos_printstring(void)
     for (;;)
     {
         uint8_t c = ram[xa++];
-        if (c == '$')
+        if (!c || (c == '$'))
             break;
         (void)write(1, &c, 1);
     }
@@ -405,7 +427,7 @@ static void bdos_readwritesequential(readwrite_cb* readwrite)
     if (i == -1)
         set_result(0xff, false);
     else if (i == 0)
-        set_result(1, true);
+        set_result(1, false);
     else
         set_result(0, true);
 }
@@ -421,7 +443,7 @@ static void bdos_readwriterandom(readwrite_cb* readwrite)
     if (i == -1)
         set_result(0xff, false);
     else if (i == 0)
-        set_result(1, true);
+        set_result(1, false);
     else
         set_result(0, true);
 }
@@ -448,6 +470,7 @@ void bdos_entry(uint8_t bdos_call)
     switch (bdos_call)
     {
             // clang-format off
+		case 0: exit(0); return;
         case 1: bdos_getchar(); return;
         case 2: bdos_putchar(); return;
         case 6: bdos_consoleio(); return;

@@ -12,13 +12,6 @@ M6502* cpu;
 uint8_t ram[0x10000];
 bool breakpoints[0x10000];
 
-struct watchpoint
-{
-    uint16_t address;
-    uint8_t value;
-    bool enabled;
-};
-
 static bool tracing = false;
 static bool singlestepping = true;
 static bool bdosbreak = false;
@@ -88,25 +81,6 @@ static void cmd_break(void)
     }
 }
 
-static void cmd_watch(void)
-{
-    char* w1 = strtok(NULL, " ");
-    if (w1)
-    {
-        uint16_t watchaddr = strtoul(w1, NULL, 16);
-        cpu->callbacks->read[watchaddr] = break_cb;
-        cpu->callbacks->write[watchaddr] = break_cb;
-    }
-    else
-    {
-        for (int i = 0; i < 0x10000; i++)
-        {
-            if (cpu->callbacks->read[i] == break_cb)
-                printf("%04x (current value: %02x)\n", i, ram[i]);
-        }
-    }
-}
-
 static void cmd_delete_breakpoint(void)
 {
     char* w1 = strtok(NULL, " ");
@@ -114,17 +88,6 @@ static void cmd_delete_breakpoint(void)
     {
         uint16_t breakpc = strtoul(w1, NULL, 16);
         breakpoints[breakpc] = false;
-    }
-}
-
-static void cmd_delete_watchpoint(void)
-{
-    char* w1 = strtok(NULL, " ");
-    if (w1)
-    {
-        uint16_t address = strtoul(w1, NULL, 16);
-        cpu->callbacks->read[address] = NULL;
-        cpu->callbacks->write[address] = NULL;
     }
 }
 
@@ -227,8 +190,6 @@ static void cmd_help(void)
         "  b               show breakpoints\n"
         "  b <addr>        set breakpoint\n"
         "  db <addr>       delete breakpoint\n"
-        "  w <addr>        set watchpoint\n"
-        "  dw <addr>       delete watchpoint\n"
         "  m <addr> <len>  show memory\n"
         "  u <addr> <len>  unassemble memory\n"
         "  s               single step\n"
@@ -256,12 +217,8 @@ static void debug(void)
                 cmd_register();
             else if (strcmp(token, "b") == 0)
                 cmd_break();
-            else if (strcmp(token, "w") == 0)
-                cmd_watch();
             else if (strcmp(token, "db") == 0)
                 cmd_delete_breakpoint();
-            else if (strcmp(token, "dw") == 0)
-                cmd_delete_watchpoint();
             else if (strcmp(token, "m") == 0)
                 cmd_memory();
             else if (strcmp(token, "u") == 0)
@@ -288,6 +245,14 @@ static void debug(void)
     }
 }
 
+static int rts(void)
+{
+    uint16_t pc;
+    pc = (uint16_t)ram[++cpu->registers->s + 0x100];
+    pc |= (uint16_t)ram[++cpu->registers->s + 0x100] << 8;
+    cpu->registers->pc = pc + 1;
+}
+
 static void sigusr1_cb(int number)
 {
     singlestepping = true;
@@ -308,24 +273,27 @@ void emulator_run(void)
     {
         uint16_t pc = cpu->registers->pc;
         singlestepping |= breakpoints[pc];
-#if 0
-		for (int i=0; i<sizeof(watchpoints)/sizeof(*watchpoints); i++)
-		{
-			struct watchpoint* w = &watchpoints[i];
-			if (w->enabled && (ram[w->address] != w->value))
-			{
-				printf("\nWatchpoint hit: %04x has changed from %02x to %02x\n",
-					w->address, w->value, ram[w->address]);
-				w->value = ram[w->address];
-				singlestepping = true;
-			}
-		}
-#endif
 
         if (singlestepping)
             debug();
         else if (tracing)
             showregs();
+
+        switch (pc)
+        {
+            case BDOS_ADDRESS:
+                bdos_entry(cpu->registers->y);
+                rts();
+                continue;
+
+            case BIOS_ADDRESS:
+                bios_entry(cpu->registers->y);
+                rts();
+                continue;
+
+            case EXIT_ADDRESS:
+                exit(0);
+        }
 
         M6502_run(cpu);
     }
