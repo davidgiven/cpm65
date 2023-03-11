@@ -30,7 +30,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: c64.d64 bbcmicro.ssd x16.zip $(OBJDIR)/cpmemu
+all: c64.d64 bbcmicro.ssd x16.zip bin/cpmemu
 
 $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
@@ -40,7 +40,7 @@ $(OBJDIR)/mkdfs: $(OBJDIR)/tools/mkdfs.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $<
 
-$(OBJDIR)/cpmemu: $(CPMEMU_OBJS)
+bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
 

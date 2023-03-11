@@ -30,10 +30,7 @@ static void syntax(void)
         "and\n");
     printf(
         "injected directly into memory (it's not loaded through the CCP).\n");
-    printf(
-        "Arguments may also be provided, but note that any FCBs aren't set "
-        "up,\n");
-    printf("so traditional CP/M utilities probably won't work.\n");
+	printf("The first two arguments are mapped to the standard FCBs.\n");
     exit(1);
 }
 

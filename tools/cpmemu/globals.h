@@ -26,6 +26,7 @@ extern const uint8_t biosbdosdata_data[];
 extern const int biosbdosdata_len;
 
 extern void bios_coldboot(void);
+extern void bios_warmboot(void);
 
 extern void bdos_entry(uint8_t bdos_call);
 extern void bios_entry(uint8_t bios_call);
