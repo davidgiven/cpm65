@@ -221,21 +221,14 @@ void bios_entry(uint8_t bios_call)
 {
     switch (bios_call)
     {
-        case 0:
-            bios_coldboot();
-            return;
-        case 1:
-            bios_warmboot();
-            return;
-        case 2:
-            bios_const();
-            return; // const
-        case 3:
-            bios_getchar();
-            return; // conin
-        case 4:
-            bios_putchar();
-            return; // conout
+            // clang-format off
+        case 0: bios_coldboot(); return;
+        case 1: bios_warmboot(); return;
+        case 2: bios_const(); return; // const
+        case 3: bios_getchar(); return; // conin
+        case 4: bios_putchar(); return; // conout
+		case 9: set_result((TPA_BASE>>8) | (TPA_END&0xff), true); return;
+            // clang-format on
     }
 
     showregs();

@@ -10,6 +10,9 @@ static uint8_t inputBufferPos = 128;
 static FCB destFcb;
 static uint8_t outputBuffer[128];
 static uint8_t outputBufferPos;
+static uint8_t* ramtop;
+
+/* --- I/O --------------------------------------------------------------- */
 
 static void cr(void)
 {
@@ -55,8 +58,15 @@ static void writeByte(uint8_t b)
     outputBuffer[outputBufferPos++] = b;
 }
 
+/* --- Main program ------------------------------------------------------ */
+
 int main()
 {
+	ramtop = (uint8_t*)(cpm_bios_gettpa() & 0xff00);
+	cpm_printstring("ASM; ");
+	printi(ramtop - cpm_ram);
+	cpm_printstring(" bytes free\n");
+
     destFcb = cpm_fcb2;
 
     srcFcb.ex = 0;
