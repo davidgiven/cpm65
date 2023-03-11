@@ -68,11 +68,25 @@ byte 0000 number of zero page bytes required
 byte 0001 number of TPA memory pages required
 word 0002 offset of relocation table
 byte 0004 must be $4c
-word 0005 address of bDOS entrypoint
+word 0005 address of BDOS entrypoint
 code 0007 entrypoint
 ...
 
-relocation bytes: two strings of nibbles, in MSB/LSB order, representing
+Relocation bytes: two strings of nibbles, in MSB/LSB order, representing
 incremental offsets from the beginning of the file; 0xe advances pointer but
 does nothing and 0xf terminates the stream (any trailing 0 is ignored). The
 first one is for ZP, second is for high byte of any addresses.
+
+Once relocated, the address which the relocation table is at is repurposed as
+the pblock, a 165-byte structure which contains the initial FCBs and command
+line:
+
+byte 0000 first FCB start
+byte 0010 second FCB start (only the filename bytes are usable)
+byte 0025 default DMA address
+byte 0025 ...also, command line length
+byte 0026 127 bytes of command line
+
+The binary's BSS must start above this (if you want to use it, which you don't
+have to).
+
