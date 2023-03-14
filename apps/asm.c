@@ -51,6 +51,7 @@ typedef struct PACKED
 {
     char name[3];
     uint8_t opcode;
+    uint16_t addressingModes;
 } Instruction;
 
 #define lengthof(a) (sizeof(a) / sizeof(*a))
@@ -104,6 +105,23 @@ enum
     SYMBOL_COMPUTED,
 };
 
+typedef enum
+{
+    AM_XPTR = 1 << 0,  /* (0x12, x) */
+    AM_ZP = 1 << 1,    /* 0x12 */
+    AM_IMM = 1 << 2,   /* #0x12 */
+    AM_ABS = 1 << 3,   /* 0x1234 */
+    AM_YPTR = 1 << 4,  /* (0x12), y */
+    AM_XOFZ = 1 << 5,  /* 0x12, x */
+    AM_YOFF = 1 << 6,  /* 0x1234, y */
+    AM_XOFF = 1 << 7,  /* 0x1234, x */
+    AM_IMP = 1 << 8,   /* (nothing) */
+    AM_A = 1 << 9,    /* A */
+    AM_IMMS = 1 << 10, /* #0x12 */
+    AM_WIND = 1 << 11, /* (0x1234) */
+    AM_YOFZ = 1 << 12, /* 0x12, y */
+} AddressingMode;
+
 enum
 {
     B_XPTR = 0 << 2,
@@ -111,12 +129,12 @@ enum
     B_IMM = 2 << 2,
     B_ABS = 3 << 2,
     B_YPTR = 4 << 2,
-    B_XINDEXZP = 5 << 2,
-    B_YINDEX = 6 << 2,
-    B_XINDEX = 7 << 2,
+    B_XOFZ = 5 << 2,
+    B_YOFF = 6 << 2,
+    B_XOFF = 7 << 2,
 
-    B_IMPLICIT = 8 << 2, /* not actually a valid 6502 b-value */
-    B_RELATIVE = 9 << 2, /* likewise */
+	B_IMP = 8 << 2, /* not a real B-value */
+	B_REL = 9 << 2, /* likewise */
 };
 
 enum
@@ -216,8 +234,8 @@ static int ishex(int c)
 static void pushToken(char c)
 {
     tokenLookahead = c;
-	tokenLookaheadValue = tokenValue;
-	tokenLookaheadVariable = tokenVariable;
+    tokenLookaheadValue = tokenValue;
+    tokenLookaheadVariable = tokenVariable;
 }
 
 static char readToken()
@@ -226,8 +244,8 @@ static char readToken()
     {
         char c = tokenLookahead;
         tokenLookahead = 0;
-		tokenValue = tokenLookaheadValue;
-		tokenVariable = tokenLookaheadVariable;
+        tokenValue = tokenLookaheadValue;
+        tokenVariable = tokenLookaheadVariable;
         return c;
     }
 
@@ -370,6 +388,115 @@ static char peekToken()
 
 /* --- Instruction data -------------------------------------------------- */
 
+#define AM_ALU \
+    (AM_XPTR | AM_ZP | AM_IMM | AM_ABS | AM_YPTR | AM_XOFZ | AM_XOFF | AM_YOFF)
+
+static const Instruction simpleInsns[] = {
+	{"ASL", 0x02, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
+	{"LSR", 0x42, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
+	{"ROL", 0x22, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
+	{"ROR", 0x62, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
+    {"ADC", 0x61, AM_ALU},
+    {"AND", 0x21, AM_ALU},
+    {"BCC", 0x90, AM_ABS},
+    {"BCS", 0xb0, AM_ABS},
+    {"BEQ", 0xf0, AM_ABS},
+    {"BIT", 0x24, AM_ZP | AM_ABS},
+    {"BMI", 0x30, AM_ABS},
+    {"BNE", 0xd0, AM_ABS},
+    {"BPL", 0x10, AM_ABS},
+    {"BRK", 0x00, AM_ABS},
+    {"BVC", 0x50, AM_ABS},
+    {"BVS", 0x70, AM_ABS},
+    {"CLC", 0x18, AM_IMP},
+    {"CLD", 0xd8, AM_IMP},
+    {"CLI", 0x58, AM_IMP},
+    {"CLV", 0xb8, AM_IMP},
+    {"CMP", 0xc1, AM_ALU},
+    {"CPX", 0xe0, AM_IMMS | AM_ZP | AM_ABS},
+    {"CPY", 0xc0, AM_IMMS | AM_ZP | AM_ABS},
+    {"DEX", 0xca, AM_IMP},
+    {"DEY", 0x88, AM_IMP},
+    {"EOR", 0x41, AM_ALU},
+    {"INX", 0xe8, AM_IMP},
+    {"INY", 0xc8, AM_IMP},
+    {"JSR", 0x20, AM_ABS},
+	{"JMP", 0x40, AM_ABS | AM_WIND},
+    {"LDA", 0xa1, AM_ALU},
+    {"LDX", 0xa2, AM_IMMS | AM_ZP | AM_ABS | AM_YOFZ | AM_YOFF},
+    {"LDY", 0xa0, AM_IMMS | AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
+    {"NOP", 0xea, AM_IMP},
+    {"ORA", 0x01, AM_ALU},
+    {"PHA", 0x48, AM_IMP},
+    {"PHP", 0x08, AM_IMP},
+    {"PLA", 0x68, AM_IMP},
+    {"PLP", 0x28, AM_IMP},
+    {"RTI", 0x40, AM_IMP},
+    {"RTS", 0x60, AM_IMP},
+    {"SBC", 0xe1, AM_ALU},
+    {"SEC", 0x38, AM_IMP},
+    {"SED", 0xf8, AM_IMP},
+    {"SEI", 0x78, AM_IMP},
+    {"STA", 0x81, AM_ALU & ~AM_IMM},
+    {"STX", 0x82, AM_ZP | AM_ABS | AM_YOFZ},
+    {"STY", 0x80, AM_ZP | AM_ABS | AM_XOFZ},
+    {"TAX", 0xaa, AM_IMP},
+    {"TAY", 0xa8, AM_IMP},
+    {"TSX", 0xba, AM_IMP},
+    {"TXA", 0x8a, AM_IMP},
+    {"TXS", 0x9a, AM_IMP},
+    {"TYA", 0x98, AM_IMP},
+    {}
+};
+
+static const uint8_t bOfAm[] = {
+    B_XPTR, /* AM_XPTR */
+    B_ZP, /* AM_ZP */
+    B_IMM, /* AM_IMM */
+    B_ABS, /* AM_ABS */
+    B_YPTR, /* AM_YPTR */
+    B_XOFZ, /* AM_XOFZ */
+    B_YOFF, /* AM_YOFF */
+    B_XOFF, /* AM_XOFF */
+    0, /* AM_IMP */
+    2<<2, /* AM_A */
+    0<<2, /* AM_IMMS */
+    0x20|B_ABS, /* AM_WIND */
+    B_XOFZ, /* AM_YOFZ */
+};
+
+static const Instruction* findInstruction(const Instruction* insn)
+{
+    char opcode[3];
+
+    for (int i = 0; i < 3; i++)
+        opcode[i] = toupper(parseBuffer[i]);
+
+    while (insn->name[0])
+    {
+        if ((opcode[0] == insn->name[0]) && (opcode[1] == insn->name[1]) &&
+            (opcode[2] == insn->name[2]))
+        {
+            return insn;
+        }
+
+        insn++;
+    }
+
+    return NULL;
+}
+
+static uint8_t getBofAM(uint16_t am)
+{
+	uint8_t p = 0;
+	while (!(am & 1))
+	{
+		p++;
+		am >>= 1;
+	}
+	return bOfAm[p];
+}
+
 static uint8_t getB(uint8_t opcode)
 {
     if ((opcode & 0b00000011) == 0b00000001) /* c=1 */
@@ -378,7 +505,7 @@ static uint8_t getB(uint8_t opcode)
 
         return opcode & 0b00011100;
     }
-    else if ((opcode & 0b00000011) == 0b00000010) /* c=0 */
+    else if ((opcode & 0b00000011) == 0b00000010) /* c=2 */
     {
         /* Shift instructions with ALU-compatible b-values? */
 
@@ -390,7 +517,7 @@ static uint8_t getB(uint8_t opcode)
         if (opcode == 0xa2)
             return B_IMM;
 
-        return B_IMPLICIT;
+        return B_IMP;
     }
     else /* c=0 */
     {
@@ -402,7 +529,7 @@ static uint8_t getB(uint8_t opcode)
         /* Relative branches? */
 
         if ((opcode & 0b00011100) == 0b00010000)
-            return B_RELATIVE;
+            return B_REL;
 
         /* JSR is special */
 
@@ -414,23 +541,23 @@ static uint8_t getB(uint8_t opcode)
         if ((opcode & 0b10011100) == 0b10000000)
             return B_IMM;
 
-        return B_IMPLICIT;
+        return B_IMP;
     }
 }
 
 static uint8_t getBProps(uint8_t b)
 {
-    static const uint8_t flags[10] = {
+    static const uint8_t flags[] = {
         (2 << BPROP_SIZE_SHIFT) | BPROP_ZP | BPROP_PTR,  // B_XPTR
         (2 << BPROP_SIZE_SHIFT) | BPROP_ZP,              // B_ZP
         (2 << BPROP_SIZE_SHIFT) | BPROP_IMM,             // B_IMM
         (3 << BPROP_SIZE_SHIFT) | BPROP_ABS | BPROP_SHR, // B_ABS
         (2 << BPROP_SIZE_SHIFT) | BPROP_ZP | BPROP_PTR,  // B_YPTR
-        (2 << BPROP_SIZE_SHIFT) | BPROP_ZP,              // B_XINDEXZP
-        (3 << BPROP_SIZE_SHIFT) | BPROP_ABS,             // B_YINDEX
-        (3 << BPROP_SIZE_SHIFT) | BPROP_ABS | BPROP_SHR, // B_XINDEX
-        (1 << BPROP_SIZE_SHIFT),                         // B_IMPLICIT
-        (2 << BPROP_SIZE_SHIFT) | BPROP_RELATIVE,        // B_RELATIVE
+        (2 << BPROP_SIZE_SHIFT) | BPROP_ZP,              // B_XOFZ
+        (3 << BPROP_SIZE_SHIFT) | BPROP_ABS,             // B_YOFF
+        (3 << BPROP_SIZE_SHIFT) | BPROP_ABS | BPROP_SHR, // B_XOFF
+        (1 << BPROP_SIZE_SHIFT),                         // B_IMP
+        (2 << BPROP_SIZE_SHIFT) | BPROP_RELATIVE,        // B_REL
     };
 
     return flags[b >> 2];
@@ -490,10 +617,14 @@ static void addExpressionRecord(uint8_t op, uint8_t type)
     }
     else
     {
+		uint8_t len = getInsnLength(op);
         emitByte(op);
-        emitByte(tokenValue & 0xff);
-        if (getInsnProps(op) & BPROP_ABS)
-            emitByte(tokenValue >> 8);
+		if (len != 1)
+		{
+			emitByte(tokenValue & 0xff);
+			if (len != 2)
+				emitByte(tokenValue >> 8);
+		}
     }
 }
 
@@ -550,76 +681,6 @@ static SymbolRecord* addSymbol()
 }
 
 /* --- Parser ------------------------------------------------------------ */
-
-static const Instruction simpleInsns[] = {
-    {"BRK", 0x00},
-    {"PHP", 0x08},
-    {"CLC", 0x18},
-    {"PLP", 0x28},
-    {"SEC", 0x38},
-    {"RTI", 0x40},
-    {"PHA", 0x48},
-    {"CLI", 0x58},
-    {"RTS", 0x60},
-    {"PLA", 0x68},
-    {"SEI", 0x78},
-    {"DEY", 0x88},
-    {"TYA", 0x98},
-    {"TAY", 0xa8},
-    {"CLV", 0xb8},
-    {"INY", 0xc8},
-    {"CLD", 0xd8},
-    {"INX", 0xe8},
-    {"SED", 0xf8},
-    {"TXS", 0x9a},
-    {"TSX", 0xba},
-    {}
-};
-
-static const Instruction aluInsns[] = {
-    {"ORA", 0x01},
-    {"AND", 0x21},
-    {"EOR", 0x41},
-    {"ADC", 0x61},
-    {"STA", 0x81},
-    {"LDA", 0xa1},
-    {"CMP", 0xc1},
-    {"SBC", 0xe1},
-    {}
-};
-
-static const Instruction braInsns[] = {
-    {"BPL", 0x10},
-    {"BMI", 0x30},
-    {"BVC", 0x50},
-    {"BVS", 0x70},
-    {"BCC", 0x90},
-    {"BCS", 0xb0},
-    {"BNE", 0xd0},
-    {"BEQ", 0xf0},
-    {}
-};
-
-static uint8_t findInstruction(const Instruction* insn)
-{
-    char opcode[3];
-
-    for (int i = 0; i < 3; i++)
-        opcode[i] = toupper(parseBuffer[i]);
-
-    while (insn->name[0])
-    {
-        if ((opcode[0] == insn->name[0]) && (opcode[1] == insn->name[1]) &&
-            (opcode[2] == insn->name[2]))
-        {
-            return insn->opcode;
-        }
-
-        insn++;
-    }
-
-    return ILLEGAL;
-}
 
 static void syntaxError()
 {
@@ -693,15 +754,16 @@ static void parseExpression()
     }
 }
 
-static uint8_t parseAluArgument()
+static AddressingMode parseArgument()
 {
-    char c = readToken();
+	tokenValue = 0;
     tokenVariable = NULL;
+    char c = readToken();
     switch (c)
     {
         case '#':
             parseExpression();
-            return B_IMM;
+            return AM_IMM;
 
         case '(':
             parseExpression();
@@ -709,12 +771,15 @@ static uint8_t parseAluArgument()
             if (c == ')')
             {
                 readToken();
-                expect(',');
+				if (peekToken() != ',')
+					return AM_WIND;
+
+                readToken();
                 c = expectXorY();
                 if (c != 'Y')
                     fatal("bad addressing mode");
 
-                return B_YPTR;
+                return AM_YPTR;
             }
             else
             {
@@ -724,10 +789,13 @@ static uint8_t parseAluArgument()
                     fatal("bad addressing mode");
                 expect(')');
 
-                return B_XPTR;
+                return AM_XPTR;
             }
 
         case TOKEN_ID:
+			if ((tokenLength == 1) && (toupper(parseBuffer[0]) == 'A'))
+				return AM_A;
+			/* fall through */
         case TOKEN_NUMBER:
             pushToken(c);
             parseExpression();
@@ -739,17 +807,23 @@ static uint8_t parseAluArgument()
                 if (c == 'X')
                 {
                     if (!tokenVariable && (tokenValue < 0x100))
-                        return B_XINDEXZP;
+                        return AM_XOFZ;
                     else
-                        return B_XINDEX;
+                        return AM_XOFF;
                 }
-                /* Must be Y */
-                return B_YINDEX;
+				else
+				{
+					/* Must be Y */
+                    if (!tokenVariable && (tokenValue < 0x100))
+                        return AM_YOFZ;
+                    else
+                        return AM_YOFF;
+				}
             }
             else if (!tokenVariable && (tokenValue < 0x100))
-                return B_ZP;
+                return AM_ZP;
             else
-                return B_ABS;
+                return AM_ABS;
 
         default:
             fatal("bad addressing mode");
@@ -776,36 +850,30 @@ static void parse()
 
                 if (tokenLength == 3)
                 {
-                    /* Simple instructions */
+                    /* Look up the instruction. */
 
-                    uint8_t op = findInstruction(simpleInsns);
-                    if (op != ILLEGAL)
+                    const Instruction* insn = findInstruction(simpleInsns);
+                    if (insn)
                     {
-                        emitByte(op);
-                        break;
-                    }
+						if (insn->addressingModes & AM_IMP)
+						{
+							emitByte(insn->opcode);
+							break;
+						}
 
-                    /* 'Normal' ALU instructions */
+						AddressingMode am = parseArgument();
+						if ((insn->addressingModes & AM_IMMS) && (am == AM_IMM))
+							am = AM_IMMS;
+						if (!(insn->addressingModes & AM_YOFZ) && (am == AM_YOFZ))
+							am = AM_YOFF;
+						if (!(insn->addressingModes & AM_ZP) && (am == AM_ZP))
+							am = AM_ABS;
+						if (!(insn->addressingModes & am))
+							fatal("invalid addressing mode");
 
-                    op = findInstruction(aluInsns);
-                    if (op != ILLEGAL)
-                    {
-                        uint8_t b = parseAluArgument();
-                        op |= b;
-
-                        addExpressionRecord(op, RECORD_EXPR);
-                        break;
-                    }
-
-                    /* Conditional branch instructions */
-
-                    op = findInstruction(braInsns);
-                    if (op != ILLEGAL)
-                    {
-                        parseExpression();
-
-                        addExpressionRecord(op, RECORD_EXPR);
-                        break;
+						uint8_t b = getBofAM(am);
+						addExpressionRecord(insn->opcode + b, RECORD_EXPR);
+						break;
                     }
                 }
 
@@ -946,7 +1014,7 @@ exit:
 static void writeCode()
 {
     uint8_t* r = cpm_ram;
-	uint8_t pc = 0;
+    uint8_t pc = 0;
     for (;;)
     {
         uint8_t type = *r & 0xe0;
@@ -960,7 +1028,7 @@ static void writeCode()
                 uint8_t count = len - offsetof(ByteRecord, bytes);
                 for (uint8_t i = 0; i < count; i++)
                     writeByte(s->bytes[i]);
-				pc += count;
+                pc += count;
                 break;
             }
 
@@ -969,7 +1037,7 @@ static void writeCode()
                 ExpressionRecord* s = (ExpressionRecord*)r;
                 uint8_t bprops = getInsnProps(s->opcode);
 
-                    if (bprops & BPROP_RELATIVE)
+                if (bprops & BPROP_RELATIVE)
                 {
                     uint16_t address = s->variable->offset + s->offset;
                     if (s->length == 2)
@@ -1000,7 +1068,7 @@ static void writeCode()
                         writeByte(address >> 8);
                 }
 
-				pc += s->length;
+                pc += s->length;
                 break;
             }
 
