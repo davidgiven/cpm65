@@ -1,10 +1,12 @@
+start:
+	lda #<message
+	ldx #>message
 	ldy #9
-	lda #>msg
-	ldx #<msg
-	jmp BDOS
+	jsr start - 3
+	rts
 
-msg:
-	.ascii "Hello, world!"
-	.byte 13, 10, 0
+message:
+	.byte "Hello, world!", 13, 10, 0
+
 
 

@@ -2,7 +2,7 @@ CXX = g++
 CC = gcc
 
 CFLAGS = -O0 -g -I.
-CFLAGS65 = -Os -g
+CFLAGS65 = -Os -g -fnonreentrant
 
 OBJDIR = .obj
 
@@ -11,6 +11,7 @@ APPS = \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/copy.com \
+	$(OBJDIR)/asm.com \
 	cpmfs/readme.txt \
 	cpmfs/hello.asm \
 
