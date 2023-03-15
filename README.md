@@ -94,8 +94,8 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Supported programs
 
-You don't get a lot right now. As transients, you get `DUMP`, `STAT`, `COPY`
-and `SUBMIT`. I'd love more --- send me pull requests! The build system
+You don't get a lot right now. As transients, you get `DUMP`, `STAT`, `COPY`,
+`SUBMIT` and `ASM`. I'd love more --- send me pull requests! The build system
 supports cc65 assembler and llvm-mos C programs.
 
 In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
@@ -105,6 +105,32 @@ usage.
 
 Pokey the Penguin loves to read your [pull
 requests](https://github.com/davidgiven/cpm65/compare)!
+
+### The assembler
+
+The CP/M-65 assembler is extremely simple and very much customised to work for
+the CP/M-65 environment. It operates entirely in memory (so it should be fast)
+but it's written in C (so it's going to be big and slow). It's very very new
+and is likely to have lots of bugs.
+
+It supports 6502 opcodes. You can have forward references to labels, but not to
+equates. It's got these pseudo-ops are:
+
+  - `.zp <symbol>, <size>`: allocates this much zero page
+  - `.bss <symbol>, <size>`: allocates this much BSS
+  - `.byte <bytes or strings>`: emits raw data
+  - `.word <word>`: emits raw words
+
+Expressions (anywhere) are currently limited to _label_ +/- _offset_. Either
+the label or the offset are optional. You may also prefix the whole with `<` or
+`>` to get the LSB or MSB respectively.
+
+It supports expanding branches to five-byte long jumps.
+
+It does not know about the pblock, so if you want command line arguments, make
+sure to allocate a 165 structure from the BSS first.
+
+To use, try `asm hello.asm hello.com`.
 
 ### Utilities
 
