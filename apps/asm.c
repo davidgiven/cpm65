@@ -66,7 +66,7 @@ typedef struct PACKED
 
 #define srcFcb cpm_fcb
 #define inputBuffer ((char*)cpm_default_dma)
-static char inputLookahead = 0;
+static char currentByte;
 static uint8_t inputBufferPos = 128;
 static FCB destFcb;
 static uint8_t outputBuffer[128];
@@ -193,37 +193,18 @@ static void __attribute__((noreturn)) fatal(const char* msg)
     cpm_warmboot();
 }
 
-static void pushByte(char c)
+static void consumeByte()
 {
-    inputLookahead = c;
-}
-
-static char readByte()
-{
-    if (inputLookahead)
-    {
-        uint8_t c = inputLookahead;
-        inputLookahead = 0;
-        return c;
-    }
-
     if (inputBufferPos == 128)
     {
         cpm_set_dma(inputBuffer);
         int i = cpm_read_sequential(&srcFcb);
         if (i != 0)
-            return 26;
+            currentByte = 26;
         inputBufferPos = 0;
     }
 
-    return inputBuffer[inputBufferPos++];
-}
-
-static char peekByte()
-{
-    char r = readByte();
-    pushByte(r);
-    return r;
+	currentByte = inputBuffer[inputBufferPos++];
 }
 
 static void flushOutputBuffer()
@@ -270,27 +251,31 @@ static char readToken()
 
     tokenLength = 0;
 
-    uint8_t c;
-    do
+	if (currentByte == 26)
+		return 26;
+
+    for (;;)
     {
-        c = readByte();
-        if (c == '\\')
+        if (currentByte == '\\')
         {
             do
-            {
-                c = readByte();
-            } while ((c != '\n') && (c != 26));
+                consumeByte();
+            while ((currentByte != '\n') && (currentByte != 26));
         }
-    } while ((c == 32) || (c == 9) || (c == '\r'));
-
-    if (c == '\n')
-    {
-        lineNumber++;
-        c = ';';
+        else if ((currentByte == ' ') || (currentByte == '\t') ||
+                 (currentByte == '\r'))
+            consumeByte();
+        else
+            break;
     }
 
-    parseBuffer[tokenLength++] = c;
-    switch (c)
+    if (currentByte == '\n')
+    {
+        lineNumber++;
+        currentByte = ';';
+    }
+
+    switch (currentByte)
     {
         case 26:
         case '#':
@@ -305,66 +290,60 @@ static char readToken()
         case '>':
         case '.':
         case '=':
+        {
+            char c = currentByte;
+            consumeByte();
             return c;
+        }
     }
 
-    if (isalpha(c) || (c == '$'))
+    if (isalpha(currentByte) || (currentByte == '$'))
     {
-        for (;;)
+        do
         {
-            c = readByte();
-            if (!isdigit(c) && !isalpha(c))
-            {
-                pushByte(c);
-                break;
-            }
-
-            parseBuffer[tokenLength++] = c;
-        }
+            parseBuffer[tokenLength++] = currentByte;
+            consumeByte();
+        } while (isdigit(currentByte) || isalpha(currentByte));
 
         parseBuffer[tokenLength] = 0;
         return TOKEN_ID;
     }
 
-    if (isdigit(c))
+    if (isdigit(currentByte))
     {
         tokenValue = 0;
         uint8_t base = 10;
 
-        if (c == '0')
+        if (currentByte == '0')
         {
-            c = readByte();
-            switch (c)
+            consumeByte();
+            switch (currentByte)
             {
                 case 'x':
                     base = 16;
-                    c = readByte();
+                    consumeByte();
                     break;
 
                 case 'b':
                     base = 2;
-                    c = readByte();
+                    consumeByte();
                     break;
 
                 case 'o':
                     base = 8;
-                    c = readByte();
+                    consumeByte();
                     break;
-
-                default:
-                    pushByte(c);
             }
         }
 
         for (;;)
         {
-            if (!ishex(c))
-            {
-                pushByte(c);
+            if (!ishex(currentByte))
                 break;
-            }
 
             tokenValue *= base;
+
+            uint8_t c = currentByte;
             if (c >= 'a')
                 c = (c - 'a') + 10;
             else if (c >= 'A')
@@ -375,25 +354,27 @@ static char readToken()
                 fatal("invalid number");
             tokenValue += c;
 
-            c = readByte();
+            consumeByte();
         }
 
         return TOKEN_NUMBER;
     }
 
-    if (c == '"')
+    if (currentByte == '"')
     {
         tokenLength = 0;
         for (;;)
         {
-            c = readByte();
+            consumeByte();
+            char c = currentByte;
             if (c == '"')
                 break;
             if (c == '\n')
                 fatal("unterminated string constant");
             if (c == '\\')
             {
-                c = readByte();
+                consumeByte();
+                c = currentByte;
                 if (c == 'n')
                     c = 10;
                 else if (c == 'r')
@@ -406,10 +387,12 @@ static char readToken()
 
             parseBuffer[tokenLength++] = c;
         }
+        consumeByte();
 
         return TOKEN_STRING;
     }
 
+    printi(currentByte);
     fatal("bad parse");
 }
 
@@ -1448,6 +1431,7 @@ int main()
     {
         fatal("cannot open source file");
     }
+    consumeByte();
 
     /* Open output file */
 
