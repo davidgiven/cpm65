@@ -76,12 +76,12 @@ static uint8_t* ramtop;
 
 static uint16_t lineNumber = 0;
 
-static char tokenLookahead = 0;
-static uint16_t tokenLookaheadValue;
+static char token = 0;
 static uint8_t tokenLength;
 static uint16_t tokenValue;
 static SymbolRecord* tokenVariable;
 static uint8_t tokenPostProcessing;
+
 static SymbolRecord* lastSymbol;
 
 static uint8_t zpUsage = 0;
@@ -204,7 +204,7 @@ static void consumeByte()
         inputBufferPos = 0;
     }
 
-	currentByte = inputBuffer[inputBufferPos++];
+    currentByte = inputBuffer[inputBufferPos++];
 }
 
 static void flushOutputBuffer()
@@ -233,26 +233,15 @@ static int ishex(int c)
            ((ch >= '0') && (ch <= '9'));
 }
 
-static void pushToken(char c)
+static void consumeToken()
 {
-    tokenLookahead = c;
-    tokenLookaheadValue = tokenValue;
-}
-
-static char readToken()
-{
-    if (tokenLookahead)
-    {
-        char c = tokenLookahead;
-        tokenLookahead = 0;
-        tokenValue = tokenLookaheadValue;
-        return c;
-    }
-
     tokenLength = 0;
 
-	if (currentByte == 26)
-		return 26;
+    if (currentByte == 26)
+    {
+        token = currentByte;
+        return;
+    }
 
     for (;;)
     {
@@ -291,9 +280,9 @@ static char readToken()
         case '.':
         case '=':
         {
-            char c = currentByte;
+            token = currentByte;
             consumeByte();
-            return c;
+            return;
         }
     }
 
@@ -306,7 +295,8 @@ static char readToken()
         } while (isdigit(currentByte) || isalpha(currentByte));
 
         parseBuffer[tokenLength] = 0;
-        return TOKEN_ID;
+        token = TOKEN_ID;
+        return;
     }
 
     if (isdigit(currentByte))
@@ -357,24 +347,26 @@ static char readToken()
             consumeByte();
         }
 
-        return TOKEN_NUMBER;
+        token = TOKEN_NUMBER;
+        return;
     }
 
     if (currentByte == '"')
     {
+		consumeByte();
         tokenLength = 0;
         for (;;)
         {
-            consumeByte();
             char c = currentByte;
+			consumeByte();
             if (c == '"')
                 break;
             if (c == '\n')
                 fatal("unterminated string constant");
             if (c == '\\')
             {
-                consumeByte();
                 c = currentByte;
+                consumeByte();
                 if (c == 'n')
                     c = 10;
                 else if (c == 'r')
@@ -387,20 +379,12 @@ static char readToken()
 
             parseBuffer[tokenLength++] = c;
         }
-        consumeByte();
 
-        return TOKEN_STRING;
+        token = TOKEN_STRING;
+        return;
     }
 
-    printi(currentByte);
     fatal("bad parse");
-}
-
-static char peekToken()
-{
-    char c = readToken();
-    pushToken(c);
-    return c;
 }
 
 /* --- Instruction data -------------------------------------------------- */
@@ -705,21 +689,28 @@ static void syntaxError()
     fatal("syntax error");
 }
 
-static void expect(char token)
+static void expect(char t)
 {
-    char c = readToken();
-    if (c != token)
+    if (token != t)
         syntaxError();
 }
 
-static char expectXorY()
+static void consume(char t)
 {
-    char c = readToken();
-    if ((c == TOKEN_ID) && (tokenLength == 1))
+    expect(t);
+    consumeToken();
+}
+
+static char consumeXorY()
+{
+    if ((token == TOKEN_ID) && (tokenLength == 1))
     {
-        c = toupper(parseBuffer[0]);
+        char c = toupper(parseBuffer[0]);
         if ((c == 'X') || (c == 'Y'))
+        {
+            consumeToken();
             return c;
+        }
     }
     fatal("expected X or Y");
 }
@@ -742,27 +733,26 @@ static void postProcessConstant()
     tokenPostProcessing = PP_NONE;
 }
 
-static void parseExpression()
+static void consumeExpression()
 {
-    tokenValue = 0;
     tokenVariable = NULL;
     tokenPostProcessing = PP_NONE;
-    char c = peekToken();
-    if (c == '<')
+
+    if (token == '<')
     {
-        readToken();
+        consumeToken();
         tokenPostProcessing = PP_LSB;
     }
-    else if (c == '>')
+    else if (token == '>')
     {
-        readToken();
+        consumeToken();
         tokenPostProcessing = PP_MSB;
     }
 
-    c = readToken();
-    switch (c)
+    switch (token)
     {
         case TOKEN_NUMBER:
+            consumeToken();
             postProcessConstant();
             return;
 
@@ -784,15 +774,16 @@ static void parseExpression()
                 offset = 0;
             }
 
-            c = peekToken();
-            if ((c == '+') || (c == '-'))
+            consumeToken();
+            if ((token == '+') || (token == '-'))
             {
-                readToken();
+                consumeToken();
                 expect(TOKEN_NUMBER);
-                if (c == '+')
+                if (token == '+')
                     offset += tokenValue;
                 else
                     offset -= tokenValue;
+                consumeToken();
             }
             tokenValue = offset;
 
@@ -804,35 +795,35 @@ static void parseExpression()
     }
 }
 
-static void parseConstExpression()
+static void consumeConstExpression()
 {
-    parseExpression();
+    consumeExpression();
     if (tokenVariable)
         fatal("expression must be constant");
 }
 
-static AddressingMode parseArgument()
+static AddressingMode consumeArgument()
 {
     tokenValue = 0;
     tokenVariable = NULL;
-    char c = readToken();
-    switch (c)
+    switch (token)
     {
         case '#':
-            parseExpression();
+            consumeToken();
+            consumeExpression();
             return AM_IMM;
 
         case '(':
-            parseExpression();
-            c = peekToken();
-            if (c == ')')
+            consumeToken();
+            consumeExpression();
+            if (token == ')')
             {
-                readToken();
-                if (peekToken() != ',')
+                consumeToken();
+                if (token != ',')
                     return AM_WIND;
 
-                readToken();
-                c = expectXorY();
+                consumeToken();
+                char c = consumeXorY();
                 if (c != 'Y')
                     fatal("bad addressing mode");
 
@@ -840,27 +831,28 @@ static AddressingMode parseArgument()
             }
             else
             {
-                expect(',');
-                c = expectXorY();
+                consume(',');
+                char c = consumeXorY();
                 if (c != 'X')
                     fatal("bad addressing mode");
-                expect(')');
+                consume(')');
 
                 return AM_XPTR;
             }
 
         case TOKEN_ID:
             if ((tokenLength == 1) && (toupper(parseBuffer[0]) == 'A'))
+            {
+                consumeToken();
                 return AM_A;
+            }
             /* fall through */
         case TOKEN_NUMBER:
-            pushToken(c);
-            parseExpression();
-            c = peekToken();
-            if (c == ',')
+            consumeExpression();
+            if (token == ',')
             {
-                readToken();
-                c = expectXorY();
+                consumeToken();
+                char c = consumeXorY();
                 if (c == 'X')
                 {
                     if (!tokenVariable && (tokenValue < 0x100))
@@ -887,19 +879,20 @@ static AddressingMode parseArgument()
     }
 }
 
-static SymbolRecord* parseSymbolCommaNumber()
+static SymbolRecord* consumeSymbolCommaNumber()
 {
     expect(TOKEN_ID);
     SymbolRecord* r = addSymbol();
 
     expect(',');
-    parseConstExpression();
+    consumeConstExpression();
     return r;
 }
 
-static void parseDotZp()
+static void consumeDotZp()
 {
-    SymbolRecord* r = parseSymbolCommaNumber();
+	consumeToken();
+    SymbolRecord* r = consumeSymbolCommaNumber();
     if ((zpUsage + tokenValue) < zpUsage)
         fatal("ran out of zero page");
 
@@ -908,9 +901,10 @@ static void parseDotZp()
     zpUsage += tokenValue;
 }
 
-static void parseDotBss()
+static void consumeDotBss()
 {
-    SymbolRecord* r = parseSymbolCommaNumber();
+	consumeToken();
+    SymbolRecord* r = consumeSymbolCommaNumber();
     if ((bssUsage + tokenValue) < bssUsage)
         fatal("ran out of BSS");
 
@@ -919,21 +913,22 @@ static void parseDotBss()
     bssUsage += tokenValue;
 }
 
-static void parseDotByte()
+static void consumeDotByte()
 {
+	consumeToken();
     for (;;)
     {
-        if (peekToken() == TOKEN_STRING)
+        if (token == TOKEN_STRING)
         {
             const char* p = parseBuffer;
             while (*p)
                 emitByte(*p++);
 
-            readToken();
+            consumeToken();
         }
         else
         {
-            parseExpression();
+            consumeExpression();
             if (tokenVariable)
                 addExpressionRecord(0x00);
             else
@@ -942,17 +937,18 @@ static void parseDotByte()
             }
         }
 
-        if (peekToken() != ',')
+        if (token != ',')
             break;
-        readToken();
+        consumeToken();
     }
 }
 
-static void parseDotWord()
+static void consumeDotWord()
 {
+	consumeToken();
     for (;;)
     {
-        parseExpression();
+        consumeExpression();
         if (tokenVariable)
             addExpressionRecord(0xff);
         else
@@ -961,9 +957,9 @@ static void parseDotWord()
             emitByte(tokenValue >> 8);
         }
 
-        if (peekToken() != ',')
+        if (token != ',')
             break;
-        readToken();
+        consumeToken();
     }
 }
 
@@ -973,25 +969,26 @@ static void parse()
 
     for (;;)
     {
-        char token = readToken();
         switch (token)
         {
             case TOKEN_EOF:
                 goto exit;
 
             case ';':
+                consumeToken();
                 continue;
 
             case '.':
+                consumeToken();
                 expect(TOKEN_ID);
                 if (strcmp(parseBuffer, "zp") == 0)
-                    parseDotZp();
+                    consumeDotZp();
                 else if (strcmp(parseBuffer, "bss") == 0)
-                    parseDotBss();
+                    consumeDotBss();
                 else if (strcmp(parseBuffer, "byte") == 0)
-                    parseDotByte();
+                    consumeDotByte();
                 else if (strcmp(parseBuffer, "word") == 0)
-                    parseDotWord();
+                    consumeDotWord();
                 else
                     fatal("unknown pseudo-op");
                 break;
@@ -1006,13 +1003,14 @@ static void parse()
                     const Instruction* insn = findInstruction(simpleInsns);
                     if (insn)
                     {
+                        consumeToken();
                         if (insn->addressingModes & AM_IMP)
                         {
                             emitByte(insn->opcode);
                             break;
                         }
 
-                        AddressingMode am = parseArgument();
+                        AddressingMode am = consumeArgument();
                         if ((insn->addressingModes & AM_IMMS) && (am == AM_IMM))
                             am = AM_IMMS;
                         if (!(insn->addressingModes & AM_YOFZ) &&
@@ -1034,7 +1032,7 @@ static void parse()
                 /* Not an instruction. Must be a symbol definition. */
 
                 SymbolRecord* r = addOrFindSymbol();
-                token = readToken();
+                consumeToken();
                 if (token == ':')
                 {
                     if ((r->type != SYMBOL_UNINITIALISED) &&
@@ -1045,6 +1043,7 @@ static void parse()
                     LabelDefinitionRecord* r2 = addRecord(
                         sizeof(LabelDefinitionRecord) | RECORD_LABELDEF);
                     r2->variable = r;
+                    consumeToken();
                     break;
                 }
                 else if (token == '=')
@@ -1052,7 +1051,8 @@ static void parse()
                     if (r->type != SYMBOL_UNINITIALISED)
                         symbolExists();
 
-                    parseExpression();
+                    consumeToken();
+                    consumeExpression();
                     if (tokenPostProcessing != PP_NONE)
                         fatal("cannot postprocess value here");
                     if (tokenVariable)
@@ -1066,18 +1066,14 @@ static void parse()
                 fatal("unexpected token");
         }
 
-        token = readToken();
         if (token == 26)
             break;
         if (token != ';')
-        {
-            printi(token);
-            cr();
             fatal("unexpected garbage at end of line");
-        }
+        consumeToken();
     }
 
-exit:;
+exit:
     addRecord(1 | RECORD_EOF);
 }
 
@@ -1432,6 +1428,7 @@ int main()
         fatal("cannot open source file");
     }
     consumeByte();
+    consumeToken();
 
     /* Open output file */
 
