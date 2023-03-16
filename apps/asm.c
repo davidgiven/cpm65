@@ -74,9 +74,10 @@ static uint8_t outputBufferPos;
 static uint8_t* ramtop;
 #define parseBuffer ((char*)outputBuffer)
 
+static uint16_t lineNumber = 0;
+
 static char tokenLookahead = 0;
 static uint16_t tokenLookaheadValue;
-static uint8_t tokenLookaheadPostProcessing;
 static uint8_t tokenLength;
 static uint16_t tokenValue;
 static SymbolRecord* tokenVariable;
@@ -183,6 +184,11 @@ static void printnl(const char* msg)
 static void __attribute__((noreturn)) fatal(const char* msg)
 {
     cpm_printstring("Error: ");
+    if (lineNumber)
+    {
+        printi(lineNumber);
+        cpm_printstring(": ");
+    }
     printnl(msg);
     cpm_warmboot();
 }
@@ -250,7 +256,6 @@ static void pushToken(char c)
 {
     tokenLookahead = c;
     tokenLookaheadValue = tokenValue;
-	tokenLookaheadPostProcessing = tokenPostProcessing;
 }
 
 static char readToken()
@@ -260,13 +265,10 @@ static char readToken()
         char c = tokenLookahead;
         tokenLookahead = 0;
         tokenValue = tokenLookaheadValue;
-		tokenPostProcessing = tokenLookaheadPostProcessing;
         return c;
     }
 
     tokenLength = 0;
-    bool alpha = false;
-    bool number = false;
 
     uint8_t c;
     do
@@ -282,7 +284,10 @@ static char readToken()
     } while ((c == 32) || (c == 9) || (c == '\r'));
 
     if (c == '\n')
+    {
+        lineNumber++;
         c = ';';
+    }
 
     parseBuffer[tokenLength++] = c;
     switch (c)
@@ -329,10 +334,25 @@ static char readToken()
         if (c == '0')
         {
             c = readByte();
-            if (c == 'x')
+            switch (c)
             {
-                base = 16;
-                c = readByte();
+                case 'x':
+                    base = 16;
+                    c = readByte();
+                    break;
+
+                case 'b':
+                    base = 2;
+                    c = readByte();
+                    break;
+
+                case 'o':
+                    base = 8;
+                    c = readByte();
+                    break;
+
+                default:
+                    pushByte(c);
             }
         }
 
@@ -351,6 +371,8 @@ static char readToken()
                 c = (c - 'A') + 10;
             else
                 c -= '0';
+            if (c >= base)
+                fatal("invalid number");
             tokenValue += c;
 
             c = readByte();
@@ -388,9 +410,6 @@ static char readToken()
         return TOKEN_STRING;
     }
 
-    cpm_printstring("Bad token: ");
-    printi(c);
-    cr();
     fatal("bad parse");
 }
 
@@ -407,12 +426,9 @@ static char peekToken()
     (AM_XPTR | AM_ZP | AM_IMM | AM_ABS | AM_YPTR | AM_XOFZ | AM_XOFF | AM_YOFF)
 
 static const Instruction simpleInsns[] = {
-    {"ASL", 0x02, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
-    {"LSR", 0x42, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
-    {"ROL", 0x22, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
-    {"ROR", 0x62, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
     {"ADC", 0x61, AM_ALU},
     {"AND", 0x21, AM_ALU},
+    {"ASL", 0x02, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
     {"BCC", 0x90, AM_ABS},
     {"BCS", 0xb0, AM_ABS},
     {"BEQ", 0xf0, AM_ABS},
@@ -435,17 +451,20 @@ static const Instruction simpleInsns[] = {
     {"EOR", 0x41, AM_ALU},
     {"INX", 0xe8, AM_IMP},
     {"INY", 0xc8, AM_IMP},
-    {"JSR", 0x20-(3<<2), AM_ABS},
     {"JMP", 0x40, AM_ABS | AM_WIND},
+    {"JSR", 0x20 - B_ABS, AM_ABS},
     {"LDA", 0xa1, AM_ALU},
     {"LDX", 0xa2, AM_IMMS | AM_ZP | AM_ABS | AM_YOFZ | AM_YOFF},
     {"LDY", 0xa0, AM_IMMS | AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
+    {"LSR", 0x42, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
     {"NOP", 0xea, AM_IMP},
     {"ORA", 0x01, AM_ALU},
     {"PHA", 0x48, AM_IMP},
     {"PHP", 0x08, AM_IMP},
     {"PLA", 0x68, AM_IMP},
     {"PLP", 0x28, AM_IMP},
+    {"ROL", 0x22, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
+    {"ROR", 0x62, AM_ZP | AM_A | AM_ABS | AM_XOFZ | AM_XOFF},
     {"RTI", 0x40, AM_IMP},
     {"RTS", 0x60, AM_IMP},
     {"SBC", 0xe1, AM_ALU},
@@ -724,8 +743,8 @@ static char expectXorY()
 
 static void postProcessConstant()
 {
-	if (tokenVariable)
-		return;
+    if (tokenVariable)
+        return;
 
     switch (tokenPostProcessing)
     {
@@ -1445,7 +1464,8 @@ int main()
 
     /* Parse file into memory. */
 
-    printnl("Parsing");
+    printnl("Parsing...");
+    lineNumber++;
     parse();
     printi(top - cpm_ram);
     printnl(" bytes memory used");
@@ -1467,7 +1487,7 @@ int main()
 
     /* Code emission */
 
-    printnl("Writing");
+    printnl("Writing...");
     writeHeader();
     writeCode();
     writeZPRelocations();
@@ -1477,5 +1497,6 @@ int main()
 
     flushOutputBuffer();
     cpm_close_file(&destFcb);
-	cpm_warmboot();
+    printnl("Done.");
+    cpm_warmboot();
 }
