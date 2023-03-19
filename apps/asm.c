@@ -233,6 +233,11 @@ static int ishex(int c)
            ((ch >= '0') && (ch <= '9'));
 }
 
+static void badEscape()
+{
+	fatal("bad escape");
+}
+
 static void consumeToken()
 {
     tokenLength = 0;
@@ -374,7 +379,7 @@ static void consumeToken()
                 else if (c == 't')
                     c = 9;
                 else
-                    fatal("bad escape");
+					badEscape();
             }
 
             parseBuffer[tokenLength++] = c;
@@ -383,6 +388,38 @@ static void consumeToken()
         token = TOKEN_STRING;
         return;
     }
+
+	if (currentByte == '\'')
+	{
+		consumeByte();
+		if (currentByte == '\\')
+		{
+			consumeByte();
+			switch (currentByte)
+			{
+				case 'n':
+					currentByte = 10;
+					break;
+
+				case 'r':
+					currentByte = 13;
+					break;
+
+				case 't':
+					currentByte = 9;
+					break;
+
+				default:
+					badEscape();
+			}
+		}
+
+		tokenValue = currentByte;
+		consumeByte();
+		consumeByte();
+		token = TOKEN_NUMBER;
+		return;
+	}
 
     fatal("bad parse");
 }
