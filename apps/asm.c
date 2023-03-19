@@ -68,6 +68,12 @@ typedef struct PACKED
     uint16_t addressingModes;
 } Instruction;
 
+typedef struct
+{
+    const char* string;
+    void (*callback)();
+} SymbolCallbackEntry;
+
 #define lengthof(a) (sizeof(a) / sizeof(*a))
 
 #define srcFcb cpm_fcb
@@ -94,6 +100,15 @@ static uint8_t defaultBranchSize = 5;
 static uint8_t zpUsage = 0;
 static uint16_t bssUsage = 0;
 static uint16_t textUsage = 0;
+
+#define STACK_SIZE 8
+static uint8_t scopePointer = 0;
+static SymbolRecord* scopePointers[STACK_SIZE];
+static SymbolRecord* startLabels[STACK_SIZE];
+static SymbolRecord* endLabels[STACK_SIZE];
+
+static uint8_t breakPointer = 0xff;
+static SymbolRecord* breakLabels[STACK_SIZE];
 
 #define START_ADDRESS 7
 
@@ -712,6 +727,12 @@ static SymbolRecord* appendSymbol()
     return r;
 }
 
+static SymbolRecord* appendAnonymousSymbol()
+{
+    tokenLength = 0;
+    return appendSymbol();
+}
+
 static SymbolRecord* addOrFindSymbol()
 {
     SymbolRecord* r = lookupSymbol();
@@ -739,6 +760,24 @@ static SymbolRecord* addSymbol()
 static void syntaxError()
 {
     fatal("syntax error");
+}
+
+static void pushScope()
+{
+    if (scopePointer == (STACK_SIZE - 1))
+        fatal("too many nested scopes");
+
+    scopePointers[scopePointer] = lastSymbol;
+    scopePointer++;
+}
+
+static void popScope()
+{
+    if (scopePointer == 0)
+        fatal("scope underflow");
+
+    scopePointer--;
+    lastSymbol = scopePointers[scopePointer];
 }
 
 static void expect(char t)
@@ -943,7 +982,6 @@ static SymbolRecord* consumeSymbolCommaNumber()
 
 static void consumeDotZp()
 {
-    consumeToken();
     SymbolRecord* r = consumeSymbolCommaNumber();
     if ((zpUsage + tokenValue) < zpUsage)
         fatal("ran out of zero page");
@@ -955,7 +993,6 @@ static void consumeDotZp()
 
 static void consumeDotBss()
 {
-    consumeToken();
     SymbolRecord* r = consumeSymbolCommaNumber();
     if ((bssUsage + tokenValue) < bssUsage)
         fatal("ran out of BSS");
@@ -967,7 +1004,6 @@ static void consumeDotBss()
 
 static void consumeDotByte()
 {
-    consumeToken();
     for (;;)
     {
         if (token == TOKEN_STRING)
@@ -995,7 +1031,6 @@ static void consumeDotByte()
 
 static void consumeDotWord()
 {
-    consumeToken();
     for (;;)
     {
         consumeExpression();
@@ -1015,21 +1050,114 @@ static void consumeDotWord()
 
 static void consumeDotFill()
 {
-    consumeToken();
     consumeConstExpression();
     emitFill(tokenValue);
 }
 
 static void consumeDotExpand()
 {
-    consumeToken();
     consumeConstExpression();
     defaultBranchSize = tokenValue ? 5 : 2;
+}
+
+static void createLabelDefinition(SymbolRecord* r)
+{
+    if ((r->type != SYMBOL_UNINITIALISED) && (r->type != SYMBOL_REFERENCE))
+        symbolExists();
+    r->type = SYMBOL_TEXT;
+
+    LabelDefinitionRecord* r2 =
+        addRecord(sizeof(LabelDefinitionRecord) | RECORD_LABELDEF);
+    r2->variable = r;
+}
+
+static void consumeZproc()
+{
+    expect(TOKEN_ID);
+
+    SymbolRecord* r = addOrFindSymbol();
+    createLabelDefinition(r);
+
+    pushScope();
+    consumeToken();
+}
+
+static void consumeZendproc()
+{
+    popScope();
+    consumeToken();
+}
+
+static void consumeZloop()
+{
+    pushScope();
+
+    SymbolRecord* r = appendAnonymousSymbol();
+    createLabelDefinition(r);
+    startLabels[scopePointer] = r;
+
+    r = appendAnonymousSymbol();
+    endLabels[scopePointer] = r;
+    breakLabels[++breakPointer] = r;
+}
+
+static void consumeZendloop()
+{
+    tokenVariable = startLabels[scopePointer];
+    tokenValue = 0;
+    addExpressionRecord(0x4c); /* JMP */
+
+    createLabelDefinition(endLabels[scopePointer]);
+    breakPointer--;
+
+    popScope();
+}
+
+static void consumeZbreak()
+{
+    if (breakPointer == 0xff)
+        fatal("nowhere to break to");
+
+    tokenVariable = breakLabels[breakPointer];
+    tokenValue = 0;
+    addExpressionRecord(0x4c); /* JMP */
+}
+
+static void lookupAndCall(const SymbolCallbackEntry* entries)
+{
+    for (;;)
+    {
+        if (strcmp(entries->string, parseBuffer) == 0)
+        {
+            consumeToken();
+            entries->callback();
+            return;
+        }
+        entries++;
+
+        if (!entries->string)
+            fatal("unknown pseudo-op");
+    }
 }
 
 static void parse()
 {
     top = cpm_ram;
+
+    static const SymbolCallbackEntry dotEntries[] = {
+        {"zp", consumeDotZp},
+        {"bss", consumeDotBss},
+        {"byte", consumeDotByte},
+        {"word", consumeDotWord},
+        {"fill", consumeDotFill},
+        {"expand", consumeDotExpand},
+        {"zproc", consumeZproc},
+        {"zendproc", consumeZendproc},
+        {"zloop", consumeZloop},
+        {"zendloop", consumeZendloop},
+        {"zbreak", consumeZbreak},
+        {}
+    };
 
     for (;;)
     {
@@ -1045,20 +1173,7 @@ static void parse()
             case '.':
                 consumeToken();
                 expect(TOKEN_ID);
-                if (strcmp(parseBuffer, "zp") == 0)
-                    consumeDotZp();
-                else if (strcmp(parseBuffer, "bss") == 0)
-                    consumeDotBss();
-                else if (strcmp(parseBuffer, "byte") == 0)
-                    consumeDotByte();
-                else if (strcmp(parseBuffer, "word") == 0)
-                    consumeDotWord();
-                else if (strcmp(parseBuffer, "fill") == 0)
-                    consumeDotFill();
-                else if (strcmp(parseBuffer, "expand") == 0)
-                    consumeDotExpand();
-                else
-                    fatal("unknown pseudo-op");
+                lookupAndCall(dotEntries);
                 break;
 
             case TOKEN_ID:
@@ -1103,14 +1218,7 @@ static void parse()
                 consumeToken();
                 if (token == ':')
                 {
-                    if ((r->type != SYMBOL_UNINITIALISED) &&
-                        (r->type != SYMBOL_REFERENCE))
-                        symbolExists();
-                    r->type = SYMBOL_TEXT;
-
-                    LabelDefinitionRecord* r2 = addRecord(
-                        sizeof(LabelDefinitionRecord) | RECORD_LABELDEF);
-                    r2->variable = r;
+                    createLabelDefinition(r);
                     consumeToken();
                     break;
                 }
