@@ -25,6 +25,12 @@ typedef struct PACKED
 typedef struct PACKED
 {
     Record record;
+    uint16_t length;
+} FillRecord;
+
+typedef struct PACKED
+{
+    Record record;
     struct SymbolRecord* variable;
 } LabelDefinitionRecord;
 
@@ -83,6 +89,7 @@ static SymbolRecord* tokenVariable;
 static uint8_t tokenPostProcessing;
 
 static SymbolRecord* lastSymbol;
+static uint8_t defaultBranchSize = 5;
 
 static uint8_t zpUsage = 0;
 static uint16_t bssUsage = 0;
@@ -109,6 +116,7 @@ enum
     RECORD_EXPR = 2 << 5,
     RECORD_SYMBOL = 3 << 5,
     RECORD_LABELDEF = 4 << 5,
+    RECORD_FILL = 5 << 5,
 };
 
 enum
@@ -235,7 +243,7 @@ static int ishex(int c)
 
 static void badEscape()
 {
-	fatal("bad escape");
+    fatal("bad escape");
 }
 
 static void consumeToken()
@@ -358,12 +366,12 @@ static void consumeToken()
 
     if (currentByte == '"')
     {
-		consumeByte();
+        consumeByte();
         tokenLength = 0;
         for (;;)
         {
             char c = currentByte;
-			consumeByte();
+            consumeByte();
             if (c == '"')
                 break;
             if (c == '\n')
@@ -379,48 +387,48 @@ static void consumeToken()
                 else if (c == 't')
                     c = 9;
                 else
-					badEscape();
+                    badEscape();
             }
 
             parseBuffer[tokenLength++] = c;
         }
 
-		parseBuffer[tokenLength] = 0;
+        parseBuffer[tokenLength] = 0;
         token = TOKEN_STRING;
         return;
     }
 
-	if (currentByte == '\'')
-	{
-		consumeByte();
-		if (currentByte == '\\')
-		{
-			consumeByte();
-			switch (currentByte)
-			{
-				case 'n':
-					currentByte = 10;
-					break;
+    if (currentByte == '\'')
+    {
+        consumeByte();
+        if (currentByte == '\\')
+        {
+            consumeByte();
+            switch (currentByte)
+            {
+                case 'n':
+                    currentByte = 10;
+                    break;
 
-				case 'r':
-					currentByte = 13;
-					break;
+                case 'r':
+                    currentByte = 13;
+                    break;
 
-				case 't':
-					currentByte = 9;
-					break;
+                case 't':
+                    currentByte = 9;
+                    break;
 
-				default:
-					badEscape();
-			}
-		}
+                default:
+                    badEscape();
+            }
+        }
 
-		tokenValue = currentByte;
-		consumeByte();
-		consumeByte();
-		token = TOKEN_NUMBER;
-		return;
-	}
+        tokenValue = currentByte;
+        consumeByte();
+        consumeByte();
+        token = TOKEN_NUMBER;
+        return;
+    }
 
     fatal("bad parse");
 }
@@ -642,6 +650,12 @@ static void emitByte(uint8_t byte)
     uint8_t len = r->record.descr & 0x1f;
     r->bytes[len - 1] = byte;
     r->record.descr++;
+}
+
+static void emitFill(uint16_t len)
+{
+    FillRecord* r = addRecord(sizeof(FillRecord) | RECORD_FILL);
+    r->length = len;
 }
 
 static void addExpressionRecord(uint8_t op)
@@ -929,7 +943,7 @@ static SymbolRecord* consumeSymbolCommaNumber()
 
 static void consumeDotZp()
 {
-	consumeToken();
+    consumeToken();
     SymbolRecord* r = consumeSymbolCommaNumber();
     if ((zpUsage + tokenValue) < zpUsage)
         fatal("ran out of zero page");
@@ -941,7 +955,7 @@ static void consumeDotZp()
 
 static void consumeDotBss()
 {
-	consumeToken();
+    consumeToken();
     SymbolRecord* r = consumeSymbolCommaNumber();
     if ((bssUsage + tokenValue) < bssUsage)
         fatal("ran out of BSS");
@@ -953,13 +967,13 @@ static void consumeDotBss()
 
 static void consumeDotByte()
 {
-	consumeToken();
+    consumeToken();
     for (;;)
     {
         if (token == TOKEN_STRING)
         {
             const char* p = parseBuffer;
-			while (tokenLength--)
+            while (tokenLength--)
                 emitByte(*p++);
 
             consumeToken();
@@ -981,7 +995,7 @@ static void consumeDotByte()
 
 static void consumeDotWord()
 {
-	consumeToken();
+    consumeToken();
     for (;;)
     {
         consumeExpression();
@@ -997,6 +1011,20 @@ static void consumeDotWord()
             break;
         consumeToken();
     }
+}
+
+static void consumeDotFill()
+{
+    consumeToken();
+    consumeConstExpression();
+    emitFill(tokenValue);
+}
+
+static void consumeDotExpand()
+{
+    consumeToken();
+    consumeConstExpression();
+    defaultBranchSize = tokenValue ? 5 : 2;
 }
 
 static void parse()
@@ -1025,6 +1053,10 @@ static void parse()
                     consumeDotByte();
                 else if (strcmp(parseBuffer, "word") == 0)
                     consumeDotWord();
+                else if (strcmp(parseBuffer, "fill") == 0)
+                    consumeDotFill();
+                else if (strcmp(parseBuffer, "expand") == 0)
+                    consumeDotExpand();
                 else
                     fatal("unknown pseudo-op");
                 break;
@@ -1139,6 +1171,13 @@ static bool placeCode(uint8_t pass)
                 pc += len - offsetof(ByteRecord, bytes);
                 break;
 
+            case RECORD_FILL:
+            {
+                FillRecord* s = (FillRecord*)r;
+                pc += s->length;
+                break;
+            }
+
             case RECORD_EXPR:
             {
                 ExpressionRecord* s = (ExpressionRecord*)r;
@@ -1170,12 +1209,14 @@ static bool placeCode(uint8_t pass)
                         fatal("branch to non-text address");
 
                     if (pass == 0)
-                        len = 5;
+                        len = defaultBranchSize;
                     else
                     {
                         int delta = (s->variable->offset + s->offset) - pc;
                         if ((delta >= -128) && (delta <= 127))
                             len = 2;
+                        else if (defaultBranchSize == 2)
+                            fatal("out of range branch");
                         else
                             len = 5;
                     }
@@ -1229,6 +1270,16 @@ static void writeCode()
                 for (uint8_t i = 0; i < count; i++)
                     writeByte(s->bytes[i]);
                 pc += count;
+                break;
+            }
+
+            case RECORD_FILL:
+            {
+                FillRecord* s = (FillRecord*)r;
+                uint16_t len = s->length;
+                while (len--)
+                    writeByte(0);
+                pc += s->length;
                 break;
             }
 
@@ -1353,6 +1404,13 @@ static void writeTextRelocations()
                 pc += len - offsetof(ByteRecord, bytes);
                 break;
 
+            case RECORD_FILL:
+            {
+                FillRecord* s = (FillRecord*)r;
+                pc += s->length;
+                break;
+            }
+
             case RECORD_EXPR:
             {
                 ExpressionRecord* s = (ExpressionRecord*)r;
@@ -1408,6 +1466,13 @@ static void writeZPRelocations()
             case RECORD_BYTES:
                 pc += len - offsetof(ByteRecord, bytes);
                 break;
+
+            case RECORD_FILL:
+            {
+                FillRecord* s = (FillRecord*)r;
+                pc += s->length;
+                break;
+            }
 
             case RECORD_EXPR:
             {
