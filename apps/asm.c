@@ -385,6 +385,7 @@ static void consumeToken()
             parseBuffer[tokenLength++] = c;
         }
 
+		parseBuffer[tokenLength] = 0;
         token = TOKEN_STRING;
         return;
     }
@@ -958,7 +959,7 @@ static void consumeDotByte()
         if (token == TOKEN_STRING)
         {
             const char* p = parseBuffer;
-            while (*p)
+			while (tokenLength--)
                 emitByte(*p++);
 
             consumeToken();
@@ -969,9 +970,7 @@ static void consumeDotByte()
             if (tokenVariable)
                 addExpressionRecord(0x00);
             else
-            {
                 emitByte(tokenValue);
-            }
         }
 
         if (token != ',')
