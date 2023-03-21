@@ -68,6 +68,12 @@ typedef struct PACKED
     uint16_t addressingModes;
 } Instruction;
 
+typedef struct
+{
+    const char* string;
+    void (*callback)();
+} SymbolCallbackEntry;
+
 #define lengthof(a) (sizeof(a) / sizeof(*a))
 
 #define srcFcb cpm_fcb
@@ -76,7 +82,7 @@ static char currentByte;
 static uint8_t inputBufferPos = 128;
 static FCB destFcb;
 static uint8_t outputBuffer[128];
-static uint8_t outputBufferPos;
+static uint8_t outputBufferPos = 0;
 static uint8_t* ramtop;
 #define parseBuffer ((char*)outputBuffer)
 
@@ -94,6 +100,15 @@ static uint8_t defaultBranchSize = 5;
 static uint8_t zpUsage = 0;
 static uint16_t bssUsage = 0;
 static uint16_t textUsage = 0;
+
+#define STACK_SIZE 8
+static uint8_t scopePointer = 0;
+static SymbolRecord* scopePointers[STACK_SIZE];
+static SymbolRecord* startLabels[STACK_SIZE];
+static SymbolRecord* endLabels[STACK_SIZE];
+
+static uint8_t breakPointer = 0xff;
+static SymbolRecord* breakLabels[STACK_SIZE];
 
 #define START_ADDRESS 7
 
@@ -189,7 +204,7 @@ static void printnl(const char* msg)
     cr();
 }
 
-static void __attribute__((noreturn)) fatal(const char* msg)
+static void errormessage(const char* msg)
 {
     cpm_printstring("Error: ");
     if (lineNumber)
@@ -197,7 +212,13 @@ static void __attribute__((noreturn)) fatal(const char* msg)
         printi(lineNumber);
         cpm_printstring(": ");
     }
-    printnl(msg);
+    cpm_printstring(msg);
+}
+
+static void __attribute__((noreturn)) fatal(const char* msg)
+{
+    errormessage(msg);
+    cr();
     cpm_warmboot();
 }
 
@@ -246,14 +267,14 @@ static void badEscape()
     fatal("bad escape");
 }
 
-static void consumeToken()
+static char consumeToken()
 {
     tokenLength = 0;
 
     if (currentByte == 26)
     {
         token = currentByte;
-        return;
+        return token;
     }
 
     for (;;)
@@ -295,7 +316,7 @@ static void consumeToken()
         {
             token = currentByte;
             consumeByte();
-            return;
+            return token;
         }
     }
 
@@ -305,11 +326,12 @@ static void consumeToken()
         {
             parseBuffer[tokenLength++] = currentByte;
             consumeByte();
-        } while (isdigit(currentByte) || isalpha(currentByte));
+        } while (isdigit(currentByte) || isalpha(currentByte) ||
+                 (currentByte == '_'));
 
         parseBuffer[tokenLength] = 0;
         token = TOKEN_ID;
-        return;
+        return token;
     }
 
     if (isdigit(currentByte))
@@ -361,7 +383,7 @@ static void consumeToken()
         }
 
         token = TOKEN_NUMBER;
-        return;
+        return token;
     }
 
     if (currentByte == '"')
@@ -395,7 +417,7 @@ static void consumeToken()
 
         parseBuffer[tokenLength] = 0;
         token = TOKEN_STRING;
-        return;
+        return token;
     }
 
     if (currentByte == '\'')
@@ -427,7 +449,7 @@ static void consumeToken()
         consumeByte();
         consumeByte();
         token = TOKEN_NUMBER;
-        return;
+        return token;
     }
 
     fatal("bad parse");
@@ -459,9 +481,11 @@ static const Instruction simpleInsns[] = {
     {"CMP", 0xc1, AM_ALU},
     {"CPX", 0xe0, AM_IMMS | AM_ZP | AM_ABS},
     {"CPY", 0xc0, AM_IMMS | AM_ZP | AM_ABS},
+	{"DEC", 0xc2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
     {"DEX", 0xca, AM_IMP},
     {"DEY", 0x88, AM_IMP},
     {"EOR", 0x41, AM_ALU},
+	{"INC", 0xe2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
     {"INX", 0xe8, AM_IMP},
     {"INY", 0xc8, AM_IMP},
     {"JMP", 0x40, AM_ABS | AM_WIND},
@@ -712,6 +736,15 @@ static SymbolRecord* appendSymbol()
     return r;
 }
 
+static SymbolRecord* appendAnonymousSymbol()
+{
+	uint8_t oldLength = tokenLength;
+    tokenLength = 0;
+    SymbolRecord* r = appendSymbol();
+	tokenLength = oldLength;
+	return r;
+}
+
 static SymbolRecord* addOrFindSymbol()
 {
     SymbolRecord* r = lookupSymbol();
@@ -739,6 +772,24 @@ static SymbolRecord* addSymbol()
 static void syntaxError()
 {
     fatal("syntax error");
+}
+
+static void pushScope()
+{
+    if (scopePointer == (STACK_SIZE - 1))
+        fatal("too many nested scopes");
+
+    scopePointers[scopePointer] = lastSymbol;
+    scopePointer++;
+}
+
+static void popScope()
+{
+    if (scopePointer == 0)
+        fatal("scope underflow");
+
+    scopePointer--;
+    lastSymbol = scopePointers[scopePointer];
 }
 
 static void expect(char t)
@@ -826,12 +877,12 @@ static void consumeExpression()
                 offset = 0;
             }
 
-            consumeToken();
-            if ((token == '+') || (token == '-'))
+            char c = consumeToken();
+            if ((c == '+') || (c == '-'))
             {
                 consumeToken();
                 expect(TOKEN_NUMBER);
-                if (token == '+')
+                if (c == '+')
                     offset += tokenValue;
                 else
                     offset -= tokenValue;
@@ -935,15 +986,15 @@ static SymbolRecord* consumeSymbolCommaNumber()
 {
     expect(TOKEN_ID);
     SymbolRecord* r = addSymbol();
+    consumeToken();
 
-    expect(',');
+    consume(',');
     consumeConstExpression();
     return r;
 }
 
 static void consumeDotZp()
 {
-    consumeToken();
     SymbolRecord* r = consumeSymbolCommaNumber();
     if ((zpUsage + tokenValue) < zpUsage)
         fatal("ran out of zero page");
@@ -955,7 +1006,6 @@ static void consumeDotZp()
 
 static void consumeDotBss()
 {
-    consumeToken();
     SymbolRecord* r = consumeSymbolCommaNumber();
     if ((bssUsage + tokenValue) < bssUsage)
         fatal("ran out of BSS");
@@ -967,7 +1017,6 @@ static void consumeDotBss()
 
 static void consumeDotByte()
 {
-    consumeToken();
     for (;;)
     {
         if (token == TOKEN_STRING)
@@ -995,7 +1044,6 @@ static void consumeDotByte()
 
 static void consumeDotWord()
 {
-    consumeToken();
     for (;;)
     {
         consumeExpression();
@@ -1015,21 +1063,177 @@ static void consumeDotWord()
 
 static void consumeDotFill()
 {
-    consumeToken();
     consumeConstExpression();
     emitFill(tokenValue);
 }
 
 static void consumeDotExpand()
 {
-    consumeToken();
     consumeConstExpression();
     defaultBranchSize = tokenValue ? 5 : 2;
+}
+
+static void consumeDotLabel()
+{
+    consumeExpression();
+}
+
+static void createLabelDefinition(SymbolRecord* r)
+{
+    if ((r->type != SYMBOL_UNINITIALISED) && (r->type != SYMBOL_REFERENCE))
+        symbolExists();
+    r->type = SYMBOL_TEXT;
+
+    LabelDefinitionRecord* r2 =
+        addRecord(sizeof(LabelDefinitionRecord) | RECORD_LABELDEF);
+    r2->variable = r;
+}
+
+static void consumeZproc()
+{
+    expect(TOKEN_ID);
+
+    SymbolRecord* r = addOrFindSymbol();
+    createLabelDefinition(r);
+
+    pushScope();
+    consumeToken();
+}
+
+static void consumeZendproc()
+{
+    popScope();
+    consumeToken();
+}
+
+static void consumeZloop()
+{
+    pushScope();
+
+    SymbolRecord* r = appendAnonymousSymbol();
+    createLabelDefinition(r);
+    startLabels[scopePointer] = r;
+
+    r = appendAnonymousSymbol();
+    endLabels[scopePointer] = r;
+    breakLabels[++breakPointer] = r;
+}
+
+static void consumeZendloop()
+{
+    tokenVariable = startLabels[scopePointer];
+    tokenValue = 0;
+    addExpressionRecord(0x4c); /* JMP */
+
+    createLabelDefinition(endLabels[scopePointer]);
+    breakPointer--;
+
+    popScope();
+}
+
+static void emitConditionalJump(uint8_t xor)
+{
+    if (token == ';')
+        addExpressionRecord(0x4c); /* JMP */
+    else
+    {
+        if (tokenLength != 2)
+            syntaxError();
+
+        parseBuffer[2] = parseBuffer[1];
+        parseBuffer[1] = parseBuffer[0];
+        parseBuffer[0] = 'b';
+        tokenLength = 3;
+
+        const Instruction* insn = findInstruction(simpleInsns);
+        if (!insn || !(getInsnProps(insn->opcode) & BPROP_RELATIVE))
+            syntaxError();
+
+        addExpressionRecord(insn->opcode ^ xor);
+        consumeToken();
+    }
+}
+
+static void consumeZbreak()
+{
+    if (breakPointer == 0xff)
+        fatal("nowhere to break to");
+
+    tokenVariable = breakLabels[breakPointer];
+    tokenValue = 0;
+    emitConditionalJump(0);
+}
+
+static void consumeZuntil()
+{
+    tokenVariable = startLabels[scopePointer];
+    tokenValue = 0;
+    emitConditionalJump(0b00100000);
+
+    createLabelDefinition(endLabels[scopePointer]);
+    breakPointer--;
+
+    popScope();
+}
+
+static void consumeZif()
+{
+    pushScope();
+
+    SymbolRecord* r = appendAnonymousSymbol();
+    endLabels[scopePointer] = r;
+
+	tokenVariable = r;
+	tokenValue = 0;
+	emitConditionalJump(0b00100000);
+}
+
+static void consumeZendif()
+{
+    createLabelDefinition(endLabels[scopePointer]);
+    popScope();
+}
+
+static void lookupAndCall(const SymbolCallbackEntry* entries)
+{
+    for (;;)
+    {
+        if (strcmp(entries->string, parseBuffer) == 0)
+        {
+            consumeToken();
+            entries->callback();
+            return;
+        }
+        entries++;
+
+        if (!entries->string)
+            fatal("unknown pseudo-op");
+    }
 }
 
 static void parse()
 {
     top = cpm_ram;
+
+    static const SymbolCallbackEntry dotEntries[] = {
+        {"zp", consumeDotZp},
+        {"bss", consumeDotBss},
+        {"byte", consumeDotByte},
+        {"word", consumeDotWord},
+        {"fill", consumeDotFill},
+        {"expand", consumeDotExpand},
+        {"label", consumeDotLabel},
+        {"zproc", consumeZproc},
+        {"zendproc", consumeZendproc},
+        {"zloop", consumeZloop},
+        {"zendloop", consumeZendloop},
+        {"zbreak", consumeZbreak},
+        {"zrepeat", consumeZloop},
+        {"zuntil", consumeZuntil},
+		{"zif", consumeZif},
+		{"zendif", consumeZendif},
+        {}
+    };
 
     for (;;)
     {
@@ -1045,20 +1249,7 @@ static void parse()
             case '.':
                 consumeToken();
                 expect(TOKEN_ID);
-                if (strcmp(parseBuffer, "zp") == 0)
-                    consumeDotZp();
-                else if (strcmp(parseBuffer, "bss") == 0)
-                    consumeDotBss();
-                else if (strcmp(parseBuffer, "byte") == 0)
-                    consumeDotByte();
-                else if (strcmp(parseBuffer, "word") == 0)
-                    consumeDotWord();
-                else if (strcmp(parseBuffer, "fill") == 0)
-                    consumeDotFill();
-                else if (strcmp(parseBuffer, "expand") == 0)
-                    consumeDotExpand();
-                else
-                    fatal("unknown pseudo-op");
+                lookupAndCall(dotEntries);
                 break;
 
             case TOKEN_ID:
@@ -1103,14 +1294,7 @@ static void parse()
                 consumeToken();
                 if (token == ':')
                 {
-                    if ((r->type != SYMBOL_UNINITIALISED) &&
-                        (r->type != SYMBOL_REFERENCE))
-                        symbolExists();
-                    r->type = SYMBOL_TEXT;
-
-                    LabelDefinitionRecord* r2 = addRecord(
-                        sizeof(LabelDefinitionRecord) | RECORD_LABELDEF);
-                    r2->variable = r;
+                    createLabelDefinition(r);
                     consumeToken();
                     break;
                 }
@@ -1163,7 +1347,15 @@ static bool placeCode(uint8_t pass)
             {
                 SymbolRecord* s = (SymbolRecord*)r;
                 if (s->type == SYMBOL_REFERENCE)
-                    fatal("unresolved forward reference");
+                {
+                    errormessage("unresolved forward reference: ");
+                    uint8_t namelen = len - offsetof(SymbolRecord, name);
+                    uint8_t i = 0;
+                    while (namelen--)
+                        cpm_conout(s->name[i++]);
+                    cr();
+                    cpm_warmboot();
+                }
                 break;
             }
 
@@ -1390,8 +1582,9 @@ static void writeTextRelocations()
 {
     uint8_t* r = cpm_ram;
     uint16_t pc = START_ADDRESS;
-    uint16_t lastRelocation = 0;
+    uint16_t lastRelocation = 3;
     resetRelocationWriter();
+	writeRelocationFor(3);
 
     for (;;)
     {
@@ -1517,7 +1710,6 @@ int main()
     printi(ramtop - cpm_ram);
     printnl(" bytes free");
     memset(cpm_ram, 0, ramtop - cpm_ram);
-
     destFcb = cpm_fcb2;
 
     /* Open input file */

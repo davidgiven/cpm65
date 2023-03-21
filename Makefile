@@ -12,8 +12,10 @@ APPS = \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/asm.com \
+	cpmfs/asm.txt \
 	cpmfs/readme.txt \
 	cpmfs/hello.asm \
+	cpmfs/dump.asm \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \

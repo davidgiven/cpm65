@@ -323,6 +323,8 @@ static void sigusr1_cb(int number)
 
 void emulator_init(void)
 {
+	memset(ram, 0xee, sizeof(ram));
+
     cpu = M6502_new(NULL, ram, NULL);
     singlestepping = flag_enter_debugger;
 
