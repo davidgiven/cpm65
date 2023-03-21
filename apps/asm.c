@@ -82,7 +82,7 @@ static char currentByte;
 static uint8_t inputBufferPos = 128;
 static FCB destFcb;
 static uint8_t outputBuffer[128];
-static uint8_t outputBufferPos;
+static uint8_t outputBufferPos = 0;
 static uint8_t* ramtop;
 #define parseBuffer ((char*)outputBuffer)
 
@@ -204,7 +204,7 @@ static void printnl(const char* msg)
     cr();
 }
 
-static void __attribute__((noreturn)) fatal(const char* msg)
+static void errormessage(const char* msg)
 {
     cpm_printstring("Error: ");
     if (lineNumber)
@@ -212,7 +212,13 @@ static void __attribute__((noreturn)) fatal(const char* msg)
         printi(lineNumber);
         cpm_printstring(": ");
     }
-    printnl(msg);
+    cpm_printstring(msg);
+}
+
+static void __attribute__((noreturn)) fatal(const char* msg)
+{
+    errormessage(msg);
+    cr();
     cpm_warmboot();
 }
 
@@ -320,7 +326,8 @@ static void consumeToken()
         {
             parseBuffer[tokenLength++] = currentByte;
             consumeByte();
-        } while (isdigit(currentByte) || isalpha(currentByte));
+        } while (isdigit(currentByte) || isalpha(currentByte) ||
+                 (currentByte == '_'));
 
         parseBuffer[tokenLength] = 0;
         token = TOKEN_ID;
@@ -974,8 +981,9 @@ static SymbolRecord* consumeSymbolCommaNumber()
 {
     expect(TOKEN_ID);
     SymbolRecord* r = addSymbol();
+    consumeToken();
 
-    expect(',');
+    consume(',');
     consumeConstExpression();
     return r;
 }
@@ -1058,6 +1066,11 @@ static void consumeDotExpand()
 {
     consumeConstExpression();
     defaultBranchSize = tokenValue ? 5 : 2;
+}
+
+static void consumeDotLabel()
+{
+    consumeExpression();
 }
 
 static void createLabelDefinition(SymbolRecord* r)
@@ -1151,6 +1164,7 @@ static void parse()
         {"word", consumeDotWord},
         {"fill", consumeDotFill},
         {"expand", consumeDotExpand},
+        {"label", consumeDotLabel},
         {"zproc", consumeZproc},
         {"zendproc", consumeZendproc},
         {"zloop", consumeZloop},
@@ -1271,7 +1285,15 @@ static bool placeCode(uint8_t pass)
             {
                 SymbolRecord* s = (SymbolRecord*)r;
                 if (s->type == SYMBOL_REFERENCE)
-                    fatal("unresolved forward reference");
+                {
+                    errormessage("unresolved forward reference: ");
+                    uint8_t namelen = len - offsetof(SymbolRecord, name);
+                    uint8_t i = 0;
+                    while (namelen--)
+                        cpm_conout(s->name[i++]);
+                    cr();
+                    cpm_warmboot();
+                }
                 break;
             }
 
@@ -1625,7 +1647,6 @@ int main()
     printi(ramtop - cpm_ram);
     printnl(" bytes free");
     memset(cpm_ram, 0, ramtop - cpm_ram);
-
     destFcb = cpm_fcb2;
 
     /* Open input file */
