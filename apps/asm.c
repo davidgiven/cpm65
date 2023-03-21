@@ -1126,6 +1126,29 @@ static void consumeZendloop()
     popScope();
 }
 
+static void emitConditionalJump(uint8_t xor)
+{
+    if (token == ';')
+        addExpressionRecord(0x4c); /* JMP */
+    else
+    {
+        if (tokenLength != 2)
+            syntaxError();
+
+        parseBuffer[2] = parseBuffer[1];
+        parseBuffer[1] = parseBuffer[0];
+        parseBuffer[0] = 'b';
+        tokenLength = 3;
+
+        const Instruction* insn = findInstruction(simpleInsns);
+        if (!insn || !(getInsnProps(insn->opcode) & BPROP_RELATIVE))
+            syntaxError();
+
+        addExpressionRecord(insn->opcode);
+        consumeToken();
+    }
+}
+
 static void consumeZbreak()
 {
     if (breakPointer == 0xff)
@@ -1133,7 +1156,7 @@ static void consumeZbreak()
 
     tokenVariable = breakLabels[breakPointer];
     tokenValue = 0;
-    addExpressionRecord(0x4c); /* JMP */
+    emitConditionalJump(0);
 }
 
 static void lookupAndCall(const SymbolCallbackEntry* entries)
