@@ -1144,7 +1144,7 @@ static void emitConditionalJump(uint8_t xor)
         if (!insn || !(getInsnProps(insn->opcode) & BPROP_RELATIVE))
             syntaxError();
 
-        addExpressionRecord(insn->opcode);
+        addExpressionRecord(insn->opcode ^ xor);
         consumeToken();
     }
 }
@@ -1157,6 +1157,18 @@ static void consumeZbreak()
     tokenVariable = breakLabels[breakPointer];
     tokenValue = 0;
     emitConditionalJump(0);
+}
+
+static void consumeZuntil()
+{
+    tokenVariable = startLabels[scopePointer];
+    tokenValue = 0;
+    emitConditionalJump(0b00100000);
+
+    createLabelDefinition(endLabels[scopePointer]);
+    breakPointer--;
+
+    popScope();
 }
 
 static void lookupAndCall(const SymbolCallbackEntry* entries)
@@ -1193,6 +1205,8 @@ static void parse()
         {"zloop", consumeZloop},
         {"zendloop", consumeZendloop},
         {"zbreak", consumeZbreak},
+        {"zrepeat", consumeZloop},
+        {"zuntil", consumeZuntil},
         {}
     };
 
