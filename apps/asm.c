@@ -267,14 +267,14 @@ static void badEscape()
     fatal("bad escape");
 }
 
-static void consumeToken()
+static char consumeToken()
 {
     tokenLength = 0;
 
     if (currentByte == 26)
     {
         token = currentByte;
-        return;
+        return token;
     }
 
     for (;;)
@@ -316,7 +316,7 @@ static void consumeToken()
         {
             token = currentByte;
             consumeByte();
-            return;
+            return token;
         }
     }
 
@@ -331,7 +331,7 @@ static void consumeToken()
 
         parseBuffer[tokenLength] = 0;
         token = TOKEN_ID;
-        return;
+        return token;
     }
 
     if (isdigit(currentByte))
@@ -383,7 +383,7 @@ static void consumeToken()
         }
 
         token = TOKEN_NUMBER;
-        return;
+        return token;
     }
 
     if (currentByte == '"')
@@ -417,7 +417,7 @@ static void consumeToken()
 
         parseBuffer[tokenLength] = 0;
         token = TOKEN_STRING;
-        return;
+        return token;
     }
 
     if (currentByte == '\'')
@@ -449,7 +449,7 @@ static void consumeToken()
         consumeByte();
         consumeByte();
         token = TOKEN_NUMBER;
-        return;
+        return token;
     }
 
     fatal("bad parse");
@@ -481,9 +481,11 @@ static const Instruction simpleInsns[] = {
     {"CMP", 0xc1, AM_ALU},
     {"CPX", 0xe0, AM_IMMS | AM_ZP | AM_ABS},
     {"CPY", 0xc0, AM_IMMS | AM_ZP | AM_ABS},
+	{"DEC", 0xc2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
     {"DEX", 0xca, AM_IMP},
     {"DEY", 0x88, AM_IMP},
     {"EOR", 0x41, AM_ALU},
+	{"INC", 0xe2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
     {"INX", 0xe8, AM_IMP},
     {"INY", 0xc8, AM_IMP},
     {"JMP", 0x40, AM_ABS | AM_WIND},
@@ -736,8 +738,11 @@ static SymbolRecord* appendSymbol()
 
 static SymbolRecord* appendAnonymousSymbol()
 {
+	uint8_t oldLength = tokenLength;
     tokenLength = 0;
-    return appendSymbol();
+    SymbolRecord* r = appendSymbol();
+	tokenLength = oldLength;
+	return r;
 }
 
 static SymbolRecord* addOrFindSymbol()
@@ -872,12 +877,12 @@ static void consumeExpression()
                 offset = 0;
             }
 
-            consumeToken();
-            if ((token == '+') || (token == '-'))
+            char c = consumeToken();
+            if ((c == '+') || (c == '-'))
             {
                 consumeToken();
                 expect(TOKEN_NUMBER);
-                if (token == '+')
+                if (c == '+')
                     offset += tokenValue;
                 else
                     offset -= tokenValue;
@@ -1171,6 +1176,24 @@ static void consumeZuntil()
     popScope();
 }
 
+static void consumeZif()
+{
+    pushScope();
+
+    SymbolRecord* r = appendAnonymousSymbol();
+    endLabels[scopePointer] = r;
+
+	tokenVariable = r;
+	tokenValue = 0;
+	emitConditionalJump(0b00100000);
+}
+
+static void consumeZendif()
+{
+    createLabelDefinition(endLabels[scopePointer]);
+    popScope();
+}
+
 static void lookupAndCall(const SymbolCallbackEntry* entries)
 {
     for (;;)
@@ -1207,6 +1230,8 @@ static void parse()
         {"zbreak", consumeZbreak},
         {"zrepeat", consumeZloop},
         {"zuntil", consumeZuntil},
+		{"zif", consumeZif},
+		{"zendif", consumeZendif},
         {}
     };
 
@@ -1557,8 +1582,9 @@ static void writeTextRelocations()
 {
     uint8_t* r = cpm_ram;
     uint16_t pc = START_ADDRESS;
-    uint16_t lastRelocation = 0;
+    uint16_t lastRelocation = 3;
     resetRelocationWriter();
+	writeRelocationFor(3);
 
     for (;;)
     {
