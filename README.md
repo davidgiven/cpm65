@@ -111,26 +111,10 @@ requests](https://github.com/davidgiven/cpm65/compare)!
 The CP/M-65 assembler is extremely simple and very much customised to work for
 the CP/M-65 environment. It operates entirely in memory (so it should be fast)
 but it's written in C (so it's going to be big and slow). It's very very new
-and is likely to have lots of bugs.
+and is likely to have lots of bugs. There is, at least, a port of the DUMP
+program to it which assembles, works, and is ready to play with.
 
-It supports 6502 opcodes. You can have forward references to labels, but not to
-equates. It's got these pseudo-ops are:
-
-  - `.zp <symbol>, <size>`: allocates this much zero page
-  - `.bss <symbol>, <size>`: allocates this much BSS
-  - `.byte <bytes or strings>`: emits raw data
-  - `.word <word>`: emits raw words
-
-Expressions (anywhere) are currently limited to _label_ +/- _offset_. Either
-the label or the offset are optional. You may also prefix the whole with `<` or
-`>` to get the LSB or MSB respectively.
-
-It supports expanding branches to five-byte long jumps.
-
-It does not know about the pblock, so if you want command line arguments, make
-sure to allocate a 165 structure from the BSS first.
-
-To use, try `asm hello.asm hello.com`.
+Go read [cpmfs/asm.txt](cpmfs/asm.txt) for the documentation. 
 
 ### Utilities
 

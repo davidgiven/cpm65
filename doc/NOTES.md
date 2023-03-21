@@ -77,6 +77,9 @@ incremental offsets from the beginning of the file; 0xe advances pointer but
 does nothing and 0xf terminates the stream (any trailing 0 is ignored). The
 first one is for ZP, second is for high byte of any addresses.
 
+**Important!** The relocation table address at offset 2 must, itself, be
+relocated --- the CCP uses this to locate the program's pblock.
+
 Once relocated, the address which the relocation table is at is repurposed as
 the pblock, a 165-byte structure which contains the initial FCBs and command
 line:
