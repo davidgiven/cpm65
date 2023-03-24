@@ -15,7 +15,7 @@ APPS = \
 	cpmfs/asm.txt \
 	cpmfs/readme.txt \
 	cpmfs/hello.asm \
-	cpmfs/dump.asm \
+	apps/dump.asm \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
@@ -82,6 +82,12 @@ $(OBJDIR)/%.o: %.c
 $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+
+$(OBJDIR)/%.com: apps/%.asm $(OBJDIR)/asm.com bin/cpmemu
+	@mkdir -p $(dir $@)
+	bin/cpmemu $(OBJDIR)/asm.com -pA=$(dir $<) -pB=$(dir $@) \
+		a:$(notdir $<) b:$(notdir $@)
+	test -f $@
 
 $(OBJDIR)/bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)

@@ -219,6 +219,7 @@ static void __attribute__((noreturn)) fatal(const char* msg)
 {
     errormessage(msg);
     cr();
+    cpm_delete_file(&destFcb);
     cpm_warmboot();
 }
 
@@ -1712,17 +1713,6 @@ int main()
     memset(cpm_ram, 0, ramtop - cpm_ram);
     destFcb = cpm_fcb2;
 
-    /* Open input file */
-
-    srcFcb.ex = 0;
-    srcFcb.cr = 0;
-    if (cpm_open_file(&srcFcb))
-    {
-        fatal("cannot open source file");
-    }
-    consumeByte();
-    consumeToken();
-
     /* Open output file */
 
     destFcb.ex = 0;
@@ -1735,6 +1725,17 @@ int main()
         cr();
         fatal("cannot create destination file");
     }
+
+    /* Open input file */
+
+    srcFcb.ex = 0;
+    srcFcb.cr = 0;
+    if (cpm_open_file(&srcFcb))
+    {
+        fatal("cannot open source file");
+    }
+    consumeByte();
+    consumeToken();
 
     /* Parse file into memory. */
 
