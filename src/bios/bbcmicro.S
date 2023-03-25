@@ -313,7 +313,7 @@ zp_end:  .byte __USERZEROPAGE_END__
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, $600, 1024, 64, 0
+define_drive dph, 0x600, 1024, 64, 0
 
 NOINIT
 
