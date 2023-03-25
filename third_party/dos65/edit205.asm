@@ -17,17 +17,12 @@
 \       1 march 2011
 \               changed opening message
 \               added file name checking
+\       25 march 2023
+\               ported to CP/M65 --- dtrg
 \assembly time options
 strmax  =       100             \maximum string length
 srclng  =       1024            \source buffer length
 dstlng  =       1024            \destination buffer length
-\dos/65 references
-boot    =       $100            \warm boot
-pem     =       $103            \pem jump
-dflfcb  =       $107            \default fcb
-dflbuf  =       $128            \default buffer
-tea     =       $200            \origin
-condef  =       55              \condef block offset in sim
 \fixed parameters
 plus    =       $ff             \plus sign
 minus   =       0               \minus sign
@@ -42,11 +37,55 @@ ctlx    =       $18             \cancel line
 ctll    =       $c              \cr-lf substitute
 delete  =       $7f             \backspace
 
+\ CP/M-65 entrypoints
+
+BDOS_WARMBOOT          =  0
+BDOS_CONIN             =  1
+BDOS_CONOUT            =  2
+BDOS_AUXIN             =  3
+BDOS_AUXOUT            =  4
+BDOS_LSTOUT            =  5
+BDOS_CONIO             =  6
+BDOS_GET_IOBYTE        =  7
+BDOS_SET_IOBYTE        =  8
+BDOS_PRINTSTRING       =  9
+BDOS_READLINE          = 10
+BDOS_CONST             = 11
+BDOS_GET_VERSION       = 12
+BDOS_RESET_DISK_SYSTEM = 13
+BDOS_SELECT_DRIVE      = 14
+BDOS_OPEN_FILE         = 15
+BDOS_CLOSE_FILE        = 16
+BDOS_FINDFIRST         = 17
+BDOS_FINDNEXT          = 18
+BDOS_DELETE_FILE       = 19
+BDOS_READ_SEQUENTIAL   = 20
+BDOS_WRITE_SEQUENTIAL  = 21
+BDOS_MAKE_FILE         = 22
+BDOS_RENAME_FILE       = 23
+BDOS_GET_LOGIN_VECTOR  = 24
+BDOS_GET_CURRENT_DRIVE = 25
+BDOS_SET_DMA           = 26
+BDOS_GET_ALLOC_VECTOR  = 27
+BDOS_WRITE_PROT_DRIVE  = 28
+BDOS_GET_READONLY_VEC  = 29
+BDOS_SET_FILE_ATTRS    = 30
+BDOS_GET_DPB           = 31
+BDOS_GET_SET_USER      = 32
+BDOS_READ_RANDOM       = 33
+BDOS_WRITE_RANDOM      = 34
+BDOS_SEEK_TO_END       = 35
+BDOS_SEEK_TO_SEQ_POS   = 36
+BDOS_RESET_DRIVES      = 37
+BDOS_WRITE_RANDOM_FILL = 40
+BDOS_GETTPA            = 41
+BDOS_GETZP             = 42
+
 \pblock definition
 
 .bss pblock, 165
-cpm_fcb = pblock
-cpm_default_dma = pblock + 0x25
+dflfcb = pblock
+dflbuf = pblock + 0x25
 
 \page zero variables
 
@@ -91,6 +130,9 @@ cpm_default_dma = pblock + 0x25
 .zp dfldrv, 1                           \default drive
 .zp lastzp, 0
 
+\console buffer
+.bss cnsbuf, 1
+.bss cnslng, 1
 .bss cnstxt, 128
 
 \destination file fcb
@@ -120,6 +162,8 @@ cpm_default_dma = pblock + 0x25
 \main program
 \-------------------------------
 
+BDOS = start - 3
+start:
         jmp     edit            \go execute
         .byte   "COPYRIGHT (C) 2009 - "
         .byte   "RICHARD A. LEARY"
@@ -132,40 +176,45 @@ clrzrp: sta     $0,x            \clear byte
         bne     clrzrp          \loop if more
 \send opening message
         lda     #<opnmsg        \point to it
-        ldy     #>opnmsg
+        ldx     #>opnmsg
         jsr     prtbuf          \send it
 \get console definition parameters from sim
-        lda     boot+2          \get high
-        sta     getsys+2        \and save
-        ldx     #condef+3       \get normal
-        jsr     getsys          \char
-        sta     normal          \and save
-        ldx     #condef+4       \same
-        jsr     getsys          \for
-        sta     invert          \invert
-        ldx     #condef+2       \and
-        jsr     getsys          \for
-        sta     forwar          \forward
-        ldx     #condef+1       \then
-        jsr     getsys          \for
-        sta     clreol          \clear to eol
-        ldx     #condef+0       \finally
-        jsr     getsys          \get
-        sta     backsp          \backspace
+		lda		#0
+		sta		normal
+		sta		invert
+		sta		forwar
+		sta		clreol
+		lda		#127
+		sta		backsp
+        \lda     boot+2          \get high
+        \sta     getsys+2        \and save
+        \ldx     #condef+3       \get normal
+        \jsr     getsys          \char
+        \sta     normal          \and save
+        \ldx     #condef+4       \same
+        \jsr     getsys          \for
+        \sta     invert          \invert
+        \ldx     #condef+2       \and
+        \jsr     getsys          \for
+        \sta     forwar          \forward
+        \ldx     #condef+1       \then
+        \jsr     getsys          \for
+        \sta     clreol          \clear to eol
+        \ldx     #condef+0       \finally
+        \jsr     getsys          \get
+        \sta     backsp          \backspace
 \find default drive
-        jsr     rdecur          \get from pem
+        jsr     rdecur          \get from BDOS
         sta     dfldrv          \and save for later
 \calculate pointers for text buffer
-        sec                     \set
-        lda     pem+1           \upper
-        ldy     pem+2           \text
-        sbc     #1              \limits
-        sta     txtlmt          \to
-        sta     maxtxt          \pem
-        bcs     *+3             \location
-        dey                     \minus
-        sty     txtlmt+1        \one
-        sty     maxtxt+1        \then
+		ldy		#BDOS_GETTPA	\set
+		jsr		BDOS			\upper
+		dex						\text
+		stx		txtlmt+1		\limits
+		stx		maxtxt+1		\to
+		lda		#0xff			\top
+		sta		txtlmt+0		\of
+		stx		maxtxt+0		\tpa (minus one)
         ldy     #0              \clear index
         tya                     \and accum
         sta     (txtlmt),y      \and insert a zero
@@ -186,7 +235,7 @@ tstmre: cmp     dflfcb,x        \do compare
         beq     tstblk          \otherwise test for blan in first position
 \there is an error in the file names
 nmeerr: lda     #<nmemsg        \point to error message
-        ldy     #>nmemsg
+        ldx     #>nmemsg
         jmp     prtbuf          \send it and return
 \keep going and check for blanks were needed
 tstblk: lda     #blank          \test for blank
@@ -240,9 +289,9 @@ stdsfc: lda     dflfcb,x        \default fcb
         beq     dstsme          \branch if same
         jsr     setdrv          \else set dest
         lda     #<dflfcb        \point
-        ldy     #>dflfcb        \to default
-        ldx     #17             \search
-        jsr     pem             \for it
+        ldx     #>dflfcb        \to default
+        ldy     #BDOS_FINDFIRST \search
+        jsr     BDOS            \for it
         bmi     dstsme          \ok if not
         lda     #<flxmsg        \else send
         ldy     #>flxmsg        \file exists
@@ -251,11 +300,11 @@ stdsfc: lda     dflfcb,x        \default fcb
 dstsme: lda     curdrv          \get current
         jsr     setdrv          \and set
         lda     #<dflfcb        \then
-        ldy     #>dflfcb        \open
+        ldx     #>dflfcb        \open
         jsr     opnfle          \source
         bne     srisok          \ok if there
         lda     #<dflfcb        \else
-        ldy     #>dflfcb        \create
+        ldx     #>dflfcb        \create
         jsr     crtfle          \it
         bne     *+5             \jump if ok
         jmp     doserr          \else error
@@ -267,23 +316,23 @@ srisok: lda     #<bakstr        \change
         ldy     #>bakstr        \destination
         jsr     chgtyp          \to .bak
         lda     #<dstfcb        \delete
-        ldy     #>dstfcb        \it if
+        ldx     #>dstfcb        \it if
         jsr     dltfle          \there
         lda     dstdrv          \if dest
         cmp     curdrv          \same as current
         beq     dntddd          \jump
         jsr     setdrv          \else
         lda     #<dstfcb        \delete
-        ldy     #>dstfcb        \it on
+        ldx     #>dstfcb        \it on
         jsr     dltfle          \destination
 dntddd: lda     #<dlrstr        \change
         ldy     #>dlrstr        \type
         jsr     chgtyp          \to .$$$
         lda     #<dstfcb        \delete
-        ldy     #>dstfcb        \it if
+        ldx     #>dstfcb        \it if
         jsr     dltfle          \there
         lda     #<dstfcb        \then
-        ldy     #>dstfcb        \create
+        ldx     #>dstfcb        \create
         jsr     crtfle          \it
         bne     *+5             \jump if ok
         jmp     dlxlex          \else exit
@@ -315,12 +364,12 @@ brklpe: pha                     \save error
         jsr     prcrbf          \message
         pla                     \then
         asl     a               \make index
-        tax
-        lda     errtbl,x        \get message address
-        ldy     errtbl+1,x
+        tay
+        lda     errtbl,y        \get message address
+        ldx     errtbl+1,y
         jsr     prtbuf          \print message
         lda     #<atmsg         \send
-        ldy     #>atmsg         \at
+        ldx     #>atmsg         \at
         jsr     prtbuf          \message
         lda     nxtchr          \then last
         jsr     chrout          \char
@@ -341,16 +390,16 @@ prsmre: lda     #0              \clear insert
         jsr     tstfon
         bne     nothlp          \no so try next
         lda     #<help0         \do first part
-        ldy     #>help0
+        ldx     #>help0
         jsr     prtbuf
         lda     #<help1         \then second part
-        ldy     #>help1
+        ldx     #>help1
         jsr     prtbuf
         lda     #<help2         \then third part
-        ldy     #>help2
+        ldx     #>help2
         jsr     prtbuf
         lda     #<help3         \and final part
-        ldy     #>help3
+        ldx     #>help3
         jsr     prtbuf
         jmp     prsmre          \and do main loop
 \e for end
@@ -507,7 +556,7 @@ lbflok: lda     #0              \clear
         sta     libfcb+13
         sta     libfcb+32       \and record
         lda     #<libfcb        \then
-        ldy     #>libfcb        \open
+        ldx     #>libfcb        \open
         jsr     opnfle          \file
         bne     *+7             \continue if ok
         lda     #3              \else send
@@ -526,7 +575,7 @@ notrlb: lda     #'Q'            \see if q
         jsr     tstvrf          \and verify
         bne     notqut          \branch if not
         lda     #<dstfcb        \else
-        ldy     #>dstfcb        \delete
+        ldx     #>dstfcb        \delete
         jsr     dltfle          \destination
         jmp     dlxlex          \and exit
 \number
@@ -710,15 +759,15 @@ notwrt: cmp     #'X'            \if not x
         bne     ntdlxl          \branch if not
         jsr     intxlb          \else
         lda     #<xlbfcb        \delete
-        ldy     #>xlbfcb        \the
+        ldx     #>xlbfcb        \the
         jsr     dltfle          \file
         jmp     prsmre          \and loop
 ntdlxl: jsr     intxlb          \else set up
         lda     #<xlbfcb        \then
-        ldy     #>xlbfcb        \delete
+        ldx     #>xlbfcb        \delete
         jsr     dltfle          \file
         lda     #<xlbfcb        \then
-        ldy     #>xlbfcb        \initialize
+        ldx     #>xlbfcb        \initialize
         jsr     crtfle          \it again
         bne     *+5             \branch if ok
         jmp     doserr          \else error
@@ -745,12 +794,12 @@ endxfr: bit     xlbind          \test index
         jsr     putxlb          \an eof
         jmp     endxfr          \and loop
 clsxfr: lda     #<xlbfcb        \write
-        ldy     #>xlbfcb        \final
+        ldx     #>xlbfcb        \final
         jsr     wrtrcr          \record
         beq     *+5             \continue if ok
         jmp     doserr          \else error
         lda     #<xlbfcb        \close
-        ldy     #>xlbfcb        \the
+        ldx     #>xlbfcb        \the
         jsr     clsfle          \file
         jmp     prsmre          \loop for more
 \null command
@@ -838,83 +887,88 @@ sndinc: inc     column          \bump column
 cnsout: bit     outflg          \test flag
         bpl     *+3             \print if clear
         rts
-        ldx     #2              \and send
-        jmp     pem             \through pem
+        ldy     #BDOS_CONOUT    \and send
+        jmp     BDOS            \through BDOS
 \read character from console
-cnsin:  ldx     #1
-        jmp     pem
+cnsin:  ldy     #BDOS_CONIN
+        jmp     BDOS
 \print string
-prtbuf: ldx     #9
-        jmp     pem
+prtbuf: ldy     #BDOS_PRINTSTRING
+        jmp     BDOS
 \print cr and lf and then string
 prcrbf: pha                     \save
         tya                     \string
         pha                     \pointer
         jsr     crlf            \do cr and lf
         pla                     \restore
-        tay                     \string
+        tax                     \string
         pla                     \pointer
         jmp     prtbuf          \and print
 \open file (z=1 if error)
-opnfle: ldx     #15
-        jsr     pem             \execute
-        cmp     #255            \see if bad
+opnfle: ldy     #BDOS_OPEN_FILE
+        jsr     BDOS            \execute
+		lda		#255
+		adc		#0				\see if bad
         rts
 \close file (z=1 if error)
-clsfle: ldx     #16
-        jsr     pem             \execute
-        cmp     #255            \see if bad
+clsfle: ldy     #BDOS_CLOSE_FILE
+        jsr     BDOS            \execute
+        lda     #255            \see if bad
+		adc		#0
         rts
 \delete file
-dltfle: ldx     #19
-        jmp     pem
+dltfle: ldy     #BDOS_DELETE_FILE
+        jmp     BDOS
 \read record
-rdercr: ldx     #20
-        jmp     pem
+rdercr: ldy     #BDOS_READ_SEQUENTIAL
+        jmp     BDOS
 \write record
-wrtrcr: ldx     #21
-        jmp     pem
+wrtrcr: ldy     #BDOS_WRITE_SEQUENTIAL
+        jmp     BDOS
 \create file (z=1 if error)
-crtfle: ldx     #22
-        jsr     pem             \execute
-        cmp     #255            \see if bad
+crtfle: ldy     #BDOS_MAKE_FILE
+        jsr     BDOS            \execute
+        lda     #255            \see if bad
+		adc		#0
         rts
 \rename file
-rnmfle: ldx     #23
-        jmp     pem
+rnmfle: ldy     #BDOS_RENAME_FILE
+        jmp     BDOS
 \check console status (z=1 if none)
-consts: ldx     #11
-        jsr     pem             \check for key
-        bne     *+3             \branch if ready
+consts: ldy     #BDOS_CONST
+        jsr     BDOS            \check for key
+		cmp		#0
+        beq     *+3             \branch if ready
         rts                     \else done
         jsr     cnsin           \clear input
         lda     #255            \and set z=0
         rts
 \read current drive
-rdecur: ldx     #25
-        jmp     pem
+rdecur: ldy     #BDOS_GET_CURRENT_DRIVE
+        jmp     BDOS
 \set drive
-setdrv: ldx     #14
-        jmp     pem
+setdrv: ldy     #BDOS_SELECT_DRIVE
+        jmp     BDOS
 \set buffer address
-setbuf: ldx     #26
-        jmp     pem
+setbuf: ldy     #BDOS_SET_DMA
+        jmp     BDOS
 \delete x$$$$$$$.lib and boot
 dlxlex: lda     curdrv          \set drive
         jsr     setdrv          \to current
         lda     #<xlbfcb        \point to
-        ldy     #>xlbfcb        \fcb
+        ldx     #>xlbfcb        \fcb
         jsr     dltfle          \delete it
         lda     dfldrv          \set drive to default
         jsr     setdrv
-        jmp     boot            \and boot
-\dos/65 error exit
+		ldy		#BDOS_WARMBOOT
+		jmp		BDOS			\and boot
+\CP/M-65 error exit
 doserr: jsr     crlf            \send a cr and lf
         lda     #<pemerr        \then send
         ldy     #>pemerr        \another cr and lf
         jsr     prcrbf          \and message
         lda     #<dstfcb        \close
-        ldy     #>dstfcb        \output
+        ldx     #>dstfcb        \output
         jsr     clsfle          \file
         jsr     crlf            \another cr and lf
         jmp     dlxlex          \and delete x$$$$$$$.lib and boot
@@ -929,7 +983,7 @@ intxlb: lda     #0              \clear
 stupxl: lda     curdrv          \set drive
         jsr     setdrv          \to current
         lda     #<xlbbuf        \then point
-        ldy     #>xlbbuf        \buffer
+        ldx     #>xlbbuf        \buffer
         jmp     setbuf          \to correct
 \clear source index to start
 clsind: lda     #<source        \get
@@ -941,14 +995,14 @@ clsind: lda     #<source        \get
 curdfl: lda     curdrv          \set
         jsr     setdrv          \drive
         lda     #<dflbuf        \then
-        ldy     #>dflbuf        \do
+        ldx     #>dflbuf        \do
         jmp     setbuf          \buffer
 \get char from .lib file
 getlib: ldx     libind          \get index
         bpl     lbinok          \use if <128
         jsr     curdfl          \else setup
         lda     #<libfcb        \then
-        ldy     #>libfcb        \read
+        ldx     #>libfcb        \read
         jsr     rdercr          \a record
         beq     *+5             \use if ok
         lda     #eof            \else get eof
@@ -1091,10 +1145,10 @@ rdesrc: jsr     clsind          \set index to start
         lda     #srclng/128     \and set sector
         sta     rdsccn          \count
 rdeslp: lda     srcind          \get current
-        ldy     srcind+1        \pointer
+        ldx     srcind+1        \pointer
         jsr     setbuf          \and set as buffer
         lda     #<dflfcb        \point
-        ldy     #>dflfcb        \to fcb
+        ldx     #>dflfcb        \to fcb
         jsr     rdercr          \read record
         beq     rdesok          \branch if ok
         bpl     *+5             \eof if positive
@@ -1118,7 +1172,7 @@ putxlb: ldx     xlbind          \get index
         pha                     \else save char
         jsr     stupxl          \set up for write
         lda     #<xlbfcb        \point
-        ldy     #>xlbfcb        \to fcb
+        ldx     #>xlbfcb        \to fcb
         jsr     wrtrcr          \write a record
         beq     *+5             \continue if ok
         jmp     doserr          \else error
@@ -1160,7 +1214,7 @@ tstvrf: pha                     \save char
         pla                     \get char
         jsr     cnsout          \and send it
         lda     #<qusmsg        \send
-        ldy     #>qusmsg        \-(y/n)?
+        ldx     #>qusmsg        \-(y/n)?
         jsr     prtbuf          \message
         jsr     cnsin           \get answer
         jsr     cnvlwr          \convert to upper case
@@ -1299,10 +1353,10 @@ wrtdv:  lsr     point+1         \by 128
         rts                     \else empty file
         jsr     cldind          \set index to start
 wrtdlp: lda     dstind          \then
-        ldy     dstind+1        \set buffer
+        ldx     dstind+1        \set buffer
         jsr     setbuf          \address
         lda     #<dstfcb        \point to
-        ldy     #>dstfcb        \fcb and
+        ldx     #>dstfcb        \fcb and
         jsr     wrtrcr          \write
         beq     *+5             \ok if zero
         jmp     doserr          \else error
@@ -1342,7 +1396,7 @@ clsdst: sec                     \get low
         jmp     clsdst          \and loop
 whlrec: jsr     wrtdst          \write it all
         lda     #<dstfcb        \then
-        ldy     #>dstfcb        \close
+        ldx     #>dstfcb        \close
         jsr     clsfle          \.$$$
         bne     *+5             \continue if ok
         jmp     doserr          \else error
@@ -1358,7 +1412,7 @@ dfdsmv: lda     dflfcb,x        \move source
         dex                     \fcb
         bpl     dfdsmv
         lda     #<dstfcb        \point
-        ldy     #>dstfcb        \to it
+        ldx     #>dstfcb        \to it
         jsr     rnmfle          \and name it .bak
         jsr     movnme          \put it in second
         lda     #<dlrstr        \change
@@ -1367,7 +1421,7 @@ dfdsmv: lda     dflfcb,x        \move source
         lda     dstdrv          \go to
         jsr     setdrv          \destination
         lda     #<dstfcb        \and end
-        ldy     #>dstfcb        \with
+        ldx     #>dstfcb        \with
         jmp     rnmfle          \it renamed
 \test for lower case (if lower case then c=1 else c=0)
 tstlwr: cmp     #'a'            \if less than "a"
@@ -1419,10 +1473,14 @@ ntinmd: bit     nomore          \test for no input
         sta     nomore          \status
         lda     #'*'            \send prompt
         jsr     chrout          \to console
+		lda		#0x80
+		sta		cnsbuf			\initialise console buffer
+		lda		#0
+		sta		cnslng
         lda     #<cnsbuf        \get
-        ldy     #>cnsbuf        \input
-        ldx     #10             \line
-        jsr     pem             \from dos
+        ldx     #>cnsbuf        \input
+        ldy     #BDOS_READLINE  \line
+        jsr     BDOS            \from dos
         lda     #lf             \echo a
         jsr     chrout          \linefeed
         lda     #0              \clear
@@ -1811,10 +1869,6 @@ errtbl: .word   cncmsg
         .word   lfemsg
 
 \buffers and fcbs
-
-\console buffer
-cnsbuf: .byte   128
-cnslng: .byte   0
 
 \.lib file fcb
 libfcb:
