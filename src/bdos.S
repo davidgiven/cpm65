@@ -277,6 +277,8 @@ jumptable_lo:
     .byte entry_GETBIOS@mos16lo ; get_bios = 38
     .byte unimplemented@mos16lo ; 39
     .byte entry_WRITERANDOMFILLED@mos16lo ; write_random_filled = 40
+    .byte bios_GETTPA@mos16lo ; get_tpa = 41
+    .byte bios_GETZP@mos16lo ; get_zp = 42
 jumptable_hi:
     .byte entry_EXIT@mos16hi ;exit_program = 0
     .byte entry_CONIN@mos16hi ; console_input = 1
@@ -319,6 +321,8 @@ jumptable_hi:
     .byte entry_GETBIOS@mos16hi ; 38
     .byte unimplemented@mos16hi ; 39
     .byte entry_WRITERANDOMFILLED@mos16hi ; write_random_filled = 40
+    .byte bios_GETTPA@mos16hi ; get_tpa = 41
+    .byte bios_GETZP@mos16hi ; get_zp = 42
 zendproc
 
 ; --- Misc ------------------------------------------------------------------
