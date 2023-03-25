@@ -483,7 +483,7 @@ static const Instruction simpleInsns[] = {
     {"BMI", 0x30, AM_ABS},
     {"BNE", 0xd0, AM_ABS},
     {"BPL", 0x10, AM_ABS},
-    {"BRK", 0x00, AM_ABS},
+    {"BRK", 0x00, AM_IMP},
     {"BVC", 0x50, AM_ABS},
     {"BVS", 0x70, AM_ABS},
     {"CLC", 0x18, AM_IMP},
@@ -1338,6 +1338,8 @@ static void parse()
                             am = AM_ABS;
                         if (!(insn->addressingModes & am))
                             fatal("invalid addressing mode");
+						if ((insn->opcode == 0xa2) && (am == AM_YOFF))
+							am = AM_XOFF; /* ldx abs,y is special */
 
                         uint8_t op = insn->opcode;
                         if (!(getInsnProps(op) & BPROP_RELATIVE))
