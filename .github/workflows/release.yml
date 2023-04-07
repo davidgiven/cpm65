@@ -1,0 +1,64 @@
+name: C/C++ CI
+
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: apt
+      run: sudo apt update && sudo apt install cc1541 cpmtools
+
+    - name: cache llvm-mos
+      id: cache-llvm-mos
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-llvm-mos
+      with:
+        path: ~/llvm-mos
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+
+    - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
+      name: install llvm-mos
+      run: |
+        curl -L https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xvJf - -C $HOME
+
+    - name: make
+      run: PATH=$PATH:$HOME/llvm-mos/bin make
+
+    - name: zip
+      run: |
+        zip -9 cpm65.zip README.md bbcmicro.ssd c64.d64 x16.zip diskdefs
+
+    - name: date
+      run: |
+        echo "RELEASE_DATE=$(date --rfc-3339=date)" >> ${GITHUB_ENV}
+
+    - name: tag
+      uses: EndBug/latest-tag@latest
+      with:
+        tag-name: dev
+        force-branch: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: delete-old-assets
+      uses: mknejp/delete-release-assets@v1
+      with:
+        token: ${{ github.token }}
+        tag: dev
+        assets: | 
+          cpm65.zip
+        fail-if-no-assets: false
+
+    - name: release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Development build ${{ env.RELEASE_DATE }}
+        files: |
+          cpm65.zip
+        tag_name: dev
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
