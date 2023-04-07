@@ -1,12 +1,16 @@
-name: C/C++ CI
+name: Autorelease
 
-on: [push]
+on:
+  push:
+    branches:
+      - "master"
 
 jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
+
     - name: apt
       run: sudo apt update && sudo apt install cc1541 cpmtools
 
