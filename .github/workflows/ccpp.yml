@@ -1,0 +1,39 @@
+name: C/C++ CI
+
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v1
+    - name: apt
+      run: sudo apt update && sudo apt install cc1541 cpmtools
+
+    - name: cache llvm-mos
+      id: cache-llvm-mos
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-llvm-mos
+      with:
+        path: llvm-mos
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+
+    - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
+      name: install llvm-mos
+      run: |
+        curl -L https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xvaf - -C /tmp
+
+    - name: make
+      run: PATH=$PATH:$PWD/llvm-mos/bin make
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ github.event.repository.name }}.${{ github.sha }}
+        path: |
+          bbcmicro.ssd
+          c64.d64
+          x16.zip
+          diskdefs
+
