@@ -31,10 +31,6 @@ jobs:
     - name: make
       run: PATH=$PATH:$HOME/llvm-mos/bin make
 
-    - name: zip
-      run: |
-        zip -9 cpm65.zip README.md bbcmicro.ssd c64.d64 x16.zip diskdefs
-
     - name: date
       run: |
         echo "RELEASE_DATE=$(date --rfc-3339=date)" >> ${GITHUB_ENV}
@@ -54,6 +50,9 @@ jobs:
         tag: dev
         assets: | 
           cpm65.zip
+          bbcmicro.ssd
+          c64.d64
+          x16.zip
         fail-if-no-assets: false
 
     - name: release
