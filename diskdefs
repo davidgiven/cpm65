@@ -28,6 +28,17 @@ diskdef c1541
 	os 2.2
 end
 
+diskdef apple-po
+  seclen 256
+  tracks 35
+  sectrk 16
+  blocksize 1024
+  maxdir 64
+  skewtab 0,9,3,12,6,15,1,10,4,13,7,8,2,11,5,14
+  boottrk 3
+  os 2.2
+end
+
 diskdef generic-1m
 	seclen 128
 	tracks 128

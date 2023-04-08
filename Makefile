@@ -34,7 +34,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: c64.d64 bbcmicro.ssd x16.zip bin/cpmemu
+all: apple2e.po c64.d64 bbcmicro.ssd x16.zip bin/cpmemu
 
 $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
@@ -149,6 +149,12 @@ x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
 	printf "@ x16.exe\n@=CPM\n" | zipnote -w $@
 	printf "@ bdos.img\n@=BDOS\n" | zipnote -w $@
 	printf "@ generic-1m-cpmfs.img\n@=CPMFS\n" | zipnote -w $@
+
+apple2e.po: $(OBJDIR)/apple2e.exe $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
+	@rm -f $@
+	mkfs.cpm -f apple-po -b $(OBJDIR)/apple2e.exe $@
+	cpmcp -f apple-po $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	truncate -s 143360 $@
 
 clean:
 	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.zip
