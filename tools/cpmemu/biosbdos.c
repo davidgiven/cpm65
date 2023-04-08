@@ -494,6 +494,7 @@ void bdos_entry(uint8_t bdos_call)
         case 35: bdos_filelength(); return;
 		case 38: set_result(BIOS_ADDRESS, true); return;
         case 40: bdos_readwriterandom(file_write); return;
+		case 41: set_result((TPA_BASE>>8) | (TPA_END&0xff), true); return;
             // clang-format on
     }
 

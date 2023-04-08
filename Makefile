@@ -7,11 +7,12 @@ CFLAGS65 = -Os -g -fnonreentrant
 OBJDIR = .obj
 
 APPS = \
-	$(OBJDIR)/dump.com \
 	$(OBJDIR)/submit.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/asm.com \
+	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/third_party/dos65/edit205.com \
 	cpmfs/asm.txt \
 	cpmfs/readme.txt \
 	cpmfs/hello.asm \
@@ -83,7 +84,7 @@ $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
-$(OBJDIR)/%.com: apps/%.asm $(OBJDIR)/asm.com bin/cpmemu
+$(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu
 	@mkdir -p $(dir $@)
 	bin/cpmemu $(OBJDIR)/asm.com -pA=$(dir $<) -pB=$(dir $@) \
 		a:$(notdir $<) b:$(notdir $@)

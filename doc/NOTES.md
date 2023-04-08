@@ -43,6 +43,8 @@ and the parameter in XA. C is set on error.
 37: reset some drives
 38: get BDOS entrypoint
 40: write random with zero fill
+41: calls the BIOS GETTPA entrypoint
+42: calls the BIOS GETZP entrypoint
 
 BIOS system calls: https://www.seasip.info/Cpm/bios.html The entrypoint can be
 fetched with BDOS call 38 (which is new).  Call with the function code in Y and

@@ -190,6 +190,10 @@ enum
 
 #define ILLEGAL 0xff
 
+static void createLabelDefinition(SymbolRecord* r);
+static void consumeExpression();
+static void printSymbol(SymbolRecord* r);
+
 /* --- I/O --------------------------------------------------------------- */
 
 static void cr(void)
@@ -206,6 +210,7 @@ static void printnl(const char* msg)
 
 static void errormessage(const char* msg)
 {
+    cpm_delete_file(&destFcb);
     cpm_printstring("Error: ");
     if (lineNumber)
     {
@@ -219,7 +224,6 @@ static void __attribute__((noreturn)) fatal(const char* msg)
 {
     errormessage(msg);
     cr();
-    cpm_delete_file(&destFcb);
     cpm_warmboot();
 }
 
@@ -308,6 +312,8 @@ static char consumeToken()
         case ',':
         case '+':
         case '-':
+		case '*':
+		case '/':
         case '(':
         case ')':
         case '<':
@@ -321,7 +327,7 @@ static char consumeToken()
         }
     }
 
-    if (isalpha(currentByte) || (currentByte == '$'))
+    if (isalpha(currentByte))
     {
         do
         {
@@ -335,7 +341,7 @@ static char consumeToken()
         return token;
     }
 
-    if (isdigit(currentByte))
+    if (isdigit(currentByte) || (currentByte == '$'))
     {
         tokenValue = 0;
         uint8_t base = 10;
@@ -361,6 +367,11 @@ static char consumeToken()
                     break;
             }
         }
+		else if (currentByte == '$')
+		{
+			consumeByte();
+			base = 16;
+		}
 
         for (;;)
         {
@@ -468,11 +479,11 @@ static const Instruction simpleInsns[] = {
     {"BCC", 0x90, AM_ABS},
     {"BCS", 0xb0, AM_ABS},
     {"BEQ", 0xf0, AM_ABS},
-    {"BIT", 0x24, AM_ZP | AM_ABS},
+    {"BIT", 0x20, AM_ZP | AM_ABS},
     {"BMI", 0x30, AM_ABS},
     {"BNE", 0xd0, AM_ABS},
     {"BPL", 0x10, AM_ABS},
-    {"BRK", 0x00, AM_ABS},
+    {"BRK", 0x00, AM_IMP},
     {"BVC", 0x50, AM_ABS},
     {"BVS", 0x70, AM_ABS},
     {"CLC", 0x18, AM_IMP},
@@ -837,6 +848,19 @@ static void postProcessConstant()
     tokenPostProcessing = PP_NONE;
 }
 
+/* Returns the current value, that is, the LHS */
+static uint16_t consumeRhs()
+{
+	if (tokenVariable)
+		fatal("bad operator");
+	uint16_t lhs = tokenValue;
+	consumeToken();
+	consumeExpression();
+	if (tokenVariable)
+		fatal("bad operator");
+	return lhs;
+}
+
 static void consumeExpression()
 {
     tokenVariable = NULL;
@@ -858,13 +882,23 @@ static void consumeExpression()
         case TOKEN_NUMBER:
             consumeToken();
             postProcessConstant();
-            return;
+            break;
 
+		case '*':
         case TOKEN_ID:
         {
-            SymbolRecord* r = addOrFindSymbol();
-            if (r->type == SYMBOL_UNINITIALISED)
-                r->type = SYMBOL_REFERENCE;
+            SymbolRecord* r;
+			if (token == '*')
+			{
+				r = appendAnonymousSymbol();
+				createLabelDefinition(r);
+			}
+			else
+			{
+				r = addOrFindSymbol();
+				if (r->type == SYMBOL_UNINITIALISED)
+					r->type = SYMBOL_REFERENCE;
+			}
 
             uint16_t offset;
             if (r->type == SYMBOL_COMPUTED)
@@ -890,13 +924,36 @@ static void consumeExpression()
                 consumeToken();
             }
             tokenValue = offset;
-
-            return;
+            break;
         }
 
         default:
             syntaxError();
     }
+
+	switch (token)
+	{
+		case '/':
+		{
+			uint16_t lhs = consumeRhs();
+			tokenValue = lhs / tokenValue;
+			break;
+		}
+
+		case '+':
+		{
+			uint16_t lhs = consumeRhs();
+			tokenValue = lhs + tokenValue;
+			break;
+		}
+
+		case '-':
+		{
+			uint16_t lhs = consumeRhs();
+			tokenValue = lhs - tokenValue;
+			break;
+		}
+	}
 }
 
 static void consumeConstExpression()
@@ -951,6 +1008,7 @@ static AddressingMode consumeArgument()
                 return AM_A;
             }
             /* fall through */
+		case '*':
         case TOKEN_NUMBER:
             consumeExpression();
             if (token == ',')
@@ -1280,6 +1338,8 @@ static void parse()
                             am = AM_ABS;
                         if (!(insn->addressingModes & am))
                             fatal("invalid addressing mode");
+						if ((insn->opcode == 0xa2) && (am == AM_YOFF))
+							am = AM_XOFF; /* ldx abs,y is special */
 
                         uint8_t op = insn->opcode;
                         if (!(getInsnProps(op) & BPROP_RELATIVE))
@@ -1297,7 +1357,7 @@ static void parse()
                 {
                     createLabelDefinition(r);
                     consumeToken();
-                    break;
+                    continue;
                 }
                 else if (token == '=')
                 {
@@ -1332,6 +1392,14 @@ exit:
 
 /* --- Code placement ---------------------------------------------------- */
 
+static void printSymbol(SymbolRecord* r)
+{
+	uint8_t namelen = (r->record.descr & 0x1f) - offsetof(SymbolRecord, name);
+	uint8_t i = 0;
+	while (namelen--)
+		cpm_conout(r->name[i++]);
+}
+
 static bool placeCode(uint8_t pass)
 {
     bool changed = false;
@@ -1350,10 +1418,7 @@ static bool placeCode(uint8_t pass)
                 if (s->type == SYMBOL_REFERENCE)
                 {
                     errormessage("unresolved forward reference: ");
-                    uint8_t namelen = len - offsetof(SymbolRecord, name);
-                    uint8_t i = 0;
-                    while (namelen--)
-                        cpm_conout(s->name[i++]);
+					printSymbol(s);
                     cr();
                     cpm_warmboot();
                 }
@@ -1398,8 +1463,16 @@ static bool placeCode(uint8_t pass)
                 }
                 else if (bprops & BPROP_RELATIVE)
                 {
-                    if (!s->variable || (s->variable->type != SYMBOL_TEXT))
-                        fatal("branch to non-text address");
+					if (!s->variable)
+                        fatal("relative branch to constant");
+                    if (s->variable->type != SYMBOL_TEXT)
+					{
+						errormessage("branch to non-text label: ");
+						printSymbol(s->variable);
+						cr();
+						printf("%x\n", s->opcode);
+						cpm_warmboot();
+					}
 
                     if (pass == 0)
                         len = defaultBranchSize;
