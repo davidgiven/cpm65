@@ -29,7 +29,7 @@ TALKSA = $ff96
 CLRCHN = $ffcc
 GETIN = $ffe4
 SCREEN_MODE = $ff5f
-STATUS = $289
+STATUS = $0287
 
 ZEROPAGE
 
@@ -120,8 +120,8 @@ _start:
     jsr TALKSA
 
     ldy #0
+	sty STATUS
     zrepeat
-		sty STATUS
         jsr ACPTR       ; read a byte
         sta (ptr), y
 
