@@ -18,7 +18,7 @@ SECTIONS {
 
 	.bss (0x10000-BIOS_SIZE) (NOLOAD) : {
 		*(.bss .bss.*)
-	} >highram AT>ram
+	} >highram
 
 	.data : {
 		bios_exec_addr = .;
@@ -30,6 +30,9 @@ SECTIONS {
 		*(.text .text.*) 
 	} >highram AT>ram
 
+	.dummy : {
+		BIOS_SECTOR_COUNT = ((. - LOADADDR(.loader)) + 255) / 256;
+	} AT>ram
 }
 
 OUTPUT_FORMAT {

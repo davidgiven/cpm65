@@ -16,7 +16,7 @@ ptr1:   .word 0
 ; Boot sector and relocator. Loaded at 0x0800 when the disk boots. Called once
 ; on startup and then never again.
 .section loader, "ax"
-	.byte 1 ; number of sectors in boot image
+	.byte BIOS_SECTOR_COUNT ; boot loader loads this many sectors
 _start:
     cli
 	lda	0xc088, x			; turn off disk motor
@@ -45,6 +45,21 @@ _start:
         zendif
     zendloop
 
+    jmp _init
+
+banner: ; reversed!
+    .byte 13, 10
+    .ascii "56-M/PC"
+banner_end:
+
+    ; One byte to spare here. This must be at offset 0x3f in the disk
+    ; image in order to spoof emulators into thinking this is a ProDOS
+    ; format.
+
+    .org 0x3a
+    .ascii "PRODOS"
+
+_init:
     ; Print the startup banner.
 
     jsr clear_screen
@@ -59,16 +74,39 @@ _start:
         dey
     zuntil_eq
 
-    zloop
-        lda #'q'
-        jsr write_char
-    zendloop
-	jmp .
 
-banner: ; reversed!
-    .byte 13, 10
-    .ascii "56-M/PC"
-banner_end:
+    ; Build the GCR tables.
+
+    ldy #0
+    ldx #0x16
+    zrepeat
+        stx ptr
+        txa
+        asl a
+        bit ptr
+        zif_ne
+            ora ptr
+            eor #0xff
+            and #0x7e
+            zrepeat
+                bcs skipthis
+                lsr a
+            zuntil_eq
+                
+            tya
+            sta decode_tab - 0x16, x
+
+            txa
+            ora #0x80
+            sta encode_tab, y
+
+            iny
+        skipthis:
+        zendif
+        inx
+    zuntil_mi
+
+	jmp .
 
 ; Given a row number in A, set ptr to the address of that
 ; row of video memory.
@@ -217,7 +255,13 @@ zproc bios
     rts
 zendproc
 
+.bss
+
+encode_tab: .fill 64
+decode_tab: .fill 20
+
 ; This must go last --- it's the three 6502 vectors.
+.text
 nmi_handler:
 reset_handler:
 irq_handler:

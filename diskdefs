@@ -28,13 +28,16 @@ diskdef c1541
 	os 2.2
 end
 
-diskdef apple-po
+# This produces .po files, so there's implicit soft sector skewing intended to
+# be done in the backend. Note that the boot are read in physical sector order
+# and so need to be specially skewed so that one they're ProDOS skewed each
+# sector gets put back in physical order. Sigh, Apple II disk formats.
+diskdef appleiie
   seclen 256
   tracks 35
   sectrk 16
   blocksize 1024
   maxdir 64
-  skewtab 0,9,3,12,6,15,1,10,4,13,7,8,2,11,5,14
   boottrk 3
   os 2.2
 end

@@ -48,6 +48,10 @@ bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
 
+bin/shuffle: $(OBJDIR)/tools/shuffle.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -o $@ $<
+
 $(OBJDIR)/third_party/%.o: third_party/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -154,10 +158,13 @@ x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
 	printf "@ bdos.img\n@=BDOS\n" | zipnote -w $@
 	printf "@ generic-1m-cpmfs.img\n@=CPMFS\n" | zipnote -w $@
 
-apple2e.po: $(OBJDIR)/apple2e.bios $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
+$(OBJDIR)/apple2e.bios.swapped: $(OBJDIR)/apple2e.bios bin/shuffle
+	bin/shuffle -i $< -o $@ -b 256 -t 16 -r -m 02468ace13579bdf
+
+apple2e.po: $(OBJDIR)/apple2e.bios.swapped $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys Makefile diskdefs bin/shuffle
 	@rm -f $@
-	mkfs.cpm -f apple-po -b $(OBJDIR)/apple2e.bios $@
-	cpmcp -f apple-po $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.bios.swapped $@
+	cpmcp -f appleiie $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	truncate -s 143360 $@
 
 clean:
