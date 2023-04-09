@@ -45,17 +45,30 @@ _start:
         zendif
     zendloop
 
+    ; Print the startup banner.
+
     jsr clear_screen
+    ldy #banner_end - banner
+    zrepeat
+        tya
+        pha
+        lda banner-1, y
+        jsr write_char
+        pla
+        tay
+        dey
+    zuntil_eq
+
     zloop
-        zrepeat
-            lda 0xc000
-        zuntil_mi
-        sta 0xc010
-        and #0x7f
+        lda #'q'
         jsr write_char
     zendloop
-
 	jmp .
+
+banner: ; reversed!
+    .byte 13, 10
+    .ascii "56-M/PC"
+banner_end:
 
 ; Given a row number in A, set ptr to the address of that
 ; row of video memory.
@@ -123,7 +136,18 @@ zproc read_char
     rts
 zendproc
 
+; Writes the character in A.
+
 zproc write_char
+    cmp #13
+    zif_eq
+        lda #0
+        sta cursorx
+        rts
+    zendif
+    cmp #10
+    beq write_nl
+
     tay
     lda cursory
     jsr calculate_screen_address
@@ -136,21 +160,57 @@ zproc write_char
     lda cursorx
     cmp #40
     zif_eq
-        inc cursory
-        lda cursory
-        cmp #25
-        zif_eq
-            jsr scroll_up
-            lda #24
-            sta cursory
-        zendif
         lda #0
         sta cursorx
+        jmp write_nl
+    zendif
+    rts
+zendproc
+
+zproc write_nl
+    inc cursory
+    lda cursory
+    cmp #25
+    zif_eq
+        dec cursory
+        jmp scroll_up
     zendif
     rts
 zendproc
 
 zproc scroll_up
+    lda #0              ; current line
+    zrepeat
+        tax
+        jsr calculate_screen_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        inx
+        txa
+        jsr calculate_screen_address ; ptr is source pointer
+
+        pha             ; push current line
+        ldy #39
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+        pla
+
+        cmp #24
+    zuntil_eq
+
+    ldy #39
+    lda #32|0x80
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
 zendproc
 
 zproc bios
