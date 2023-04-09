@@ -100,8 +100,7 @@ $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 
 $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts/apple2e.ld
 	@mkdir -p $(dir $@)
-	$(eval BIOS_SIZE := $(shell llvm-objdump --section-headers $(OBJDIR)/src/bios/apple2e.o  | awk '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }'))
-	ld.lld -Map $(patsubst %.bios,%.map,$@) --defsym=BIOS_SIZE=$(BIOS_SIZE) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a
+	ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/src/bios/apple2e.o  | awk '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 	
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
