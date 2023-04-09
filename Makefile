@@ -98,6 +98,11 @@ $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
+$(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts/apple2e.ld
+	@mkdir -p $(dir $@)
+	$(eval BIOS_SIZE := $(shell llvm-objdump --section-headers $(OBJDIR)/src/bios/apple2e.o  | awk '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }'))
+	ld.lld -Map $(patsubst %.bios,%.map,$@) --defsym=BIOS_SIZE=$(BIOS_SIZE) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a
+	
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a
@@ -150,14 +155,14 @@ x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
 	printf "@ bdos.img\n@=BDOS\n" | zipnote -w $@
 	printf "@ generic-1m-cpmfs.img\n@=CPMFS\n" | zipnote -w $@
 
-apple2e.po: $(OBJDIR)/apple2e.exe $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
+apple2e.po: $(OBJDIR)/apple2e.bios $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
-	mkfs.cpm -f apple-po -b $(OBJDIR)/apple2e.exe $@
+	mkfs.cpm -f apple-po -b $(OBJDIR)/apple2e.bios $@
 	cpmcp -f apple-po $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	truncate -s 143360 $@
 
 clean:
-	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.zip
+	rm -rf $(OBJDIR) apple2e.po c64.d64 bbcmicro.ssd x16.zip
 
 .DELETE_ON_ERROR:
 .SECONDARY:
