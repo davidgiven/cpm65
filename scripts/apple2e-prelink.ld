@@ -1,8 +1,12 @@
+/* This performs a fake link, so that we can see how big the BIOS is going to
+ * be, so it can get placed properly at the end of memory in the real link.
+ * Sigh, ld. */
+
 MEMORY {
     zp : ORIGIN = 2, LENGTH = 0xfe
     ram (rw) : ORIGIN = 0x800, LENGTH = 0x1000
-	midram (rw) : ORIGIN = 0xd000, LENGTH = 0x1000
-	highram (rw) : ORIGIN = 0xe000, LENGTH = 0x2000
+	midram (rw) : ORIGIN = 0x8000, LENGTH = 0x1000
+	highram (rw) : ORIGIN = 0x9000, LENGTH = 0x4000
 }
 
 SECTIONS {
@@ -35,9 +39,4 @@ SECTIONS {
 		BIOS_SECTOR_COUNT = ((. - LOADADDR(.loader)) + 255) / 256;
 	} AT>ram
 }
-
-OUTPUT_FORMAT {
-	TRIM(ram)
-}
-
 
