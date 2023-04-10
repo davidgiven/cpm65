@@ -162,9 +162,14 @@ x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
 $(OBJDIR)/apple2e.bios.swapped: $(OBJDIR)/apple2e.bios bin/shuffle
 	bin/shuffle -i $< -o $@ -b 256 -t 16 -r -m 02468ace13579bdf
 
-apple2e.po: $(OBJDIR)/apple2e.bios.swapped $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys Makefile diskdefs bin/shuffle
+$(OBJDIR)/apple2e.boottracks: $(OBJDIR)/apple2e.bios.swapped $(OBJDIR)/bdos.img
+	cp $(OBJDIR)/apple2e.bios.swapped $@
+	truncate -s 4096 $@
+	cat $(OBJDIR)/bdos.img >> $@
+
+apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys Makefile diskdefs bin/shuffle
 	@rm -f $@
-	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.bios.swapped $@
+	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.boottracks $@
 	cpmcp -f appleiie $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	truncate -s 143360 $@
 

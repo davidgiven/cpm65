@@ -133,7 +133,7 @@ _init:
 
     lda #0
     sta ptr1+0
-    lda #0xe0
+    lda #>__TPA1_START__
     sta ptr1+1
     zrepeat
         lda ptr1+1
@@ -151,15 +151,31 @@ _init:
 
         inc ptr1+1
         lda ptr1+1
-        cmp #0xf0
+        and #0x0f
     zuntil_eq
 
-    jmp .
+label:
+    ; Relocate the BDOS.
+
+    lda #>__TPA1_START__
+    ldx #__ZEROPAGE_START__
+    jsr entry_RELOCATE
+	
+    ; Compute the entry address and jump.
+
+    lda #>__TPA1_START__
+    pha
+    lda #COMHDR_ENTRY-1 ; rts addresses are one before the target
+    pha
+
+    lda #<biosentry
+    ldx #>biosentry
+    rts                 ; indirect jump
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
 ; BIOS entry point. Parameter is in XA, function in Y.
-biosentry:
+zproc biosentry
     pha
     lda biostable_lo, y
     sta ptr+0
@@ -198,6 +214,7 @@ biostable_hi:
     .byte entry_GETZP@mos16hi
     .byte entry_SETZP@mos16hi
     .byte entry_SETBANK@mos16hi
+zendproc
 
 entry_CONST:
 entry_CONIN:
@@ -207,12 +224,42 @@ entry_SETSEC:
 entry_SETDMA:
 entry_READ:
 entry_WRITE:
-entry_GETTPA:
-entry_SETTPA:
-entry_GETZP:
-entry_SETZP:
-entry_SETBANK:
     rts
+
+zproc entry_GETTPA
+	ldy current_bank
+    lda mem_base, y
+    ldx mem_end, y
+    clc
+    rts
+zendproc
+
+zproc entry_SETTPA
+	ldy current_bank
+    sta mem_base, y
+    stx mem_end, y
+    clc
+    rts
+zendproc
+
+zproc entry_GETZP
+    lda zp_base
+    ldx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETZP
+    sta zp_base
+    stx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETBANK
+	sta current_bank
+    rts
+zendproc
 
 ; --- Disk handling ---------------------------------------------------------
 
@@ -544,10 +591,16 @@ zendproc
 .data
 prodos_sector_map:
     .byte 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15
-.bss
 
+zp_base:    .byte __ZEROPAGE_START__
+zp_end:     .byte __ZEROPAGE_END__
+mem_base:   .byte __TPA0_START__@mos16hi, __TPA1_START__@mos16hi
+mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
+
+.bss
 cursorx: .fill 1
 cursory: .fill 1
+current_bank:     .byte 0
 disk_slot: .fill 1
 current_phase: .fill 1
 disk_twos_buffer: .fill 86

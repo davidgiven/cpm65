@@ -3,7 +3,7 @@
  * Sigh, ld. */
 
 MEMORY {
-    zp : ORIGIN = 2, LENGTH = 0xfe
+    zp : ORIGIN = 0, LENGTH = 0x100
     ram (rw) : ORIGIN = 0x800, LENGTH = 0x1000
 	midram (rw) : ORIGIN = 0x8000, LENGTH = 0x1000
 	highram (rw) : ORIGIN = 0x9000, LENGTH = 0x4000
@@ -12,8 +12,8 @@ MEMORY {
 SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
-		__USERZEROPAGE_START__ = .;
-		__USERZEROPAGE_END__ = 0x100;
+		__ZEROPAGE_START__ = .;
+		__ZEROPAGE_END__ = 0x100;
 	} >zp
 
 	.loader : {
@@ -38,5 +38,11 @@ SECTIONS {
 	.dummy : {
 		BIOS_SECTOR_COUNT = ((. - LOADADDR(.loader)) + 255) / 256;
 	} AT>ram
+
+	__TPA1_START__ = 0x9000;
+	__TPA1_END__   = 0xc000;
+
+	__TPA0_START__ = 0x0800;
+	__TPA0_END__   = 0xc000;
 }
 
