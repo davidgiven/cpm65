@@ -154,23 +154,17 @@ _init:
         and #0x0f
     zuntil_eq
 
-label:
     ; Relocate the BDOS.
 
     lda #>__TPA1_START__
     ldx #__ZEROPAGE_START__
     jsr entry_RELOCATE
 	
-    ; Compute the entry address and jump.
-
-    lda #>__TPA1_START__
-    pha
-    lda #COMHDR_ENTRY-1 ; rts addresses are one before the target
-    pha
+    ; Go!
 
     lda #<biosentry
     ldx #>biosentry
-    rts                 ; indirect jump
+    jmp __TPA1_START__ + COMHDR_ENTRY
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -340,7 +334,7 @@ zproc read_sector
     zrepeat
         dex
         zif_mi
-            ldx #0x56
+            ldx #0x55
         zendif
         lda disk_buffer, y
         lsr disk_twos_buffer, x
