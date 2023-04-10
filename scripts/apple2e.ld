@@ -1,6 +1,6 @@
 MEMORY {
     zp : ORIGIN = 2, LENGTH = 0xfe
-    ram (rw) : ORIGIN = 0x800, LENGTH = 0x200
+    ram (rw) : ORIGIN = 0x800, LENGTH = 0x1000
 	midram (rw) : ORIGIN = 0xd000, LENGTH = 0x1000
 	highram (rw) : ORIGIN = 0xe000, LENGTH = 0x2000
 }

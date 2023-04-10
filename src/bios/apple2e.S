@@ -5,23 +5,38 @@
 #include "zif.inc"
 #include "cpm65.inc"
 
+IWMPH0OFF   = 0xc080 ; stepper motor phase off
+IWMPH0ON    = 0xc081 ; stepper motor phase on
+IWMMOTOROFF = 0xc080 ; motor off
+IWMMOTORON  = 0xc089 ; motor on
+IWMSELDRV1  = 0xc08a ; selects drive 1
+IWMQ6L      = 0xc08c ; read
+IWMQ6H      = 0xc08d
+IWMQ7L      = 0xc08e ; write protect sense/read
+IWMQ7H      = 0xc08f
+
+DECODE_TABLE_START = 0x96
+
 .global _start
 ZEROPAGE
 
 ptr:    .word 0
 ptr1:   .word 0
 
+disk_buffer = 0x300
+
 ; --- Initialisation code ---------------------------------------------------
 
 ; Boot sector and relocator. Loaded at 0x0800 when the disk boots. Called once
 ; on startup and then never again.
 .section loader, "ax"
-	.byte BIOS_SECTOR_COUNT ; boot loader loads this many sectors
+    .byte BIOS_SECTOR_COUNT ; boot loader loads this many sectors
 _start:
     cli
-	lda	0xc088, x			; turn off disk motor
+    ;lda IWMMOTOROFF, x      ; turn off disk motor
     sta 0xc08b              ; R/W 0xe000 RAM; bank 1 in 0xd000
     sta 0xc08b              ; yes, I'm sure
+    stx disk_slot           ; save disk slot number
     ldx #0xff
     txs                     ; reset stack
 
@@ -74,39 +89,224 @@ _init:
         dey
     zuntil_eq
 
-
     ; Build the GCR tables.
 
+    ldx #0x03
     ldy #0
-    ldx #0x16
     zrepeat
-        stx ptr
+        stx ptr+0
         txa
-        asl a
-        bit ptr
-        zif_ne
-            ora ptr
-            eor #0xff
-            and #0x7e
-            zrepeat
-                bcs skipthis
-                lsr a
-            zuntil_eq
-                
-            tya
-            sta decode_tab - 0x16, x
+        asl a               ; check for double ones
+        bit ptr+0
+        beq reject
 
-            txa
-            ora #0x80
-            sta encode_tab, y
+        ora ptr+0           ; check for double zeros
+        eor #0xff
+        and #0x7e
+        zrepeat
+            bcs reject
+            lsr a
+        zuntil_eq
 
-            iny
-        skipthis:
-        zendif
+        txa
+        ora #0x80
+        sta encode_tab, y
+
+        tya
+        sta decode_tab - DECODE_TABLE_START + 0x80, x
+
+        iny
+    reject:
         inx
     zuntil_mi
 
-	jmp .
+    ; Initialise the disk.
+
+    lda #0
+    sta current_phase
+
+    lda #0
+    jsr read_sector
+
+    jmp .
+
+; Read sector with physical id A from the current track, into disk_buffer.
+
+zproc read_sector
+    sta ptr+1
+    ldx disk_slot
+
+    zrepeat
+        ; Wait for a matching sector header.
+
+        zrepeat
+            zrepeat
+                jsr read_header
+                cpy #0x96
+            zuntil_eq
+            jsr read_gcr44
+            jsr read_gcr44
+            jsr read_gcr44
+            cmp ptr+1
+        zuntil_eq
+
+        ; Wait for the next data header.
+
+        jsr read_header
+        cpy #0xad
+        zif_ne
+            sec
+            rts
+        zendif
+
+        ; Reads the first section of the sector data (the twos) into the special
+        ; buffer.
+
+        ldy #0x56
+        lda #0                  ; accumulated checksum
+        zrepeat
+            sty ptr+0
+            zrepeat
+                ldy IWMQ6L, x
+            zuntil_mi
+            eor decode_tab-DECODE_TABLE_START, y
+            ldy ptr+0
+            dey
+            sta disk_twos_buffer, y
+        zuntil_eq
+
+        ; Reads the second section (the sixes) into the output buffer.
+        ; Y is 0 on entry
+
+        zrepeat
+            sty ptr+0
+            zrepeat
+                ldy IWMQ6L, x
+            zuntil_mi
+            eor decode_tab-DECODE_TABLE_START, y
+            ldy ptr+0
+            sta disk_buffer, y
+            iny
+        zuntil_eq
+
+        ; Read the checksum byte.
+
+        zrepeat
+            ldy IWMQ6L, x
+        zuntil_mi
+        eor decode_tab-DECODE_TABLE_START, y
+    zuntil_eq
+
+    ; We now have a successfully read sector. We just need to decode it.
+
+    ldy #0
+    ldx #0x56
+    zrepeat
+        dex
+        zif_mi
+            ldx #0x56
+        zendif
+        lda disk_buffer, y
+        lsr disk_twos_buffer, x
+        rol a
+        lsr disk_twos_buffer, x
+        rol a
+        sta disk_buffer, y
+        iny
+    zuntil_eq
+
+    clc
+    rts
+
+    ; Waits for a sector header. Returns the unencoded ID byte immediately
+    ; following in Y.
+
+read_header:
+    zrepeat
+        zrepeat
+            zrepeat
+                ldy IWMQ6L, x
+            zuntil_mi
+            cpy #0xd5
+        zuntil_eq
+        zrepeat
+            ldy IWMQ6L, x
+        zuntil_mi
+        cpy #0xaa
+    zuntil_eq
+    zrepeat
+        ldy IWMQ6L, x
+    zuntil_mi
+    rts
+
+read_gcr44:
+    zrepeat
+        lda IWMQ6L, x
+    zuntil_mi
+    rol a
+    sta ptr+0
+    zrepeat
+        lda IWMQ6L, x
+    zuntil_mi
+    and ptr+0
+    rts
+zendproc
+
+; Seek to the track number in A.
+
+zproc seek_to_track
+    ldx disk_slot
+    asl a               ; convert to phase number
+    tay
+again:
+    cpy current_phase
+    zif_eq
+        rts
+    zendif
+    zif_cs
+        ; A > track, count up
+
+        jsr change_up
+        jsr change_up
+        jmp again
+    zendif
+    ; A < track, count down
+
+    jsr change_down
+    jsr change_down
+    jmp again
+
+change_up:
+    inc current_phase
+    jmp change_phase
+
+change_down:
+    dec current_phase
+    ; fall through
+
+    ; Preserves Y.
+change_phase:
+    lda current_phase
+    sta IWMPH0OFF, x    ; turn off current motor phase
+    and #3              ; turn track number to phase number
+    ora disk_slot       ; add on the current disk unit
+    tax
+    lda IWMPH0ON, x     ; apply phase
+
+    ; Waits the appropriate amount of time for the head to move.
+
+    lda #86
+    sec
+    zrepeat
+        pha
+        zrepeat
+            sbc #1
+        zuntil_eq
+        pla
+        sbc #1
+    zuntil_eq
+    rts
+zendproc
 
 ; Given a row number in A, set ptr to the address of that
 ; row of video memory.
@@ -158,10 +358,6 @@ zproc clear_screen
     sta cursory
     rts
 zendproc
-
-.bss
-cursorx:    .fill 1
-cursory:    .fill 1
 
 ; Returns the next keyboard character in A.
 
@@ -257,8 +453,14 @@ zendproc
 
 .bss
 
+cursorx: .fill 1
+cursory: .fill 1
+disk_slot: .fill 1
+current_phase: .fill 1
+disk_twos_buffer: .fill 86
 encode_tab: .fill 64
-decode_tab: .fill 20
+
+decode_tab: .fill 0x100 - DECODE_TABLE_START
 
 ; This must go last --- it's the three 6502 vectors.
 .text
