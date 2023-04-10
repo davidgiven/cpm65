@@ -84,7 +84,7 @@ _init:
         tya
         pha
         lda banner-1, y
-        jsr write_char
+        jsr entry_CONOUT
         pla
         tay
         dey
@@ -212,10 +212,6 @@ zendproc
 
 entry_CONST:
 entry_CONIN:
-entry_CONOUT:
-entry_SELDSK:
-entry_SETSEC:
-entry_SETDMA:
 entry_READ:
 entry_WRITE:
     rts
@@ -255,7 +251,146 @@ zproc entry_SETBANK
     rts
 zendproc
 
+; --- Screen ----------------------------------------------------------------
+
+; Writes the character in A.
+
+zproc entry_CONOUT
+    cmp #13
+    zif_eq
+        lda #0
+        sta cursorx
+        rts
+    zendif
+    cmp #10
+    beq write_nl
+
+    tay
+    lda cursory
+    jsr calculate_screen_address
+    tya
+    ldy cursorx
+    eor #0x80
+    sta (ptr), y
+
+    inc cursorx
+    lda cursorx
+    cmp #40
+    zif_eq
+        lda #0
+        sta cursorx
+        jmp write_nl
+    zendif
+    rts
+zendproc
+
+zproc write_nl
+    inc cursory
+    lda cursory
+    cmp #25
+    zif_eq
+        dec cursory
+        jmp scroll_up
+    zendif
+    rts
+zendproc
+
+zproc scroll_up
+    lda #0              ; current line
+    zrepeat
+        tax
+        jsr calculate_screen_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        inx
+        txa
+        jsr calculate_screen_address ; ptr is source pointer
+
+        pha             ; push current line
+        ldy #39
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+        pla
+
+        cmp #24
+    zuntil_eq
+
+    ldy #39
+    lda #32|0x80
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
 ; --- Disk handling ---------------------------------------------------------
+
+; Sets the current DMA address.
+
+zproc entry_SETDMA
+    sta dma+0
+    stx dma+1
+    clc
+    rts
+zendproc
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc entry_SELDSK
+    cmp #0
+    zif_ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
+    lda #<dph
+    ldx #>dph
+    clc
+    rts
+zendproc
+
+; Set the current absolute sector number.
+; XA is a pointer to a three-byte sector number.
+
+zproc entry_SETSEC
+	sta ptr+0
+	stx ptr+1
+
+    ldy #0
+    lda (ptr), y
+    and #0x01
+    sta current_half
+
+    lda (ptr), y
+    lsr a
+    and #0x0f
+    sta current_sector
+
+    lda (ptr), y
+    sta ptr1+0
+    iny
+    lda (ptr), y
+
+    asl ptr1+0
+    rol a
+    asl ptr1+0
+    rol a
+    asl ptr1+0
+    rol a
+
+    sta current_track
+    rts
+zendproc
 
 ; Read sector with physical id A from the current track, into disk_buffer.
 
@@ -501,87 +636,6 @@ zproc read_char
     rts
 zendproc
 
-; Writes the character in A.
-
-zproc write_char
-    cmp #13
-    zif_eq
-        lda #0
-        sta cursorx
-        rts
-    zendif
-    cmp #10
-    beq write_nl
-
-    tay
-    lda cursory
-    jsr calculate_screen_address
-    tya
-    ldy cursorx
-    eor #0x80
-    sta (ptr), y
-
-    inc cursorx
-    lda cursorx
-    cmp #40
-    zif_eq
-        lda #0
-        sta cursorx
-        jmp write_nl
-    zendif
-    rts
-zendproc
-
-zproc write_nl
-    inc cursory
-    lda cursory
-    cmp #25
-    zif_eq
-        dec cursory
-        jmp scroll_up
-    zendif
-    rts
-zendproc
-
-zproc scroll_up
-    lda #0              ; current line
-    zrepeat
-        tax
-        jsr calculate_screen_address
-        lda ptr+0
-        sta ptr1+0
-        lda ptr+1
-        sta ptr1+1      ; ptr1 is dest pointer
-
-        inx
-        txa
-        jsr calculate_screen_address ; ptr is source pointer
-
-        pha             ; push current line
-        ldy #39
-        zrepeat
-            lda (ptr), y
-            sta (ptr1), y
-            dey
-        zuntil_mi
-        pla
-
-        cmp #24
-    zuntil_eq
-
-    ldy #39
-    lda #32|0x80
-    zrepeat
-        sta (ptr), y
-        dey
-    zuntil_mi
-    rts
-zendproc
-
-zproc bios
-    rts
-zendproc
-
 .data
 prodos_sector_map:
     .byte 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15
@@ -591,6 +645,10 @@ zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA0_START__@mos16hi, __TPA1_START__@mos16hi
 mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
+; DPH for drive 0 (our only drive)
+
+define_drive dph, 140, 1024, 64, 64
+
 .bss
 cursorx: .fill 1
 cursory: .fill 1
@@ -599,8 +657,12 @@ disk_slot: .fill 1
 current_phase: .fill 1
 disk_twos_buffer: .fill 86
 encode_tab: .fill 64
-
+directory_buffer: .fill 128
+dma: .fill 2
 decode_tab: .fill 0x100 - DECODE_TABLE_START
+current_track: .fill 1
+current_sector: .fill 1
+current_half: .fill 1
 
 ; This must go last --- it's the three 6502 vectors.
 .text
