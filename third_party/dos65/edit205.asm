@@ -81,6 +81,17 @@ BDOS_WRITE_RANDOM_FILL = 40
 BDOS_GETTPA            = 41
 BDOS_GETZP             = 42
 
+\ BDOS error codes
+
+E_OK        = $00 \ success (usually)
+E_NODATA    = $01 \ or EOF
+E_DISKFULL  = $02 \ no free blocks on disk
+E_CANTCLOSE = $03 \ can't write extent back to disk
+E_NOEXTENT  = $04 \ only on random access reads
+E_DIRFULL   = $05 \ no free dirents on disk
+E_BADFCB    = $09 \ FCB couldn't be parsed
+E_FAILED    = $ff \ general purpose failure code
+
 \pblock definition
 
 .bss pblock, 165
@@ -302,11 +313,11 @@ dstsme: lda     curdrv          \get current
         lda     #<dflfcb        \then
         ldx     #>dflfcb        \open
         jsr     opnfle          \source
-        bne     srisok          \ok if there
+        bcc     srisok          \ok if there
         lda     #<dflfcb        \else
         ldx     #>dflfcb        \create
         jsr     crtfle          \it
-        bne     *+5             \jump if ok
+        bcc     *+5             \jump if ok
         jmp     doserr          \else error
         lda     #<nwfmsg        \point to
         ldy     #>nwfmsg        \new file message
@@ -334,7 +345,7 @@ dntddd: lda     #<dlrstr        \change
         lda     #<dstfcb        \then
         ldx     #>dstfcb        \create
         jsr     crtfle          \it
-        bne     *+5             \jump if ok
+        bcc     *+5             \jump if ok
         jmp     dlxlex          \else exit
         lda     #lf             \insert a lf
         sta     txtbuf          \at start of buffer
@@ -558,7 +569,7 @@ lbflok: lda     #0              \clear
         lda     #<libfcb        \then
         ldx     #>libfcb        \open
         jsr     opnfle          \file
-        bne     *+7             \continue if ok
+        bcc     *+7             \continue if ok
         lda     #3              \else send
         jmp     brklpe          \break
         lda     #128            \set index
@@ -647,6 +658,7 @@ notmln: cmp     #'T'            \if not t
 \cr for move n lines and type
 nottyp: cmp     #cr             \if not a cr
         bne     ntcr            \try next
+		brk
         ldx     macflg          \but if a macro
         bne     endcr           \do nothing
         ldx     prsstr          \get start
@@ -769,7 +781,7 @@ ntdlxl: jsr     intxlb          \else set up
         lda     #<xlbfcb        \then
         ldx     #>xlbfcb        \initialize
         jsr     crtfle          \it again
-        bne     *+5             \branch if ok
+        bcc     *+5             \branch if ok
         jmp     doserr          \else error
         jsr     lmtclc          \calculate limits
         lda     lwrlmt          \then set
@@ -796,7 +808,7 @@ endxfr: bit     xlbind          \test index
 clsxfr: lda     #<xlbfcb        \write
         ldx     #>xlbfcb        \final
         jsr     wrtrcr          \record
-        beq     *+5             \continue if ok
+        bcc     *+5             \continue if ok
         jmp     doserr          \else error
         lda     #<xlbfcb        \close
         ldx     #>xlbfcb        \the
@@ -1004,7 +1016,7 @@ getlib: ldx     libind          \get index
         lda     #<libfcb        \then
         ldx     #>libfcb        \read
         jsr     rdercr          \a record
-        beq     *+5             \use if ok
+        bcc     *+5             \use if ok
         lda     #eof            \else get eof
         rts                     \and return
         tax                     \set index
@@ -1150,8 +1162,9 @@ rdeslp: lda     srcind          \get current
         lda     #<dflfcb        \point
         ldx     #>dflfcb        \to fcb
         jsr     rdercr          \read record
-        beq     rdesok          \branch if ok
-        bpl     *+5             \eof if positive
+        bcc     rdesok          \branch if ok
+		cmp		#E_NODATA
+        beq     *+5             \eof if positive
         jmp     doserr          \else error
         ldy     #0              \clear index
         lda     #eof            \get an eof
@@ -1174,7 +1187,7 @@ putxlb: ldx     xlbind          \get index
         lda     #<xlbfcb        \point
         ldx     #>xlbfcb        \to fcb
         jsr     wrtrcr          \write a record
-        beq     *+5             \continue if ok
+        bcc     *+5             \continue if ok
         jmp     doserr          \else error
         tax                     \clear index
         stx     xlbind          \and save
@@ -1358,7 +1371,7 @@ wrtdlp: lda     dstind          \then
         lda     #<dstfcb        \point to
         ldx     #>dstfcb        \fcb and
         jsr     wrtrcr          \write
-        beq     *+5             \ok if zero
+        bcc     *+5             \ok if zero
         jmp     doserr          \else error
         clc                     \add
         lda     dstind          \128
@@ -1398,7 +1411,7 @@ whlrec: jsr     wrtdst          \write it all
         lda     #<dstfcb        \then
         ldx     #>dstfcb        \close
         jsr     clsfle          \.$$$
-        bne     *+5             \continue if ok
+        bcc     *+5             \continue if ok
         jmp     doserr          \else error
         lda     #<bakstr        \change
         ldy     #>bakstr        \.$$$
@@ -1475,8 +1488,6 @@ ntinmd: bit     nomore          \test for no input
         jsr     chrout          \to console
 		lda		#0x80
 		sta		cnsbuf			\initialise console buffer
-		lda		#0
-		sta		cnslng
         lda     #<cnsbuf        \get
         ldx     #>cnsbuf        \input
         ldy     #BDOS_READLINE  \line
