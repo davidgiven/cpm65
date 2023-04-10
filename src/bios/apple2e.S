@@ -125,13 +125,43 @@ _init:
     lda #0
     sta current_phase
 
+    ; Read the BDOS from track 1.
+
+    lda #1
+    jsr seek_to_track
+
     lda #0
-    jsr read_sector
+    sta ptr1+0
+    lda #0xe0
+    sta ptr1+1
+    zrepeat
+        lda ptr1+1
+        and #0x0f
+        zrepeat
+            jsr read_prodos_sector
+        zuntil_cc
+
+        ldy #0
+        zrepeat
+            lda disk_buffer, y
+            sta (ptr1), y
+            dey
+        zuntil_eq
+
+        inc ptr1+1
+        lda ptr1+1
+        cmp #0xf0
+    zuntil_eq
 
     jmp .
 
 ; Read sector with physical id A from the current track, into disk_buffer.
 
+zproc read_prodos_sector
+    tax
+    lda prodos_sector_map, x
+    ; fall through
+zendproc
 zproc read_sector
     sta ptr+1
     ldx disk_slot
@@ -141,23 +171,21 @@ zproc read_sector
 
         zrepeat
             zrepeat
-                jsr read_header
-                cpy #0x96
+                zrepeat
+                    jsr read_header
+                    cpy #0x96
+                zuntil_eq
+                jsr read_gcr44
+                jsr read_gcr44
+                jsr read_gcr44
+                cmp ptr+1
             zuntil_eq
-            jsr read_gcr44
-            jsr read_gcr44
-            jsr read_gcr44
-            cmp ptr+1
+
+            ; Wait for the next data header.
+
+            jsr read_header
+            cpy #0xad
         zuntil_eq
-
-        ; Wait for the next data header.
-
-        jsr read_header
-        cpy #0xad
-        zif_ne
-            sec
-            rts
-        zendif
 
         ; Reads the first section of the sector data (the twos) into the special
         ; buffer.
@@ -288,7 +316,8 @@ change_down:
 change_phase:
     lda current_phase
     sta IWMPH0OFF, x    ; turn off current motor phase
-    and #3              ; turn track number to phase number
+    and #3
+    asl a
     ora disk_slot       ; add on the current disk unit
     tax
     lda IWMPH0ON, x     ; apply phase
@@ -451,6 +480,9 @@ zproc bios
     rts
 zendproc
 
+.data
+prodos_sector_map:
+    .byte 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15
 .bss
 
 cursorx: .fill 1
