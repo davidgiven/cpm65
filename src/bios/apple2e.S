@@ -219,8 +219,6 @@ biostable_hi:
     .byte entry_SETBANK@mos16hi
 zendproc
 
-entry_CONST:
-entry_CONIN:
 entry_WRITE:
     rts
 
@@ -268,6 +266,19 @@ zproc entry_CONOUT
     zif_eq
         lda #0
         sta cursorx
+        rts
+    zendif
+    cmp #127
+    zif_eq
+        dec cursorx
+        zif_mi
+            inc cursorx
+        zendif
+        lda cursory
+        jsr calculate_screen_address
+        ldy cursorx
+        lda #0xa0
+        sta (ptr), y
         rts
     zendif
     cmp #10
@@ -335,6 +346,49 @@ zproc scroll_up
         sta (ptr), y
         dey
     zuntil_mi
+    rts
+zendproc
+
+; --- Keyboard --------------------------------------------------------------
+
+zproc entry_CONST
+    ldy #0
+    ldx 0xc000
+    zif_mi
+        dey
+    zendif
+
+    tya
+    clc
+    rts
+zendproc
+
+zproc entry_CONIN
+    ; Display the cursor.
+
+    lda cursory
+    jsr calculate_screen_address
+    ldy cursorx
+    lda (ptr), y
+    sta cursork
+    lda #0x60           ; flashing block
+    sta (ptr), y
+
+    ; Wait for the key.
+
+    zrepeat
+        lda 0xc000
+    zuntil_mi
+    sta 0xc010
+    and #0x7f
+    clc
+
+    ; Cursor off again.
+
+    tax
+    lda cursork
+    sta (ptr), y
+    txa
     rts
 zendproc
 
@@ -673,17 +727,6 @@ zproc clear_screen
     rts
 zendproc
 
-; Returns the next keyboard character in A.
-
-zproc read_char
-    zrepeat
-        lda 0xc000
-    zuntil_mi
-    sta 0xc010
-    and #0x7f
-    rts
-zendproc
-
 .data
 prodos_sector_map:
     .byte 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15
@@ -700,6 +743,7 @@ define_drive dph, 0x42e, 1024, 64, 64
 .bss
 cursorx: .fill 1
 cursory: .fill 1
+cursork: .fill 1
 current_bank:     .byte 0
 current_phase: .fill 1
 disk_twos_buffer: .fill 86
@@ -711,6 +755,7 @@ wanted_sector: .fill 1
 wanted_half: .fill 1
 buffered_track: .fill 1
 buffered_sector: .fill 1
+pending_key: .fill 1
 
 ; This must go last --- it's the three 6502 vectors.
 .text

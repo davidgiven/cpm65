@@ -13,7 +13,7 @@ SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
 		__ZEROPAGE_START__ = .;
-		__ZEROPAGE_END__ = 0x100;
+		__ZEROPAGE_END__ = 0xff;
 	} >zp
 
 	.loader : {
