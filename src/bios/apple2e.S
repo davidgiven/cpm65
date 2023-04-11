@@ -306,7 +306,7 @@ zendproc
 zproc write_nl
     inc cursory
     lda cursory
-    cmp #25
+    cmp #24
     zif_eq
         dec cursory
         jmp scroll_up
@@ -315,9 +315,9 @@ zproc write_nl
 zendproc
 
 zproc scroll_up
-    lda #0              ; current line
+    ldx #0              ; current line
     zrepeat
-        tax
+        txa
         jsr calculate_screen_address
         lda ptr+0
         sta ptr1+0
@@ -328,16 +328,14 @@ zproc scroll_up
         txa
         jsr calculate_screen_address ; ptr is source pointer
 
-        pha             ; push current line
         ldy #39
         zrepeat
             lda (ptr), y
             sta (ptr1), y
             dey
         zuntil_mi
-        pla
 
-        cmp #24
+        cpx #23
     zuntil_eq
 
     ldy #39
