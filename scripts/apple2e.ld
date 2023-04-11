@@ -18,6 +18,7 @@ SECTIONS {
 
 	.bss (0x10000-BIOS_SIZE) (NOLOAD) : {
 		*(.bss .bss.*)
+		*(.noinit .noinit.*)
 	} >highram
 
 	.data : {

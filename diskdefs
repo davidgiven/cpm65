@@ -38,7 +38,7 @@ diskdef appleiie
   sectrk 16
   blocksize 1024
   maxdir 64
-  boottrk 3
+  boottrk 2
   os 2.2
 end
 

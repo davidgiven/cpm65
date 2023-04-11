@@ -5,15 +5,22 @@
 #include "zif.inc"
 #include "cpm65.inc"
 
-IWMPH0OFF   = 0xc080 ; stepper motor phase off
-IWMPH0ON    = 0xc081 ; stepper motor phase on
-IWMMOTOROFF = 0xc080 ; motor off
-IWMMOTORON  = 0xc089 ; motor on
-IWMSELDRV1  = 0xc08a ; selects drive 1
-IWMQ6L      = 0xc08c ; read
-IWMQ6H      = 0xc08d
-IWMQ7L      = 0xc08e ; write protect sense/read
-IWMQ7H      = 0xc08f
+DISK_PH0OFF   = 0xc080 + 0x60
+DISK_PH0ON    = 0xc081 + 0x60
+DISK_PH1OFF   = 0xc082 + 0x60
+DISK_PH1ON    = 0xc083 + 0x60
+DISK_PH2OFF   = 0xc084 + 0x60
+DISK_PH2ON    = 0xc085 + 0x60
+DISK_PH3OFF   = 0xc086 + 0x60
+DISK_PH3ON    = 0xc087 + 0x60
+DISK_MOTOROFF = 0xc088 + 0x60
+DISK_MOTORON  = 0xc089 + 0x60
+DISK_DRIVE1   = 0xc08a + 0x60
+DISK_DRIVE2   = 0xc08b + 0x60
+DISK_READ     = 0xc08c + 0x60
+DISK_WRITE    = 0xc08d + 0x60
+DISK_READEN   = 0xc08e + 0x60
+DISK_WRITEEN  = 0xc08f + 0x60
 
 DECODE_TABLE_START = 0x96
 
@@ -23,6 +30,7 @@ ZEROPAGE
 .global ptr
 ptr:    .word 0
 ptr1:   .word 0
+dma:    .word 0
 
 disk_buffer = 0x300
 
@@ -34,10 +42,8 @@ disk_buffer = 0x300
     .byte BIOS_SECTOR_COUNT ; boot loader loads this many sectors
 _start:
     cli
-    ;lda IWMMOTOROFF, x      ; turn off disk motor
     sta 0xc08b              ; R/W 0xe000 RAM; bank 1 in 0xd000
     sta 0xc08b              ; yes, I'm sure
-    stx disk_slot           ; save disk slot number
     ldx #0xff
     txs                     ; reset stack
 
@@ -123,8 +129,11 @@ _init:
 
     ; Initialise the disk.
 
-    lda #0
-    sta current_phase
+    ldx #0
+    stx current_phase
+    dex
+    stx buffered_track
+    stx buffered_sector
 
     ; Read the BDOS from track 1.
 
@@ -212,7 +221,6 @@ zendproc
 
 entry_CONST:
 entry_CONIN:
-entry_READ:
 entry_WRITE:
     rts
 
@@ -369,12 +377,12 @@ zproc entry_SETSEC
     ldy #0
     lda (ptr), y
     and #0x01
-    sta current_half
+    sta wanted_half
 
     lda (ptr), y
     lsr a
     and #0x0f
-    sta current_sector
+    sta wanted_sector
 
     lda (ptr), y
     sta ptr1+0
@@ -388,8 +396,52 @@ zproc entry_SETSEC
     asl ptr1+0
     rol a
 
-    sta current_track
+    sta wanted_track
     rts
+zendproc
+
+; Reads the current sector to the DMA address
+
+zproc entry_READ
+    jsr change_sectors
+    zif_cc
+        lda wanted_half
+        ror a
+        ror a
+        tax                 ; 0x00 or 0x80; read offset
+        ldy #0              ; write offset
+        zrepeat
+            lda disk_buffer, x
+            sta (dma), y
+            inx
+            iny
+        zuntil_mi
+        clc
+    zendif
+    rts
+zendproc
+
+; Changes the sector in the disk buffer.
+
+zproc change_sectors
+    lda wanted_track
+    cmp buffered_track
+    zif_eq
+        ldx wanted_sector
+        cpx buffered_sector
+        zif_eq
+            ; If we're changing to the same sector, do nothing.
+            clc
+            rts
+        zendif
+    zendif
+
+    sta buffered_track
+    jsr seek_to_track
+
+    lda wanted_sector
+    sta buffered_sector
+    ; fall through
 zendproc
 
 ; Read sector with physical id A from the current track, into disk_buffer.
@@ -401,7 +453,6 @@ zproc read_prodos_sector
 zendproc
 zproc read_sector
     sta ptr+1
-    ldx disk_slot
 
     zrepeat
         ; Wait for a matching sector header.
@@ -432,7 +483,7 @@ zproc read_sector
         zrepeat
             sty ptr+0
             zrepeat
-                ldy IWMQ6L, x
+                ldy DISK_READ
             zuntil_mi
             eor decode_tab-DECODE_TABLE_START, y
             ldy ptr+0
@@ -446,7 +497,7 @@ zproc read_sector
         zrepeat
             sty ptr+0
             zrepeat
-                ldy IWMQ6L, x
+                ldy DISK_READ
             zuntil_mi
             eor decode_tab-DECODE_TABLE_START, y
             ldy ptr+0
@@ -457,7 +508,7 @@ zproc read_sector
         ; Read the checksum byte.
 
         zrepeat
-            ldy IWMQ6L, x
+            ldy DISK_READ
         zuntil_mi
         eor decode_tab-DECODE_TABLE_START, y
     zuntil_eq
@@ -490,28 +541,28 @@ read_header:
     zrepeat
         zrepeat
             zrepeat
-                ldy IWMQ6L, x
+                ldy DISK_READ
             zuntil_mi
             cpy #0xd5
         zuntil_eq
         zrepeat
-            ldy IWMQ6L, x
+            ldy DISK_READ
         zuntil_mi
         cpy #0xaa
     zuntil_eq
     zrepeat
-        ldy IWMQ6L, x
+        ldy DISK_READ
     zuntil_mi
     rts
 
 read_gcr44:
     zrepeat
-        lda IWMQ6L, x
+        lda DISK_READ
     zuntil_mi
     rol a
     sta ptr+0
     zrepeat
-        lda IWMQ6L, x
+        lda DISK_READ
     zuntil_mi
     and ptr+0
     rts
@@ -520,44 +571,41 @@ zendproc
 ; Seek to the track number in A.
 
 zproc seek_to_track
-    ldx disk_slot
     asl a               ; convert to phase number
-    tay
-again:
-    cpy current_phase
-    zif_eq
-        rts
-    zendif
-    zif_cs
-        ; A > track, count up
+    zloop
+        cmp current_phase
+        zif_eq
+            rts
+        zendif
+        ldy #0xff           ; default to counting down
+        zif_cs
+            ; A > track, count up
+            ldy #1
+        zendif
 
-        jsr change_up
-        jsr change_up
-        jmp again
-    zendif
-    ; A < track, count down
+        pha
+        jsr change_phase
+        jsr change_phase
+        pla
+    zendloop
 
-    jsr change_down
-    jsr change_down
-    jmp again
-
-change_up:
-    inc current_phase
-    jmp change_phase
-
-change_down:
-    dec current_phase
-    ; fall through
-
-    ; Preserves Y.
+    ; Takes in Y either +1 to change up, or -1 to change down.
+    ; Preserves it.
 change_phase:
     lda current_phase
-    sta IWMPH0OFF, x    ; turn off current motor phase
     and #3
     asl a
-    ora disk_slot       ; add on the current disk unit
     tax
-    lda IWMPH0ON, x     ; apply phase
+    sta DISK_PH0OFF, x  ; turn off current phase
+
+    tya
+    clc
+    adc current_phase
+    sta current_phase
+    and #3
+    asl a
+    tax
+    sta DISK_PH0ON, x   ; turn on new phase
 
     ; Waits the appropriate amount of time for the head to move.
 
@@ -647,22 +695,22 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 140, 1024, 64, 64
+define_drive dph, 0x42e, 1024, 64, 64
 
 .bss
 cursorx: .fill 1
 cursory: .fill 1
 current_bank:     .byte 0
-disk_slot: .fill 1
 current_phase: .fill 1
 disk_twos_buffer: .fill 86
 encode_tab: .fill 64
 directory_buffer: .fill 128
-dma: .fill 2
 decode_tab: .fill 0x100 - DECODE_TABLE_START
-current_track: .fill 1
-current_sector: .fill 1
-current_half: .fill 1
+wanted_track: .fill 1
+wanted_sector: .fill 1
+wanted_half: .fill 1
+buffered_track: .fill 1
+buffered_sector: .fill 1
 
 ; This must go last --- it's the three 6502 vectors.
 .text
