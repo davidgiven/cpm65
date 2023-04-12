@@ -12,6 +12,8 @@ SCREEN_80COLON    = 0xc00d
 SCREEN_PAGE2OFF   = 0xc054
 SCREEN_PAGE2ON    = 0xc055
 
+KBD_READ        = 0xc000
+KBD_STROBERESET = 0xc010
 
 DISK_PH0OFF   = 0xc080 + 0x60
 DISK_PH0ON    = 0xc081 + 0x60
@@ -29,6 +31,8 @@ DISK_READ     = 0xc08c + 0x60
 DISK_WRITE    = 0xc08d + 0x60
 DISK_READEN   = 0xc08e + 0x60
 DISK_WRITEEN  = 0xc08f + 0x60
+
+MEM_BANKING   = 0xc080
 
 DECODE_TABLE_START = 0x96
 
@@ -50,8 +54,8 @@ disk_buffer = 0x300
     .byte BIOS_SECTOR_COUNT ; boot loader loads this many sectors
 _start:
     cli
-    sta 0xc08b              ; R/W 0xe000 RAM; bank 1 in 0xd000
-    sta 0xc08b              ; yes, I'm sure
+    sta MEM_BANKING+0xb     ; R/W 0xe000 RAM; bank 1 in 0xd000
+    sta MEM_BANKING+0xb     ; yes, I'm sure
     sta SCREEN_80COLON
     sta SCREEN_80STOREON
     sta SCREEN_PAGE2OFF
@@ -435,7 +439,7 @@ zproc entry_CONST
     zendif
 
     ldy #0
-    ldx 0xc000
+    ldx KBD_READ
     zif_mi
         dey
     zendif
@@ -463,9 +467,9 @@ zproc entry_CONIN
     ; Wait for the key.
 
     zrepeat
-        lda 0xc000
+        lda KBD_READ
     zuntil_mi
-    sta 0xc010
+    sta KBD_STROBERESET
     and #0x7f
     clc
 
