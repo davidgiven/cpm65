@@ -7,19 +7,21 @@ What?
 This is a native port of Digital Research's seminal 1977 operating system CP/M
 to the 6502. So far it runs on:
 
-  - BBC Micro (and Master, and Tube)
+  - BBC Micro (and Master, and Tube, and Electron)
   - Commodore 64
   - Commander X16
+  - Apple IIe (partially)
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
 much less standardised than 8080 and Z80 systems. On the BBC Micro in mode 7
-you get a 21kB TPA, on the Master you get about 25kB, and on the C64 you get
-46kB. A BBC Tube system will give you just under 57kB, which is nice.
+you get a 21kB TPA, on the Master you get about 25kB, and on the C64 and Apple
+IIe you get 46kB. A BBC Tube system will give you just under 57kB, which is
+nice.
 
 Currently you can cross-assemble programs from a PC, as well as a working C
-toolchain with llvm-mos. I plan on finding an assembler and editor which will
-run natively for full native development support.
+toolchain with llvm-mos. For native development, there's a basic assembler but
+currently no (functioning) editor.
 
 No, it won't let you run 8080 programs on the 6502!
 
@@ -91,6 +93,18 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 	outstanding](https://github.com/commanderx16/x16-emulator/pull/435) to add
 	support. An SD2IEC should work too, as these support the same commands.
 	However a real Commodore disk drive _will not work_.
+
+### Apple IIe notes
+
+  - this is still in development and doesn't support writing to disk yet.
+
+  - to use, place the contents of the `appleiie.po` file onto a disk and boot
+    it. The disk image has been munged according to ProDOS sector ordering.
+
+  - It supports a single drive on slot 6 drive 1. You need a 80-column card
+    (but not any aux memory).
+
+  - this port runs completely bare-metal and does not use any ROM routines.
 
 ### Supported programs
 

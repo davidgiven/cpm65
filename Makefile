@@ -14,7 +14,6 @@ APPS = \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/third_party/dos65/edit205.com \
 	cpmfs/asm.txt \
-	cpmfs/readme.txt \
 	cpmfs/hello.asm \
 	apps/dump.asm \
 
@@ -34,7 +33,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: c64.d64 bbcmicro.ssd x16.zip bin/cpmemu
+all: apple2e.po c64.d64 bbcmicro.ssd x16.zip bin/cpmemu
 
 $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
@@ -47,6 +46,10 @@ $(OBJDIR)/mkdfs: $(OBJDIR)/tools/mkdfs.o
 bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
+
+bin/shuffle: $(OBJDIR)/tools/shuffle.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -o $@ $<
 
 $(OBJDIR)/third_party/%.o: third_party/%.c
 	@mkdir -p $(dir $@)
@@ -98,6 +101,11 @@ $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
+$(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts/apple2e.ld scripts/apple2e-prelink.ld
+	@mkdir -p $(dir $@)
+	ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
+	ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | awk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
+	
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a
@@ -150,8 +158,22 @@ x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
 	printf "@ bdos.img\n@=BDOS\n" | zipnote -w $@
 	printf "@ generic-1m-cpmfs.img\n@=CPMFS\n" | zipnote -w $@
 
+$(OBJDIR)/apple2e.bios.swapped: $(OBJDIR)/apple2e.bios bin/shuffle
+	bin/shuffle -i $< -o $@ -b 256 -t 16 -r -m 02468ace13579bdf
+
+$(OBJDIR)/apple2e.boottracks: $(OBJDIR)/apple2e.bios.swapped $(OBJDIR)/bdos.img
+	cp $(OBJDIR)/apple2e.bios.swapped $@
+	truncate -s 4096 $@
+	cat $(OBJDIR)/bdos.img >> $@
+
+apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys Makefile diskdefs bin/shuffle
+	@rm -f $@
+	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.boottracks $@
+	cpmcp -f appleiie $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	truncate -s 143360 $@
+
 clean:
-	rm -rf $(OBJDIR) c64.d64 bbcmicro.ssd x16.zip
+	rm -rf $(OBJDIR) apple2e.po c64.d64 bbcmicro.ssd x16.zip
 
 .DELETE_ON_ERROR:
 .SECONDARY:

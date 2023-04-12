@@ -29,21 +29,21 @@ The following pseudoops are available:
     Takes a list of numbers, or string constants, and emits them.
 
 .word ...
-	Takes a list of number, and emits them (in little-endian format).
+    Takes a list of number, and emits them (in little-endian format).
 
 .fill number
-	Emits `number` zeroes.
+    Emits `number` zeroes.
 
 .zp symbol, number
-	Defines an area of zero page of length `number`, defining `symbol` to point
-	to it. This must be done before use.
+    Defines an area of zero page of length `number`, defining `symbol` to point
+    to it. This must be done before use.
 
 .bss symbol, number
-	Defines an area of bss of length `number`, defining `symbol` to point to
-	it. This must be done before use.
+    Defines an area of bss of length `number`, defining `symbol` to point to
+    it. This must be done before use.
 
 .expand 0/1
-	Turns off/on branch expansion.
+    Turns off/on branch expansion.
 
 Structured programming
 ----------------------
@@ -59,27 +59,28 @@ ahead of time to get around this.
 
 .zproc <symbol>
 .zendproc
-	Defines a procedure (or other scope). `symbol` points to it.
+    Defines a procedure (or other scope). `symbol` points to it.
 
 .zloop
   .zbreak <conditional>
 .zendloop
-	Creates an infinite loop. `.zbreak` will jump out of the loop. If a
-	conditional is supplied --- e.g. `cc` or `ne` --- then it will jump
-	conditionally.
+    Creates an infinite loop. `.zbreak` will jump out of the loop. If a
+    conditional is supplied --- e.g. `cc` or `ne` --- then it will jump
+    conditionally.
 
 .zrepeat
   .zbreak <conditional>
 .zuntil <conditional>
- 	As for `.zloop`, but with a conditional terminator.
+    As for `.zloop`, but with a conditional terminator.
 
 .zif <conditional>
 .zendif
-	A simple if..endif (with no else, currently). You can break from loops from
-	within this.
+    A simple if..endif (with no else, currently). You can break from loops from
+    within this.
 
 .label <symbol>
-	Declares a label before use. This is ueful for forward references in cases
-	where the assembler can't handle these automatically.
+    Declares a label before use. This is ueful for forward references in cases
+    where the assembler can't handle these automatically.
 
+vim: ts=4 sw=4 et
 

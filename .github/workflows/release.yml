@@ -53,6 +53,7 @@ jobs:
           bbcmicro.ssd
           c64.d64
           x16.zip
+          apple2e.po
         fail-if-no-assets: false
 
     - name: release
@@ -63,6 +64,7 @@ jobs:
           bbcmicro.ssd
           c64.d64
           x16.zip
+          apple2e.po
         tag_name: dev
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
