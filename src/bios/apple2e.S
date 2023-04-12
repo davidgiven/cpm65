@@ -44,7 +44,7 @@ ptr:    .word 0
 ptr1:   .word 0
 dma:    .word 0
 
-disk_buffer = 0x300
+track_buffer = 0xd000
 
 ; --- Initialisation code ---------------------------------------------------
 
@@ -133,33 +133,34 @@ _start:
     stx current_phase
     dex
     stx buffered_track
-    stx buffered_sector
 
-    ; Read the BDOS from track 1.
+    ; Read the BDOS from track 1 into the track buffer..
 
     lda #1
     jsr seek_to_track
+    jsr read_track
+    
+    ; Copy it to the beginning of TPA1.
 
     lda #0
+    sta ptr+0
     sta ptr1+0
-    lda #>__TPA1_START__
+    lda #>track_buffer
     sta ptr1+1
-    zrepeat
-        lda ptr1+1
-        and #0x0f
-        zrepeat
-            jsr read_prodos_sector
-        zuntil_cc
+    lda #>__TPA1_START__
+    sta ptr+1
 
+    zrepeat
         ldy #0
         zrepeat
-            lda disk_buffer, y
-            sta (ptr1), y
+            lda (ptr1), y
+            sta (ptr), y
             dey
         zuntil_eq
 
+        inc ptr+1
         inc ptr1+1
-        lda ptr1+1
+        lda ptr+1
         and #0x0f
     zuntil_eq
 
@@ -518,15 +519,20 @@ zproc entry_SETSEC
 	sta ptr+0
 	stx ptr+1
 
+    ; The bottom five bits need to become bits 12..7 of the
+    ; offset into the track address.
+
     ldy #0
     lda (ptr), y
-    and #0x01
-    sta wanted_half
+    and #0x1f
+    lsr a                   ; carry contains bottom bit
+    ora #>track_buffer      ; turn into an actual address
+    sta wanted_trackoffset+1
+    lda #0
+    ror a                   ; 0x00 or 0x80
+    sta wanted_trackoffset+0
 
-    lda (ptr), y
-    lsr a
-    and #0x0f
-    sta wanted_sector
+    ; The rest of the sector number becomes the track number.
 
     lda (ptr), y
     sta ptr1+0
@@ -547,136 +553,173 @@ zendproc
 ; Reads the current sector to the DMA address
 
 zproc entry_READ
-    jsr change_sectors
+    jsr change_tracks
     zif_cc
-        lda wanted_half
-        ror a
-        ror a
-        tax                 ; 0x00 or 0x80; read offset
-        ldy #0              ; write offset
+        lda wanted_trackoffset+0
+        sta ptr+0
+        lda wanted_trackoffset+1
+        sta ptr+1
+
+        ldy #127
         zrepeat
-            lda disk_buffer, x
+            lda (ptr), y
             sta (dma), y
-            inx
-            iny
+            dey
         zuntil_mi
         clc
     zendif
     rts
 zendproc
 
-; Changes the sector in the disk buffer.
+; Changes the track in the buffer.
 
-zproc change_sectors
+zproc change_tracks
     lda wanted_track
     cmp buffered_track
     zif_eq
-        ldx wanted_sector
-        cpx buffered_sector
-        zif_eq
-            ; If we're changing to the same sector, do nothing.
-            clc
-            rts
-        zendif
+        ; If we're changing to the same track, do nothing.
+        clc
+        rts
     zendif
 
     sta buffered_track
     jsr seek_to_track
 
-    lda wanted_sector
-    sta buffered_sector
     ; fall through
 zendproc
 
-; Read sector with physical id A from the current track, into disk_buffer.
+; Read the current track into the track buffer.
 
-zproc read_prodos_sector
-    tax
-    lda prodos_sector_map, x
-    ; fall through
-zendproc
-zproc read_sector
-    sta ptr+1
-    lda #0xff
-    sta motor_countdown
-    sta DISK_MOTORON
+zproc read_track
+    jsr motor_on
 
+    ; No sectors have been read.
+
+    ldx #15
+    lda #1
     zrepeat
-        ; Wait for a matching sector header.
+        sta track_flags, x
+        dex
+    zuntil_mi
 
+    ; Low byte of ptr1 remains 0 throughout.
+
+    lda #0
+    sta ptr1+0
+
+    ; Start reading sectors.
+
+    zloop
         zrepeat
+            ; Wait for the next sector header.
+
             zrepeat
                 zrepeat
-                    jsr read_header
-                    cpy #0x96
-                zuntil_eq
-                jsr read_gcr44
-                jsr read_gcr44
-                jsr read_gcr44
-                cmp ptr+1
+                    zrepeat
+                        jsr read_header
+                        cpy #0x96
+                    zuntil_eq
+                    jsr read_gcr44
+                    jsr read_gcr44
+                    jsr read_gcr44
+                    
+                    ; Found a sector. Has it already been read?
+                    ; Remember to undo the ProDOS sector skew.
+
+                    tax
+                    lda prodos_reverse_sector_map, x
+                    tax
+                    ldy track_flags, x
+                zuntil_ne
+
+                ; Set up ptr1 to point to this sector's buffer.
+
+                and #0x0f
+                ora #0xd0
+                sta ptr1+1
+
+                ; Wait for the next data header.
+
+                jsr read_header
+                cpy #0xad
             zuntil_eq
 
-            ; Wait for the next data header.
+            ; Reads the first section of the sector data (the twos) into the special
+            ; buffer.
 
-            jsr read_header
-            cpy #0xad
-        zuntil_eq
+            ldy #0x56
+            lda #0                  ; accumulated checksum
+            zrepeat
+                sty ptr+0
+                zrepeat
+                    ldy DISK_READ
+                zuntil_mi
+                eor decode_tab-DECODE_TABLE_START, y
+                ldy ptr+0
+                dey
+                sta disk_twos_buffer, y
+            zuntil_eq
 
-        ; Reads the first section of the sector data (the twos) into the special
-        ; buffer.
+            ; Reads the second section (the sixes) into the output buffer.
+            ; Y is 0 on entry
 
-        ldy #0x56
-        lda #0                  ; accumulated checksum
-        zrepeat
-            sty ptr+0
+            zrepeat
+                sty ptr+0
+                zrepeat
+                    ldy DISK_READ
+                zuntil_mi
+                eor decode_tab-DECODE_TABLE_START, y
+                ldy ptr+0
+                sta (ptr1), y
+                iny
+            zuntil_eq
+
+            ; Read the checksum byte.
+
             zrepeat
                 ldy DISK_READ
             zuntil_mi
             eor decode_tab-DECODE_TABLE_START, y
-            ldy ptr+0
-            dey
-            sta disk_twos_buffer, y
         zuntil_eq
 
-        ; Reads the second section (the sixes) into the output buffer.
-        ; Y is 0 on entry
+        ; We now have a successfully read sector. We just need to decode it.
 
+        ldy #0
+        ldx #0x56
         zrepeat
-            sty ptr+0
-            zrepeat
-                ldy DISK_READ
-            zuntil_mi
-            eor decode_tab-DECODE_TABLE_START, y
-            ldy ptr+0
-            sta disk_buffer, y
+            dex
+            zif_mi
+                ldx #0x55
+            zendif
+            lda (ptr1), y
+            lsr disk_twos_buffer, x
+            rol a
+            lsr disk_twos_buffer, x
+            rol a
+            sta (ptr1), y
             iny
         zuntil_eq
 
-        ; Read the checksum byte.
+        ; Mark this sector as having been successfully read.
 
+        lda ptr1+1
+        and #0x0f           ; recover the sector number
+        tax
+        lda #0
+        sta track_flags, x  ; clear sector marker
+
+        ; Find out if we've read all the sectors yet.
+
+        ldx #15
+        lda #0
+        clc
         zrepeat
-            ldy DISK_READ
+            adc track_flags, x
+            dex
         zuntil_mi
-        eor decode_tab-DECODE_TABLE_START, y
-    zuntil_eq
-
-    ; We now have a successfully read sector. We just need to decode it.
-
-    ldy #0
-    ldx #0x56
-    zrepeat
-        dex
-        zif_mi
-            ldx #0x55
-        zendif
-        lda disk_buffer, y
-        lsr disk_twos_buffer, x
-        rol a
-        lsr disk_twos_buffer, x
-        rol a
-        sta disk_buffer, y
-        iny
-    zuntil_eq
+        tax
+        zbreakif_eq
+    zendloop
 
     clc
     rts
@@ -718,6 +761,8 @@ zendproc
 ; Seek to the track number in A.
 
 zproc seek_to_track
+    jsr motor_on
+
     asl a               ; convert to phase number
     zloop
         cmp current_phase
@@ -769,9 +814,19 @@ change_phase:
     rts
 zendproc
 
+; Corrupts X.
+
+zproc motor_on
+    ldx #0xff
+    stx motor_countdown
+    stx DISK_MOTORON
+zendproc
+
 .data
 prodos_sector_map:
     .byte 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15
+prodos_reverse_sector_map:
+    .byte 0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15
 
 zp_base:    .byte __ZEROPAGE_START__
 zp_end:     .byte __ZEROPAGE_END__
@@ -783,22 +838,21 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 define_drive dph, 0x42e, 1024, 64, 64
 
 .bss
-cursorx:          .fill 1
-cursory:          .fill 1
-cursork:          .fill 1
-current_bank:     .fill 1
-current_phase:    .fill 1
-disk_twos_buffer: .fill 86
-encode_tab:       .fill 64
-directory_buffer: .fill 128
-decode_tab:       .fill 0x100 - DECODE_TABLE_START
-wanted_track:     .fill 1
-wanted_sector:    .fill 1
-wanted_half:      .fill 1
-buffered_track:   .fill 1
-buffered_sector:  .fill 1
-pending_key:      .fill 1
-motor_countdown:  .fill 1
+cursorx:            .fill 1
+cursory:            .fill 1
+cursork:            .fill 1
+current_bank:       .fill 1
+current_phase:      .fill 1
+disk_twos_buffer:   .fill 86
+encode_tab:         .fill 64
+directory_buffer:   .fill 128
+decode_tab:         .fill 0x100 - DECODE_TABLE_START
+wanted_track:       .fill 1
+wanted_trackoffset: .fill 2
+buffered_track:     .fill 1
+pending_key:        .fill 1
+motor_countdown:    .fill 1
+track_flags:        .fill 16
 
 ; This must go last --- it's the three 6502 vectors.
 .text
