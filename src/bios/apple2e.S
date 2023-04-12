@@ -426,6 +426,14 @@ zendproc
 ; --- Keyboard --------------------------------------------------------------
 
 zproc entry_CONST
+    ldx motor_countdown
+    zif_ne
+        dec motor_countdown
+        zif_eq
+            lda DISK_MOTOROFF
+        zendif
+    zendif
+
     ldy #0
     ldx 0xc000
     zif_mi
@@ -438,6 +446,12 @@ zproc entry_CONST
 zendproc
 
 zproc entry_CONIN
+    ; Turn the disk motor off.
+
+    lda DISK_MOTOROFF
+    lda #0
+    sta motor_countdown
+
     ; Display the cursor.
 
     jsr prepare_for_screen_write
@@ -579,6 +593,9 @@ zproc read_prodos_sector
 zendproc
 zproc read_sector
     sta ptr+1
+    lda #0xff
+    sta motor_countdown
+    sta DISK_MOTORON
 
     zrepeat
         ; Wait for a matching sector header.
@@ -762,21 +779,22 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 define_drive dph, 0x42e, 1024, 64, 64
 
 .bss
-cursorx: .fill 1
-cursory: .fill 1
-cursork: .fill 1
-current_bank:     .byte 0
-current_phase: .fill 1
+cursorx:          .fill 1
+cursory:          .fill 1
+cursork:          .fill 1
+current_bank:     .fill 1
+current_phase:    .fill 1
 disk_twos_buffer: .fill 86
-encode_tab: .fill 64
+encode_tab:       .fill 64
 directory_buffer: .fill 128
-decode_tab: .fill 0x100 - DECODE_TABLE_START
-wanted_track: .fill 1
-wanted_sector: .fill 1
-wanted_half: .fill 1
-buffered_track: .fill 1
-buffered_sector: .fill 1
-pending_key: .fill 1
+decode_tab:       .fill 0x100 - DECODE_TABLE_START
+wanted_track:     .fill 1
+wanted_sector:    .fill 1
+wanted_half:      .fill 1
+buffered_track:   .fill 1
+buffered_sector:  .fill 1
+pending_key:      .fill 1
+motor_countdown:  .fill 1
 
 ; This must go last --- it's the three 6502 vectors.
 .text
