@@ -5,6 +5,14 @@
 #include "zif.inc"
 #include "cpm65.inc"
 
+SCREEN_80STOREOFF = 0xc000
+SCREEN_80STOREON  = 0xc001
+SCREEN_80COLOFF   = 0xc00c
+SCREEN_80COLON    = 0xc00d
+SCREEN_PAGE2OFF   = 0xc054
+SCREEN_PAGE2ON    = 0xc055
+
+
 DISK_PH0OFF   = 0xc080 + 0x60
 DISK_PH0ON    = 0xc081 + 0x60
 DISK_PH1OFF   = 0xc082 + 0x60
@@ -44,6 +52,9 @@ _start:
     cli
     sta 0xc08b              ; R/W 0xe000 RAM; bank 1 in 0xd000
     sta 0xc08b              ; yes, I'm sure
+    sta SCREEN_80COLON
+    sta SCREEN_80STOREON
+    sta SCREEN_PAGE2OFF
     ldx #0xff
     txs                     ; reset stack
 
@@ -67,21 +78,6 @@ _start:
         zendif
     zendloop
 
-    jmp _init
-
-banner: ; reversed!
-    .byte 13, 10
-    .ascii "56-M/PC"
-banner_end:
-
-    ; One byte to spare here. This must be at offset 0x3f in the disk
-    ; image in order to spoof emulators into thinking this is a ProDOS
-    ; format.
-
-    .org 0x3a
-    .ascii "PRODOS"
-
-_init:
     ; Print the startup banner.
 
     jsr clear_screen
@@ -174,6 +170,11 @@ _init:
     lda #<biosentry
     ldx #>biosentry
     jmp __TPA1_START__ + COMHDR_ENTRY
+
+banner: ; reversed!
+    .byte 13, 10
+    .ascii "56-M/PC"
+banner_end:
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -274,9 +275,7 @@ zproc entry_CONOUT
         zif_mi
             inc cursorx
         zendif
-        lda cursory
-        jsr calculate_screen_address
-        ldy cursorx
+        jsr prepare_for_screen_write
         lda #0xa0
         sta (ptr), y
         rts
@@ -284,17 +283,15 @@ zproc entry_CONOUT
     cmp #10
     beq write_nl
 
-    tay
-    lda cursory
-    jsr calculate_screen_address
-    tya
-    ldy cursorx
+    pha
+    jsr prepare_for_screen_write
+    pla
     eor #0x80
     sta (ptr), y
 
     inc cursorx
     lda cursorx
-    cmp #40
+    cmp #80
     zif_eq
         lda #0
         sta cursorx
@@ -330,6 +327,10 @@ zproc scroll_up
 
         ldy #39
         zrepeat
+            sta SCREEN_PAGE2OFF
+            lda (ptr), y
+            sta (ptr1), y
+            sta SCREEN_PAGE2ON
             lda (ptr), y
             sta (ptr1), y
             dey
@@ -341,11 +342,86 @@ zproc scroll_up
     ldy #39
     lda #32|0x80
     zrepeat
+        sta SCREEN_PAGE2OFF
+        sta (ptr), y
+        sta SCREEN_PAGE2ON
         sta (ptr), y
         dey
     zuntil_mi
     rts
 zendproc
+
+; Sets ptr to the current cursor row address; also sets up the page stuff.
+; Leaves Y to the screen line offset.
+
+zproc prepare_for_screen_write
+    lda cursory
+    jsr calculate_screen_address
+    lda cursorx
+    lsr a
+    tay
+    lda #0
+    rol
+    eor #1
+    tax
+    sta SCREEN_PAGE2OFF, x
+    rts
+zendproc
+
+; Given a row number in A, set ptr to the address of that
+; row of video memory.
+;
+; Given a row 000abcde, the address is 000001cd eabab000.
+; Preserves X and Y.
+zproc calculate_screen_address
+    pha
+    lsr a
+    and #0x03
+    ora #0x04
+    sta ptr+1
+    pla
+
+    lsr a           ; 0000abcd, e -> carry
+    php
+    and #0x0c       ; 0000ab00
+    sta ptr+0
+    lsr a
+    lsr a           ; 000000ab
+    ora ptr+0       ; 0000abab
+    asl a
+    asl a
+    asl a
+    asl a           ; abab0000
+    plp
+    ror a           ; eabab000
+    sta ptr+0
+    rts
+zendproc
+
+zproc clear_screen
+    lda #24
+    sta ptr1
+    zrepeat
+        lda ptr1
+        jsr calculate_screen_address
+        ldy #40
+        lda #32|0x80
+        zrepeat
+            dey
+            sta SCREEN_PAGE2ON
+            sta (ptr), y
+            sta SCREEN_PAGE2OFF
+            sta (ptr), y
+        zuntil_eq
+
+        dec ptr1
+    zuntil_mi
+    lda #0
+    sta cursorx
+    sta cursory
+    rts
+zendproc
+
 
 ; --- Keyboard --------------------------------------------------------------
 
@@ -364,9 +440,7 @@ zendproc
 zproc entry_CONIN
     ; Display the cursor.
 
-    lda cursory
-    jsr calculate_screen_address
-    ldy cursorx
+    jsr prepare_for_screen_write
     lda (ptr), y
     sta cursork
     lda #0x60           ; flashing block
@@ -671,57 +745,6 @@ change_phase:
         pla
         sbc #1
     zuntil_eq
-    rts
-zendproc
-
-; Given a row number in A, set ptr to the address of that
-; row of video memory.
-;
-; Given a row 000abcde, the address is 000001cd eabab000.
-; Preserves X and Y.
-zproc calculate_screen_address
-    pha
-    lsr a
-    and #0x03
-    ora #0x04
-    sta ptr+1
-    pla
-
-    lsr a           ; 0000abcd, e -> carry
-    php
-    and #0x0c       ; 0000ab00
-    sta ptr+0
-    lsr a
-    lsr a           ; 000000ab
-    ora ptr+0       ; 0000abab
-    asl a
-    asl a
-    asl a
-    asl a           ; abab0000
-    plp
-    ror a           ; eabab000
-    sta ptr+0
-    rts
-zendproc
-
-zproc clear_screen
-    lda #24
-    sta ptr1
-    zrepeat
-        lda ptr1
-        jsr calculate_screen_address
-        ldy #40
-        lda #32|0x80
-        zrepeat
-            dey
-            sta (ptr), y
-        zuntil_eq
-
-        dec ptr1
-    zuntil_mi
-    lda #0
-    sta cursorx
-    sta cursory
     rts
 zendproc
 
