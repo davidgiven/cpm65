@@ -35,5 +35,6 @@ jobs:
           bbcmicro.ssd
           c64.d64
           x16.zip
+          apple2e.po
           diskdefs
 
