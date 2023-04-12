@@ -820,6 +820,7 @@ zproc motor_on
     ldx #0xff
     stx motor_countdown
     stx DISK_MOTORON
+    rts
 zendproc
 
 .data
