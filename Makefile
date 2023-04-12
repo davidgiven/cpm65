@@ -14,7 +14,6 @@ APPS = \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/third_party/dos65/edit205.com \
 	cpmfs/asm.txt \
-	cpmfs/readme.txt \
 	cpmfs/hello.asm \
 	apps/dump.asm \
 
