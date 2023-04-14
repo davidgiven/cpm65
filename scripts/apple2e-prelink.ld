@@ -21,6 +21,8 @@ SECTIONS {
 	} >ram
 
 	.bss (0x10000-BIOS_SIZE) (NOLOAD) : {
+		. = ALIGN(256);
+		*(aligneddata)
 		*(.bss .bss.*)
 		*(.noinit .noinit.*)
 	} >highram
@@ -33,6 +35,7 @@ SECTIONS {
 
 	.text : {
 		*(.text .text.*) 
+		*(write_track)
 		*(tail)
 	} >highram AT>ram
 

@@ -16,7 +16,12 @@ SECTIONS {
 		*(loader)
 	} >ram
 
-	.bss (0x10000-BIOS_SIZE) (NOLOAD) : {
+	BIOS_SIZE_ROUNDED_UP = (BIOS_SIZE + 255) & 0xff00;
+	BIOS_PADDING = BIOS_SIZE_ROUNDED_UP - BIOS_SIZE;
+
+	.bss (0x10000-BIOS_SIZE_ROUNDED_UP) (NOLOAD) : {
+		*(aligneddata)
+		. = . + BIOS_PADDING;
 		*(.bss .bss.*)
 		*(.noinit .noinit.*)
 	} >highram
@@ -29,6 +34,7 @@ SECTIONS {
 
 	.text : {
 		*(.text .text.*) 
+		*(write_track)
 		*(tail)
 	} >highram AT>ram
 

@@ -15,22 +15,22 @@ SCREEN_PAGE2ON    = 0xc055
 KBD_READ        = 0xc000
 KBD_STROBERESET = 0xc010
 
-DISK_PH0OFF   = 0xc080 + 0x60
+DISK_PH0OFF   = 0xc080 + 0x60 ; Q0
 DISK_PH0ON    = 0xc081 + 0x60
-DISK_PH1OFF   = 0xc082 + 0x60
+DISK_PH1OFF   = 0xc082 + 0x60 ; Q1
 DISK_PH1ON    = 0xc083 + 0x60
-DISK_PH2OFF   = 0xc084 + 0x60
+DISK_PH2OFF   = 0xc084 + 0x60 ; Q2
 DISK_PH2ON    = 0xc085 + 0x60
-DISK_PH3OFF   = 0xc086 + 0x60
+DISK_PH3OFF   = 0xc086 + 0x60 ; Q3
 DISK_PH3ON    = 0xc087 + 0x60
-DISK_MOTOROFF = 0xc088 + 0x60
+DISK_MOTOROFF = 0xc088 + 0x60 ; Q4
 DISK_MOTORON  = 0xc089 + 0x60
-DISK_DRIVE1   = 0xc08a + 0x60
+DISK_DRIVE1   = 0xc08a + 0x60 ; Q5
 DISK_DRIVE2   = 0xc08b + 0x60
-DISK_READ     = 0xc08c + 0x60
-DISK_WRITE    = 0xc08d + 0x60
-DISK_READEN   = 0xc08e + 0x60
-DISK_WRITEEN  = 0xc08f + 0x60
+DISK_SHIFT    = 0xc08c + 0x60 ; Q6
+DISK_LOAD     = 0xc08d + 0x60
+DISK_READ     = 0xc08e + 0x60 ; Q7
+DISK_WRITE    = 0xc08f + 0x60
 
 MEM_BANKING   = 0xc080
 
@@ -44,6 +44,7 @@ ptr:    .word 0
 ptr1:   .word 0
 dma:    .word 0
 
+io_buffer = 0x300
 track_buffer = 0xd000
 
 ; --- Initialisation code ---------------------------------------------------
@@ -131,8 +132,16 @@ _start:
 
     ldx #0
     stx current_phase
+    stx buffer_dirty
     dex
     stx buffered_track
+
+    jsr read_track
+    lda #1
+    jsr seek_to_track
+    jsr write_track
+    lda DISK_MOTOROFF
+    jmp .
 
     ; Read the BDOS from track 1 into the track buffer..
 
@@ -224,9 +233,6 @@ biostable_hi:
     .byte entry_SETZP@mos16hi
     .byte entry_SETBANK@mos16hi
 zendproc
-
-entry_WRITE:
-    rts
 
 zproc entry_GETTPA
 	ldy current_bank
@@ -571,6 +577,39 @@ zproc entry_READ
     rts
 zendproc
 
+; On entry, A=0 for a normal write; A=1 to always flush to disk.
+
+zproc entry_WRITE
+    pha
+    jsr change_tracks
+    pla
+    zif_cc
+        pha
+
+        lda wanted_trackoffset+0
+        sta ptr+0
+        lda wanted_trackoffset+1
+        sta ptr+1
+
+        ldy #127
+        zrepeat
+            lda (dma), y
+            sta (ptr), y
+            dey
+        zuntil_mi
+
+        pla
+        zif_ne
+            jmp write_track
+        zendif
+
+        lda #1
+        sta buffer_dirty
+        clc
+    zendif
+    rts
+zendproc
+
 ; Changes the track in the buffer.
 
 zproc change_tracks
@@ -582,6 +621,12 @@ zproc change_tracks
         rts
     zendif
 
+    lda buffer_dirty
+    zif_mi
+        jsr write_track
+    zendif
+
+    lda wanted_track
     sta buffered_track
     jsr seek_to_track
 
@@ -652,7 +697,7 @@ zproc read_track
             zrepeat
                 sty ptr+0
                 zrepeat
-                    ldy DISK_READ
+                    ldy DISK_SHIFT
                 zuntil_mi
                 eor decode_tab-DECODE_TABLE_START, y
                 ldy ptr+0
@@ -666,7 +711,7 @@ zproc read_track
             zrepeat
                 sty ptr+0
                 zrepeat
-                    ldy DISK_READ
+                    ldy DISK_SHIFT
                 zuntil_mi
                 eor decode_tab-DECODE_TABLE_START, y
                 ldy ptr+0
@@ -677,7 +722,7 @@ zproc read_track
             ; Read the checksum byte.
 
             zrepeat
-                ldy DISK_READ
+                ldy DISK_SHIFT
             zuntil_mi
             eor decode_tab-DECODE_TABLE_START, y
         zuntil_eq
@@ -722,39 +767,6 @@ zproc read_track
     zendloop
 
     clc
-    rts
-
-    ; Waits for a sector header. Returns the unencoded ID byte immediately
-    ; following in Y.
-
-read_header:
-    zrepeat
-        zrepeat
-            zrepeat
-                ldy DISK_READ
-            zuntil_mi
-            cpy #0xd5
-        zuntil_eq
-        zrepeat
-            ldy DISK_READ
-        zuntil_mi
-        cpy #0xaa
-    zuntil_eq
-    zrepeat
-        ldy DISK_READ
-    zuntil_mi
-    rts
-
-read_gcr44:
-    zrepeat
-        lda DISK_READ
-    zuntil_mi
-    rol a
-    sta ptr+0
-    zrepeat
-        lda DISK_READ
-    zuntil_mi
-    and ptr+0
     rts
 zendproc
 
@@ -814,6 +826,44 @@ change_phase:
     rts
 zendproc
 
+; Waits for a sector header. Returns the unencoded ID byte immediately
+; following in Y. Preserves X and A.
+
+zproc read_header
+    zrepeat
+        zrepeat
+            zrepeat
+                ldy DISK_SHIFT
+            zuntil_mi
+            cpy #0xd5
+        zuntil_eq
+        zrepeat
+            ldy DISK_SHIFT
+        zuntil_mi
+        cpy #0xaa
+    zuntil_eq
+    zrepeat
+        ldy DISK_SHIFT
+    zuntil_mi
+    rts
+zendproc
+
+; Reads and decodes a gcr44 value.
+; Preserves X and Y. Corrupts ptr.
+
+zproc read_gcr44
+    zrepeat
+        lda DISK_SHIFT
+    zuntil_mi
+    rol a
+    sta ptr+0
+    zrepeat
+        lda DISK_SHIFT
+    zuntil_mi
+    and ptr+0
+    rts
+zendproc
+
 ; Corrupts X.
 
 zproc motor_on
@@ -823,9 +873,200 @@ zproc motor_on
     rts
 zendproc
 
+; Write the track buffer to disk.
+; The timing in this routine is critical, so it's important that it doesn't
+; cross page boundary. Therefore this must be the last routine in the BIOS so
+; all the timing-critical bits are in the last page.
+
+.section write_track, "ax"
+    jsr motor_on
+    clc
+
+    ; Timing here is super-critical. We have 32 cycles to write each byte, and
+    ; we have to be on time. Normally we'd just blat out the entire track worth
+    ; of data in one go, but we don't have time to compute the sector encoding
+    ; on the fly! So we have to do a normal sector-by-sector write: we compute
+    ; a sector, then wait for its header, then write it, then compute the next
+    ; sector and wait for its header. Because of the ProDOS sector skew we can
+    ; write the entire track in two rotations.
+
+    lda #>track_buffer  ; bottom nibble is also our ProDOS sector number
+    sta ptr1+1
+    lda #0
+    sta ptr1+0          ; remains zero for the duration
+
+    zloop
+        lda ptr1+1
+        and #0x0f
+        tax
+
+        ; Precompute the 2s buffer.
+
+        ldx #0
+        ldy #2
+        zrepeat
+            zrepeat
+                dey
+
+                lda (ptr1), y
+                lsr a
+                rol disk_twos_buffer, x
+                lsr a
+                rol disk_twos_buffer, x
+                sta io_buffer, y
+
+                inx
+                cpx #0x56
+            zuntil_cs
+
+            ldx #0
+            tya
+        zuntil_eq
+
+        ldx #0x55
+        zrepeat
+            lda disk_twos_buffer, x
+            and #0x3f
+            sta disk_twos_buffer, x
+            dex
+        zuntil_mi
+
+        ; Wait for the right sector header.
+
+        zrepeat
+            zrepeat
+                jsr read_header
+                cpy #0x96
+            zuntil_eq
+            jsr read_gcr44
+            jsr read_gcr44
+            jsr read_gcr44
+            
+            ; Found a sector. Has it already been read?
+            ; Remember to undo the ProDOS sector skew.
+
+            tax
+            lda ptr1+1
+            and #0x0f
+            cmp prodos_reverse_sector_map, x
+        zuntil_eq
+
+        ; Skip the tail of the sector header.
+
+        ldy #0x25
+        zrepeat
+            dey
+        zuntil_mi
+            
+        lda DISK_LOAD       ; prime drive
+        lda DISK_READ      
+        zif_mi
+            sec             ; write protected
+            rts
+        zendif
+
+        ; Timing-critical part starts when the first byte is queued!
+
+            lda #0xff
+            sta DISK_WRITE  ; start writing
+            ora DISK_SHIFT
+/*  0 */    cmp (0, x)                    ; 6
+/*  6 */    cmp 0                         ; 3
+
+            ; Write prologue.
+
+/*  9 */    ldx #sector_prologue_len      ; 2
+            zrepeat
+/* 11 */        nop                       ; 2
+/* 13 */        cmp 0                     ; 3
+/* 16 */        nop                       ; 2
+/* 18 */        nop                       ; 2
+/* 20 */        lda sector_prologue-1, x  ; 4
+/* 24 */        sta DISK_LOAD             ; 4
+/* 28 */        ora DISK_SHIFT            ; 4
+/*  0 */        cmp (0, x)                ; 6
+/*  6 */        dex                       ; 2
+/*  8 */    zuntil_eq       ; 3 if taken, 2 if not
+
+            ; Write out the 2s buffer.
+
+label:
+/* 10 */    ldy #56                       ; 2
+/* 12 */    lda #0                        ; 2 
+            zloop  
+/* 14 */        eor disk_twos_buffer-1, y ; 4
+/* 18 */        tax                       ; 2
+/* 20 */        lda encode_tab, x         ; 4
+/* 24 */        sta DISK_LOAD             ; 4
+/* 28 */        ora DISK_SHIFT            ; 4
+/*  0 */        lda disk_twos_buffer-1, y ; 4
+/*  4 */        dey                       ; 2
+/*  6 */        zbreakif_ne ; 3 if taken, 2 if not
+/*  8 */        cmp 0                     ; 3
+/* 11 */    zendloop                      ; 3
+/* 9 */
+
+            ; Write out the actual data.
+            ; (y is zero)
+
+            zrepeat
+/* 14 */        eor io_buffer, y          ; 4
+/* 18 */        tax                       ; 2
+/* 20 */        lda encode_tab, x         ; 4
+/* 24 */        sta DISK_LOAD             ; 4
+/* 28 */        ora DISK_SHIFT            ; 4
+/*  0 */        lda io_buffer, y          ; 4
+/*  4 */        cmp 0                     ; 3
+/*  7 */        nop                       ; 2
+/*  9 */        iny                       ; 2
+/* 11 */    zuntil_eq       ; 3 if taken, 2 if not
+/* 13 */
+
+            ; Write epilogue.
+
+/* 13 */    ldx #sector_epilogue_len      ; 2
+            zrepeat
+/* 15 */        lda sector_epilogue-1, x  ; 4
+/* 19 */        cmp $00                   ; 3
+/* 22 */        nop                       ; 2
+/* 24 */        sta DISK_LOAD             ; 4
+/* 28 */        ora DISK_SHIFT            ; 4
+/*  0 */        cmp (0, x)                ; 6
+/*  6 */        nop                       ; 2
+/*  8 */        nop                       ; 2
+/* 10 */        dex                       ; 2
+/* 12 */    zuntil_eq       ; 3 if taken, 2 if not
+
+        ; Finished with the timing-critical stuff. Write mode off.
+
+        lda DISK_READ
+        lda DISK_SHIFT
+
+        ; Advance to the next sector and go again.
+
+        inc ptr1+1
+        lda ptr1+1
+        and #0x0f
+        zif_eq
+            lda #0
+            sta buffer_dirty
+            clc
+            rts
+        zendif
+    zendloop
+
+sector_prologue:
+    .byte 0xad, 0xaa, 0xd5, 0xff, 0xff, 0xff, 0xff ; REVERSED
+sector_prologue_end:
+sector_prologue_len = sector_prologue_end - sector_prologue
+sector_epilogue:
+    .byte 0xff, 0xeb, 0xaa, 0xde ; REVERSED
+sector_epilogue_end:
+sector_epilogue_len = sector_epilogue_end - sector_epilogue
+zendproc
+
+
 .data
-prodos_sector_map:
-    .byte 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15
 prodos_reverse_sector_map:
     .byte 0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15
 
@@ -838,21 +1079,24 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 define_drive dph, 0x42e, 1024, 64, 64
 
+.section aligneddata
+encode_tab:         .fill 64
+disk_twos_buffer:   .fill 86 ; must be second
+
 .bss
 cursorx:            .fill 1
 cursory:            .fill 1
 cursork:            .fill 1
 current_bank:       .fill 1
 current_phase:      .fill 1
-disk_twos_buffer:   .fill 86
-encode_tab:         .fill 64
 directory_buffer:   .fill 128
 decode_tab:         .fill 0x100 - DECODE_TABLE_START
 wanted_track:       .fill 1
 wanted_trackoffset: .fill 2
-buffered_track:     .fill 1
 pending_key:        .fill 1
 motor_countdown:    .fill 1
+buffered_track:     .fill 1
+buffer_dirty:       .fill 1
 track_flags:        .fill 16
 
 ; This must go last --- it's the three 6502 vectors.
