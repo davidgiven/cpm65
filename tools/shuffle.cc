@@ -48,7 +48,7 @@ static void write_file()
     }
 
     int inblocks = (infile.size() + blocksize - 1) / blocksize;
-    int tracks = (inblocks + blockspertrack - 1) % blockspertrack;
+    int tracks = (inblocks + blockspertrack - 1) / blockspertrack;
     std::cout << "file size: " << tracks << " tracks of " << blockspertrack
               << " blocks\n";
     infile.resize(tracks * blockspertrack * blocksize);
