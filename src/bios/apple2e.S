@@ -142,14 +142,6 @@ _start:
     dex
     stx buffered_track
 
-;    jsr read_track
-;    lda #1
-;    jsr seek_to_track
-;    jsr write_track
-;    ldx #DISK_SLOT
-;    lda DISK_MOTOROFF, x
-;    jmp .
-
     ; Read the BDOS from track 1 into the track buffer..
 
     lda #1
@@ -631,7 +623,7 @@ zproc change_tracks
     zendif
 
     lda buffer_dirty
-    zif_mi
+    zif_ne
         jsr write_track
     zendif
 
