@@ -4,6 +4,7 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "wait.inc"
 
 SCREEN_80STOREOFF = 0xc000
 SCREEN_80STOREON  = 0xc001
@@ -40,62 +41,6 @@ DISK_WRITE    = 0xc08f
 MEM_BANKING   = 0xc080
 
 DECODE_TABLE_START = 0x96
-
-.macro WAIT2
-    nop        ; 2
-.endm
-
-.macro WAIT3
-    cmp 0      ; 3
-.endm
-
-.macro WAIT4
-    nop        ; 2
-    nop        ; 2
-.endm
-
-.macro WAIT5
-    cmp 0      ; 3
-    nop
-.endm
-
-.macro WAIT6
-    cmp (0, x) ; 6
-.endm
-
-.macro WAIT7
-    pha        ; 3
-    pla        ; 4
-.endm
-
-.macro WAIT8
-    cmp (0, x) ; 6
-    nop        ; 2
-.endm
-
-.macro WAIT9
-    pha        ; 3
-    pla        ; 4
-    nop        ; 2
-.endm
-
-.macro WAIT10
-    pha        ; 3
-    pla        ; 4
-    cmp 0      ; 3
-.endm
-    
-.macro WAIT11
-    pha        ; 3
-    pla        ; 4
-    nop        ; 2
-    nop        ; 2
-.endm
-    
-.macro WAIT12
-    cmp (0, x) ; 6
-    cmp (0, x) ; 6
-.endm
 
 .global _start
 ZEROPAGE
