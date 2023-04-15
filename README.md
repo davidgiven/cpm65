@@ -10,7 +10,7 @@ to the 6502. So far it runs on:
   - BBC Micro (and Master, and Tube, and Electron)
   - Commodore 64
   - Commander X16
-  - Apple IIe (partially)
+  - Apple IIe
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -29,6 +29,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Micro"></a>
 <a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
+<a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 </div>
 
 
@@ -95,8 +96,6 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 	However a real Commodore disk drive _will not work_.
 
 ### Apple IIe notes
-
-  - this is still in development and doesn't support writing to disk yet.
 
   - to use, place the contents of the `appleiie.po` file onto a disk and boot
     it. The disk image has been munged according to ProDOS sector ordering.
