@@ -36,6 +36,32 @@ MEM_BANKING   = 0xc080
 
 DECODE_TABLE_START = 0x96
 
+.macro WAIT2
+    nop        ; 2
+.endm
+
+.macro WAIT3
+    cmp 0      ; 3
+.endm
+
+.macro WAIT4
+    cmp 0, x   ; 4
+.endm
+
+.macro WAIT5
+    cmp 0      ; 3
+    nop
+.endm
+
+.macro WAIT6
+    cmp (0, x) ; 6
+.endm
+
+.macro WAIT7
+    pha        ; 3
+    pla        ; 4
+.endm
+
 .global _start
 ZEROPAGE
 
@@ -900,7 +926,7 @@ zendproc
         and #0x0f
         tax
 
-        ; Precompute the 2s buffer.
+        ; Precompute the 2s and I/O buffer.
 
         ldx #0
         ldy #2
@@ -970,39 +996,37 @@ zendproc
             lda #0xff
             sta DISK_WRITE  ; start writing
             ora DISK_SHIFT
-/*  0 */    cmp (0, x)                    ; 6
-/*  6 */    cmp 0                         ; 3
+/*  0 */    WAIT6                         ; 6
+/*  6 */    WAIT3                         ; 3
 
             ; Write prologue.
 
 /*  9 */    ldx #sector_prologue_len      ; 2
             zrepeat
-/* 11 */        nop                       ; 2
-/* 13 */        cmp 0                     ; 3
-/* 16 */        nop                       ; 2
-/* 18 */        nop                       ; 2
+/* 11 */        WAIT7                     ; 7
+/* 18 */        WAIT2                     ; 2
 /* 20 */        lda sector_prologue-1, x  ; 4
 /* 24 */        sta DISK_LOAD             ; 4
 /* 28 */        ora DISK_SHIFT            ; 4
-/*  0 */        cmp (0, x)                ; 6
+/*  0 */        WAIT6                     ; 6
 /*  6 */        dex                       ; 2
 /*  8 */    zuntil_eq       ; 3 if taken, 2 if not
 
             ; Write out the 2s buffer.
 
 label:
-/* 10 */    ldy #56                       ; 2
+/* 10 */    ldy #55                       ; 2
 /* 12 */    lda #0                        ; 2 
             zloop  
-/* 14 */        eor disk_twos_buffer-1, y ; 4
+/* 14 */        eor disk_twos_buffer, y   ; 4
 /* 18 */        tax                       ; 2
 /* 20 */        lda encode_tab, x         ; 4
 /* 24 */        sta DISK_LOAD             ; 4
 /* 28 */        ora DISK_SHIFT            ; 4
-/*  0 */        lda disk_twos_buffer-1, y ; 4
+/*  0 */        lda disk_twos_buffer, y   ; 4
 /*  4 */        dey                       ; 2
-/*  6 */        zbreakif_ne ; 3 if taken, 2 if not
-/*  8 */        cmp 0                     ; 3
+/*  6 */        zbreakif_pl ; 3 if taken, 2 if not
+/*  8 */        WAIT3                     ; 3
 /* 11 */    zendloop                      ; 3
 /* 9 */
 
@@ -1016,14 +1040,24 @@ label:
 /* 24 */        sta DISK_LOAD             ; 4
 /* 28 */        ora DISK_SHIFT            ; 4
 /*  0 */        lda io_buffer, y          ; 4
-/*  4 */        cmp 0                     ; 3
+/*  4 */        WAIT3                     ; 3
 /*  7 */        nop                       ; 2
 /*  9 */        iny                       ; 2
 /* 11 */    zuntil_eq       ; 3 if taken, 2 if not
 /* 13 */
 
+            ; Write checksum byte.
+
+/* 13 */    tax                           ; 2
+/* 15 */    lda encode_tab, x             ; 4
+/* 19 */    WAIT5                         ; 5
+/* 24 */    sta DISK_LOAD                 ; 4
+/* 28 */    ora DISK_SHIFT                ; 4
+
             ; Write epilogue.
 
+/*  0 */    WAIT6                         ; 6
+/*  6 */    WAIT7                         ; 7
 /* 13 */    ldx #sector_epilogue_len      ; 2
             zrepeat
 /* 15 */        lda sector_epilogue-1, x  ; 4
@@ -1031,9 +1065,8 @@ label:
 /* 22 */        nop                       ; 2
 /* 24 */        sta DISK_LOAD             ; 4
 /* 28 */        ora DISK_SHIFT            ; 4
-/*  0 */        cmp (0, x)                ; 6
-/*  6 */        nop                       ; 2
-/*  8 */        nop                       ; 2
+/*  0 */        WAIT6                     ; 6
+/*  6 */        WAIT4                     ; 4
 /* 10 */        dex                       ; 2
 /* 12 */    zuntil_eq       ; 3 if taken, 2 if not
 
