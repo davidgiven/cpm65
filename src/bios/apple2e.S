@@ -15,22 +15,27 @@ SCREEN_PAGE2ON    = 0xc055
 KBD_READ        = 0xc000
 KBD_STROBERESET = 0xc010
 
-DISK_PH0OFF   = 0xc080 + 0x60 ; Q0
-DISK_PH0ON    = 0xc081 + 0x60
-DISK_PH1OFF   = 0xc082 + 0x60 ; Q1
-DISK_PH1ON    = 0xc083 + 0x60
-DISK_PH2OFF   = 0xc084 + 0x60 ; Q2
-DISK_PH2ON    = 0xc085 + 0x60
-DISK_PH3OFF   = 0xc086 + 0x60 ; Q3
-DISK_PH3ON    = 0xc087 + 0x60
-DISK_MOTOROFF = 0xc088 + 0x60 ; Q4
-DISK_MOTORON  = 0xc089 + 0x60
-DISK_DRIVE1   = 0xc08a + 0x60 ; Q5
-DISK_DRIVE2   = 0xc08b + 0x60
-DISK_SHIFT    = 0xc08c + 0x60 ; Q6
-DISK_LOAD     = 0xc08d + 0x60
-DISK_READ     = 0xc08e + 0x60 ; Q7
-DISK_WRITE    = 0xc08f + 0x60
+; It's tempting to bake in the 0x60 offset for the drive unit at slot 6... but this
+; changes the timing of the instructions which access these registers, and then
+; writes don't work! You _must_ use lda <addr>, x or sta <addr>, x instructions
+; (the right ones; they take 4 and 5 cycles respectively).
+DISK_SLOT     = 0x60
+DISK_PH0OFF   = 0xc080 ; Q0
+DISK_PH0ON    = 0xc081
+DISK_PH1OFF   = 0xc082 ; Q1
+DISK_PH1ON    = 0xc083
+DISK_PH2OFF   = 0xc084 ; Q2
+DISK_PH2ON    = 0xc085
+DISK_PH3OFF   = 0xc086 ; Q3
+DISK_PH3ON    = 0xc087
+DISK_MOTOROFF = 0xc088 ; Q4
+DISK_MOTORON  = 0xc089
+DISK_DRIVE1   = 0xc08a ; Q5
+DISK_DRIVE2   = 0xc08b
+DISK_SHIFT    = 0xc08c ; Q6
+DISK_LOAD     = 0xc08d
+DISK_READ     = 0xc08e ; Q7
+DISK_WRITE    = 0xc08f
 
 MEM_BANKING   = 0xc080
 
@@ -45,7 +50,8 @@ DECODE_TABLE_START = 0x96
 .endm
 
 .macro WAIT4
-    cmp 0, x   ; 4
+    nop        ; 2
+    nop        ; 2
 .endm
 
 .macro WAIT5
@@ -62,6 +68,35 @@ DECODE_TABLE_START = 0x96
     pla        ; 4
 .endm
 
+.macro WAIT8
+    cmp (0, x) ; 6
+    nop        ; 2
+.endm
+
+.macro WAIT9
+    pha        ; 3
+    pla        ; 4
+    nop        ; 2
+.endm
+
+.macro WAIT10
+    pha        ; 3
+    pla        ; 4
+    cmp 0      ; 3
+.endm
+    
+.macro WAIT11
+    pha        ; 3
+    pla        ; 4
+    nop        ; 2
+    nop        ; 2
+.endm
+    
+.macro WAIT12
+    cmp (0, x) ; 6
+    cmp (0, x) ; 6
+.endm
+
 .global _start
 ZEROPAGE
 
@@ -70,7 +105,7 @@ ptr:    .word 0
 ptr1:   .word 0
 dma:    .word 0
 
-io_buffer = 0x300
+disk_sixes_buffer = 0x300
 track_buffer = 0xd000
 
 ; --- Initialisation code ---------------------------------------------------
@@ -162,12 +197,13 @@ _start:
     dex
     stx buffered_track
 
-    jsr read_track
-    lda #1
-    jsr seek_to_track
-    jsr write_track
-    lda DISK_MOTOROFF
-    jmp .
+;    jsr read_track
+;    lda #1
+;    jsr seek_to_track
+;    jsr write_track
+;    ldx #DISK_SLOT
+;    lda DISK_MOTOROFF, x
+;    jmp .
 
     ; Read the BDOS from track 1 into the track buffer..
 
@@ -467,7 +503,8 @@ zproc entry_CONST
     zif_ne
         dec motor_countdown
         zif_eq
-            lda DISK_MOTOROFF
+            ldx #DISK_SLOT
+            lda DISK_MOTOROFF, x
         zendif
     zendif
 
@@ -485,7 +522,8 @@ zendproc
 zproc entry_CONIN
     ; Turn the disk motor off.
 
-    lda DISK_MOTOROFF
+    ldx #DISK_SLOT
+    lda DISK_MOTOROFF, x
     lda #0
     sta motor_countdown
 
@@ -720,10 +758,11 @@ zproc read_track
 
             ldy #0x56
             lda #0                  ; accumulated checksum
+            ldx #DISK_SLOT          ; remains here for the duration
             zrepeat
                 sty ptr+0
                 zrepeat
-                    ldy DISK_SHIFT
+                    ldy DISK_SHIFT, x
                 zuntil_mi
                 eor decode_tab-DECODE_TABLE_START, y
                 ldy ptr+0
@@ -732,12 +771,12 @@ zproc read_track
             zuntil_eq
 
             ; Reads the second section (the sixes) into the output buffer.
-            ; Y is 0 on entry
+            ; Y is 0 on entry. X is DISK_SLOT.
 
             zrepeat
                 sty ptr+0
                 zrepeat
-                    ldy DISK_SHIFT
+                    ldy DISK_SHIFT, x
                 zuntil_mi
                 eor decode_tab-DECODE_TABLE_START, y
                 ldy ptr+0
@@ -746,9 +785,10 @@ zproc read_track
             zuntil_eq
 
             ; Read the checksum byte.
+            ; X is still DISK_SLOT.
 
             zrepeat
-                ldy DISK_SHIFT
+                ldy DISK_SHIFT, x
             zuntil_mi
             eor decode_tab-DECODE_TABLE_START, y
         zuntil_eq
@@ -825,6 +865,7 @@ change_phase:
     lda current_phase
     and #3
     asl a
+    ora #DISK_SLOT      ; add in the slot offset
     tax
     sta DISK_PH0OFF, x  ; turn off current phase
 
@@ -834,6 +875,7 @@ change_phase:
     sta current_phase
     and #3
     asl a
+    ora #DISK_SLOT      ; add in the slot offset
     tax
     sta DISK_PH0ON, x   ; turn on new phase
 
@@ -853,38 +895,39 @@ change_phase:
 zendproc
 
 ; Waits for a sector header. Returns the unencoded ID byte immediately
-; following in Y. Preserves X and A.
+; following in Y. Preserves A.
 
 zproc read_header
+    ldx #DISK_SLOT
     zrepeat
         zrepeat
             zrepeat
-                ldy DISK_SHIFT
+                ldy DISK_SHIFT, x
             zuntil_mi
             cpy #0xd5
         zuntil_eq
         zrepeat
-            ldy DISK_SHIFT
+            ldy DISK_SHIFT, x
         zuntil_mi
         cpy #0xaa
     zuntil_eq
     zrepeat
-        ldy DISK_SHIFT
+        ldy DISK_SHIFT, x
     zuntil_mi
     rts
 zendproc
 
 ; Reads and decodes a gcr44 value.
-; Preserves X and Y. Corrupts ptr.
+; X must be DISK_SLOT. Preserves and Y. Corrupts ptr.
 
 zproc read_gcr44
     zrepeat
-        lda DISK_SHIFT
+        lda DISK_SHIFT, x
     zuntil_mi
     rol a
     sta ptr+0
     zrepeat
-        lda DISK_SHIFT
+        lda DISK_SHIFT, x
     zuntil_mi
     and ptr+0
     rts
@@ -895,7 +938,8 @@ zendproc
 zproc motor_on
     ldx #0xff
     stx motor_countdown
-    stx DISK_MOTORON
+    ldx #DISK_SLOT
+    sta DISK_MOTORON, x
     rts
 zendproc
 
@@ -939,7 +983,7 @@ zendproc
                 rol disk_twos_buffer, x
                 lsr a
                 rol disk_twos_buffer, x
-                sta io_buffer, y
+                sta disk_sixes_buffer, y
 
                 inx
                 cpx #0x56
@@ -979,13 +1023,16 @@ zendproc
 
         ; Skip the tail of the sector header.
 
-        ldy #0x25
+        ldy #4*4
+        ; Each loop here is 8 cycles, so four times round gives a byte.
         zrepeat
-            dey
-        zuntil_mi
+            WAIT3           ; 3
+            dey             ; 2
+        zuntil_eq           ; 3 for every iteration
             
-        lda DISK_LOAD       ; prime drive
-        lda DISK_READ      
+        ldx #DISK_SLOT
+        lda DISK_LOAD, x    ; prime drive
+        lda DISK_READ, x   
         zif_mi
             sec             ; write protected
             rts
@@ -993,87 +1040,103 @@ zendproc
 
         ; Timing-critical part starts when the first byte is queued!
 
+            ; Write the 40-cycle sync pulses. 40 cycles means that
+            ; we actually end up with 0b1111.1111.00 on disk.
+
             lda #0xff
-            sta DISK_WRITE  ; start writing
-            ora DISK_SHIFT
-/*  0 */    WAIT6                         ; 6
-/*  6 */    WAIT3                         ; 3
-
-            ; Write prologue.
-
-/*  9 */    ldx #sector_prologue_len      ; 2
+            sta DISK_WRITE, x  ; start writing
+            cmp DISK_SHIFT, x
+/*  0 */    ldy #4                            ; 2
+/*  2 */    WAIT3                             ; 3
             zrepeat
-/* 11 */        WAIT7                     ; 7
-/* 18 */        WAIT2                     ; 2
-/* 20 */        lda sector_prologue-1, x  ; 4
-/* 24 */        sta DISK_LOAD             ; 4
-/* 28 */        ora DISK_SHIFT            ; 4
-/*  0 */        WAIT6                     ; 6
-/*  6 */        dex                       ; 2
-/*  8 */    zuntil_eq       ; 3 if taken, 2 if not
+/*  5 */        WAIT12                        ; 12
+/* 17 */        WAIT12                        ; 12
+/* 29 */        WAIT2                         ; 3
+/* 32 */        sta DISK_LOAD, x              ; 5
+/* 36 */        cmp DISK_SHIFT, x             ; 4
+/*  0 */        dey                           ; 2
+/*  2 */    zuntil_eq       ; 3 if taken, 2 if not
+/*  4 */
+/* -- */    WAIT9 ; waste four cycles for the last 40-cycle sync byte.
+                  ; plus five to sync up with the loop below.
+
+            ; Write prologue. (From here on we're at 32-cycle, er, cycles.)
+            ; Y is 0.
+
+/*  5 */    ldy #sector_prologue_len      ; 2
+            zrepeat
+/*  7 */        WAIT12                    ; 12
+/* 19 */        lda sector_prologue-1, y  ; 4
+/* 23 */        sta DISK_LOAD, x          ; 5
+/* 28 */        cmp DISK_SHIFT, x         ; 4
+/*  0 */        WAIT2                     ; 2
+/*  2 */        dey                       ; 2
+/*  4 */    zuntil_eq       ; 3 if taken, 2 if not
+/*  6 */
 
             ; Write out the 2s buffer.
+            ; Y is 0.
 
-label:
-/* 10 */    ldy #55                       ; 2
-/* 12 */    lda #0                        ; 2 
-            zloop  
-/* 14 */        eor disk_twos_buffer, y   ; 4
-/* 18 */        tax                       ; 2
-/* 20 */        lda encode_tab, x         ; 4
-/* 24 */        sta DISK_LOAD             ; 4
-/* 28 */        ora DISK_SHIFT            ; 4
-/*  0 */        lda disk_twos_buffer, y   ; 4
-/*  4 */        dey                       ; 2
-/*  6 */        zbreakif_pl ; 3 if taken, 2 if not
-/*  8 */        WAIT3                     ; 3
-/* 11 */    zendloop                      ; 3
-/* 9 */
+/*  6 */    tya                           ; 2
+/*  8 */    ldy #0x56                     ; 2
+            zrepeat  
+/* 10 */        eor disk_twos_buffer-1, y ; 5 (always crosses page boundary)
+/* 15 */        tax                       ; 2
+/* 17 */        lda encode_tab, x         ; 4
+/* 21 */        ldx #DISK_SLOT            ; 2
+/* 23 */        sta DISK_LOAD, x          ; 5
+/* 28 */        cmp DISK_SHIFT, x         ; 4
+/*  0 */        lda disk_twos_buffer-1, y ; 5 (always crosses page boundary)
+/*  5 */        dey                       ; 2
+/*  7 */    zuntil_eq       ; 3 if taken, 2 is not
+/*  9 */
 
-            ; Write out the actual data.
+            ; Write out the 6s buffer.
             ; (y is zero)
 
             zrepeat
-/* 14 */        eor io_buffer, y          ; 4
-/* 18 */        tax                       ; 2
-/* 20 */        lda encode_tab, x         ; 4
-/* 24 */        sta DISK_LOAD             ; 4
-/* 28 */        ora DISK_SHIFT            ; 4
-/*  0 */        lda io_buffer, y          ; 4
-/*  4 */        WAIT3                     ; 3
-/*  7 */        nop                       ; 2
-/*  9 */        iny                       ; 2
-/* 11 */    zuntil_eq       ; 3 if taken, 2 if not
-/* 13 */
+/*  9 */        WAIT2                     ; 2
+/* 11 */        eor disk_sixes_buffer, y  ; 4
+/* 15 */        tax                       ; 2
+/* 17 */        lda encode_tab, x         ; 4
+/* 21 */        ldx #DISK_SLOT            ; 2
+/* 23 */        sta DISK_LOAD, x          ; 5
+/* 28 */        ora DISK_SHIFT, x         ; 4
+/*  0 */        lda disk_sixes_buffer, y  ; 4
+/*  4 */        iny                       ; 2
+/*  6 */    zuntil_eq       ; 3 if taken, 2 if not
+/*  8 */
 
             ; Write checksum byte.
 
-/* 13 */    tax                           ; 2
-/* 15 */    lda encode_tab, x             ; 4
-/* 19 */    WAIT5                         ; 5
-/* 24 */    sta DISK_LOAD                 ; 4
-/* 28 */    ora DISK_SHIFT                ; 4
+/*  8 */    tax                           ; 2
+/* 10 */    lda encode_tab, x             ; 4
+/* 14 */    WAIT7                         ; 7
+/* 21 */    ldx #DISK_SLOT                ; 2
+/* 23 */    sta DISK_LOAD, x              ; 5
+/* 28 */    ora DISK_SHIFT, x             ; 4
 
             ; Write epilogue.
+            ; X is still DISK_SLOT.
 
 /*  0 */    WAIT6                         ; 6
 /*  6 */    WAIT7                         ; 7
-/* 13 */    ldx #sector_epilogue_len      ; 2
+/* 13 */    ldy #sector_epilogue_len      ; 2
             zrepeat
-/* 15 */        lda sector_epilogue-1, x  ; 4
-/* 19 */        cmp $00                   ; 3
-/* 22 */        nop                       ; 2
-/* 24 */        sta DISK_LOAD             ; 4
-/* 28 */        ora DISK_SHIFT            ; 4
-/*  0 */        WAIT6                     ; 6
-/*  6 */        WAIT4                     ; 4
-/* 10 */        dex                       ; 2
+/* 15 */        lda sector_epilogue-1, y  ; 4
+/* 19 */        WAIT2                     ; 2
+/* 21 */        ldx #DISK_SLOT            ; 2
+/* 23 */        sta DISK_LOAD, x          ; 5
+/* 28 */        ora DISK_SHIFT, x         ; 4
+/*  0 */        WAIT10                    ; 10
+/* 10 */        dey                       ; 2
 /* 12 */    zuntil_eq       ; 3 if taken, 2 if not
 
         ; Finished with the timing-critical stuff. Write mode off.
+        ; X is still DISK_SLOT.
 
-        lda DISK_READ
-        lda DISK_SHIFT
+        lda DISK_READ, x
+        lda DISK_SHIFT, x
 
         ; Advance to the next sector and go again.
 
@@ -1089,7 +1152,7 @@ label:
     zendloop
 
 sector_prologue:
-    .byte 0xad, 0xaa, 0xd5, 0xff, 0xff, 0xff, 0xff ; REVERSED
+    .byte 0xad, 0xaa, 0xd5 ; REVERSED
 sector_prologue_end:
 sector_prologue_len = sector_prologue_end - sector_prologue
 sector_epilogue:
@@ -1112,9 +1175,9 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 define_drive dph, 0x42e, 1024, 64, 64
 
-.section aligneddata
-encode_tab:         .fill 64
-disk_twos_buffer:   .fill 86 ; must be second
+.section aligneddata, "ax", @nobits
+disk_twos_buffer:   .fill 86 ; must be aligned
+encode_tab:         .fill 64 ; must be within one page
 
 .bss
 cursorx:            .fill 1
