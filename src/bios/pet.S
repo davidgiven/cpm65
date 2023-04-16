@@ -56,23 +56,57 @@ dma:        .word 0    ; current DMA
     .asciz "1037"
 1:
     .word 0
+
+    ; Goodbye interrupts, we'll never use you again...
+
+    sei
+    ldx #0xff
+    txs                     ; reset stack
+
+    ; Copy the init code out of the way so we don't have to worry about
+    ; overwriting it.
+
+    lda #<init_load_addr
+    sta ptr+0
+    lda #>init_load_addr
+    sta ptr+1
+    lda #<init_exec_addr
+    sta ptr1+0
+    lda #>init_exec_addr
+    sta ptr1+1
+
+    ldy #0
+    zrepeat
+        lda (ptr), y
+        sta (ptr1), y
+
+        inc ptr+0
+        zif_eq
+            inc ptr+1
+        zendif
+
+        inc ptr1+0
+        zif_eq
+            inc ptr1+1
+        zendif
+
+        lda ptr1+0
+        cmp #<init_end_addr
+        zcontinueif_ne
+        lda ptr1+1
+        cmp #>init_end_addr
+    zuntil_eq
+    
     jmp _start
 
 .section relocator, "ax"
 .global _start
 _start:
-    ; Goodbye interrupts, we'll never use you again...
-
-    cli
-
-    ldx #0xff
-    txs                     ; reset stack
-
     ; Copy the BIOS to its final location at 0x200. This overwrites the current
     ; memory image, so care needs to be taken. This routine is _last_ in the
     ; file, so it doesn't get overwritten.
 
-    ; Relocate the BIOS to the top of memory.
+    ; Relocate the BIOS to the bottom of memory.
 
     zrepeat
         load = .
@@ -115,41 +149,57 @@ _start:
         dey
     zuntil_eq
 
-    jsr assert_atn
-    lda #0x28               ; LISTEN device 8
-    jsr ieee_putb
-    lda #0xf0               ; OPEN channel 2
-    jsr ieee_putb
-    jsr release_atn
+    ; Load the BDOS.
 
-    lda #'$'
+    lda #0x28
+    jsr ieee_putcmdb
+    lda #0xf0               ; OPEN channel 2
+    jsr ieee_putcmdb
+
+    ldx #bdos_filename_end - bdos_filename - 1
+    zrepeat
+        lda bdos_filename, x
+        jsr ieee_putb
+        dex
+    zuntil_eq
+    lda bdos_filename
     jsr ieee_putlastb
 
-    jsr assert_atn
     lda #0x3f               ; UNLISTEN
-    jsr ieee_putb
-    jsr release_atn
+    jsr ieee_putcmdb
 
-    jsr assert_atn
     lda #0x48               ; TALK device 8
-    jsr ieee_putb
+    jsr ieee_putcmdb
     lda #0x60               ; SECOND channel 2
-    jsr ieee_putb
-    jsr release_atn
+    jsr ieee_putcmdb
 
+    label:
+    lda #>__USERTPA_START__
+    sta ptr+1
+    lda #0
+    sta ptr+0
+
+    ldy #0
     zrepeat
         jsr ieee_getb
-        php
-        jsr print_hex_number
-        lda #' '
-        jsr entry_CONOUT
-        plp
+        sta (ptr), y
+
+        iny
+        zif_eq
+            inc ptr+1
+        zendif
     zuntil_cs
 
-    lda #'!'
-    jsr entry_CONOUT
+    lda #0x28               ; LIST device 8
+    jsr ieee_putcmdb
+    lda #0xe0               ; CLOSE channel 0
+    jsr ieee_putcmdb
 
     jmp _realstart
+
+bdos_filename: ; reversed!
+    .ascii "R,P,SODB"
+bdos_filename_end:
 
 banner: ; reversed!
     .byte 13, 10
@@ -356,11 +406,20 @@ zendproc
 ; http://www.primrosebank.net/computers/pet/documents/PET_and_the_IEEE488_Bus_text.pdf
 ; (appendix E)
 
+zproc ieee_putcmdb
+    pha
+    set0 VIA_PB, VIA_PB_ATN_OUT
+    pla
+    jmp ieee_putb
+zendproc
+
 zproc ieee_putlastb
     ; Assert EOI and then send.
 
-    ldx #0x34
-    stx PIA1_CA
+    pha
+    lda #0x34
+    sta PIA1_CA
+    pla
 zendproc
     ; fall through
 zproc ieee_putb
@@ -390,11 +449,12 @@ zproc ieee_putb
         and #VIA_PB_NDAC_IN
     zuntil_ne
 
-    ; Release DAV, EOI and the data bus.
+    ; Release DAV, EOI, ATN and the data bus.
 
     set1 PIA2_CB, PIA2_CB_DAV_OUT
-    ldx #0x3c
-    stx PIA1_CA
+    set1 VIA_PB, VIA_PB_ATN_OUT
+    lda #0x3c
+    sta PIA1_CA
     lda #0xff
     sta PIA2_PB
 
@@ -450,8 +510,6 @@ zproc ieee_getb
     ; Release NDAC and the data bus.
 
     set0 PIA2_CA, PIA2_CA_NDAC_OUT
-    lda #0xff
-    sta PIA2_PB
 
     pla
     rts
@@ -475,6 +533,13 @@ zproc release_atn
     rts
 zendproc
     
+.data
+
+zp_base:    .byte __USERZEROPAGE_START__
+zp_end:     .byte __USERZEROPAGE_END__
+mem_base:   .byte __USERTPA_START__@mos16hi
+mem_end:    .byte __USERTPA_END__@mos16hi
+
 .bss
 
 cursorx: .fill 1
