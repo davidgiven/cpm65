@@ -11,7 +11,7 @@ SECTIONS {
 		__USERZEROPAGE_END__ = 0x90;
 	} >zp
 
-	head : {
+	.head : {
 		*(header)
 	} >reloram
 
@@ -35,7 +35,7 @@ SECTIONS {
 		__USERTPA_END__ = 0x8000;
 	} >ram
 
-	tail : {
+	.tail : {
 		*(relocator)
 	} >reloram
 }
