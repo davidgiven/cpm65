@@ -64,6 +64,7 @@ start:
 .label syntax_error
 
 .expand 1
+.label printchar
 
 .zproc main
 	\ Did we get a parameter?
