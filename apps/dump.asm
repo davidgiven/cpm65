@@ -2,14 +2,9 @@
 \ This file is licensed under the terms of the 2-clause BSD license. Please
 \ see the COPYING file in the root project directory for the full text.
 
-\ This is a version of the DUMP.COM program which is supplied on the disk
-\ which will assemble using the built-in ASM.COM. To assemble it, run
-\ this:
+\ This will assemble using the built-in ASM.COM. To assemble it, run this:
 \
 \ ASM DUMP.ASM NEWDUMP.COM
-\
-\ It's very nearly, but not quite, the same code as the llvm-mos cross-
-\ compiled version. Because reasons.
 
 .bss pblock, 165
 cpm_fcb = pblock
@@ -183,8 +178,7 @@ msg:
 		.zif cs
 			lda #'.'
 		.zendif
-		ldy #BDOS_CONOUT
-		jsr BDOS
+        jsr printchar
 
 		inc index
 		lda index
@@ -210,7 +204,6 @@ msg:
 \ Prints an 8-bit hex number in A.
 .zproc print_hex_number
 	pha
-	ldy #BDOS_CONOUT
 	lsr a
 	lsr a
 	lsr a
@@ -221,26 +214,32 @@ print:
 	and #0x0f
 	ora #48
 	cmp #58
-	bcc notalpha
-	adc #6
-notalpha:
+    .zif cs
+        adc #6
+    .zendif
 	pha
-	jsr BDOS
+	jsr printchar
 	pla
 	rts
 .zendproc
 
 .zproc space
 	lda #' '
-	jmp BDOS
 .zendproc
+    \ fall through
+.zproc printchar
+    ldy #BDOS_CONOUT
+    jmp BDOS
+.zendproc
+
 
 .zproc newline
 	lda #13
-	jsr BDOS
+	jsr printchar
 	lda #10
-	jmp BDOS
+	jmp printchar
 .zendproc
 
+\ vim: filetype=asm sw=4 ts=4 et
 
 
