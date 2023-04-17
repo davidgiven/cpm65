@@ -7,21 +7,25 @@ What?
 This is a native port of Digital Research's seminal 1977 operating system CP/M
 to the 6502. So far it runs on:
 
-  - BBC Micro (and Master, and Tube, and Electron)
-  - Commodore 64
-  - Commander X16
-  - Apple IIe
+  - The BBC Micro family, including Master, Tube, and Electron; TPA ranges from 14kB on the Electron to 57kB on the Tube.
+
+  - Commodore 64; TPA is 46kB.
+
+  - Commodore PET 4032; TPA is 26kB --- the assembler will run, just.
+
+  - Commander X16; TPA is 46kB.
+
+  - Apple IIe; TPA is 46kB.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
-much less standardised than 8080 and Z80 systems. On the BBC Micro in mode 7
-you get a 21kB TPA, on the Master you get about 25kB, and on the C64 and Apple
-IIe you get 46kB. A BBC Tube system will give you just under 57kB, which is
-nice.
+much less standardised than 8080 and Z80 systems. (The systems above all load
+programs at different base addresses.)
 
 Currently you can cross-assemble programs from a PC, as well as a working C
 toolchain with llvm-mos. For native development, there's a basic assembler but
-currently no (functioning) editor.
+currently no (functioning) editor. You need about 20kB to run the assembler at
+all, and of course more memory the bigger the program.
 
 No, it won't let you run 8080 programs on the 6502!
 
@@ -30,6 +34,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
+<a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
 </div>
 
 
@@ -55,12 +60,13 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### BBC Micro notes
 
-  - it'll autodetect the amount of available memory. If you're on a Master or
-	Tube system, I'd suggest making sure you're in mode 0 or 3 before running.
-	On a BBC Micro... well, it _will_ run in mode 0, but you'll only get a
-	2.5kB TPA! I suggest mode 7.
+  - It'll autodetect the amount of available memory. If you're on a Master or
+    Tube system, I'd suggest making sure you're in mode 0 or 3 before running.
+    On a BBC Micro... well, it _will_ run in mode 0, but you'll only get a
+    2.5kB TPA! I suggest mode 7. On the Electron you have to use mode 6 which
+    gives you 14kB of TPA, which isn't enough to run the assembler.
 
-  - the CP/M file system is stored in a big file (called cpmfs). This will
+  - The CP/M file system is stored in a big file (called cpmfs). This will
 	expand up to the size defined in diskdefs: currently, 192kB (the largest
 	that will fit on a SSSD disk). All disk access is done through MOS so you
 	should be able to use a ramdisk, hard disk, Econet, ADFS, VDFS, etc. If so,
@@ -69,25 +75,46 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Commodore 64 notes
 
-  - load and run the `CPM` program to start.
+  - Load and run the `CPM` program to start.
 
-  - it's excruciatingly slow as it uses normal 1541 disk accesses at 300 bytes
+  - It's excruciatingly slow as it uses normal 1541 disk accesses at 300 bytes
 	per second. Everything works, but you won't enjoy it. At some point I want
 	to add a fastloader.
 
-  - the disk image produced is a hybrid of a CP/M file system and a CBMDOS file
+  - The disk image produced is a hybrid of a CP/M file system and a CBMDOS file
 	system, which can be accessed as either. The disk structures used by the
 	other file system are hidden. You get about 170kB on a normal disk.
 
-  - disk accesses are done using direct block access, so it _won't_ work on
+  - Disk accesses are done using direct block access, so it _won't_ work on
 	anything other than a 1541. Sorry.
+
+### Commodore PET notes
+
+  - You need a PET 4032 (no other model) and, probably, a 4040 disk drive. The
+    disk image is for a 35-track SSSD system (I made it with cc1541). You could
+    probably adapt things to work on other disk systems or other systems
+    easily; the top end PET floppy drives could store a megabyte on a disk and
+    would go nicely with the 8032's 80-column display.
+
+  - This is set up for the Graphics Keyboard, which was a bad idea, but that's
+    what my emulator was set up for. If you actually want to do anything with
+    it, ask me and I'll do a Business Keyboard keymap. (Or I could emulate the
+    Business Keyboard on the Graphics Keyboard.)
+
+  - It's faster than the Comodore 64 version, but still not brilliant --- but
+    you can run the assembler in real time without having to worry about
+    retirement.
+
+  - It supports drive 0: only.
+
+  - This port runs completely bare-metal and does not use any ROM routines.
 
 ### Commander X16 notes
 
-  - to use, place the contents of the `x16.zip` file on the X16's SD card. Load
+  - To use, place the contents of the `x16.zip` file on the X16's SD card. Load
 	and run the `CPM` program to start.
 
-  - the CP/M filesystem is stored in a big file called CPMFS. It needs support
+  - The CP/M filesystem is stored in a big file called CPMFS. It needs support
 	for the Position command in order to seek within the file. `x16emu`
 	currently doesn't support this in its host filesystem, so you'll need to
 	use an actual SD card image. (I have a [pull request
@@ -97,13 +124,13 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Apple IIe notes
 
-  - to use, place the contents of the `appleiie.po` file onto a disk and boot
+  - To use, place the contents of the `appleiie.po` file onto a disk and boot
     it. The disk image has been munged according to ProDOS sector ordering.
 
   - It supports a single drive on slot 6 drive 1. You need a 80-column card
     (but not any aux memory).
 
-  - this port runs completely bare-metal and does not use any ROM routines.
+  - This port runs completely bare-metal and does not use any ROM routines.
 
 ### Supported programs
 

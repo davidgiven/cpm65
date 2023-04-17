@@ -34,6 +34,7 @@ jobs:
         path: |
           bbcmicro.ssd
           c64.d64
+          pet.d64
           x16.zip
           apple2e.po
           diskdefs

@@ -52,6 +52,7 @@ jobs:
           cpm65.zip
           bbcmicro.ssd
           c64.d64
+          pet.d64
           x16.zip
           apple2e.po
         fail-if-no-assets: false
@@ -63,6 +64,7 @@ jobs:
         files: |
           bbcmicro.ssd
           c64.d64
+          pet.d64
           x16.zip
           apple2e.po
         tag_name: dev
