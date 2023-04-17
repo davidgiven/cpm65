@@ -300,6 +300,11 @@ zendproc
 ; Blocks until a key is pressed; returns it in A.
 
 zproc entry_CONIN
+    jsr calculate_cursor_address
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
+
     lda pending_key
     zif_eq
         zrepeat
@@ -310,6 +315,13 @@ zproc entry_CONIN
 
     ldx #0
     stx pending_key
+
+    pha
+    jsr calculate_cursor_address
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
+    pla
 
     clc
     rts
@@ -573,7 +585,7 @@ zproc scroll_up
     ldx #0              ; current line
     zrepeat
         txa
-        jsr calculate_cursor_address
+        jsr calculate_line_address
         lda ptr+0
         sta ptr1+0
         lda ptr+1
@@ -581,7 +593,7 @@ zproc scroll_up
 
         inx
         txa
-        jsr calculate_cursor_address ; ptr is source pointer
+        jsr calculate_line_address ; ptr is source pointer
 
         ldy #39
         zrepeat
