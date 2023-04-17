@@ -51,6 +51,13 @@ dma:              .fill 2    ; current DMA
 sector_num:       .fill 3 ; current absolute sector number
 buffered_sector:  .fill 3 ; sector currently in disk buffer
 
+pending_key:      .fill 1 ; pending keypress from system
+buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
+ieee_buffered_char: .fill 1 ; byte pending output
+ieee_has_buffered_char: .fill 1 ; if there is one
+cursorx:          .fill 1
+cursory:          .fill 1
+
 .section header, "ax"
     .word $0401
     .word 1f, 1
@@ -155,8 +162,10 @@ _start:
 
     lda #0
     sta ieee_buffered_char
+    sta ieee_has_buffered_char
     sta shift_pressed
     sta pending_key
+    sta buffer_dirty
 
     ldx #10
     lda #0xff
@@ -870,8 +879,94 @@ zproc read_sector
 u1_string:
     .ascii "0 2 1U" ; reversed!
 u1_string_end:
-
 zendproc
+
+; Writes a 256-byte sector whose LBA index is in XA.
+
+zproc write_sector
+    jsr convert_to_ts
+    pha
+    tya
+    pha
+
+    ; Reset buffer pointer.
+
+    lda #0x6f               ; SECOND channel 15
+    jsr ieee_listen
+
+    ldx #bp_string_end - bp_string
+    zrepeat
+        lda bp_string-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+
+    jsr ieee_unlisten
+
+    ; Write bytes.
+
+    lda #0x62               ; SECOND channel 2
+    jsr ieee_listen
+
+    ldy #0
+    zrepeat
+        lda disk_buffer, y
+        jsr ieee_write
+        iny
+    zuntil_eq
+
+    jsr ieee_unlisten
+
+    ; Write sector to disk.
+
+    lda #0x6f               ; SECOND channel 15
+    jsr ieee_listen
+
+    ldx #u2_string_end - u2_string
+    zrepeat
+        lda u2_string-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+
+    pla
+    jsr decimal_out
+
+    pla
+    jsr decimal_out
+
+    jsr ieee_unlisten
+
+    clc
+    rts
+
+bp_string:
+    .ascii "0 2 P-B" ; reversed!
+bp_string_end:
+u2_string:
+    .ascii "0 2 2U" ; reversed!
+u2_string_end:
+zendproc
+
+.if 0
+zproc getstatus
+    lda #0x6f
+    jsr ieee_talk
+
+    zloop
+        jsr ieee_getb
+        zbreakif_cs
+        jsr entry_CONOUT
+    zendloop
+   
+    lda #0x0d
+    jsr entry_CONOUT
+    lda #0x0a
+    jsr entry_CONOUT
+    jsr ieee_untalk
+    rts
+zendproc
+.endif
 
 ; Prints a decimal number in A to the IEEE output.
 
@@ -949,7 +1044,14 @@ zproc buffered_sector_to_lba
 zendproc
 
 zproc flush_buffered_sector
-    sec
+    bit buffer_dirty
+    zif_mi
+        jsr buffered_sector_to_lba
+        jsr write_sector
+
+        lda #0
+        sta buffer_dirty
+    zendif
     rts
 zendproc
 
@@ -970,10 +1072,13 @@ zendproc
 
 zproc ieee_write
     pha
-    lda ieee_buffered_char
+    lda ieee_has_buffered_char
     zif_ne
+        lda ieee_buffered_char
         jsr ieee_putb
     zendif
+    lda #1
+    sta ieee_has_buffered_char
     pla
     sta ieee_buffered_char
     rts
@@ -983,7 +1088,7 @@ zendproc
 ; Preserves X and Y.
 
 zproc ieee_flush
-    lda ieee_buffered_char
+    lda ieee_has_buffered_char
     zif_ne
         ; Assert EOI.
 
@@ -992,9 +1097,10 @@ zproc ieee_flush
         sta PIA1_CA
         pla
 
+        lda ieee_buffered_char
         jsr ieee_putb
         lda #0
-        sta ieee_buffered_char
+        sta ieee_has_buffered_char
     zendif
     rts
 zendproc
@@ -1150,15 +1256,9 @@ define_drive dph, 136*10, 1024, 64, 0
 
 .bss
 
-pending_key:      .fill 1 ; pending keypress from system
-buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
-ieee_buffered_char: .fill 1 ; byte pending output
-
 directory_buffer: .fill 128
 disk_buffer:      .fill 256
 
-cursorx:          .fill 1
-cursory:          .fill 1
 keyboard_state:   .fill 10
 shift_pressed:    .fill 1
 
