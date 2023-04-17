@@ -173,29 +173,49 @@ _start:
     lda #0x60               ; SECOND channel 2
     jsr ieee_putcmdb
 
-    label:
-    lda #>__USERTPA_START__
-    sta ptr+1
+    lda #>__TPA_START__
+    sta ptr1+1
     lda #0
-    sta ptr+0
+    sta ptr1+0
 
     ldy #0
     zrepeat
         jsr ieee_getb
-        sta (ptr), y
+        php
+        sta (ptr1), y
 
         iny
         zif_eq
-            inc ptr+1
+            inc ptr1+1
+
+            tya
+            pha
+            lda #'.'
+            jsr entry_CONOUT
+            pla
+            tay
         zendif
+        plp
     zuntil_cs
 
+    lda #0x5f               ; UNTALK
+    jsr ieee_putcmdb
     lda #0x28               ; LIST device 8
     jsr ieee_putcmdb
     lda #0xe0               ; CLOSE channel 0
     jsr ieee_putcmdb
 
-    jmp _realstart
+    ; Relocate the BDOS.
+
+    lda #>__TPA_START__
+    ldx #__ZEROPAGE_START__
+    jsr entry_RELOCATE
+	
+    ; Go!
+
+    lda #<biosentry
+    ldx #>biosentry
+    jmp __TPA_START__ + COMHDR_ENTRY
 
 bdos_filename: ; reversed!
     .ascii "R,P,SODB"
@@ -206,30 +226,48 @@ banner: ; reversed!
     .ascii "56-M/PC"
 banner_end:
 
-print_hex_number:
-        pha
-        lsr a
-        lsr a
-        lsr a
-        lsr a
-        jsr print
-        pla
-print:
-        and #0x0f
-        ora #48
-        cmp #58
-    zif_cs
-        adc #6
-    zendif
-        pha
-        jsr entry_CONOUT
-        pla
-        rts
+; --- BIOS entrypoints ------------------------------------------------------
 
-; Executes once the BIOS is at location.
+zproc entry_GETTPA
+    lda mem_base
+    ldx mem_end
+    clc
+    rts
+zendproc
 
-zproc _realstart
-    jmp .
+zproc entry_SETTPA
+    sta mem_base
+    stx mem_end
+    clc
+    rts
+zendproc
+
+zproc entry_GETZP
+    lda zp_base
+    ldx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETZP
+    sta zp_base
+    stx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETBANK
+    rts
+zendproc
+
+; --- Keyboard handling -----------------------------------------------------
+
+zproc entry_CONST
+    rts
+zendproc
+
+zproc entry_CONIN
+    rts
 zendproc
 
 ; --- Screen handling -------------------------------------------------------
@@ -260,7 +298,7 @@ zproc entry_CONOUT
     pha
     jsr calculate_cursor_address
     pla
-    ;jsr topetscii
+    jsr convert_ascii_to_screencode
     sta (ptr), y
 
     inc cursorx
@@ -271,6 +309,66 @@ zproc entry_CONOUT
         sta cursorx
         jmp write_nl
     zendif
+    rts
+zendproc
+
+zproc convert_ascii_to_screencode
+    ; Flip case.
+
+    cmp #'A'
+    zif_cs
+        cmp #'Z'+1
+        bcc swapcase
+    zendif
+
+    cmp #'a'
+    zif_cs
+        cmp #'z'+1
+        zif_cc
+        swapcase:
+            eor #0x20
+        zendif
+    zendif
+
+    ; This is from https://codebase64.org/doku.php?id=base:petscii_to_screencode&s[]=screencodes
+
+	cmp #0x20		; if A<32 then...
+	bcc ddRev
+
+	cmp #0x60		; if A<96 then...
+	bcc dd1
+
+	cmp #0x80		; if A<128 then...
+	bcc dd2
+
+	cmp #0xa0		; if A<160 then...
+	bcc dd3
+
+	cmp #0xc0		; if A<192 then...
+	bcc dd4
+
+	cmp #0xff		; if A<255 then...
+	bcc ddRev
+
+	lda #0x7e		; A=255, then A=126
+	bne ddEnd
+
+dd2:
+    and #0x5f		; if A=96..127 then strip bits 5 and 7
+	bne ddEnd
+dd3:
+    ora #0x40		; if A=128..159, then set bit 6
+	bne ddEnd
+dd4:
+    eor #0xc0		; if A=160..191 then flip bits 6 and 7
+	bne ddEnd
+dd1:
+    and #0x3f		; if A=32..95 then strip bits 6 and 7
+	bpl ddEnd		; <- you could also do .byte 0x0c here
+ddRev:
+    eor #0x80		; flip bit 7 (reverse on when off and vice versa)
+ddEnd:
+
     rts
 zendproc
 
@@ -389,6 +487,120 @@ zendproc
 
 ; --- Disk handling ---------------------------------------------------------
 
+; Sets the current DMA address.
+
+zproc entry_SETDMA
+    sta dma+0
+    stx dma+1
+    clc
+    rts
+zendproc
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc entry_SELDSK
+    cmp #0
+    zif_ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
+    lda #<dph
+    ldx #>dph
+    clc
+    rts
+zendproc
+
+; Set the current absolute sector number.
+; XA is a pointer to a three-byte number.
+
+zproc entry_SETSEC
+    sta ptr+0
+    stx ptr+1
+    ldy #2
+    zrepeat
+        lda (ptr), y
+        sta sector_num, y
+        dey
+    zuntil_mi
+    clc
+    rts
+zendproc
+
+zproc entry_READ
+    jsr change_sectors
+    zif_cc
+        lda sector_num+0
+        ror a               ; bottom bit -> C
+        lda #0
+        ror a               ; C -> top bit, producing $00 or $80
+        tax
+
+        ldy #0
+        zrepeat
+            lda disk_buffer, x
+            sta (dma), y
+            iny
+            inx
+            cpy #$80
+        zuntil_eq
+
+        clc
+    zendif
+    rts
+zendproc
+
+; On entry, A=0 for a normal write; A=1 to always flush to disk.
+
+zproc entry_WRITE
+    pha
+    jsr change_sectors
+    zif_cs
+        pla
+        sec
+        rts
+    zendif
+
+    lda sector_num+0
+    ror a               ; bottom bit -> C
+    lda #0
+    ror a               ; C -> top bit, producing $00 or $80
+    tax
+
+    ldy #0
+    zrepeat
+        lda (dma), y
+        sta disk_buffer, x
+        iny
+        inx
+        cpy #$80
+    zuntil_eq
+
+    lda #$80
+    sta buffer_dirty
+
+    pla
+    zif_ne
+        jmp flush_buffered_sector
+    zendif
+
+    clc
+    rts
+zendproc
+
+zproc change_sectors
+    sec
+    rts
+zendproc
+
+zproc flush_buffered_sector
+    sec
+    rts
+zendproc
+
 .macro set1 port, bit
     lda \port
     ora #\bit
@@ -423,10 +635,11 @@ zproc ieee_putlastb
 zendproc
     ; fall through
 zproc ieee_putb
-    ; Deassert our own NRFD and wait for NRFD=0 (i.e. ready for data)
+    ; Deassert our own NRFD and NDAC and wait for NRFD=0 (i.e. ready for data)
 
     pha
     set1 VIA_PB, VIA_PB_NRFD_OUT
+    set1 PIA2_CA, PIA2_CA_NDAC_OUT
     zrepeat
         lda VIA_PB
         and #VIA_PB_NRFD_IN
@@ -491,9 +704,9 @@ zproc ieee_getb
 
     lda PIA1_PA
     and #PIA1_PA_EOI_IN
-    sec
-    zif_ne
-        clc
+    clc
+    zif_eq
+        sec
     zendif
 
     ; Acknowledge the data.
@@ -514,35 +727,29 @@ zproc ieee_getb
     pla
     rts
 zendproc
-
-; Asserts ATN.
-
-zproc assert_atn
-    lda VIA_PB
-    and #(~VIA_PB_ATN_OUT) & 0xff
-    sta VIA_PB
-    rts
-zendproc
-
-; Deasserts ATN.
-
-zproc release_atn
-    lda VIA_PB
-    ora #VIA_PB_ATN_OUT
-    sta VIA_PB
-    rts
-zendproc
     
 .data
 
-zp_base:    .byte __USERZEROPAGE_START__
-zp_end:     .byte __USERZEROPAGE_END__
-mem_base:   .byte __USERTPA_START__@mos16hi
-mem_end:    .byte __USERTPA_END__@mos16hi
+zp_base:    .byte __ZEROPAGE_START__
+zp_end:     .byte __ZEROPAGE_END__
+mem_base:   .byte __TPA_START__@mos16hi
+mem_end:    .byte __TPA_END__@mos16hi
+
+; DPH for drive 0 (our only drive)
+
+define_drive dph, 136*10, 1024, 64, 0
 
 .bss
 
-cursorx: .fill 1
-cursory: .fill 1
+pending_key:      .byte 0 ; pending keypress from system
+sector_num:       .fill 3 ; current absolute sector number
+buffered_sector:  .fill 3 ; sector currently in disk buffer
+buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
+
+directory_buffer: .fill 128
+disk_buffer:      .fill 256
+
+cursorx:          .fill 1
+cursory:          .fill 1
 
 ; vim: sw=4 ts=4 et ft=asm

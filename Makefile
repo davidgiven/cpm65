@@ -24,8 +24,9 @@ LIBCPM_OBJS = \
 	$(OBJDIR)/lib/xfcb.o \
 
 LIBBIOS_OBJS = \
-	$(OBJDIR)/src/bios/relocate.o \
+	$(OBJDIR)/src/bios/biosentry.o \
 	$(OBJDIR)/src/bios/petscii.o \
+	$(OBJDIR)/src/bios/relocate.o \
 
 CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/main.o \

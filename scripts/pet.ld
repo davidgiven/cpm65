@@ -8,8 +8,8 @@ MEMORY {
 SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
-		__USERZEROPAGE_START__ = .;
-		__USERZEROPAGE_END__ = 0xff;
+		__ZEROPAGE_START__ = .;
+		__ZEROPAGE_END__ = 0xff;
 	} >zp
 
 	.head : {
@@ -39,8 +39,8 @@ SECTIONS {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		bios_size = . - bios_exec_addr;
-		__USERTPA_START__ = .;
-		__USERTPA_END__ = 0x8000;
+		__TPA_START__ = .;
+		__TPA_END__ = 0x8000;
 	} >ram
 }
 
