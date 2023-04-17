@@ -85,6 +85,8 @@ zproc _start
         inc ptr+0
         zif_eq
             inc ptr+1
+            lda #'.'
+            jsr entry_CONOUT
         zendif
 
         lda STATUS      ; check for EOF
