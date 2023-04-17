@@ -45,9 +45,11 @@ VIDEO   = 0x8000
 ZEROPAGE
 
 .global ptr
-ptr:        .word 0
-ptr1:       .word 0
-dma:        .word 0    ; current DMA
+ptr:              .fill 2
+ptr1:             .fill 2
+dma:              .fill 2    ; current DMA
+sector_num:       .fill 3 ; current absolute sector number
+buffered_sector:  .fill 3 ; sector currently in disk buffer
 
 .section header, "ax"
     .word $0401
@@ -151,27 +153,22 @@ _start:
 
     ; Load the BDOS.
 
-    lda #0x28
-    jsr ieee_putcmdb
-    lda #0xf0               ; OPEN channel 2
-    jsr ieee_putcmdb
+    lda #0
+    sta ieee_buffered_char
 
-    ldx #bdos_filename_end - bdos_filename - 1
+    lda #0xf0               ; OPEN channel 0
+    jsr ieee_listen
+
+    ldx #bdos_filename_end - bdos_filename
     zrepeat
-        lda bdos_filename, x
-        jsr ieee_putb
+        lda bdos_filename-1, x
+        jsr ieee_write
         dex
     zuntil_eq
-    lda bdos_filename
-    jsr ieee_putlastb
+    jsr ieee_unlisten
 
-    lda #0x3f               ; UNLISTEN
-    jsr ieee_putcmdb
-
-    lda #0x48               ; TALK device 8
-    jsr ieee_putcmdb
-    lda #0x60               ; SECOND channel 2
-    jsr ieee_putcmdb
+    lda #0                  ; channel 0
+    jsr ieee_talk
 
     lda #>__TPA_START__
     sta ptr1+1
@@ -198,12 +195,21 @@ _start:
         plp
     zuntil_cs
 
-    lda #0x5f               ; UNTALK
-    jsr ieee_putcmdb
-    lda #0x28               ; LIST device 8
-    jsr ieee_putcmdb
+    jsr ieee_untalk
+
     lda #0xe0               ; CLOSE channel 0
-    jsr ieee_putcmdb
+    jsr ieee_listen
+    jsr ieee_unlisten
+
+    lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
+    jsr ieee_listen
+    ldx #allocate_cmd_end - allocate_cmd
+    zrepeat
+        lda allocate_cmd-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+    jsr ieee_unlisten
 
     ; Relocate the BDOS.
 
@@ -220,6 +226,10 @@ _start:
 bdos_filename: ; reversed!
     .ascii "R,P,SODB"
 bdos_filename_end:
+
+allocate_cmd: ; reversed!
+    .ascii "2#"
+allocate_cmd_end:
 
 banner: ; reversed!
     .byte 13, 10
@@ -591,8 +601,162 @@ zproc entry_WRITE
     rts
 zendproc
 
+; Returns C on error.
+
 zproc change_sectors
+    ; If the buffered sector is the one we want, just return.
+
+    lda sector_num+0
+    and #$fe
+    cmp buffered_sector+0
+    zif_eq
+        lda sector_num+1
+        cmp buffered_sector+1
+        zif_eq
+            lda sector_num+2
+            cmp buffered_sector+2
+            zif_eq
+                clc
+                rts
+            zendif
+        zendif
+    zendif
+
+    ; We need to change sectors. Flush the current one?
+
+    jsr flush_buffered_sector
+
+    ; Now read the new one.
+
+    lda sector_num+0
+    and #$fe
+    sta buffered_sector+0
+    lda sector_num+1
+    sta buffered_sector+1
+    lda sector_num+2
+    sta buffered_sector+2
+
+    jsr buffered_sector_to_lba
+    jmp read_sector
+zendproc
+
+; Reads a 256-byte sector whose LBA index is in XA.
+
+zproc read_sector
+    jsr convert_to_ts
+    pha
+    tya
+    pha
+
+    lda #0x6f               ; SECOND channel 15
+    jsr ieee_listen
+
+    ldx #u1_string_end - u1_string
+    zrepeat
+        lda u1_string-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+
+    pla
+    jsr decimal_out
+
+    pla
+    jsr decimal_out
+    jsr ieee_unlisten
+
+    lda #0x62               ; SECOND channel 2
+    jsr ieee_talk
+
+    ldy #0
+    zrepeat
+        jsr ieee_getb
+        sta disk_buffer, y
+        iny
+    zuntil_cs
+
+    jsr ieee_untalk
+    clc
+    rts
+
+u1_string:
+    .ascii "0 2 1U" ; reversed!
+u1_string_end:
+
+zendproc
+
+; Prints a decimal number in A to the IEEE output.
+
+zproc decimal_out
+    pha
+    lda #' '
+    jsr ieee_write
+    pla
+
+    ldx #$ff
     sec
+    zrepeat
+        inx
+        sbc #100
+    zuntil_cc
+    adc #100
+    jsr digit
+
+    ldx #$ff
+    sec
+    zrepeat
+        inx
+        sbc #10
+    zuntil_cc
+    adc #10
+    jsr digit
+    tax
+digit:
+    pha
+    txa
+    ora #'0'
+    jsr ieee_write
+    pla
+    rts
+zendproc
+
+; Converts an LBA sector number in XA to track/sector in Y, A.
+
+zproc convert_to_ts
+    ldy #0
+    zloop
+        cpx #0
+        zif_eq
+            cmp track_size_table, y
+            zif_cc
+                iny     ; tracks are one-based.
+                rts
+            zendif
+        zendif
+
+        sec
+        sbc track_size_table, y
+        zif_cc
+            dex
+        zendif
+        iny
+    zendloop
+
+track_size_table:
+    .fill 17, 1, 21
+    .fill 7, 1, 19
+    .fill 6, 1, 18
+    .fill 10, 1, 17
+zendproc
+
+; Compute the current LBA sector number in XA for the buffered sector.
+
+zproc buffered_sector_to_lba
+    lda buffered_sector+1
+    lsr a
+    tax
+    lda buffered_sector+0
+    ror
     rts
 zendproc
 
@@ -613,11 +777,77 @@ zendproc
     sta \port
 .endm
 
+; Writes a single character in A with buffering.
+; Preserves X and Y.
+
+zproc ieee_write
+    pha
+    lda ieee_buffered_char
+    zif_ne
+        jsr ieee_putb
+    zendif
+    pla
+    sta ieee_buffered_char
+    rts
+zendproc
+
+; Flushes the last character with EOI asserted.
+; Preserves X and Y.
+
+zproc ieee_flush
+    lda ieee_buffered_char
+    zif_ne
+        ; Assert EOI.
+
+        pha
+        lda #0x34
+        sta PIA1_CA
+        pla
+
+        jsr ieee_putb
+        lda #0
+        sta ieee_buffered_char
+    zendif
+    rts
+zendproc
+
 ; See http://www.6502.org/users/andre/petindex/local/pet-io-2.txt
 ; https://www.pagetable.com/?p=1023
 ; http://www.primrosebank.net/computers/pet/documents/PET_and_the_IEEE488_Bus_text.pdf
 ; (appendix E)
 
+; A is the secondary address (0xfX for OPEN).
+
+zproc ieee_talk
+    pha
+    lda #0x48               ; TALK device 8
+    jsr ieee_putcmdb
+    pla
+    ora #0x60               ; SECOND
+    jmp ieee_putcmdb
+zendproc
+
+zproc ieee_untalk
+    lda #0x5f               ; UNTALK
+    jmp ieee_putcmdb
+zendproc
+
+; A is the secondary address.
+
+zproc ieee_listen
+    pha
+    lda #0x28               ; LISTEN device 8
+    jsr ieee_putcmdb
+    pla
+    ora #0x60               ; SECOND
+    jmp ieee_putcmdb
+zendproc
+
+zproc ieee_unlisten
+    jsr ieee_flush
+    lda #0x3f               ; UNLISTEN
+zendproc
+    ; fall through
 zproc ieee_putcmdb
     pha
     set0 VIA_PB, VIA_PB_ATN_OUT
@@ -625,15 +855,6 @@ zproc ieee_putcmdb
     jmp ieee_putb
 zendproc
 
-zproc ieee_putlastb
-    ; Assert EOI and then send.
-
-    pha
-    lda #0x34
-    sta PIA1_CA
-    pla
-zendproc
-    ; fall through
 zproc ieee_putb
     ; Deassert our own NRFD and NDAC and wait for NRFD=0 (i.e. ready for data)
 
@@ -741,10 +962,9 @@ define_drive dph, 136*10, 1024, 64, 0
 
 .bss
 
-pending_key:      .byte 0 ; pending keypress from system
-sector_num:       .fill 3 ; current absolute sector number
-buffered_sector:  .fill 3 ; sector currently in disk buffer
+pending_key:      .fill 1 ; pending keypress from system
 buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
+ieee_buffered_char: .fill 1 ; byte pending output
 
 directory_buffer: .fill 128
 disk_buffer:      .fill 256

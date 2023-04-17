@@ -145,7 +145,7 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	echo "16574: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	echo "16584: 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ s 0:ccp.sys 0:cbm.sys
+	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
 $(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
@@ -197,7 +197,7 @@ pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	echo "16574: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	echo "16584: 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ s 0:ccp.sys 0:cbm.sys
+	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
 clean:
 	rm -rf $(OBJDIR) apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64
