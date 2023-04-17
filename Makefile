@@ -35,7 +35,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 bin/cpmemu
+all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 bin/cpmemu
 
 $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
@@ -199,8 +199,32 @@ pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
+$(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
+vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
+	@rm -f $@
+	cc1541 -i 15 -q -n "cp/m-65" $@
+	mkfs.cpm -f c1541 $@
+	cc1541 -q \
+		-t -u 0 \
+		-r 18 -f cpm -w $(OBJDIR)/vic20.exe \
+		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
+		$@
+	cpmcp -f c1541 $@ /dev/null 0:cbm.sys
+	echo "00f: 30 59 5a 5b 5c 5d 5e" | xxd -r - $@
+	echo "16504: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16514: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16524: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16534: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16544: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16554: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16564: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16574: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	echo "16584: 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
+
 clean:
-	rm -rf $(OBJDIR) apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64
+	rm -rf $(OBJDIR) apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64
 
 .DELETE_ON_ERROR:
 .SECONDARY:
