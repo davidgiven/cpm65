@@ -151,10 +151,21 @@ _start:
         dey
     zuntil_eq
 
-    ; Load the BDOS.
+    ; Miscellaneous initialisation.
 
     lda #0
     sta ieee_buffered_char
+    sta shift_pressed
+    sta pending_key
+
+    ldx #10
+    lda #0xff
+    zrepeat
+        sta keyboard_state, x
+        dex
+    zuntil_mi
+
+    ; Load the BDOS.
 
     lda #0xf0               ; OPEN channel 0
     jsr ieee_listen
@@ -272,13 +283,178 @@ zendproc
 
 ; --- Keyboard handling -----------------------------------------------------
 
+; Returns 0xff if no key is pending, 0 if one is.
+
 zproc entry_CONST
+    jsr scan_keyboard
+
+    lda pending_key
+    zif_ne
+        lda #0xff
+    zendif
+
+    clc
     rts
 zendproc
 
+; Blocks until a key is pressed; returns it in A.
+
 zproc entry_CONIN
+    lda pending_key
+    zif_eq
+        zrepeat
+            jsr scan_keyboard
+            lda pending_key
+        zuntil_ne
+    zendif
+
+    ldx #0
+    stx pending_key
+
+    clc
     rts
 zendproc
+
+; Does a single keyboard scan, processing any pressed keys. Last pressed key
+; wins.
+
+zproc scan_keyboard
+    ldy #0
+    zrepeat
+        sty ptr+0
+        lda PIA1_PA
+        and #0xf0
+        ora ptr+0
+        sta PIA1_PA
+
+        ldx PIA1_PB
+        txa
+        eor keyboard_state, y
+        zif_ne
+            ; Any set bits in A correspond to a key which has changes state.
+            ; The corresponding bit in X tells us whether it went up or down.
+
+            sta ptr1+0
+            stx ptr1+1
+
+            pha
+            txa
+            pha
+            tya
+            pha
+
+            txa
+            sta keyboard_state, y
+
+            tya
+            asl a
+            asl a
+            asl a       ; compute row*8 to get base of scancode number
+            tay
+
+            zrepeat
+                bit ptr1+0
+                zif_mi
+                    ; This key has changed.
+
+                    tya
+                    pha
+                    jsr change_key_state
+                    pla
+                    tay
+                zendif
+    
+                iny
+                asl ptr1+1
+                asl ptr1+0
+            zuntil_eq
+
+            pla
+            tay
+            pla
+            tax
+            pla
+        zendif
+
+        iny
+        cpy #0x0a
+    zuntil_eq
+    rts
+zendproc
+
+; The key with scancode Y has changed state. Whether it's up or down is in
+; the top bit of ptr1+1.
+
+zproc change_key_state
+    cpy #0x47               ; left shift
+    beq shift_change
+    cpy #0x42               ; right shift
+    beq shift_change
+
+    bit ptr1+1
+    zif_pl
+        lda keyboard_decode_tab, y
+
+        bit shift_pressed
+        zif_pl
+            cmp #'a'
+            zif_cs
+                cmp #'z'+1
+                eor #0x20
+            zendif
+        zendif
+        sta pending_key
+    zendif
+    rts
+
+    ; Shift gets special treatment because we care about ups as well as downs.
+
+shift_change:
+    lda keyboard_state + 8
+    rol a
+    rol a
+    rol a
+    rol a                   ; left shift state in bit 0
+    and keyboard_state + 8  ; right shift state in bit 0
+    ror a
+    ror a
+    sta shift_pressed       ; new state in top bit
+    rts
+
+keyboard_decode_tab:
+    .byte 0x00, 0x00, '_',  '(',  '&',  '%',  '#',  '!'  ; 0x00
+    .byte 0x7f, 0x00, 0x00, ')',  '\\', '\'', '$',  '"'  ; 0x08
+    .byte '9',  '7',  '^',  'o',  'u',  't',  'e',  'q'  ; 0x10
+    .byte '/',  '8',  0x00, 'p',  'i',  'y',  'r',  'w'  ; 0x18
+    .byte '6',  '4',  0x00, 'l',  'j',  'g',  'd',  'a'  ; 0x20
+    .byte '*',  '5',  0x00, ':',  'k',  'h',  'f',  's'  ; 0x28
+    .byte '3',  '1',  0x0d, ';',  'm',  'b',  'c',  'z'  ; 0x30
+    .byte '+',  '2',  0x00, '?',  '.',  'n',  'v',  'x'  ; 0x38
+    .byte '-',  '0',  0x00, '>',  0x00, ']',  '@',  0x00 ; 0x40
+    .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
+zendproc
+
+zproc print_hex_number
+	pha
+	lsr a
+	lsr a
+	lsr a
+	lsr a
+	jsr print
+	pla
+print:
+	and #0x0f
+	ora #48
+	cmp #58
+    zif_cs
+        adc #6
+    zendif
+	pha
+	jsr entry_CONOUT
+	pla
+	rts
+zendproc
+
 
 ; --- Screen handling -------------------------------------------------------
 
@@ -971,5 +1147,7 @@ disk_buffer:      .fill 256
 
 cursorx:          .fill 1
 cursory:          .fill 1
+keyboard_state:   .fill 10
+shift_pressed:    .fill 1
 
 ; vim: sw=4 ts=4 et ft=asm
