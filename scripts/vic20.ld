@@ -2,6 +2,7 @@ MEMORY {
     zp : ORIGIN = 2, LENGTH = 0x8e
     ram (rw) : ORIGIN = 0x400, LENGTH = 0x8000
 	basic (rw) : ORIGIN = 0x11ff, LENGTH = 0x3000
+	init (rw) : ORIGIN = 0x7000, LENGTH = 0x1000
 	block5 (rw) : ORIGIN = 0xa000, LENGTH = 0x2000
 }
 
@@ -15,6 +16,13 @@ SECTIONS {
 	.head : {
 		*(header)
 	} >basic
+
+	.init : {
+		init_exec_addr = .;
+		init_load_addr = LOADADDR(.init);
+		*(init)
+		init_end_addr = .;
+	} >init AT>basic
 
 	.text : {
 		bios_exec_addr = .;
