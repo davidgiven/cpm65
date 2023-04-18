@@ -53,8 +53,6 @@ buffered_sector:  .fill 3 ; sector currently in disk buffer
 
 pending_key:      .fill 1 ; pending keypress from system
 buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
-ieee_buffered_char: .fill 1 ; byte pending output
-ieee_has_buffered_char: .fill 1 ; if there is one
 cursorx:          .fill 1
 cursory:          .fill 1
 
@@ -161,11 +159,11 @@ _start:
     ; Miscellaneous initialisation.
 
     lda #0
-    sta ieee_buffered_char
-    sta ieee_has_buffered_char
     sta shift_pressed
     sta pending_key
     sta buffer_dirty
+
+    jsr ieee_init
 
     ldx #10
     lda #0xff
@@ -1045,88 +1043,21 @@ zendproc
     sta \port
 .endm
 
-; Writes a single character in A with buffering.
-; Preserves X and Y.
-
-zproc ieee_write
+zproc ieee_puteoib
     pha
-    lda ieee_has_buffered_char
-    zif_ne
-        lda ieee_buffered_char
-        jsr ieee_putb
-    zendif
-    lda #1
-    sta ieee_has_buffered_char
+    lda #0x34               ; assert EOI
+    sta PIA1_CA
     pla
-    sta ieee_buffered_char
-    rts
+
+    bne ieee_putb           ; always taken
 zendproc
 
-; Flushes the last character with EOI asserted.
-; Preserves X and Y.
-
-zproc ieee_flush
-    lda ieee_has_buffered_char
-    zif_ne
-        ; Assert EOI.
-
-        pha
-        lda #0x34
-        sta PIA1_CA
-        pla
-
-        lda ieee_buffered_char
-        jsr ieee_putb
-        lda #0
-        sta ieee_has_buffered_char
-    zendif
-    rts
-zendproc
-
-; See http://www.6502.org/users/andre/petindex/local/pet-io-2.txt
-; https://www.pagetable.com/?p=1023
-; http://www.primrosebank.net/computers/pet/documents/PET_and_the_IEEE488_Bus_text.pdf
-; (appendix E)
-
-; A is the secondary address (0xfX for OPEN).
-
-zproc ieee_talk
-    pha
-    lda #0x48               ; TALK device 8
-    jsr ieee_putcmdb
-    pla
-    ora #0x60               ; SECOND
-    jmp ieee_putcmdb
-zendproc
-
-zproc ieee_untalk
-    lda #0x5f               ; UNTALK
-    jmp ieee_putcmdb
-zendproc
-
-; A is the secondary address.
-
-zproc ieee_listen
-    pha
-    lda #0x28               ; LISTEN device 8
-    jsr ieee_putcmdb
-    pla
-    ora #0x60               ; SECOND
-    jmp ieee_putcmdb
-zendproc
-
-zproc ieee_unlisten
-    jsr ieee_flush
-    lda #0x3f               ; UNLISTEN
-zendproc
-    ; fall through
 zproc ieee_putcmdb
     pha
     set0 VIA_PB, VIA_PB_ATN_OUT
     pla
-    jmp ieee_putb
 zendproc
-
+    ; fall through
 zproc ieee_putb
     ; Deassert our own NRFD and NDAC and wait for NRFD=0 (i.e. ready for data)
 

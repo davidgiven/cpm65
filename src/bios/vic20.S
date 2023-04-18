@@ -11,6 +11,16 @@ TEXT = 0x1000
 FRAMEBUFFER = 0x1100
 COLOURRAM = 0x9400
 
+VIA1     = 0x9110
+VIA1_PB  = VIA1 + 0x0
+VIA1_PCR = VIA1 + 0xc
+VIA1_DRA = VIA1 + 0xf
+
+VIA2     = 0x9120
+VIA2_PB  = VIA2 + 0x0
+VIA2_PCR = VIA2 + 0xc
+VIA2_DRA = VIA2 + 0xf
+
 ZEROPAGE
 
 ptr:		.fill 2
@@ -116,6 +126,11 @@ _init:
         tay
         dey
     zuntil_eq
+
+	; IEC initialisation.
+
+	; Y is 0
+	sty ieee_eoi
 
 	jmp .
 
@@ -368,6 +383,148 @@ font_tab:
 	#include ".obj/4x8font.inc"
 zendproc
 
+; --- Disk handling ---------------------------------------------------------
+
+; Kernel ROM disassembly here:
+; http://www.fox-ts.co.uk/shared/vic20kernelrom.html
+
+zproc ieee_putcmdb
+	pha
+	jsr set_iec_data_high
+	jsr set_iec_clock_high
+
+	lda VIA1_DRA
+	ora #0x80 			; set ATN low
+	sta VIA1_DRA
+
+	pla
+zendproc
+	; fall through
+zproc ieee_putb
+	sta ieee_byte
+
+	jsr set_iec_data_high
+	jsr get_iec_status
+	zif_mi
+		sec				; device not present
+		rts
+	zendif
+
+	; Wait for the IEC data to rise.
+
+	jsr wait_for_iec_data_high
+
+	; Perform EOI sequence if necessary: we wait without sending the clock low.
+	; Eventually the device will aknowledge by pulling the data low.
+
+	lda ieee_eoi
+	zif_ne
+		zrepeat
+			jsr get_iec_status
+		zuntil_pl ; data low
+		jsr wait_for_iec_data_high
+	zendif
+
+	; Send clock low.
+
+	jsr set_iec_clock_low
+
+	; Now send a byte.
+
+	ldx #8				; bit count
+	zrepeat
+		jsr get_iec_status
+		zif_pl
+			sec
+			rts			; if data low, timeout
+		zendif
+
+		ror ieee_byte
+		jsr set_iec_data
+
+		; Put the clock high for ~26 cycles.
+
+		jsr set_iec_clock_high
+
+		ldy #5			; 2
+		zrepeat
+			dey			; 2
+		zuntil_eq		; 3 if taken; 5 per loop
+
+		lda VIA2_PCR
+		and #0xdf		; CB2 low (serial data high)
+		ora #0x02		; CA2 high (serial data low)
+		sta VIA2_PCR
+
+		dex
+	zuntil_eq
+
+	; Wait for the device to acknowledge by pulling data low.
+
+	zrepeat
+		jsr get_iec_status
+	zuntil_pl
+
+	lda VIA1_DRA
+	and #0x7f 			; release ATN
+	sta VIA1_DRA
+
+	rts
+zendproc
+
+; Sets the data bit to C.
+
+zproc set_iec_data
+	bcc set_iec_data_low
+zendproc
+	; fall through
+zproc set_iec_data_high
+	lda VIA2_PCR
+	and #0xdf ; set CB2 low (iec data goes high)
+	sta VIA2_PCR
+	rts
+zendproc
+
+zproc wait_for_iec_data_high
+	zrepeat
+		jsr get_iec_status
+	zuntil_cs
+	rts
+zendproc
+
+zproc set_iec_data_low
+	lda VIA2_PCR
+	ora #0x02 ; set CB2 high (iec data goes low)
+	sta VIA2_PCR
+	rts
+zendproc
+
+zproc set_iec_clock_high
+	lda VIA2_PCR
+	and #0xfd ; set CA2 low (iec clock goes high)
+	sta VIA2_PCR
+	rts
+zendproc
+
+zproc set_iec_clock_low
+	lda VIA2_PCR
+	ora #0x02 ; set CA2 high (iec clock goes low)
+	sta VIA2_PCR
+	rts
+zendproc
+
+; Returns the clock bit in N and the data bit in C.
+
+zproc get_iec_status
+	zrepeat
+		lda VIA1_DRA
+		cmp VIA1_DRA
+	zuntil_eq
+	ror a
+	ror a
+	rts
+zendproc
+
 zproc print_hex_number
 	pha
 	lsr a
@@ -389,9 +546,9 @@ print:
 	rts
 zendproc
 
-
 ZEROPAGE
 
-cursorx: .fill 1
-cursory: .fill 1
-
+cursorx:   .fill 1
+cursory:   .fill 1
+ieee_byte: .fill 1
+ieee_eoi:  .fill 1
