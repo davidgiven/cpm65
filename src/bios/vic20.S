@@ -15,6 +15,7 @@ ZEROPAGE
 
 ptr:		.fill 2
 ptr1:		.fill 2
+ptr2:		.fill 2
 dma:		.fill 2
 
 .section header, "ax"
@@ -101,6 +102,28 @@ _init:
 
 	jsr clear_screen
 
+	lda #0
+	sta cursorx
+	sta cursory
+
+	zrepeat
+		pha
+		
+		jsr calculate_cursor_address
+	1:
+		lda #'a'
+		jsr draw_glyph
+
+		inc cursorx
+		inc cursory
+		inc 1b+1
+
+		pla
+		clc
+		adc #1
+		cmp #24
+	zuntil_eq
+
 	jmp biosentry
 
 vic_tab:
@@ -124,15 +147,15 @@ zproc clear_screen
 	ldx #16
 	zrepeat
 		txa
-		sta TEXT-16, x
+		sta TEXT-0x10, x
 		lda #1
-		sta COLOURRAM-16, x
+		sta COLOURRAM-0x10, x
 		inx
 	zuntil_eq
 
 	; Clear the bitmap itself.
 
-	ldx #>(FRAMEBUFFER + 0xe00)
+	ldx #>(FRAMEBUFFER + 0xf00)
 	ldy #0
 	tya
 	sta ptr+0
@@ -150,4 +173,154 @@ zproc clear_screen
 
 	rts
 zendproc
+
+; Calculates into ptr the address of bitmap line A.
+
+zproc calculate_line_address
+	; The bottom bit of Y turns into a +8 offset at the end.
+
+	pha
+	and #0xfe		; 'x2'
+	asl a			; x4
+	sta ptr+0
+	asl a			; x8
+	asl a			; x16
+	clc
+	adc ptr+0		; =x20; may overflow
+	sta ptr+0
+	lda #0
+	zif_cs
+		lda #1
+	zendif
+
+	; Now multiply the whole lot by 16 to get the byte address.
+
+	asl ptr+0
+	rol a
+	asl ptr+0
+	rol a
+	asl ptr+0
+	rol a
+	asl ptr+0
+	rol a
+	
+	; Add on the actual framebuffer address.
+
+	clc
+	adc #>FRAMEBUFFER
+	sta ptr+1
+
+	; Add on the +8 offset for odd lines.
+
+	pla
+	ror a
+	zif_cs
+		clc
+		lda #8
+		adc ptr+0
+		sta ptr+0
+		zif_cs
+			inc ptr+1
+		zendif
+	zendif
+	rts
+zendproc
+
+; Calculates into ptr the address of the cursor.
+
+zproc calculate_cursor_address
+	lda cursory
+	jsr calculate_line_address
+
+	lda cursorx
+	and #0xfe
+	asl a			; x2
+
+	sta ptr1+0
+	lda #0			; x4
+
+	asl ptr1+0		; x8
+	rol a
+
+	asl ptr1+0		; x16; top bit into carry
+	rol a
+
+	sta ptr1+1
+
+	clc
+	lda ptr+0
+	adc ptr1+0
+	sta ptr+0
+
+	lda ptr+1
+	adc ptr1+1
+	sta ptr+1
+	rts
+zendproc
+
+; Draws glyph A into (ptr), y.
+
+zproc draw_glyph
+	sec
+	sbc #32			; get glyph offset
+
+	asl a			; x2
+	sta ptr1+0
+
+	lda #0
+	asl ptr1+0
+	rol a			; x4
+
+	asl ptr1+0
+	rol a			; x8
+
+	sta ptr1+1
+	clc
+	lda #<font_tab
+	adc ptr1+0
+	sta ptr1+0
+
+	lda #>font_tab
+	adc ptr1+1
+	sta ptr1+1
+
+	; ptr1 now contains the glyph address.
+
+	lda cursorx
+	ror a
+	lda #0x0f
+	ldy #0xf0
+	zif_cs
+		; Off address.
+
+		lda #0xf0
+		ldy #0x0f
+	zendif
+
+	sta ptr2+0
+	sty ptr2+1
+
+	ldy #7
+	zrepeat
+		lda (ptr), y
+		and ptr2+0
+		sta (ptr), y
+
+		lda (ptr1), y
+		and ptr2+1
+		ora (ptr), y
+		sta (ptr), y
+
+		dey
+	zuntil_eq
+	rts
+
+font_tab:
+	#include ".obj/4x8font.inc"
+zendproc
+
+ZEROPAGE
+
+cursorx: .fill 1
+cursory: .fill 1
 

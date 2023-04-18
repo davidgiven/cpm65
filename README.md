@@ -193,4 +193,6 @@ directory, you must conform to the terms of the GPL.
 2005 Ian Plumarta and is available under the terms of the MIT license. See
 `third_party/lib6502/COPYING.lib6502` for the full text.
 
-
+`third_party/tomsfonts` contains a copy of the atari-small font, which is ©
+1999 Thomas A. Fine and is available under the terms of a minimal free license.
+See `third_party/tomsfonts/LICENSE` for the full text.

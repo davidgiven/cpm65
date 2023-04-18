@@ -1,8 +1,8 @@
 CXX = g++
 CC = gcc
 
-CFLAGS = -O0 -g -I.
-CFLAGS65 = -Os -g -fnonreentrant
+CFLAGS = -Os -g -I.
+CFLAGS65 = -Os -g -fnonreentrant -I.
 
 OBJDIR = .obj
 
@@ -52,6 +52,10 @@ bin/cpmemu: $(CPMEMU_OBJS)
 bin/shuffle: $(OBJDIR)/tools/shuffle.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $<
+
+bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -o $@ $^
 
 $(OBJDIR)/third_party/%.o: third_party/%.c
 	@mkdir -p $(dir $@)
@@ -111,6 +115,10 @@ $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a $(LINKFLAGS)
+
+$(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
+	@mkdir -p $(dir $@)
+	bin/fontconvert third_party/tomsfonts/atari-small.bdf > $@
 	
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
@@ -200,6 +208,7 @@ pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
+$(OBJDIR)/vic20.exe: $(OBJDIR)/4x8font.inc
 vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
 	cc1541 -i 15 -q -n "cp/m-65" $@
@@ -224,7 +233,7 @@ vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
 clean:
-	rm -rf $(OBJDIR) apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64
+	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64
 
 .DELETE_ON_ERROR:
 .SECONDARY:

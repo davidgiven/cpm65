@@ -7,10 +7,13 @@ MEMORY {
 }
 
 SECTIONS {
+	__TPA_START__ = 0x2000;
+	__TPA_END__ = 0x8000;
+
 	.zp : {
 		*(.zp .zp.*)
-		__USERZEROPAGE_START__ = .;
-		__USERZEROPAGE_END__ = 0xff;
+		__ZEROPAGE_START__ = .;
+		__ZEROPAGE_END__ = 0xff;
 	} >zp
 
 	.head : {
@@ -40,8 +43,6 @@ SECTIONS {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		bios_size = . - bios_exec_addr;
-		__TPA_START__ = .;
-		__TPA_END__ = 0x8000;
 	} >block5
 }
 
