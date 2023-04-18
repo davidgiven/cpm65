@@ -7,8 +7,9 @@
 
 ;https://www.antimon.org/dl/c64/code/stable.txt
 
-TEXT = 0x0200
-FRAMEBUFFER = 0x1000
+TEXT = 0x1000
+FRAMEBUFFER = 0x1100
+COLOURRAM = 0x9400
 
 ZEROPAGE
 
@@ -86,28 +87,67 @@ _start:
 
 .section init, "ax"
 _init:
-	lda 0x9002
-	ora #0x80
-	sta 0x9002
+	; Initialise the VIC.
 
-	lda #0x8c
-	sta 0x9005
-
-	ldy #0
+	ldx #vic_tab_end - vic_tab
 	zrepeat
-		tya
-		sta TEXT+0x000, y
-		sta TEXT+0x100, y
-		sta FRAMEBUFFER+0x000, y
-		sta FRAMEBUFFER+0x100, y
-		sta FRAMEBUFFER+0x200, y
-		sta FRAMEBUFFER+0x300, y
-		iny
+		lda vic_tab-1, x
+		sta 0x9000-1, x
+		dex
 	zuntil_eq
+
+	lda #0x08			; black border, black background, inverted
+	sta 0x900f
+
+	jsr clear_screen
 
 	jmp biosentry
 
+vic_tab:
+	.byte 14   			; 0x9000: abbbbbbb: interlace, screen X
+	.byte 35            ; 0x9001: cccccccc: screen Y
+	.byte 0x00 | 20     ; 0x9002: hddddddd: screen address, screen width
+	.byte (12<<1) | 1   ; 0x9003: geeeeeef: screen height, char size
+	.byte 0             ; 0x9004: gggggggg: variable
+	.byte 0xcc          ; 0x9005: hhhhiiii: screen address, char address
+vic_tab_end:
+
 zproc biosentry
 	jmp .
+zendproc
+
+; --- Screen handling ----------------------------------------------------
+
+zproc clear_screen
+	; Reset the character mapping on the screen.
+
+	ldx #16
+	zrepeat
+		txa
+		sta TEXT-16, x
+		lda #1
+		sta COLOURRAM-16, x
+		inx
+	zuntil_eq
+
+	; Clear the bitmap itself.
+
+	ldx #>(FRAMEBUFFER + 0xe00)
+	ldy #0
+	tya
+	sta ptr+0
+	zrepeat
+		stx ptr+1
+		zrepeat
+			lda #0
+			sta (ptr), y
+			dec ptr+1
+			lda ptr+1
+			cmp #>(FRAMEBUFFER - 0x100)
+		zuntil_eq
+		iny
+	zuntil_eq
+
+	rts
 zendproc
 
