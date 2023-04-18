@@ -106,25 +106,23 @@ _init:
 	sta cursorx
 	sta cursory
 
-	zrepeat
-		pha
-		
-		jsr calculate_cursor_address
-	1:
-		lda #'a'
-		jsr draw_glyph
+    ldy #banner_end - banner
+    zrepeat
+        tya
+        pha
+        lda banner-1, y
+        jsr entry_CONOUT
+        pla
+        tay
+        dey
+    zuntil_eq
 
-		inc cursorx
-		inc cursory
-		inc 1b+1
+	jmp .
 
-		pla
-		clc
-		adc #1
-		cmp #24
-	zuntil_eq
-
-	jmp biosentry
+banner:
+	.byte 10, 13
+	.ascii "02-CIV eht rof 56-M/PC"
+banner_end:
 
 vic_tab:
 	.byte 14   			; 0x9000: abbbbbbb: interlace, screen X
@@ -134,12 +132,63 @@ vic_tab:
 	.byte 0             ; 0x9004: gggggggg: variable
 	.byte 0xcc          ; 0x9005: hhhhiiii: screen address, char address
 vic_tab_end:
-
-zproc biosentry
-	jmp .
 zendproc
 
 ; --- Screen handling ----------------------------------------------------
+
+; Writes the character in A.
+
+zproc entry_CONOUT
+    cmp #13
+    zif_eq
+        lda #0
+        sta cursorx
+        rts
+    zendif
+    cmp #127
+    zif_eq
+        dec cursorx
+        zif_mi
+            inc cursorx
+        zendif
+        jsr calculate_cursor_address
+        lda #' '
+        jsr draw_glyph
+        rts
+    zendif
+    cmp #10
+    beq write_nl
+
+    pha
+    jsr calculate_cursor_address
+    pla
+    jsr draw_glyph
+
+    inc cursorx
+    lda cursorx
+    cmp #40
+    zif_eq
+        lda #0
+        sta cursorx
+        jmp write_nl
+    zendif
+    rts
+zendproc
+
+zproc write_nl
+    inc cursory
+    lda cursory
+    cmp #24
+    zif_eq
+        dec cursory
+        jmp scroll_up
+    zendif
+    rts
+zendproc
+
+zproc scroll_up
+	rts
+zendproc
 
 zproc clear_screen
 	; Reset the character mapping on the screen.
@@ -318,6 +367,28 @@ zproc draw_glyph
 font_tab:
 	#include ".obj/4x8font.inc"
 zendproc
+
+zproc print_hex_number
+	pha
+	lsr a
+	lsr a
+	lsr a
+	lsr a
+	jsr print
+	pla
+print:
+	and #0x0f
+	ora #48
+	cmp #58
+    zif_cs
+        adc #6
+    zendif
+	pha
+	jsr entry_CONOUT
+	pla
+	rts
+zendproc
+
 
 ZEROPAGE
 

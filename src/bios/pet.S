@@ -455,28 +455,6 @@ keyboard_decode_tab:
     .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
 zendproc
 
-zproc print_hex_number
-	pha
-	lsr a
-	lsr a
-	lsr a
-	lsr a
-	jsr print
-	pla
-print:
-	and #0x0f
-	ora #48
-	cmp #58
-    zif_cs
-        adc #6
-    zendif
-	pha
-	jsr entry_CONOUT
-	pla
-	rts
-zendproc
-
-
 ; --- Screen handling -------------------------------------------------------
 
 ; Writes the character in A.
