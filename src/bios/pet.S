@@ -1043,6 +1043,23 @@ zendproc
     sta \port
 .endm
 
+zproc ieee_mode_atn
+    set0 VIA_PB, VIA_PB_ATN_OUT
+    rts
+zendproc
+
+zproc ieee_mode_talk
+    set1 VIA_PB, VIA_PB_ATN_OUT
+    rts
+zendproc
+
+; Switch from ATN mode to LISTEN mode.
+
+zproc ieee_mode_listen
+    set1 VIA_PB, VIA_PB_ATN_OUT
+    rts
+zendproc
+
 zproc ieee_puteoib
     pha
     lda #0x34               ; assert EOI
@@ -1052,12 +1069,6 @@ zproc ieee_puteoib
     bne ieee_putb           ; always taken
 zendproc
 
-zproc ieee_putcmdb
-    pha
-    set0 VIA_PB, VIA_PB_ATN_OUT
-    pla
-zendproc
-    ; fall through
 zproc ieee_putb
     ; Deassert our own NRFD and NDAC and wait for NRFD=0 (i.e. ready for data)
 
@@ -1086,10 +1097,9 @@ zproc ieee_putb
         and #VIA_PB_NDAC_IN
     zuntil_ne
 
-    ; Release DAV, EOI, ATN and the data bus.
+    ; Release DAV, EOI, and the data bus.
 
     set1 PIA2_CB, PIA2_CB_DAV_OUT
-    set1 VIA_PB, VIA_PB_ATN_OUT
     lda #0x3c
     sta PIA1_CA
     lda #0xff
