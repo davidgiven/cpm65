@@ -54,13 +54,6 @@ VIA2_PCR_CB2_DATA_OUT  = 1<<5
     sta \port
 .endm
 
-ZEROPAGE
-
-ptr:        .fill 2
-ptr1:       .fill 2
-ptr2:       .fill 2
-dma:        .fill 2
-
 .section header, "ax"
     .word $1201
     .word 1f, 1
@@ -164,6 +157,16 @@ _init:
 
     ; Y is 0
     sty ieee_eoi
+    jsr ieee_init
+
+    ldy #3
+    zrepeat
+        lda #0
+        sta sector_num-1, y
+        lda #0xff
+        sta buffered_sector-1, y
+        dey
+    zuntil_eq
 
     ; Load the BDOS.
 
@@ -180,6 +183,8 @@ _init:
 
     lda #0x60
     jsr ieee_talk
+
+    sei
     zrepeat
         jsr ieee_getb
         php
@@ -198,11 +203,34 @@ _init:
     zuntil_cs
     jsr ieee_untalk
 
+    lda #'!'
+    jsr entry_CONOUT
+
     lda #0xe0               ; CLOSE channel 0
     jsr ieee_listen
     jsr ieee_unlisten
 
-    jmp .
+    lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
+    jsr ieee_listen
+    ldx #allocate_cmd_end - allocate_cmd
+    zrepeat
+        lda allocate_cmd-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+    jsr ieee_unlisten
+
+    ; Relocate the BDOS.
+
+    lda #>__TPA_START__
+    ldx #__ZEROPAGE_START__
+    jsr entry_RELOCATE
+	
+    ; Go!
+
+    lda #<biosentry
+    ldx #>biosentry
+    jmp __TPA_START__ + COMHDR_ENTRY
 
 bdos_filename: ; reversed!
     .ascii "R,P,SODB"
@@ -225,6 +253,66 @@ vic_tab:
     .byte 0             ; 0x9004: gggggggg: variable
     .byte 0xcc          ; 0x9005: hhhhiiii: screen address, char address
 vic_tab_end:
+zendproc
+
+; --- BIOS entrypoints ------------------------------------------------------
+
+zproc entry_GETTPA
+    lda mem_base
+    ldx mem_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETTPA
+    sta mem_base
+    stx mem_end
+    clc
+    rts
+zendproc
+
+zproc entry_GETZP
+    lda zp_base
+    ldx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETZP
+    sta zp_base
+    stx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETBANK
+    rts
+zendproc
+
+; --- Keyboard handling -----------------------------------------------------
+
+; Returns 0xff if no key is pending, 0 if one is.
+
+zproc entry_CONST
+    lda #0
+    clc
+    rts
+
+;    jsr scan_keyboard
+;
+;    lda pending_key
+;    zif_ne
+;        lda #0xff
+;    zendif
+;
+;    clc
+;    rts
+zendproc
+
+; Blocks until a key is pressed; returns it in A.
+
+zproc entry_CONIN
+    jmp .
 zendproc
 
 ; --- Screen handling ----------------------------------------------------
@@ -463,6 +551,366 @@ zendproc
 
 ; --- Disk handling ---------------------------------------------------------
 
+; Sets the current DMA address.
+
+zproc entry_SETDMA
+    sta dma+0
+    stx dma+1
+    clc
+    rts
+zendproc
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc entry_SELDSK
+    cmp #0
+    zif_ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
+    lda #<dph
+    ldx #>dph
+    clc
+    rts
+zendproc
+
+; Set the current absolute sector number.
+; XA is a pointer to a three-byte number.
+
+zproc entry_SETSEC
+    sta ptr+0
+    stx ptr+1
+    ldy #2
+    zrepeat
+        lda (ptr), y
+        sta sector_num, y
+        dey
+    zuntil_mi
+    clc
+    rts
+zendproc
+
+zproc entry_READ
+    jsr change_sectors
+    zif_cc
+        lda sector_num+0
+        ror a               ; bottom bit -> C
+        lda #0
+        ror a               ; C -> top bit, producing $00 or $80
+        tax
+
+        ldy #0
+        zrepeat
+            lda disk_buffer, x
+            sta (dma), y
+            iny
+            inx
+            cpy #$80
+        zuntil_eq
+
+        clc
+    zendif
+    rts
+zendproc
+
+; On entry, A=0 for a normal write; A=1 to always flush to disk.
+
+zproc entry_WRITE
+    pha
+    jsr change_sectors
+    zif_cs
+        pla
+        sec
+        rts
+    zendif
+
+    lda sector_num+0
+    ror a               ; bottom bit -> C
+    lda #0
+    ror a               ; C -> top bit, producing $00 or $80
+    tax
+
+    ldy #0
+    zrepeat
+        lda (dma), y
+        sta disk_buffer, x
+        iny
+        inx
+        cpy #$80
+    zuntil_eq
+
+    lda #$80
+    sta buffer_dirty
+
+    pla
+    zif_ne
+        jmp flush_buffered_sector
+    zendif
+
+    clc
+    rts
+zendproc
+
+; Returns C on error.
+
+zproc change_sectors
+    ; If the buffered sector is the one we want, just return.
+
+    lda sector_num+0
+    and #$fe
+    cmp buffered_sector+0
+    zif_eq
+        lda sector_num+1
+        cmp buffered_sector+1
+        zif_eq
+            lda sector_num+2
+            cmp buffered_sector+2
+            zif_eq
+                clc
+                rts
+            zendif
+        zendif
+    zendif
+
+    ; We need to change sectors. Flush the current one?
+
+    jsr flush_buffered_sector
+
+    ; Now read the new one.
+
+    lda sector_num+0
+    and #$fe
+    sta buffered_sector+0
+    lda sector_num+1
+    sta buffered_sector+1
+    lda sector_num+2
+    sta buffered_sector+2
+
+    jsr buffered_sector_to_lba
+    jmp read_sector
+zendproc
+
+; Reads a 256-byte sector whose LBA index is in XA.
+
+zproc read_sector
+    jsr convert_to_ts
+    pha
+    tya
+    pha
+
+    lda #0x6f               ; SECOND channel 15
+    jsr ieee_listen
+
+    ldx #u1_string_end - u1_string
+    zrepeat
+        lda u1_string-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+
+    pla
+    jsr decimal_out
+
+    pla
+    jsr decimal_out
+    jsr ieee_unlisten
+
+    lda #0x62               ; SECOND channel 2
+    jsr ieee_talk
+
+    ldy #0
+    zrepeat
+        jsr ieee_getb
+        sta disk_buffer, y
+        iny
+    zuntil_cs
+
+    jsr ieee_untalk
+    clc
+    rts
+
+u1_string:
+    .ascii "0 2 1U" ; reversed!
+u1_string_end:
+zendproc
+
+; Writes a 256-byte sector whose LBA index is in XA.
+
+zproc write_sector
+    jsr convert_to_ts
+    pha
+    tya
+    pha
+
+    ; Reset buffer pointer.
+
+    lda #0x6f               ; SECOND channel 15
+    jsr ieee_listen
+
+    ldx #bp_string_end - bp_string
+    zrepeat
+        lda bp_string-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+
+    jsr ieee_unlisten
+
+    ; Write bytes.
+
+    lda #0x62               ; SECOND channel 2
+    jsr ieee_listen
+
+    ldy #0
+    zrepeat
+        lda disk_buffer, y
+        jsr ieee_write
+        iny
+    zuntil_eq
+
+    jsr ieee_unlisten
+
+    ; Write sector to disk.
+
+    lda #0x6f               ; SECOND channel 15
+    jsr ieee_listen
+
+    ldx #u2_string_end - u2_string
+    zrepeat
+        lda u2_string-1, x
+        jsr ieee_write
+        dex
+    zuntil_eq
+
+    pla
+    jsr decimal_out
+
+    pla
+    jsr decimal_out
+
+    jsr ieee_unlisten
+
+    clc
+    rts
+
+bp_string:
+    .ascii "0 2 P-B" ; reversed!
+bp_string_end:
+u2_string:
+    .ascii "0 2 2U" ; reversed!
+u2_string_end:
+zendproc
+
+.if 1
+zproc getstatus
+    lda #0x6f
+    jsr ieee_talk
+
+    zloop
+        jsr ieee_getb
+        zbreakif_cs
+        jsr entry_CONOUT
+    zendloop
+   
+    lda #0x0d
+    jsr entry_CONOUT
+    lda #0x0a
+    jsr entry_CONOUT
+    jsr ieee_untalk
+    rts
+zendproc
+.endif
+
+; Prints a decimal number in A to the IEEE output.
+
+zproc decimal_out
+    pha
+    lda #' '
+    jsr ieee_write
+    pla
+
+    ldx #$ff
+    sec
+    zrepeat
+        inx
+        sbc #100
+    zuntil_cc
+    adc #100
+    jsr digit
+
+    ldx #$ff
+    sec
+    zrepeat
+        inx
+        sbc #10
+    zuntil_cc
+    adc #10
+    jsr digit
+    tax
+digit:
+    pha
+    txa
+    ora #'0'
+    jsr ieee_write
+    pla
+    rts
+zendproc
+
+; Converts an LBA sector number in XA to track/sector in Y, A.
+
+zproc convert_to_ts
+    ldy #0
+    zloop
+        cpx #0
+        zif_eq
+            cmp track_size_table, y
+            zif_cc
+                iny     ; tracks are one-based.
+                rts
+            zendif
+        zendif
+
+        sec
+        sbc track_size_table, y
+        zif_cc
+            dex
+        zendif
+        iny
+    zendloop
+
+track_size_table:
+    .fill 17, 1, 21
+    .fill 7, 1, 19
+    .fill 6, 1, 18
+    .fill 10, 1, 17
+zendproc
+
+; Compute the current LBA sector number in XA for the buffered sector.
+
+zproc buffered_sector_to_lba
+    lda buffered_sector+1
+    lsr a
+    tax
+    lda buffered_sector+0
+    ror
+    rts
+zendproc
+
+zproc flush_buffered_sector
+    bit buffer_dirty
+    zif_mi
+        jsr buffered_sector_to_lba
+        jsr write_sector
+
+        lda #0
+        sta buffer_dirty
+    zendif
+    rts
+zendproc
 ; Kernel ROM disassembly here:
 ; http://www.fox-ts.co.uk/shared/vic20kernelrom.html
 ;
@@ -487,8 +935,8 @@ zendproc
 ; Switch from ATN mode to LISTEN mode.
 
 zproc ieee_mode_listen
-    jsr iec_assert_data
     jsr iec_release_atn
+    jsr iec_assert_data
     jsr iec_release_clock
     jmp wait_for_iec_clock_assert
 zendproc
@@ -517,6 +965,7 @@ zproc ieee_getb
         zif_ne
             ; Timeout. Acknowledge EOI by toggling data.
 
+label:
             jsr iec_assert_data
             jsr wait_1ms
             jsr iec_release_data
@@ -637,6 +1086,8 @@ zproc ieee_putb
     ; We are now done. Wait for the receivers to acknowledge by asserting data.
 
     jsr wait_for_iec_data_assert
+    lda #0
+    sta ieee_eoi
     clc
     rts
 zendproc
@@ -778,10 +1229,36 @@ zendproc
 
 ZEROPAGE
 
+.global ptr
+ptr:        .fill 2
+ptr1:       .fill 2
+ptr2:       .fill 2
+dma:        .fill 2
+
+sector_num:       .fill 3 ; current absolute sector number
+buffered_sector:  .fill 3 ; sector currently in disk buffer
+
 cursorx:   .fill 1
 cursory:   .fill 1
 ieee_byte: .fill 1
 ieee_eoi:  .fill 1
+buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
+
+.data
+
+zp_base:    .byte __ZEROPAGE_START__
+zp_end:     .byte __ZEROPAGE_END__
+mem_base:   .byte __TPA_START__@mos16hi
+mem_end:    .byte __TPA_END__@mos16hi
+
+.bss
+
+directory_buffer: .fill 128
+disk_buffer:      .fill 256
+
+; DPH for drive 0 (our only drive)
+
+define_drive dph, 136*10, 1024, 64, 0
 
 ; vim: sw=4 ts=4 et ft=asm
 
