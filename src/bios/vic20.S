@@ -4,6 +4,7 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "wait.inc"
 
 ;https://www.antimon.org/dl/c64/code/stable.txt
 
@@ -168,44 +169,33 @@ _init:
 
     lda #0xf0               ; OPEN channel 0
     jsr ieee_listen
-
-    label:
     ldx #bdos_filename_end - bdos_filename
     zrepeat
         lda bdos_filename-1, x
         jsr ieee_write
+
         dex
     zuntil_eq
     jsr ieee_unlisten
 
-    lda #0                  ; channel 0
+    lda #0x60
     jsr ieee_talk
-
-    lda #>__TPA_START__
-    sta ptr1+1
-    lda #0
-    sta ptr1+0
-
-    ldy #0
     zrepeat
         jsr ieee_getb
         php
-        sta (ptr1), y
 
-        iny
+    1:
+        sta __TPA_START__
+
+        inc 1b+1
         zif_eq
-            inc ptr1+1
+            inc 1b+2
 
-            tya
-            pha
             lda #'.'
             jsr entry_CONOUT
-            pla
-            tay
         zendif
         plp
     zuntil_cs
-
     jsr ieee_untalk
 
     lda #0xe0               ; CLOSE channel 0
@@ -479,24 +469,85 @@ zendproc
 ; Description of the terrible IEC protocol here:
 ; https://www.pagetable.com/?p=1135
 
-; Returns a byte into A. If EOI was set, sets the EOI flag.
+; Switch from either TALK or LISTEN mode to ATN mode.
+
+zproc ieee_mode_atn
+    jsr iec_assert_atn
+    jsr iec_assert_clock
+    jsr iec_release_data
+    jmp wait_1ms
+zendproc
+
+; Switch from ATN mode to TALK mode.
+
+zproc ieee_mode_talk
+    jmp iec_release_atn
+zendproc
+
+; Switch from ATN mode to LISTEN mode.
+
+zproc ieee_mode_listen
+    jsr iec_assert_data
+    jsr iec_release_atn
+    jsr iec_release_clock
+    jmp wait_for_iec_clock_assert
+zendproc
+
+; Returns a byte into A. If EOI was set, sets C.
 
 zproc ieee_getb
-    jsr iec_assert_data
-    jsr wait_for_iec_clock_high
-    jsr iec_assert_data
+    ; Wait for the talker to indicate it's ready to send.
 
-    ldx #8
+    jsr wait_for_iec_clock_release
+
+    ; Indicate that we're ready to receive.
+
+    jsr iec_release_data
+
+    ; Wait for the talker to assert clock, indicating that it's starting.
+    ; There's a timeout here used for indicating EOI.
+
+    lda #0
+    sta ieee_eoi
+    lda #1          ; 256us timeout
+    sta VIA2_T2CH
     zrepeat
-        jsr wait_for_iec_clock_high
-        ror ieee_byte
-        jsr wait_for_iec_clock_low
+        lda VIA2_IFR
+        and #VIA2_IFR_T2
+        zif_ne
+            ; Timeout. Acknowledge EOI by toggling data.
+
+            jsr iec_assert_data
+            jsr wait_1ms
+            jsr iec_release_data
+            inc ieee_eoi
+        zendif
+
+        jsr get_iec_status
+    zuntil_pl ; until clock is asserted
+
+    ; The talker will clock in bits on clock release edges.
+
+    txa
+    pha
+	ldx #8
+    zrepeat
+        jsr wait_for_iec_clock_release
+        ror	ieee_byte
+        jsr wait_for_iec_clock_assert
 
         dex
     zuntil_eq
+    pla
+    tax
 
-    jsr wait_and_then_release_iec
-    lda ieee_byte
+    ; Acknowledge receipt by asserting data.
+
+    jsr iec_assert_data
+
+    lda ieee_eoi        ; bottom bit set on EOI
+    ror a               ; move into C
+	lda	ieee_byte
     rts
 zendproc
 
@@ -507,46 +558,48 @@ zproc ieee_puteoib
     lda #1
     sta ieee_eoi
     pla
-    bne ieee_putb       ; always taken
-zendproc
-
-; Sends A, either with or without ATN set.
-
-zproc ieee_putcmdb
-    pha
-
-    ; Assert clock and wait for all the devices to respond.
-
-    jsr iec_assert_atn
-    jsr iec_assert_clock
-    jsr iec_release_data
-    jsr wait_1ms
-
-    pla
 zendproc
     ; fall through
+
+; Sends A. Returns C on error.
+
 zproc ieee_putb
     sta ieee_byte
 
-    ; Signify we're ready to send by releasing the clock.
+    ; Ensure there is actually a device on the other end by releasing data and
+    ; seeing if the device has it asserted. If it's not, there's nothing there.
 
     jsr iec_release_data
+    jsr get_iec_status
+    zif_cs
+        ; Device not present.
+
+        sec
+        rts
+    zendif
+
+    ; Tell the device we're ready to send by releasing clock.
+
     jsr iec_release_clock
-    jsr wait_for_iec_data_high
 
     ; Perform EOI sequence if necessary: we wait without sending the clock low.
-    ; Eventually the device will aknowledge by pulling the data low.
+    ; Eventually the receiver will aknowledge by briefly asserting data. (Not
+    ; sure how this behaves with multiple receivers?)
 
     lda ieee_eoi
     zif_ne
-        jsr wait_for_iec_data_low
-        jsr wait_for_iec_data_high
+        jsr wait_for_iec_data_release
+        jsr wait_for_iec_data_assert
     zendif
 
-    ; Send clock low.
+    ; Now that we're ready, wait for the device to acknowledge by releasing
+    ; data.
+
+    jsr wait_for_iec_data_release
+
+    ; Assert clock and go.
 
     jsr iec_assert_clock
-    jsr wait_60us
 
     ; Now send a byte.
 
@@ -554,46 +607,43 @@ zproc ieee_putb
     pha
     ldx #8              ; bit count
     zrepeat
+        zrepeat
+            lda VIA1_DRA
+            cmp VIA1_DRA
+        zuntil_eq
+        ror a
+        ror a           ; put data into carry
+        zif_cs
+            ; timeout
+        zendif
+
         ror ieee_byte
-        jsr set_iec_data
+        jsr set_iec_data_from_carry
 
-        ; Put the clock high for ~60us signifying that the data is ready.
+        ; Leave the clock released for 26 cycles.
 
-        jsr iec_release_clock
-        jsr wait_60us
-        jsr iec_assert_clock
+        jsr iec_release_clock               ; uses 6 cycles after changing clock
+        WAIT12                              ; 12
+        lda VIA2_PCR                        ; 4
+        and #~VIA2_PCR_CB2_DATA_OUT & 0xff  ; 2
+        ora #VIA2_PCR_CA2_CLOCK_OUT         ; 2
+        sta VIA2_PCR                        ; 4; total delay, 26 cycles
 
         dex
     zuntil_eq
     pla
     tax
 
-    ; Wait for the device to acknowledge by pulling data low.
+    ; We are now done. Wait for the receivers to acknowledge by asserting data.
 
-    jsr wait_for_iec_data_low
-
-    ; Release ATN and exit.
-
-    jmp iec_release_atn
+    jsr wait_for_iec_data_assert
+    clc
+    rts
 zendproc
-
-; Performs a 1ms delay and then release both clock and data.
-
-zproc wait_and_then_release_iec
-    txa
-    ldx #11
-    zrepeat
-        dex
-    zuntil_eq
-    tax
-
-    jsr iec_release_clock
-zendproc
-    ; falls through
 
 ; Sets the data bit to C.
 
-zproc set_iec_data
+zproc set_iec_data_from_carry
     bcc iec_assert_data
 zendproc
     ; fall through
@@ -604,14 +654,14 @@ zproc iec_release_data
     rts
 zendproc
 
-zproc wait_for_iec_data_high
+zproc wait_for_iec_data_release
     zrepeat
         jsr get_iec_status
     zuntil_cs
     rts
 zendproc
 
-zproc wait_for_iec_data_low
+zproc wait_for_iec_data_assert
     zrepeat
         jsr get_iec_status
     zuntil_cc
@@ -625,14 +675,14 @@ zproc iec_assert_data
     rts
 zendproc
 
-zproc wait_for_iec_clock_high
+zproc wait_for_iec_clock_release
     zrepeat
         jsr get_iec_status
     zuntil_mi
     rts
 zendproc
 
-zproc wait_for_iec_clock_low
+zproc wait_for_iec_clock_assert
     zrepeat
         jsr get_iec_status
     zuntil_pl
@@ -685,10 +735,11 @@ zendproc
 
 zproc wait_60us
     lda #60
+wait_us:
     sta VIA2_T2CL
     lda #0
     sta VIA2_T2CH
-    beq timer_wait              ; always taken
+    jmp timer_wait              ; always taken
 zendproc
 
 ; Waits for 1ms.

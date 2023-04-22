@@ -59,32 +59,40 @@ zendproc
 
 zproc ieee_talk
     pha
+	jsr ieee_mode_atn
     lda #0x48               ; TALK device 8
-    jsr ieee_putcmdb
+    jsr ieee_putb
     pla
     ora #0x60               ; SECOND
-    jmp ieee_putcmdb
+    jsr ieee_putb
+	jmp ieee_mode_listen
 zendproc
 
 zproc ieee_untalk
+	jsr ieee_mode_atn
     lda #0x5f               ; UNTALK
-    jmp ieee_putcmdb
+    jsr ieee_putb
+	jmp ieee_mode_talk
 zendproc
 
 ; A is the secondary address.
 
 zproc ieee_listen
     pha
+	jsr ieee_mode_atn
     lda #0x28               ; LISTEN device 8
-    jsr ieee_putcmdb
+    jsr ieee_putb
     pla
     ora #0x60               ; SECOND
-    jmp ieee_putcmdb
+    jsr ieee_putb
+	jmp ieee_mode_talk
 zendproc
 
 zproc ieee_unlisten
     jsr ieee_flush
+	jsr ieee_mode_atn
     lda #0x3f               ; UNLISTEN
-    jmp ieee_putcmdb
+    jsr ieee_putb
+	jmp ieee_mode_talk
 zendproc
 
