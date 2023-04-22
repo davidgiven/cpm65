@@ -8,7 +8,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev
 
     - name: cache llvm-mos
       id: cache-llvm-mos
