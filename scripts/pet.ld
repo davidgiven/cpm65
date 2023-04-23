@@ -19,7 +19,7 @@ SECTIONS {
 	.init : {
 		init_exec_addr = .;
 		init_load_addr = LOADADDR(.init);
-		*(relocator)
+		*(.init .init.*)
 		init_end_addr = .;
 	} >initram AT>reloram
 

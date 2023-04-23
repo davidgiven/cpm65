@@ -12,7 +12,7 @@ ieee_buffered_char:     .fill 1
 
 ; Initialises the IEEE488 library.
 
-zproc ieee_init
+zproc ieee_init, ".init"
 	lda #0
 	sta ieee_has_buffered_char
 	sta ieee_buffered_char

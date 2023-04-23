@@ -122,8 +122,7 @@ _start:
 
     jmp _init
 
-.section init, "ax"
-_init:
+zproc _init, .init
     ; Initialise the VIC.
 
     ldx #vic_tab_end - vic_tab

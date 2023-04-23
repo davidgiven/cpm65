@@ -67,8 +67,6 @@ cursory:          .fill 1
     ; Goodbye interrupts, we'll never use you again...
 
     sei
-    ldx #0xff
-    txs                     ; reset stack
 
     ; Copy the init code out of the way so we don't have to worry about
     ; overwriting it.
@@ -106,9 +104,7 @@ cursory:          .fill 1
     
     jmp _start
 
-.section relocator, "ax"
-.global _start
-_start:
+zproc _start, .init
     ; Copy the BIOS to its final location at 0x200. This overwrites the current
     ; memory image, so care needs to be taken. This routine is _last_ in the
     ; file, so it doesn't get overwritten.
@@ -253,6 +249,7 @@ banner: ; reversed!
     .byte 13, 10
     .ascii "56-M/PC"
 banner_end:
+zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 

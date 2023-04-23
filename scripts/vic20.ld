@@ -25,7 +25,7 @@ SECTIONS {
 	.init : {
 		init_exec_addr = .;
 		init_load_addr = LOADADDR(.init);
-		*(init)
+		*(.init .init.*)
 		init_end_addr = .;
 	} >init AT>basic
 
