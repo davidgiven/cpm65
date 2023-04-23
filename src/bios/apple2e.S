@@ -188,7 +188,7 @@ _start:
 
 banner: ; reversed!
     .byte 13, 10
-    .ascii "56-M/PC"
+    .ascii "II elppA eht rof 56-M/PC"
 banner_end:
 
 ; --- BIOS entrypoints ------------------------------------------------------

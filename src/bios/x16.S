@@ -175,9 +175,9 @@ _start:
     rts                 ; indirect jump
 
 loading_msg:
-    .byte 147, 14, 5, 13
-    .ascii "cp/m-65"
-    .byte 13, 13, 0
+    .byte 147, 14, 5
+    .ascii "cp/m-65 FOR THE x16"
+    .byte 13, 0
 
 bdos_filename:
     .ascii "BDOS,P,R"

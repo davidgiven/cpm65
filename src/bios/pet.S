@@ -247,7 +247,7 @@ allocate_cmd_end:
 
 banner: ; reversed!
     .byte 13, 10
-    .ascii "56-M/PC"
+    .ascii "TEP erodommoC eht rof 56-M/PC"
 banner_end:
 zendproc
 

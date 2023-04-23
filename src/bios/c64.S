@@ -693,9 +693,9 @@ zproc init_system
 zendproc
 
 loading_msg:
-    .byte 147, 14, 5, 13
-    .ascii "cp/m-65"
-    .byte 13, 13, 0
+    .byte 147, 14, 5
+    .ascii "cp/m-65 FOR THE cOMMODORE 64"
+    .byte 13, 0
 
 .data
 
