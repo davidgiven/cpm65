@@ -152,11 +152,19 @@ zproc _init, .init
         dey
     zuntil_eq
 
-    ; IEC initialisation.
+    ; Miscellaneous initialisation.
 
     ; Y is 0
     sty ieee_eoi
+    sty pending_key
     jsr ieee_init
+
+    ldy #7
+    lda #0xff
+    zrepeat
+        sta keyboard_state, y
+        dey
+    zuntil_mi
 
     ; Load the BDOS.
 
@@ -284,25 +292,168 @@ zendproc
 ; Returns 0xff if no key is pending, 0 if one is.
 
 zproc entry_CONST
-    lda #0
+    jsr scan_keyboard
+
+    lda pending_key
+    zif_ne
+        lda #0xff
+    zendif
+
     clc
     rts
-
-;    jsr scan_keyboard
-;
-;    lda pending_key
-;    zif_ne
-;        lda #0xff
-;    zendif
-;
-;    clc
-;    rts
 zendproc
 
 ; Blocks until a key is pressed; returns it in A.
 
 zproc entry_CONIN
-    jmp .
+    jsr toggle_cursor
+
+    lda pending_key
+    zif_eq
+        zrepeat
+            jsr scan_keyboard
+            lda pending_key
+        zuntil_ne
+    zendif
+
+    ldx #0
+    stx pending_key
+
+    pha
+    jsr toggle_cursor
+    pla
+
+    clc
+    rts
+zendproc
+
+; Does a single keyboard scan, processing any pressed keys. Last pressed key
+; wins.
+
+zproc scan_keyboard
+    lda #0xfe
+    sta VIA2_PB
+
+    ldy #0
+    zrepeat
+        zrepeat
+            ldx VIA2_PA
+            cpx VIA2_PA
+        zuntil_eq
+
+        txa
+        eor keyboard_state, y
+        zif_ne
+            ; Any set bits in A correspond to a key which has changes state.
+            ; The corresponding bit in X tells us whether it went up or down.
+
+            sta ptr1+0
+            stx ptr1+1
+
+            pha
+            txa
+            pha
+            tya
+            pha
+
+            txa
+            sta keyboard_state, y
+
+            tya
+            asl a
+            asl a
+            asl a       ; compute row*8 to get base of scancode number
+            tay
+
+            zrepeat
+                bit ptr1+0
+                zif_mi
+                    ; This key has changed.
+
+                    tya
+                    pha
+                    jsr change_key_state
+                    pla
+                    tay
+                zendif
+    
+                iny
+                asl ptr1+1
+                asl ptr1+0
+            zuntil_eq
+
+            pla
+            tay
+            pla
+            tax
+            pla
+        zendif
+
+        sec
+        rol VIA2_PB
+
+        iny
+        cpy #8
+    zuntil_eq
+    rts
+rts
+
+; The key with scancode Y has changed state. Whether it's up or down is in
+; the top bit of ptr1+1.
+
+zproc change_key_state
+    bit ptr1+1
+    zif_pl
+        lda keyboard_state+2
+        and #0x01
+        beq control_pressed
+
+        lda keyboard_state+3
+        and #0x02
+        beq shift_pressed       ; left shift
+
+        lda keyboard_state+4
+        and #0x40
+        beq shift_pressed       ; right shift
+
+        ; Normal keypress
+
+        lda normal_keytab, y
+        sta pending_key
+    zendif
+    rts
+
+shift_pressed:
+    lda shift_keytab, y
+    sta pending_key
+    rts
+
+control_pressed:
+    lda normal_keytab, y
+    and #0x1f
+    sta pending_key
+    rts
+
+normal_keytab:
+    .byte 0x08, '#',  '+',  '9',  '7',  '5',  '3',  '1'  ; 08
+    .byte 0x0d, '*',  'p',  'i',  'y',  'r',  'w',  '`'  ; 10
+    .byte 0x00, ';',  'l',  'j',  'g',  'd',  'a',  0x00 ; 18
+    .byte '/',  ',',  0x00, 'n',  'v',  'x',  0x00, 0x1b ; 20
+    .byte 0x00, 0x00, '.',  'm',  'b',  'c',  'z',  ' '  ; 28
+    .byte 0x00, '=',  ':',  'k',  'h',  'f',  's',  0x00 ; 30
+    .byte 0x00, 0x00, '@',  'o',  'u',  't',  'e',  'q'  ; 38
+    .byte 0x00, 0x00, '-',  '0',  '8',  '6',  '4',  '2'  ; 40
+
+shift_keytab:
+    .byte 0x08, '#',  '+',  ')',  '\'', '%',  '#',  '!'  ; 08
+    .byte 0x0d, '*',  'P',  'I',  'Y',  'R',  'W',  '|'  ; 10
+    .byte 0x00, ']',  'L',  'J',  'G',  'D',  'A',  0x00 ; 18
+    .byte '?',  '<',  0x00, 'N',  'V',  'X',  0x00, 0x1b ; 20
+    .byte 0x00, 0x00, '>',  'M',  'B',  'C',  'Z',  ' '  ; 28
+    .byte 0x00, '=',  '[',  'K',  'H',  'F',  'S',  0x00 ; 30
+    .byte 0x00, 0x00, '@',  'O',  'U',  'T',  'E',  'Q'  ; 38
+    .byte 0x00, 0x00, '_',  '0',  '(',  '&',  '$',  '"'  ; 40
+
 zendproc
 
 ; --- Screen handling ----------------------------------------------------
@@ -446,7 +597,8 @@ zproc calculate_line_address
     rts
 zendproc
 
-; Calculates into ptr the address of the cursor.
+; Calculates into ptr the address of the cursor. Leaves the bottom bit of X in
+; the carry flag.
 
 zproc calculate_cursor_address
     lda cursory
@@ -475,6 +627,10 @@ zproc calculate_cursor_address
     lda ptr+1
     adc ptr1+1
     sta ptr+1
+
+    lda cursorx     ; X LSB into carry
+    ror a
+
     rts
 zendproc
 
@@ -537,6 +693,23 @@ zproc draw_glyph
 
 font_tab:
     #include ".obj/4x8font.inc"
+zendproc
+
+zproc toggle_cursor
+    jsr calculate_cursor_address
+    ldx #0xf0
+    zif_cs
+        ldx #0x0f
+    zendif
+
+    ldy #7
+    zrepeat
+        txa
+        eor (ptr), y
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
 zendproc
 
 ; --- Disk handling ---------------------------------------------------------
@@ -869,6 +1042,7 @@ cursorx:         .fill 1
 cursory:         .fill 1
 ieee_byte:       .fill 1
 ieee_eoi:        .fill 1
+pending_key:     .fill 1
 
 .data
 
@@ -880,6 +1054,7 @@ mem_end:    .byte __TPA_END__@mos16hi, __HIGHTPA_END__@mos16hi
 .bss
 
 current_bank:     .fill 1
+keyboard_state:   .fill 8
 
 ; vim: sw=4 ts=4 et ft=asm
 
