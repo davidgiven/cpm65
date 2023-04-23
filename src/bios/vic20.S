@@ -137,10 +137,6 @@ zproc _init, .init
 
     jsr clear_screen
 
-    lda #0
-    sta cursorx
-    sta cursory
-
     ldy #banner_end - banner
     zrepeat
         tya
@@ -501,14 +497,78 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #24
-    zif_eq
-        dec cursory
-        jmp scroll_up
+    zif_ne
+        rts
     zendif
+
+    jsr roll_up
+
+    lda #22
+    jsr calculate_line_address
+
+    ldy #0
+    tya
+    zrepeat
+        sta (ptr), y
+        iny
+    zuntil_eq
+
+    inc ptr+1
+    ldy #0x3f
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+
+    lda #22
+    sta cursory
+
     rts
 zendproc
 
-zproc scroll_up
+; Rolls the screen two rows upwards.
+
+zproc roll_up
+    ; Cache the top row.
+
+    ldy #19
+    zrepeat
+        lda TEXT, y
+        pha
+        dey
+    zuntil_mi
+
+    ; Now scroll the entire screen.
+
+    zrepeat
+        lda TEXT+20, y
+        sta TEXT, y
+        iny
+        cpy #220
+    zuntil_eq
+
+    ; Restore the bottom row.
+
+    ldy #0
+    ldx #20
+    zrepeat
+        pla
+        sta TEXT+220, y
+        iny
+        dex
+    zuntil_eq
+
+    ; Increment the scroll compensator.
+
+    ldx scroll_compensation
+    inx
+    inx
+    cpx #24
+    zif_eq
+        ldx #0
+    zendif
+    stx scroll_compensation
+
     rts
 zendproc
 
@@ -542,6 +602,11 @@ zproc clear_screen
         iny
     zuntil_eq
 
+    lda #0
+    sta cursorx
+    sta cursory
+    sta scroll_compensation
+
     rts
 zendproc
 
@@ -551,6 +616,15 @@ zproc calculate_line_address
     ; The bottom bit of Y turns into a +8 offset at the end.
 
     pha
+
+    clc
+    adc scroll_compensation ; compensate for scrolling
+    cmp #24
+    zif_cs
+        sec
+        sbc #24
+    zendif
+
     and #0xfe       ; 'x2'
     asl a           ; x4
     sta ptr+0
@@ -1040,6 +1114,7 @@ ptr2:            .fill 2
 
 cursorx:         .fill 1
 cursory:         .fill 1
+scroll_compensation: .fill 1
 ieee_byte:       .fill 1
 ieee_eoi:        .fill 1
 pending_key:     .fill 1
