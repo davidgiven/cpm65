@@ -53,6 +53,7 @@ jobs:
           bbcmicro.ssd
           c64.d64
           pet.d64
+          vic20.d64
           x16.zip
           apple2e.po
         fail-if-no-assets: false
@@ -65,6 +66,7 @@ jobs:
           bbcmicro.ssd
           c64.d64
           pet.d64
+          vic20.d64
           x16.zip
           apple2e.po
         tag_name: dev
