@@ -10,8 +10,8 @@
 .set zloopsp, 0
 .set zifsp, 0
 
-.macro zproc name
-    .text ;\name
+.macro zproc name, section=.text
+    .section \section, "ax"
     .global \name
     \name:
 .endm

@@ -1,8 +1,8 @@
 CXX = g++
 CC = gcc
 
-CFLAGS = -O0 -g -I.
-CFLAGS65 = -Os -g -fnonreentrant
+CFLAGS = -Os -g -I.
+CFLAGS65 = -Os -g -fnonreentrant -I.
 
 OBJDIR = .obj
 
@@ -25,7 +25,8 @@ LIBCPM_OBJS = \
 
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
-	$(OBJDIR)/src/bios/petscii.o \
+	$(OBJDIR)/src/bios/commodore/ieee488.o \
+	$(OBJDIR)/src/bios/commodore/petscii.o \
 	$(OBJDIR)/src/bios/relocate.o \
 
 CPMEMU_OBJS = \
@@ -35,7 +36,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 bin/cpmemu
+all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 bin/cpmemu
 
 $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
@@ -52,6 +53,14 @@ bin/cpmemu: $(CPMEMU_OBJS)
 bin/shuffle: $(OBJDIR)/tools/shuffle.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $<
+
+bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(OBJDIR)/mkcombifs: $(OBJDIR)/tools/mkcombifs.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -o $@ $^ -lfmt
 
 $(OBJDIR)/third_party/%.o: third_party/%.c
 	@mkdir -p $(dir $@)
@@ -111,6 +120,10 @@ $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a $(LINKFLAGS)
+
+$(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
+	@mkdir -p $(dir $@)
+	bin/fontconvert third_party/tomsfonts/atari-small.bdf > $@
 	
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
@@ -124,26 +137,16 @@ bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmi
 		-f $(OBJDIR)/bdos.img -n bdos \
 		-f $(OBJDIR)/bbcmicrofs.img -n cpmfs
 
-c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
+c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys \
+		$(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -q -n "cp/m-65" $@
-	mkfs.cpm -f c1541 $@
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/c64.exe \
 		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
-	cpmcp -f c1541 $@ /dev/null 0:cbm.sys
-	echo "00f: 30 59 5a 5b 5c 5d 5e" | xxd -r - $@
-	echo "16504: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16514: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16524: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16534: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16544: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16554: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16564: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16574: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16584: 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	$(OBJDIR)/mkcombifs $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
@@ -176,31 +179,36 @@ apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/cc
 	truncate -s 143360 $@
 
 $(OBJDIR)/pet.exe: LINKFLAGS += --no-check-sections
-pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
+pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys \
+		$(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -i 15 -q -n "cp/m-65" $@
-	mkfs.cpm -f c1541 $@
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/pet.exe \
 		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
-	cpmcp -f c1541 $@ /dev/null 0:cbm.sys
-	echo "00f: 30 59 5a 5b 5c 5d 5e" | xxd -r - $@
-	echo "16504: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16514: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16524: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16534: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16544: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16554: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16564: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16574: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
-	echo "16584: 00 00 00 00 00 00 00 00 00 00 00 00" | xxd -r - $@
+	$(OBJDIR)/mkcombifs $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
+$(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
+$(OBJDIR)/src/bios/vic20.o: $(OBJDIR)/4x8font.inc
+vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
+		$(OBJDIR)/ccp.sys $(OBJDIR)/mkcombifs
+	@rm -f $@
+	cc1541 -i 15 -q -n "cp/m-65" $@
+	cc1541 -q \
+		-t -u 0 \
+		-r 18 -f cpm -w $(OBJDIR)/vic20.exe \
+		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
+		$@
+	$(OBJDIR)/mkcombifs $@
+	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f c1541 $@ s 0:cbmfs.sys 0:ccp.sys
+
 clean:
-	rm -rf $(OBJDIR) apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64
+	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64
 
 .DELETE_ON_ERROR:
 .SECONDARY:

@@ -10,6 +10,8 @@ to the 6502. So far it runs on:
   - The BBC Micro family, including Master, Tube, and Electron; TPA ranges from 14kB on the Electron to 57kB on the Tube.
 
   - Commodore 64; TPA is 46kB.
+  
+  - Commodore VIC-20: TPA is 24kB.
 
   - Commodore PET 4032; TPA is 26kB --- the assembler will run, just.
 
@@ -35,6 +37,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 <a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
+<a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 </div>
 
 
@@ -87,6 +90,20 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
   - Disk accesses are done using direct block access, so it _won't_ work on
 	anything other than a 1541. Sorry.
+
+### VIC-20 notes
+
+  - See the Commodore 64 above.
+
+  - You need a fully expanded VIC-20 with all memory banks populated, for the
+    full 35kB.
+
+  - You get a 40x24 screen, emulated using a four-pixel-wide soft font. It
+    doesn't look great but is surprisingly readable, and is vastly better than
+    the VIC-20's default 22x24 screen mode.
+
+  - Disk accesses are slightly faster than the Commodore 64, but only just.
+    It's still a miserable experience.
 
 ### Commodore PET notes
 
@@ -193,4 +210,6 @@ directory, you must conform to the terms of the GPL.
 2005 Ian Plumarta and is available under the terms of the MIT license. See
 `third_party/lib6502/COPYING.lib6502` for the full text.
 
-
+`third_party/tomsfonts` contains a copy of the atari-small font, which is ©
+1999 Thomas A. Fine and is available under the terms of a minimal free license.
+See `third_party/tomsfonts/LICENSE` for the full text.
