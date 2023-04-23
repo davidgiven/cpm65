@@ -190,7 +190,7 @@ _init:
         php
 
     1:
-        sta __TPA_START__
+        sta __HIGHTPA_START__
 
         inc 1b+1
         zif_eq
@@ -202,9 +202,6 @@ _init:
         plp
     zuntil_cs
     jsr ieee_untalk
-
-    lda #'!'
-    jsr entry_CONOUT
 
     lda #0xe0               ; CLOSE channel 0
     jsr ieee_listen
@@ -222,7 +219,7 @@ _init:
 
     ; Relocate the BDOS.
 
-    lda #>__TPA_START__
+    lda #>__HIGHTPA_START__
     ldx #__ZEROPAGE_START__
     jsr entry_RELOCATE
 	
@@ -230,7 +227,7 @@ _init:
 
     lda #<biosentry
     ldx #>biosentry
-    jmp __TPA_START__ + COMHDR_ENTRY
+    jmp __HIGHTPA_START__ + COMHDR_ENTRY
 
 bdos_filename: ; reversed!
     .ascii "R,P,SODB"
@@ -258,15 +255,17 @@ zendproc
 ; --- BIOS entrypoints ------------------------------------------------------
 
 zproc entry_GETTPA
-    lda mem_base
-    ldx mem_end
+	ldy current_bank
+    lda mem_base, y
+    ldx mem_end, y
     clc
     rts
 zendproc
 
 zproc entry_SETTPA
-    sta mem_base
-    stx mem_end
+	ldy current_bank
+    sta mem_base, y
+    stx mem_end, y
     clc
     rts
 zendproc
@@ -286,6 +285,7 @@ zproc entry_SETZP
 zendproc
 
 zproc entry_SETBANK
+	sta current_bank
     rts
 zendproc
 
@@ -1230,31 +1230,32 @@ zendproc
 ZEROPAGE
 
 .global ptr
-ptr:        .fill 2
-ptr1:       .fill 2
-ptr2:       .fill 2
-dma:        .fill 2
+ptr:             .fill 2
+ptr1:            .fill 2
+ptr2:            .fill 2
+dma:             .fill 2
 
-sector_num:       .fill 3 ; current absolute sector number
-buffered_sector:  .fill 3 ; sector currently in disk buffer
+sector_num:      .fill 3 ; current absolute sector number
+buffered_sector: .fill 3 ; sector currently in disk buffer
 
-cursorx:   .fill 1
-cursory:   .fill 1
-ieee_byte: .fill 1
-ieee_eoi:  .fill 1
-buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
+cursorx:         .fill 1
+cursory:         .fill 1
+ieee_byte:       .fill 1
+ieee_eoi:        .fill 1
 
 .data
 
 zp_base:    .byte __ZEROPAGE_START__
 zp_end:     .byte __ZEROPAGE_END__
-mem_base:   .byte __TPA_START__@mos16hi
-mem_end:    .byte __TPA_END__@mos16hi
+mem_base:   .byte __TPA_START__@mos16hi, __HIGHTPA_START__@mos16hi
+mem_end:    .byte __TPA_END__@mos16hi, __HIGHTPA_END__@mos16hi
 
 .bss
 
 directory_buffer: .fill 128
 disk_buffer:      .fill 256
+buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
+current_bank:     .fill 1
 
 ; DPH for drive 0 (our only drive)
 
