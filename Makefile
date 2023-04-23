@@ -25,8 +25,8 @@ LIBCPM_OBJS = \
 
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
-	$(OBJDIR)/src/bios/ieee488.o \
-	$(OBJDIR)/src/bios/petscii.o \
+	$(OBJDIR)/src/bios/commodore/ieee488.o \
+	$(OBJDIR)/src/bios/commodore/petscii.o \
 	$(OBJDIR)/src/bios/relocate.o \
 
 CPMEMU_OBJS = \
