@@ -97,6 +97,7 @@ static uint8_t tokenPostProcessing;
 static SymbolRecord* lastSymbol;
 static uint8_t defaultBranchSize = 5;
 
+static bool badProgram = false;
 static uint8_t zpUsage = 0;
 static uint16_t bssUsage = 0;
 static uint16_t textUsage = 0;
@@ -143,6 +144,7 @@ enum
     SYMBOL_TEXT,
     SYMBOL_COMPUTED,
 };
+static const char symbolTypeChars[] = "URZBTC";
 
 typedef enum
 {
@@ -1419,8 +1421,8 @@ static bool placeCode(uint8_t pass)
                 {
                     errormessage("unresolved forward reference: ");
 					printSymbol(s);
-                    cr();
-                    cpm_warmboot();
+					cr();
+					badProgram = 1;
                 }
                 break;
             }
@@ -1775,6 +1777,67 @@ exit:
     flushRelocations();
 }
 
+static void writeSymbols()
+{
+    bool changed = false;
+    uint8_t* r = cpm_ram;
+    uint16_t pc = START_ADDRESS;
+    for (;;)
+    {
+        uint8_t type = *r & 0xe0;
+        uint8_t len = *r & 0x1f;
+
+        switch (type)
+        {
+            case RECORD_SYMBOL:
+            {
+                SymbolRecord* s = (SymbolRecord*)r;
+				uint8_t namelen = (s->record.descr & 0x1f) - offsetof(SymbolRecord, name);
+				if (namelen == 0)
+					break;
+
+				uint8_t type = s->type;
+				if (s->variable)
+					type = s->variable->type;
+				writeByte(symbolTypeChars[type]);
+				writeByte(' ');
+
+				uint16_t address = s->offset;
+				if (s->variable)
+					address += s->variable->offset;
+				if (type == SYMBOL_BSS)
+					address += textUsage;
+
+				for (int i=0; i<4; i++)
+				{
+					uint8_t n = (address >> 12) & 0xf;
+					writeByte("0123456789abcdef"[n]);
+					address <<= 4;
+				}
+
+				writeByte(' ');
+				uint8_t i = 0;
+				while (namelen--)
+					writeByte(s->name[i++]);
+
+				writeByte(13);
+				writeByte(10);
+                break;
+            }
+
+            case RECORD_EOF:
+                goto exit;
+
+			default:
+				break;
+        }
+
+        r += len;
+    }
+exit:
+	writeByte(0x1a);
+}
+
 /* --- Main program ------------------------------------------------------ */
 
 int main()
@@ -1824,6 +1887,9 @@ int main()
     uint8_t i = 0;
     while (placeCode(i))
     {
+		if (badProgram)
+			cpm_warmboot();
+
         i++;
         cpm_conout('.');
     }
@@ -1835,7 +1901,7 @@ int main()
 
     /* Code emission */
 
-    printnl("Writing...");
+    printnl("Writing binary...");
     writeHeader();
     writeCode();
     writeZPRelocations();
@@ -1845,6 +1911,30 @@ int main()
 
     flushOutputBuffer();
     cpm_close_file(&destFcb);
+
+	/* Symbol table */
+
+	printnl("Writing symbols...");
+
+	destFcb.f[8] = 'S';
+	destFcb.f[9] = 'Y';
+	destFcb.f[10] = 'M';
+    destFcb.ex = 0;
+    destFcb.cr = 0;
+    cpm_delete_file(&destFcb);
+    destFcb.ex = 0;
+    destFcb.cr = 0;
+    if (cpm_make_file(&destFcb))
+    {
+        cr();
+        fatal("cannot create symbol file");
+    }
+
+	outputBufferPos = 0;
+	writeSymbols();
+	flushOutputBuffer();
+	cpm_close_file(&destFcb);
+
     printnl("Done.");
     cpm_warmboot();
 }
