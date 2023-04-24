@@ -11,11 +11,11 @@ APPS = \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/asm.com \
+	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/dump.com \
-	$(OBJDIR)/third_party/dos65/edit205.com \
-	third_party/dos65/edit205.asm \
 	cpmfs/asm.txt \
 	cpmfs/hello.asm \
+	apps/bedit.asm \
 	apps/dump.asm \
 
 LIBCPM_OBJS = \
