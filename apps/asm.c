@@ -546,7 +546,7 @@ static const uint8_t bOfAm[] = {
     0,            /* AM_IMP */
     2 << 2,       /* AM_A */
     0 << 2,       /* AM_IMMS */
-    0x20 | B_ABS, /* AM_WIND */
+    0x20 | B_ABS, /* AM_WIND: 0x20 bumps the opcode from 0x4c to 0x6c */
     B_XOFZ,       /* AM_YOFZ */
 };
 
@@ -650,6 +650,11 @@ static uint8_t getBProps(uint8_t b)
 
 static uint8_t getInsnProps(uint8_t opcode)
 {
+	/* JMP is special. */
+
+	if ((opcode == 0x4c) || (opcode == 0x6c))
+		return (3 << BPROP_SIZE_SHIFT) | BPROP_ABS;
+
     return getBProps(getB(opcode));
 }
 
