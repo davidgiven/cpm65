@@ -104,6 +104,7 @@ start:
 .label error
 .label exit_program
 .label jsr_indirect
+.label list_file
 .label load_file
 .label mainloop
 .label new_file
@@ -152,6 +153,33 @@ command_buffer = cpm_default_dma + 2
     jmp (ptr1)
 .zendproc
 
+\ Multiplies ptr1 by 10.
+
+.zproc mul10
+    asl ptr1+0
+    rol ptr1+1      \ x2
+
+    lda ptr1+1
+    pha
+    lda ptr1+0
+    pha             \ store for later
+
+    asl ptr1+0
+    rol ptr1+1      \ x4
+
+    asl ptr1+0
+    rol ptr1+1      \ x8
+
+    clc             \ add on the stored x2 value
+    pla
+    adc ptr1+0
+    sta ptr1+0
+    pla
+    adc ptr1+1
+    sta ptr1+1
+    rts         
+.zendproc
+
 .zproc skip_command_spaces
     ldx command_ptr
     .zloop
@@ -162,6 +190,15 @@ command_buffer = cpm_default_dma + 2
         inx
     .zendloop
     stx command_ptr
+    rts
+.zendproc
+
+\ Returns Z if there are no more words in the command line.
+
+.zproc has_command_word
+    jsr skip_command_spaces
+    ldx command_ptr
+    lda command_buffer, x
     rts
 .zendproc
 
@@ -195,6 +232,60 @@ command_buffer = cpm_default_dma + 2
     stx command_ptr
     sty line_length
     rts
+.zendproc
+
+\ Parses a number from the command buffer. Returns it in XA and ptr1.
+
+.zproc read_command_number
+    jsr skip_command_spaces
+
+    lda #0
+    sta ptr1+0
+    sta ptr1+1
+
+    ldx command_ptr
+    lda command_buffer, x
+    beq syntax_error
+
+    .zloop
+        lda command_buffer, x
+        .zbreak eq
+        cmp #' '
+        .zbreak eq
+
+        cmp #'0'
+        bcc syntax_error
+        cmp #'9'+1
+        bcs syntax_error
+
+        pha
+        txa
+        pha
+        jsr mul10
+        pla
+        tax
+        pla
+
+        sec
+        sbc #'0'
+        clc
+        adc ptr1+0
+        sta ptr1+0
+        .zif cs
+            inc ptr1+1
+        .zendif
+
+        inx
+    .zendloop
+
+    sta command_buffer, x
+    lda ptr1+0
+    ldx ptr1+1
+    rts
+
+syntax_error:
+    jsr error
+    .byte "Syntax error; expected number", 0
 .zendproc
 
 .zproc mainloop
@@ -285,6 +376,8 @@ command_buffer = cpm_default_dma + 2
     .zendloop
 
 command_tab:
+    .byte "LIS", 'T'+0x80
+    .word list_file
     .byte "EXI", 'T'+0x80
     .word exit_program
     .byte "NE", 'W'+0x80
@@ -429,6 +522,24 @@ dec_table:
    .word 1, 10, 100, 1000, 10000
 .zendproc
 
+\ Advances current_line to point at the next line. Sets Z
+\ if there isn't one.
+
+.zproc goto_next_line
+    ldy #0
+    lda (current_line), y
+    .zif ne
+        clc
+        adc current_line+0
+        sta current_line+0
+        .zif cs
+            inc current_line+1
+        .zendif
+        \ !Z must be set at this point.
+    .zendif
+    rts
+.zendproc
+
 \ Sets ptr1 to point at the terminating 0 at the end of the document.
 
 .zproc find_end_of_document
@@ -445,10 +556,10 @@ dec_table:
         .zendif
 
         clc
-        adc current_line+0
-        sta current_line+0
+        adc ptr1+0
+        sta ptr1+0
         .zif cs
-            inc current_line+1
+            inc ptr1+1
         .zendif
     .zendloop
 .zendproc
@@ -494,6 +605,90 @@ dec_table:
     sta text_start
     rts
 .zendproc
+
+\ Prints the current line.
+
+.zproc print_current_line
+    ldy #1
+    lda (current_line), y
+    pha
+    iny
+    lda (current_line), y
+    tax
+    pla
+
+    ldy #' '
+    jsr print16padded
+    lda #' '
+    jsr putchar
+
+    ldy #0
+    lda (current_line), y
+    tax
+
+    cmp #3
+    .zif ne
+        ldy #3
+        .zrepeat
+            pha
+            txa
+            pha
+            tya
+            pha
+
+            lda (current_line), y
+            jsr putchar
+
+            pla
+            tay
+            pla
+            tax
+            pla
+
+            iny
+            dex
+            cpx #3
+        .zuntil eq
+    .zendif
+    jmp crlf
+.zendproc
+
+\ Lists part of the file.
+
+.zproc list_file
+    jsr has_command_word
+    .zif ne
+        jsr error
+        .byte "Syntax error", 0
+    .zendif
+
+    lda current_line+0
+    pha
+    lda current_line+1
+    pha
+
+    lda #<text_start
+    sta current_line+0
+    lda #>text_start
+    sta current_line+1
+
+    .zloop
+        ldy #0
+        lda (current_line), y
+        .zbreak eq
+
+        jsr print_current_line
+        jsr goto_next_line
+    .zendloop
+
+    pla
+    sta current_line+1
+    pla
+    sta current_line+0
+    rts
+.zendproc
+
+
 
 \ Inserts the contents of line_buffer into the current document before the
 \ current line. The line number is unset.
