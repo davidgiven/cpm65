@@ -111,6 +111,9 @@ static SymbolRecord* endLabels[STACK_SIZE];
 static uint8_t breakPointer = 0xff;
 static SymbolRecord* breakLabels[STACK_SIZE];
 
+static uint8_t continuePointer = 0xff;
+static SymbolRecord* continueLabels[STACK_SIZE];
+
 #define START_ADDRESS 7
 
 static uint8_t* top;
@@ -1179,6 +1182,7 @@ static void consumeZloop()
     SymbolRecord* r = appendAnonymousSymbol();
     createLabelDefinition(r);
     startLabels[scopePointer] = r;
+	continueLabels[++continuePointer] = r;
 
     r = appendAnonymousSymbol();
     endLabels[scopePointer] = r;
@@ -1192,6 +1196,7 @@ static void consumeZendloop()
     addExpressionRecord(0x4c); /* JMP */
 
     createLabelDefinition(endLabels[scopePointer]);
+	continuePointer--;
     breakPointer--;
 
     popScope();
@@ -1226,6 +1231,16 @@ static void consumeZbreak()
         fatal("nowhere to break to");
 
     tokenVariable = breakLabels[breakPointer];
+    tokenValue = 0;
+    emitConditionalJump(0);
+}
+
+static void consumeZcontinue()
+{
+    if (continuePointer == 0xff)
+        fatal("nowhere to continue to");
+
+    tokenVariable = continueLabels[continuePointer];
     tokenValue = 0;
     emitConditionalJump(0);
 }
@@ -1294,6 +1309,7 @@ static void parse()
         {"zloop", consumeZloop},
         {"zendloop", consumeZendloop},
         {"zbreak", consumeZbreak},
+        {"zcontinue", consumeZcontinue},
         {"zrepeat", consumeZloop},
         {"zuntil", consumeZuntil},
 		{"zif", consumeZif},
