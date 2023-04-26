@@ -16,6 +16,7 @@ APPS = \
 	third_party/dos65/edit205.asm \
 	cpmfs/asm.txt \
 	cpmfs/hello.asm \
+	cpmfs/test.sub \
 	apps/dump.asm \
 
 LIBCPM_OBJS = \

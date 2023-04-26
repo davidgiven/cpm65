@@ -7,7 +7,7 @@
 
 ZEROPAGE
 
-cmdoffset:  .byte 0 ; current offset into command line (not including size byte)
+cmdoffset:  .byte 0 ; current offset into command line (including size bytes)
 fcb:        .word 0 ; current FCB being worked on
 temp:       .word 0
 temp2:      .byte 0
@@ -59,15 +59,15 @@ MAINLOOP:
 
         ; Zero terminate it.
 
-        ldy cmdline
+        ldy cmdline+1
         lda #0
-        sta cmdline+1, y
+        sta cmdline+2, y
 
         ; Convert to uppercase.
 
         ldy #0
         zrepeat
-            lda cmdline+1, y
+            lda cmdline+2, y
             cmp #'a'
             zif_cs
                 cmp #'z'+1
@@ -75,17 +75,17 @@ MAINLOOP:
                     and #$5f
                 zendif
             zendif
-            sta cmdline+1, y
+            sta cmdline+2, y
             iny
-            cpy cmdline
+            cpy cmdline+1
         zuntil_eq
 
         ; Empty command line?
 
-        lda #0
+        lda #2
         sta cmdoffset
         jsr skip_whitespace         ; leaves cmdoffset in X
-        lda cmdline+1, x
+        lda cmdline, x
         zcontinueif_eq
     
         ; Parse it.
@@ -172,15 +172,13 @@ zproc read_command_from_submit_file
 
     ; Shorten the file.
 
-    ldx submit_fcb+FCB_RC     ; write back update record count
-    dex
-    stx submit_fcb+FCB_RC
+    dec submit_fcb+FCB_RC     ; write back update record count
     lda submit_fcb+FCB_S2     ; mark FCB as modified
     and #$7f
     sta submit_fcb+FCB_S2
 
-    lda #<cmdline
-    ldx #>cmdline
+    lda #<submit_fcb
+    ldx #>submit_fcb
     jsr xfcb_close
 
     ; Print the command.
@@ -189,10 +187,10 @@ zproc read_command_from_submit_file
     sta temp
     zloop
         ldx temp
-        cpx cmdline+0
+        cpx cmdline+1
         zbreakif_eq
 
-        lda cmdline+1, x
+        lda cmdline+2, x
         jsr bdos_CONOUT
 
         inc temp
@@ -724,12 +722,12 @@ zproc entry_TRANSIENT
 
     ; Copy the command line into the program's PBLOCK.
 
-    pla                     ; get save command line position
+    pla                     ; get saved command line position
     sta cmdoffset
     tax
     ldy #XFCB__SIZE + 1
     zloop
-        lda cmdline+1, x
+        lda cmdline, x
         sta (temp), y
         zbreakif_eq
         inx
@@ -739,6 +737,8 @@ zproc entry_TRANSIENT
     txa                     ; set length of command line
     sec
     sbc cmdoffset
+    sec
+    sbc #2
     ldy #XFCB__SIZE
     sta (temp), y
 
@@ -834,7 +834,7 @@ zproc parse_number
 
     ldx cmdoffset
     zloop
-        lda cmdline+1, x
+        lda cmdline, x
         beq parse_number_exit
         cmp #' '
         beq parse_number_exit
@@ -909,12 +909,12 @@ zproc parse_fcb
     ; Check for drive.
 
     ldx cmdoffset
-    lda cmdline+1, x            ; drive letter
+    lda cmdline, x            ; drive letter
     zif_eq
         clc
         rts
     zendif
-    ldy cmdline+2, x
+    ldy cmdline+1, x
     cpy #':'                    ; colon?
     zif_eq
         sec
@@ -935,7 +935,7 @@ zproc parse_fcb
     ; x = cmdoffset
     ldy #FCB_F1
     zloop
-        lda cmdline+1, x        ; get a character
+        lda cmdline, x        ; get a character
         beq parse_fcb_exit      ; end of line
         cpy #FCB_F8+1
         zbreakif_eq
@@ -969,7 +969,7 @@ zproc parse_fcb
         bcs return_with_carry
 
         inx
-        lda cmdline+1, x
+        lda cmdline, x
     zuntil_eq
     ; A is the character just read
     ; X is cmdoffset
@@ -979,7 +979,7 @@ zproc parse_fcb
     inx                         ; skip dot
     ldy #FCB_T1
     zloop
-        lda cmdline+1, x        ; get a character
+        lda cmdline, x        ; get a character
         beq parse_fcb_exit      ; end of line
         cpy #FCB_T3+1
         zbreakif_eq
@@ -1007,7 +1007,7 @@ zproc parse_fcb
         bcs return_with_carry
 
         inx
-        lda cmdline+1, x
+        lda cmdline, x
     zuntil_eq
 
     ; Now A contains the terminating character --- either a space or \0.  We
@@ -1056,7 +1056,7 @@ zendproc
 zproc skip_whitespace
     ldx cmdoffset
     zloop
-        lda cmdline+1, x
+        lda cmdline, x
         cmp #' '
         zif_ne
             cmp #'='

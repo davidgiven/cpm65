@@ -500,7 +500,7 @@ zproc entry_READLINE
     lda column_position
     sta start_column_position
     sta current_column_position
-    lda #1
+    lda #2
     sta buffer_pos
     ldy #0
     lda (param), y
@@ -526,7 +526,7 @@ zproc entry_READLINE
         cmp #127
         zif_eq
             ldy buffer_pos
-            cpy #1
+            cpy #2
             zif_ne
                 dec buffer_pos
                 dec current_column_position
@@ -575,7 +575,7 @@ zproc entry_READLINE
             jsr bios_CONOUT
             jsr indent_new_line
 
-            lda #1
+            lda #2
             sta buffer_pos
             zcontinue
         zendif
@@ -605,10 +605,11 @@ zproc entry_READLINE
 
     lda #13
     jsr internal_CONOUT
-    ldy #0
     ldx buffer_pos
     dex
+    dex
     txa
+    ldy #1
     sta (param), y
     rts
 
