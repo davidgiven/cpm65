@@ -1289,7 +1289,6 @@ dec_table:
     ldx io_ptr
     sta cpm_default_dma, x
 
-    inc line_length
     inc io_ptr
     clc
     .zif eq
@@ -1335,6 +1334,7 @@ dec_table:
 
     lda #0
     sta io_ptr
+    lda #3
     sta line_length
 
     lda #<text_start
@@ -1353,18 +1353,18 @@ dec_table:
         cmp line_length
         .zif eq
             jsr goto_next_line
-            lda #0
+            lda #3
             sta line_length
 
+            lda #'\r'
+            jsr write_byte_to_file
             lda #'\n'
             jmp write_char
         .zendif
 
         ldy line_length
-        iny
-        iny
-        iny
         lda (current_line), y
+        inc line_length
 
     write_char:
         jsr write_byte_to_file
