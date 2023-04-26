@@ -97,7 +97,6 @@ start:
 .zp io_ptr, 1
 .zp himem, 1
 .zp command_ptr, 1
-.zp command_len, 1
 
 .label BIOS
 .label crlf
@@ -222,6 +221,19 @@ command_buffer = cpm_default_dma + 2
     rts
 .zendproc
 
+\ Converts an ASCII character to uppercase.
+
+.zproc toupper
+    cmp #'a'
+    .zif cs
+        cmp #'z'+1
+        .zif cc
+            and #0xdf
+        .zendif
+    .zendif
+    rts
+.zendproc
+
 \ Parses a command word and copies it to the line buffer.
 
 .zproc read_command_word
@@ -231,16 +243,7 @@ command_buffer = cpm_default_dma + 2
     ldx command_ptr
     .zloop
         lda command_buffer, x
-
-        \ Convert to upper case.
-
-        cmp #'a'
-        .zif cs
-            cmp #'z'+1
-            .zif cc
-                and #0xdf
-            .zendif
-        .zendif
+        jsr toupper
 
         \ Stop on non-command characters.
 
@@ -427,20 +430,20 @@ syntax_error:
 
         \ Read command line.
 
-        lda #0x7f
+        lda #0x7d
         sta cpm_default_dma
         lda #<cpm_default_dma+0
         ldx #>cpm_default_dma+1
         ldy #BDOS_READLINE
         jsr BDOS
+        jsr crlf
 
         \ Zero-terminate it and prepare for command parsing.
 
         ldx cpm_default_dma+1
         lda #0
-        sta command_ptr
         sta command_buffer, x
-        sta command_len
+        sta command_ptr
 
         \ Parse the command.
 
@@ -542,6 +545,10 @@ command_tab:
     tay
     pla
     tax
+    iny
+    .zif eq
+        inx
+    .zendif
     tya
 
     ldy #BDOS_PRINTSTRING
@@ -599,6 +606,8 @@ command_tab:
         ldy line_buffer+1
         cpy #':'                    \ colon?
         .zif eq
+            lda line_buffer+0
+            jsr toupper                 \ must be upper case
             sec
             sbc #'A'-1              \ to 1-based drive
             cmp #16
@@ -624,6 +633,7 @@ command_tab:
         cmp #'.'
         .zbreak eq
 
+        jsr toupper             \ must be upper case
         sta cpm_fcb, y
         iny
         inx
@@ -655,8 +665,11 @@ command_tab:
         .zbreak eq              \ end of filename
         cpy #FCB_T3+1
         .zbreak eq
-
         lda line_buffer, x      \ get a character
+        cmp #'.'
+        .zbreak eq
+
+        jsr toupper             \ must be upper case
         sta cpm_fcb, y
         iny
         inx
