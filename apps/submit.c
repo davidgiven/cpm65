@@ -107,17 +107,18 @@ static void process_byte(uint8_t b)
         return;
     }
 
-    if (b == '\r')
+    if (b == '\n')
     {
-        record_ptr[0] = record_fill;
+		record_ptr[0] = 126;
+        record_ptr[1] = record_fill;
         while (record_fill != 127)
-            record_ptr[1 + record_fill++] = '\0';
+            record_ptr[2 + record_fill++] = '\0';
 
         record_ptr += 128;
         record_fill = 0;
 		lineno++;
     }
-    else if (b != '\n')
+    else if (b != '\r')
     {
         if (escaped)
         {
@@ -132,7 +133,7 @@ static void process_byte(uint8_t b)
                 {
                     char* param = gargv[p];
                     uint8_t len = strlen(param);
-                    memcpy(&record_ptr[1 + record_fill], param, len);
+                    memcpy(&record_ptr[2 + record_fill], param, len);
                     record_fill += len;
                 }
                 goto exit;
@@ -148,11 +149,11 @@ static void process_byte(uint8_t b)
             b = toupper(b) - '@';
         }
 
-        record_ptr[1 + record_fill++] = b;
+        record_ptr[2 + record_fill++] = b;
     }
 
 exit:
-    if (record_fill >= 127)
+    if (record_fill >= 126)
         fatal("line too long");
 
     escaped = false;
@@ -164,8 +165,9 @@ int main(int argc, char* argv[])
     gargc = argc;
     gargv = argv;
 
+	cpm_fcb.cr = 0;
     memcpy(&cpm_fcb.f[8], "SUB", 3);
-    if (cpm_open_file(&cpm_fcb) != 0)
+    if (cpm_open_file(&cpm_fcb))
         fatal("could not open input file");
 
     record_ptr = cpm_ram;
@@ -176,8 +178,7 @@ int main(int argc, char* argv[])
         uint8_t i;
 
         cpm_set_dma(&buffer);
-        uint8_t r = cpm_read_sequential(&cpm_fcb);
-		if (r)
+        if (cpm_read_sequential(&cpm_fcb))
 		{
 			if (cpm_errno == CPME_NOBLOCK)
 				goto eof;
@@ -202,11 +203,11 @@ eof:
     {
         record_ptr -= 128;
         cpm_set_dma(record_ptr);
-        if (cpm_write_sequential(&out_fcb) != 0)
+        if (cpm_write_sequential(&out_fcb))
             fatal("error writing output file");
     }
 
-    if (cpm_close_file(&out_fcb) != 0)
+    if (cpm_close_file(&out_fcb))
         fatal("error writing output file");
 
     /* Force a CP/M restart so the file gets invoked */

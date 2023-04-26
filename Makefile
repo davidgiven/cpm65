@@ -17,6 +17,7 @@ APPS = \
 	cpmfs/hello.asm \
 	apps/bedit.asm \
 	apps/dump.asm \
+	cpmfs/test.sub \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
