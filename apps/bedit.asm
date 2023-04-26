@@ -113,6 +113,7 @@ start:
 .label printi
 .label putchar
 .label renumber_file
+.label save_file
 
 command_buffer = cpm_default_dma + 2
 
@@ -513,6 +514,8 @@ command_tab:
     .word renumber_file
     .byte "LOA", 'D'+0x80
     .word load_file
+    .byte "SAV", 'E'+0x80
+    .word save_file
     .byte "QUI", 'T'+0x80
     .word exit_program
     .byte 0
@@ -559,6 +562,8 @@ command_tab:
 \ Returns with C set if the filename is invalid.
 
 .zproc parse_fcb
+    .label exit
+
     \ Basic sanity test.
 
     lda line_length
@@ -612,7 +617,7 @@ command_tab:
     ldy #FCB_F1
     .zloop
         cpx line_length
-        .zbreak eq              \ end of filename
+        beq exit                \ end of filename
         cpy #FCB_F8+1
         .zbreak eq              \ maximum number of characters
         lda line_buffer, x
@@ -630,7 +635,7 @@ command_tab:
 
     .zloop
         cpx line_length
-        .zbreak eq              \ end of filename
+        beq exit                \ end of filename
         lda line_buffer, x
         cmp #'.'
         .zbreak eq
@@ -659,6 +664,7 @@ command_tab:
         
     \ Any remaining filename characters are simply ignored.
 
+exit:
     clc
     rts
 .zendproc
@@ -1260,6 +1266,120 @@ dec_table:
 
     jsr renumber_file
     jsr print_free
+    rts
+.zendproc
+    
+\ Writes a byte to the already opened cpm_fcb. Returns C
+\ on an I/O error.
+
+.zproc write_byte_to_file
+    ldx io_ptr
+    sta cpm_default_dma, x
+
+    inc line_length
+    inc io_ptr
+    clc
+    .zif eq
+        lda #<cpm_fcb
+        ldx #>cpm_fcb
+        ldy #BDOS_WRITE_SEQUENTIAL
+        jsr BDOS
+    .zendif 
+    rts
+.zendproc 
+
+\ Writes a file.
+
+.zproc save_file
+    jsr read_command_string
+
+    jsr has_command_word
+    bne syntax_error
+
+    jsr parse_fcb
+.zendproc
+    \ falls through
+
+\ Saves memory into the file pointed at by the FCB.
+
+.zproc save_file_to_fcb
+    lda #0
+    sta cpm_fcb+0x20
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_DELETE_FILE
+    jsr BDOS
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_MAKE_FILE
+    jsr BDOS
+    .zif cs
+        jsr error
+        .byte "Failed to create file", 0
+    .zendif
+
+    lda #0
+    sta io_ptr
+    sta line_length
+
+    lda #<text_start
+    sta current_line+0
+    lda #>text_start
+    sta current_line+1
+
+    .label write_char
+    .label io_error
+
+    .zloop
+        ldy #0
+        lda (current_line), y
+        .zbreak eq
+
+        cmp line_length
+        .zif eq
+            jsr goto_next_line
+            lda #0
+            sta line_length
+
+            lda #'\n'
+            jmp write_char
+        .zendif
+
+        ldy line_length
+        iny
+        iny
+        iny
+        lda (current_line), y
+
+    write_char:
+        jsr write_byte_to_file
+        bcs io_error
+    .zendloop
+
+    lda #0x1a
+    jsr write_byte_to_file
+
+    lda io_ptr
+    .zif ne
+        lda #<cpm_fcb
+        ldx #>cpm_fcb
+        ldy #BDOS_WRITE_SEQUENTIAL
+        jsr BDOS
+        bcs io_error
+    .zendif
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_CLOSE_FILE
+    jsr BDOS
+    .zif cs
+io_error:
+        jsr error
+        .byte "I/O error on write; save failed", 0
+    .zendif
+
     rts
 .zendproc
     
