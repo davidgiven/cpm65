@@ -425,7 +425,7 @@ static char consumeToken()
                     c = 13;
                 else if (c == 't')
                     c = 9;
-                else
+				else if (c != '\\')
                     badEscape();
             }
 
@@ -456,6 +456,9 @@ static char consumeToken()
                 case 't':
                     currentByte = 9;
                     break;
+
+				case '\\':
+					break;
 
                 default:
                     badEscape();
