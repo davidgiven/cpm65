@@ -202,6 +202,24 @@ command_buffer = cpm_default_dma + 2
     rts
 .zendproc
 
+\ Parses a command separator; returns Z if there are no more words.
+
+.zproc read_command_separator
+    jsr has_command_word
+    .zif ne
+        ldx command_ptr
+        lda command_buffer, x
+        cmp #','
+        .zif ne
+            jsr error
+            .byte "Syntax error; bad separator", 0
+        .zendif
+        inx
+        stx command_ptr ; \ leaves !Z
+    .zendif
+    rts
+.zendproc
+
 \ Parses a command word and copies it to the line buffer.
 
 .zproc read_command_word
@@ -211,9 +229,6 @@ command_buffer = cpm_default_dma + 2
     ldx command_ptr
     .zloop
         lda command_buffer, x
-        .zbreak eq
-        cmp #' '
-        .zbreak eq
 
         \ Convert to upper case.
 
@@ -223,6 +238,16 @@ command_buffer = cpm_default_dma + 2
             .zif cc
                 and #0xdf
             .zendif
+        .zendif
+
+        \ Stop on non-command characters.
+
+        cmp #'.'
+        .zif ne
+            cmp #'A'
+            .zbreak cc
+            cmp #'Z'+1
+            .zbreak cs
         .zendif
 
         sta line_buffer, y
@@ -249,14 +274,11 @@ command_buffer = cpm_default_dma + 2
 
     .zloop
         lda command_buffer, x
-        .zbreak eq
-        cmp #' '
-        .zbreak eq
 
         cmp #'0'
-        bcc syntax_error
+        .zbreak cc
         cmp #'9'+1
-        bcs syntax_error
+        .zbreak cs
 
         pha
         txa
@@ -278,7 +300,12 @@ command_buffer = cpm_default_dma + 2
         inx
     .zendloop
 
-    sta command_buffer, x
+    \ If we read no bytes, it's a syntax error.
+
+    cpx command_ptr
+    beq syntax_error
+
+    stx command_ptr
     lda ptr1+0
     ldx ptr1+1
     rts
@@ -318,7 +345,6 @@ syntax_error:
         \ Parse the command.
 
         jsr read_command_word
-        label:
         lda line_length
         .zif ne
             ldx #0          \ offset into command table
@@ -522,6 +548,39 @@ dec_table:
    .word 1, 10, 100, 1000, 10000
 .zendproc
 
+\ Compares the current line number to line_number.
+\ Returns:
+\   !C if current_line >= line_number
+\    C if current_line < line_number
+\    Z if current_line == line_number line
+\   !Z if current_line != line_number
+
+.zproc test_line_number
+    ldy #1
+    lda (current_line), y
+    cmp line_number+0
+    .zif eq
+        iny
+        lda (current_line), y
+        cmp line_number+1
+        .zif eq
+            clc \ return !C
+            rts 
+        .zendif
+    .zendif
+
+    \ Not equal, so do magnitude comparison.
+
+    ldy #1
+    lda line_number+0
+    cmp (current_line), y
+    iny
+    lda line_number+1
+    sbc (current_line), y
+    tya \ force !Z
+    rts
+.zendproc
+
 \ Advances current_line to point at the next line. Sets Z
 \ if there isn't one.
 
@@ -537,6 +596,27 @@ dec_table:
         .zendif
         \ !Z must be set at this point.
     .zendif
+    rts
+.zendproc
+
+\ Sets current_ptr to the first line with an equal or great number than
+\ line_number.
+
+.zproc find_line
+    lda #<text_start
+    sta current_line+0
+    lda #>text_start
+    sta current_line+1
+
+    .zloop
+        ldy #0
+        lda (current_line), y
+        .zbreak eq
+
+        jsr test_line_number
+        .zbreak cc
+        jsr goto_next_line
+    .zendloop
     rts
 .zendproc
 
@@ -656,26 +736,77 @@ dec_table:
 \ Lists part of the file.
 
 .zproc list_file
-    jsr has_command_word
-    .zif ne
-        jsr error
-        .byte "Syntax error", 0
-    .zendif
-
     lda current_line+0
     pha
     lda current_line+1
     pha
+
+    \ Default start: beginning of the file.
 
     lda #<text_start
     sta current_line+0
     lda #>text_start
     sta current_line+1
 
+    \ Default end: end of the file.
+
+    lda #0xff
+    sta line_number+0
+    sta line_number+1
+
+    \ Parameter parsing.
+
+    jsr has_command_word
+    .zif ne
+        jsr read_command_number
+        sta line_number+0
+        stx line_number+1
+
+        jsr find_line
+
+        \ If there's a parameter, default to just one line.
+
+        ldy #1
+        lda (current_line), y
+        sta line_number+0
+        iny
+        lda (current_line), y
+        sta line_number+1
+
+        \ current_line, which is the start line, is set. 
+
+        jsr read_command_separator
+        .zif ne
+            \ Default to listing to the end of the file again.
+
+            lda #0xff
+            sta line_number+0
+            sta line_number+1
+
+            jsr has_command_word
+            .zif ne
+                jsr read_command_number
+                sta line_number+0
+                stx line_number+1
+
+                jsr has_command_word
+                .zif ne
+                    jsr error
+                    .byte "Syntax error", 0
+                .zendif
+            .zendif
+        .zendif
+    .zendif
+
     .zloop
         ldy #0
         lda (current_line), y
         .zbreak eq
+
+        jsr test_line_number
+        .zif ne
+            .zbreak cc
+        .zendif
 
         jsr print_current_line
         jsr goto_next_line
@@ -687,8 +818,6 @@ dec_table:
     sta current_line+0
     rts
 .zendproc
-
-
 
 \ Inserts the contents of line_buffer into the current document before the
 \ current line. The line number is unset.
@@ -758,7 +887,6 @@ dec_table:
 
     \ Advance the current line.
 
-label:
     ldy #0
     lda (current_line), y
     clc
