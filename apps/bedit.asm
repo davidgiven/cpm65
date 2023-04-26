@@ -106,6 +106,7 @@ start:
 .label jsr_indirect
 .label list_file
 .label load_file
+.label load_file_from_fcb
 .label mainloop
 .label new_file
 .label print_free
@@ -145,7 +146,7 @@ command_buffer = cpm_default_dma + 2
         jsr print_free
         jmp mainloop
     .zendif
-    jsr load_file
+    jsr load_file_from_fcb
     jmp mainloop
 .zendproc
 
@@ -315,6 +316,104 @@ syntax_error:
     .byte "Syntax error; expected number", 0
 .zendproc
 
+\ Parses a string from the command buffer. This can be double-quote or
+\ space/comma delimited. The result is placed in the line buffer.
+
+.zproc read_command_string
+    jsr skip_command_spaces
+
+    ldx command_ptr
+    lda command_buffer, x
+    beq syntax_error
+
+    cmp #'"'
+    beq parse_quoted_string
+
+    \ Parsing a space/comma delimited string.
+
+    ldy #0
+    .zloop
+        lda command_buffer, x
+        .zbreak eq
+        cmp #' '
+        .zbreak eq
+        cmp #','
+        .zbreak eq
+
+        sta line_buffer, y
+        inx
+        iny
+    .zendloop
+    stx command_ptr
+    sty line_length
+    rts
+
+parse_quoted_string:
+    .label escaped_character_table
+
+    \ Parsing a double quoted string.
+
+    inx             \ skip double quote
+    ldy #0
+    .zloop
+        lda command_buffer, x
+        .zbreak eq
+        cmp #'"'
+        .zbreak eq
+        cmp #'\\'
+        .zif eq
+            \ Backslash-escaped character.
+
+            sty line_length
+
+            inx
+            lda command_buffer, x
+            .zbreak eq
+
+            ldy #0
+            .zloop
+                lda escaped_character_table, y
+                .zbreak mi
+                cmp command_buffer, x
+                .zbreak eq
+                iny
+                iny
+            .zendloop
+            .zif pl
+                iny
+                lda escaped_character_table, y
+            .zendif
+
+            ldy line_length
+        .zendif
+
+        sta line_buffer, y
+        inx
+        iny
+    .zendloop
+    lda command_buffer, x
+    .zif ne
+        \ If we terminated due to a closing ", skip it.
+
+        inx
+    .zendif
+    stx command_ptr
+    sty line_length
+    rts
+
+escaped_character_table:
+    .byte 'n', 0x0a
+    .byte 'r', 0x0d
+    .byte 't', 0x09
+    .byte '\\', '\\'
+    .byte 'f', 0x0c
+    .byte 0x80
+
+syntax_error:
+    jsr error
+    .byte "Syntax error; expected string", 0
+.zendproc
+
 .zproc mainloop
     ldx #0xff
     txs
@@ -345,6 +444,7 @@ syntax_error:
         \ Parse the command.
 
         jsr read_command_word
+        label:
         lda line_length
         .zif ne
             ldx #0          \ offset into command table
@@ -383,6 +483,7 @@ syntax_error:
                 .zuntil mi
                 inx
                 inx
+                ldy #0          \ reset line buffer offset
             .zendloop
 
             \ Found. Skip to the end of the word.
@@ -404,14 +505,16 @@ syntax_error:
 command_tab:
     .byte "LIS", 'T'+0x80
     .word list_file
-    .byte "EXI", 'T'+0x80
-    .word exit_program
     .byte "NE", 'W'+0x80
     .word new_file
     .byte "FRE", 'E'+0x80
     .word print_free
     .byte "RENUMBE", 'R'+0x80
     .word renumber_file
+    .byte "LOA", 'D'+0x80
+    .word load_file
+    .byte "QUI", 'T'+0x80
+    .word exit_program
     .byte 0
 .zendproc
 
@@ -443,6 +546,121 @@ command_tab:
     jsr crlf
 
     jmp mainloop
+.zendproc
+
+\ Does a simple syntax error.
+
+.zproc syntax_error
+    jsr error
+    .byte "Syntax error", 0
+.zendproc
+
+\ Parses a filename from the line buffer into cpm_fcb.
+\ Returns with C set if the filename is invalid.
+
+.zproc parse_fcb
+    \ Basic sanity test.
+
+    lda line_length
+    .zif eq
+        sec
+        rts
+    .zendif
+
+    \ Wipe FCB.
+
+    lda #0
+    sta cpm_fcb+0               \ drive
+    lda #' '
+    ldy #FCB_F1
+    .zrepeat                    \ 11 bytes of filename
+        sta cpm_fcb, y
+        iny
+        cpy #FCB_T3+1
+    .zuntil eq
+    lda #0
+    .zrepeat                    \ 4 bytes of metadata
+        sta cpm_fcb, y
+        iny
+        cpy #FCB_RC+1
+    .zuntil eq
+
+    \ Check for drive.
+
+    ldx #0                      \ offset into filename
+    lda line_length
+    cmp #1
+    .zif ne
+        ldy line_buffer+1
+        cpy #':'                    \ colon?
+        .zif eq
+            sec
+            sbc #'A'-1              \ to 1-based drive
+            cmp #16
+            .zif cs                 \ out of range drive
+                rts
+            .zendif
+            sta cpm_fcb+0           \ store
+
+            ldx #2                  \ skip drive letter
+        .zendif
+    .zendif
+
+    \ Read the filename.
+
+    \ x = offset
+    ldy #FCB_F1
+    .zloop
+        cpx line_length
+        .zbreak eq              \ end of filename
+        cpy #FCB_F8+1
+        .zbreak eq              \ maximum number of characters
+        lda line_buffer, x
+        cmp #'.'
+        .zbreak eq
+
+        sta cpm_fcb, y
+        iny
+        inx
+    .zendloop
+    \ A is the character just read
+    \ X is cmdoffset
+
+    \ Skip non-dot filename characters.
+
+    .zloop
+        cpx line_length
+        .zbreak eq              \ end of filename
+        lda line_buffer, x
+        cmp #'.'
+        .zbreak eq
+
+        inx
+        lda line_buffer, x
+    .zendloop
+    \ A is the character just read
+    \ X is cmdoffset
+
+    \ Read the extension
+
+    inx                         \ skip dot
+    ldy #FCB_T1
+    .zloop
+        cpx line_length
+        .zbreak eq              \ end of filename
+        cpy #FCB_T3+1
+        .zbreak eq
+
+        lda line_buffer, x      \ get a character
+        sta cpm_fcb, y
+        iny
+        inx
+    .zendloop
+        
+    \ Any remaining filename characters are simply ignored.
+
+    clc
+    rts
 .zendproc
 
 \ Prints an inline string. The text string must immediately follow the
@@ -790,10 +1008,7 @@ dec_table:
                 stx line_number+1
 
                 jsr has_command_word
-                .zif ne
-                    jsr error
-                    .byte "Syntax error", 0
-                .zendif
+                bne syntax_error
             .zendif
         .zendif
     .zendif
@@ -956,9 +1171,21 @@ dec_table:
     rts
 .zendproc
 
-\ Reads the file pointed at by the FCB into memory.
+\ Reads a file.
 
 .zproc load_file
+    jsr read_command_string
+
+    jsr has_command_word
+    bne syntax_error
+
+    jsr parse_fcb
+.zendproc
+    \ falls through
+
+\ Reads the file pointed at by the FCB into memory.
+
+.zproc load_file_from_fcb
     lda #0
     sta cpm_fcb+0x20
 
