@@ -682,6 +682,71 @@ exit:
     rts
 .zendproc
 
+\ Prints the name of the file in cpm_fcb.
+
+.zproc print_fcb
+    \ Drive letter.
+
+    lda cpm_fcb+0
+    .zif ne
+        clc
+        adc #'@'
+        jsr putchar
+
+        lda #':'
+        jsr putchar
+    .zendif
+
+    \ Main filename.
+
+    ldy #FCB_F1
+    .zrepeat
+        tya
+        pha
+
+        lda cpm_fcb, y
+        and #0x7f
+        cmp #' '
+        .zif ne
+            jsr putchar
+        .zendif
+
+        pla
+        tay
+        iny
+        cpy #FCB_T1
+    .zuntil eq
+
+    lda cpm_fcb+9
+    and #0x7f
+    cmp #' '
+    .zif ne
+        lda #'.'
+        jsr putchar
+
+        ldy #FCB_T1
+        .zrepeat
+            tya
+            pha
+
+            lda cpm_fcb, y
+            and #0x7f
+            cmp #' '
+            .zif ne
+                jsr putchar
+            .zendif
+
+            pla
+            tay
+            iny
+            cpy #FCB_T3+1
+        .zuntil eq
+    .zendif
+
+    rts
+.zendproc
+        
+
 \ Prints an inline string. The text string must immediately follow the
 \ subroutine call.
 
@@ -1205,6 +1270,11 @@ dec_table:
 \ Reads the file pointed at by the FCB into memory.
 
 .zproc load_file_from_fcb
+    jsr printi
+    .byte "Loading ", 0
+    jsr print_fcb
+    jsr crlf
+
     lda #0
     sta cpm_fcb+0x20
 
@@ -1315,6 +1385,11 @@ dec_table:
 \ Saves memory into the file pointed at by the FCB.
 
 .zproc save_file_to_fcb
+    jsr printi
+    .byte "Saving ", 0
+    jsr print_fcb
+    jsr crlf
+
     lda #0
     sta cpm_fcb+0x20
 
