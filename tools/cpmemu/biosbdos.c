@@ -15,6 +15,7 @@
 static uint16_t dma;
 static uint8_t current_disk;
 static int exitcode = 0;
+uint16_t himem = BDOS_ADDRESS;
 
 struct fcb
 {
@@ -145,7 +146,7 @@ void bios_warmboot(void)
         int fd = open(user_command_line[0], O_RDONLY);
         if (fd == -1)
             fatal("couldn't open program: %s", strerror(errno));
-        read(fd, &ram[TPA_BASE], TPA_END - TPA_BASE);
+        read(fd, &ram[TPA_BASE], himem - TPA_BASE);
         close(fd);
 
         uint16_t relotable =
@@ -227,7 +228,7 @@ void bios_entry(uint8_t bios_call)
         case 2: bios_const(); return; // const
         case 3: bios_getchar(); return; // conin
         case 4: bios_putchar(); return; // conout
-		case 9: set_result((TPA_BASE>>8) | (TPA_END&0xff), true); return;
+		case 9: set_result((TPA_BASE>>8) | (himem&0xff00), true); return;
             // clang-format on
     }
 
@@ -494,7 +495,7 @@ void bdos_entry(uint8_t bdos_call)
         case 35: bdos_filelength(); return;
 		case 38: set_result(BIOS_ADDRESS, true); return;
         case 40: bdos_readwriterandom(file_write); return;
-		case 41: set_result((TPA_BASE>>8) | (TPA_END&0xff), true); return;
+		case 41: set_result((TPA_BASE>>8) | (himem&0xff00), true); return;
             // clang-format on
     }
 
