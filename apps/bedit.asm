@@ -100,6 +100,7 @@ start:
 
 .label BIOS
 .label crlf
+.label delete_lines
 .label error
 .label exit_program
 .label jsr_indirect
@@ -448,7 +449,6 @@ syntax_error:
         \ Parse the command.
 
         jsr read_command_word
-        label:
         lda line_length
         .zif ne
             ldx #0          \ offset into command table
@@ -515,6 +515,8 @@ command_tab:
     .word print_free
     .byte "RENUMBE", 'R'+0x80
     .word renumber_file
+    .byte "DELET", 'E'+0x80
+    .word delete_lines
     .byte "LOA", 'D'+0x80
     .word load_file
     .byte "SAV", 'E'+0x80
@@ -1035,14 +1037,10 @@ dec_table:
     jmp crlf
 .zendproc
 
-\ Lists part of the file.
+\ Parses a line range. Sets current_line to the first line of the range, and
+\ line_number to the line number of the last line of the range.
 
-.zproc list_file
-    lda current_line+0
-    pha
-    lda current_line+1
-    pha
-
+.zproc parse_line_range
     \ Default start: beginning of the file.
 
     lda #<text_start
@@ -1096,6 +1094,18 @@ dec_table:
             .zendif
         .zendif
     .zendif
+    rts
+.zendproc
+
+\ Lists part of the file.
+
+.zproc list_file
+    lda current_line+0
+    pha
+    lda current_line+1
+    pha
+
+    jsr parse_line_range
 
     .zloop
         ldy #0
@@ -1199,6 +1209,85 @@ dec_table:
     \ (y is zero)
 
     sty line_length
+
+    rts
+.zendproc
+
+\ Deletes the current line from the document (unless it's the end of the file).
+
+.zproc delete_current_line
+    lda current_line+0
+    pha
+    lda current_line+1
+    pha
+
+    ldy #0
+    lda (current_line), y
+    .zif ne
+        \ Calculate address of next line into ptr2.
+
+        clc
+        adc current_line+0
+        sta ptr2+0
+        ldx current_line+1
+        .zif cs
+            inx
+        .zendif
+        stx ptr2+1
+
+        jsr find_end_of_document \ into ptr1
+
+        \ Close up space.
+
+        ldy #0
+        .zrepeat
+            lda (ptr2), y
+            sta (current_line), y
+
+            inc current_line+0
+            .zif eq
+                inc current_line+1
+            .zendif
+
+            inc ptr2+0
+            .zif eq
+                inc ptr2+1
+            .zendif
+
+            lda ptr1+0
+            cmp current_line+0
+            .zif eq
+                lda ptr1+1
+                cmp current_line+1
+            .zendif
+        .zuntil eq
+    .zendif
+
+    pla
+    sta current_line+1
+    pla
+    sta current_line+0
+
+    rts
+.zendproc
+
+\ Delets a line range.
+
+.zproc delete_lines
+    jsr parse_line_range
+
+    .zloop
+        ldy #0
+        lda (current_line), y
+        .zbreak eq
+
+        jsr test_line_number
+        .zif ne
+            .zbreak cc
+        .zendif
+
+        jsr delete_current_line
+    .zendloop
 
     rts
 .zendproc
