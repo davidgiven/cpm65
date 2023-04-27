@@ -748,7 +748,6 @@ exit:
     rts
 .zendproc
         
-
 \ Prints an inline string. The text string must immediately follow the
 \ subroutine call.
 
@@ -965,10 +964,11 @@ dec_table:
     sec
     lda #0
     sbc ptr1+0
-    sta ptr1+0
+    pha
     lda himem
     sbc ptr1+1
     tax
+    pla
 
     jsr print16
     jsr printi
