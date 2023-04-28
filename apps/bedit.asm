@@ -545,7 +545,7 @@ command_tab:
 .zendproc
 
 .zproc putchar
-    ldy #BDOS_CONOUT
+    ldy #BDOS_CONIO
     jmp BDOS
 .zendproc
 
@@ -1137,6 +1137,13 @@ dec_table:
         .zendif
 
         jsr print_current_line
+
+        lda #0xff
+        ldy #BDOS_CONIO
+        jsr BDOS
+        tax
+        .zbreak ne
+
         jsr goto_next_line
     .zendloop
 
