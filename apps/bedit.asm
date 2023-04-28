@@ -106,6 +106,7 @@ start:
 .label error
 .label exit_program
 .label jsr_indirect
+.label line_entry
 .label list_file
 .label load_file
 .label load_file_from_fcb
@@ -464,7 +465,21 @@ syntax_error:
         sta command_buffer, x
         sta command_ptr
 
-        \ Parse the command.
+        \ Parse the command. First check for a leading line number.
+
+        jsr skip_command_spaces
+        ldx command_ptr
+        lda command_buffer, x
+        cmp #'0'
+        .zif cs
+            cmp #'9'+1
+            .zif cc
+                jsr line_entry
+                .zcontinue
+            .zendif
+        .zendif
+
+        \ If not, it must be a normal command.
 
         jsr read_command_word
         lda line_length
@@ -521,7 +536,6 @@ syntax_error:
             sta ptr1+1
             jsr jsr_indirect
         .zendif
-
     .zendloop
 
 command_tab:
@@ -1313,7 +1327,7 @@ dec_table:
     rts
 .zendproc
 
-\ Delets a line range.
+\ Deletes a line range.
 
 .zproc delete_lines
     jsr parse_line_range
@@ -1382,6 +1396,75 @@ dec_table:
             inc ptr1+1
         .zendif
     .zendloop
+
+    rts
+.zendproc
+
+\ Does line entry.
+
+.zproc line_entry
+    jsr read_command_number
+    sta line_number+0
+    stx line_number+1
+    jsr find_line
+
+    \ If this is exactly the line the user asked for, delete it.
+
+    ldy #0
+    lda (current_line), y
+    .zif ne
+        iny
+        lda (current_line), y
+        cmp line_number+0
+        .zif eq
+            iny
+            lda (current_line), y
+            cmp line_number+1
+            .zif eq
+                jsr delete_current_line
+            .zendif
+        .zendif
+    .zendif
+
+    \ If the next character is a space, skip it.
+
+    ldx command_ptr
+    lda command_buffer, x
+    cmp #' '
+    .zif eq
+        inx
+    .zendif
+
+    \ Copy the entire remainder of the command into the line buffer.
+
+    ldy #0
+    .zloop
+        lda command_buffer, x
+        .zbreak eq
+        sta line_buffer, y
+        inx
+        iny
+    .zendloop
+    sty line_length
+
+    \ Insert it into the document and patch up the line number.
+
+    lda current_line+0
+    pha
+    lda current_line+1
+    pha
+    jsr insert_line
+    pla
+    sta current_line+1
+    pla
+    sta current_line+0
+
+    ldy #1
+    lda line_number+0
+    sta (current_line), y
+    iny
+    lda line_number+1
+    sta (current_line), y
 
     rts
 .zendproc
