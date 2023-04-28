@@ -1,0 +1,49 @@
+BEdit
+=====
+
+BEdit is an incredibly simple line editor themed after a Basic interpreter. It
+has almost no features, but can be used to edit text files. With this and the
+assembler, you have a full software development kit!
+
+Usage
+-----
+
+```
+BEDIT [<filename>]
+```
+
+Once started, you'll get a `>` prompt, at which you can use the traditional
+BASIC commands LIST, NEW, SAVE, LOAD, RENUMBER and of course line entry. These
+should work pretty much how you expect. Non-standard commands are:
+
+  - FREE: displays the amount of free memory
+  - DELETE <line or line range>: deletes one or multiple lines
+  - QUIT: returns to CP/M
+
+Be careful of DELETE: if you use it with no parameters, it'll delete your
+entire document.
+
+Things which may surprise you:
+
+  - Lines can be empty (unlike in BASIC). Just typing in a line number will
+	make an empty line. Use DELETE to remove lines.
+
+  - Pressing a key during LIST will stop the listing.
+
+  - Files are always CP/M format, i.e. CRLF terminated with a ^Z at the end.
+
+  - All commands can be abbreviated with a dot. So, RENUM. is equivalent to
+	RENUMBER. So is R.. A . by itself is equivalent to LIST.
+
+  - There is no ability to edit within a line (yet). Just retype the entire
+	line...
+
+The source code for BEDIT is intended to be assembled with the built-in
+assembler. You'll need about 40kB of TPA to load it and about 30kB to assemble
+it.
+
+WARNING: there are bugs.
+
+vim: ts=4 sw=4 et
+
+

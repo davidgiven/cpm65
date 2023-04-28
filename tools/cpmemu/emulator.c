@@ -30,8 +30,16 @@ void showregs(void)
     M6502_dump(cpu, buffer);
     printf("%s\n", buffer);
 
-    M6502_disassemble(cpu, cpu->registers->pc, buffer);
-    printf("%04x : %s\n", cpu->registers->pc, buffer);
+    int bytes = M6502_disassemble(cpu, cpu->registers->pc, buffer);
+    printf("%04x : ", cpu->registers->pc);
+	for (int i=0; i<3; i++)
+	{
+		if (i < bytes)
+			printf("%02x ", ram[cpu->registers->pc + i]);
+		else
+			printf("   ");
+	}
+	printf(": %s\n", buffer);
 }
 
 static void cmd_register(void)
@@ -213,7 +221,15 @@ static void cmd_unassemble(void)
         {
             char buffer[64];
             int len = M6502_disassemble(cpu, addr, buffer);
-            printf("%04x : %s\n", addr, buffer);
+            printf("%04x : ", addr);
+			for (int i=0; i<3; i++)
+			{
+				if (i < len)
+					printf("%02x ", ram[addr + i]);
+				else
+					printf("   ");
+			}
+            printf(": %s\n", buffer);
 
             addr += len;
         }
