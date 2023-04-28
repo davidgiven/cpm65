@@ -16,6 +16,7 @@ zproc ieee_init, ".init"
 	lda #0
 	sta ieee_has_buffered_char
 	sta ieee_buffered_char
+	sta buffer_dirty
 
     ldy #3
     zrepeat
