@@ -97,6 +97,8 @@ start:
 .zp io_ptr, 1
 .zp himem, 1
 .zp command_ptr, 1
+.zp dirty, 1
+.zp needs_renumber, 1
 
 .label BIOS
 .label crlf
@@ -122,7 +124,7 @@ command_buffer = cpm_default_dma + 2
 
 .zproc main
     jsr printi
-    .byte "Basic Editor (c) 2023 David Given", 13, 10, 0
+    .byte "Basic Text Editor", 13, 10, 0
 
     lda #<cpm_default_dma
     ldx #>cpm_default_dma
@@ -137,6 +139,10 @@ command_buffer = cpm_default_dma + 2
     ldy #BIOS_GETTPA
     jsr BIOS
     stx himem
+
+    lda #0
+    sta dirty
+    sta needs_renumber
 
     lda cpm_fcb+1
     cmp #' '
@@ -422,6 +428,13 @@ syntax_error:
 .zproc mainloop
     ldx #0xff
     txs
+
+    lda needs_renumber
+    .zif ne
+        lda #0
+        sta needs_renumber
+        jsr renumber_file
+    .zendif
 
     .label command_tab
 
@@ -1145,6 +1158,14 @@ dec_table:
     adc #0
     sta ptr2+1
 
+    \ Is there actually room?
+
+    cmp himem
+    .zif cs
+        jsr error
+        .byte "No room", 0
+    .zendif
+
     \ Open up space.
 
     ldy #0
@@ -1377,6 +1398,8 @@ dec_table:
     .zendif
 
     jsr new_file
+    lda #1
+    sta needs_renumber
 
     lda #10             \ start line number
     sta line_number+0
@@ -1436,7 +1459,6 @@ dec_table:
         stx io_ptr
     .zendloop
 
-    jsr renumber_file
     jsr print_free
     rts
 .zendproc
