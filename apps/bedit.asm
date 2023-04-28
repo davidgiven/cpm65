@@ -1215,7 +1215,7 @@ dec_table:
 
         lda ptr1+0
         .zif eq
-            dec ptr2+1
+            dec ptr1+1
         .zendif
         dec ptr1+0
 
@@ -1249,14 +1249,7 @@ dec_table:
 
     \ Advance the current line.
 
-    ldy #0
-    lda (current_line), y
-    clc
-    adc current_line+0
-    sta current_line+0
-    .zif cs
-        inc current_line+1
-    .zendif
+    jsr goto_next_line
 
     \ Done. Reset the line buffer.
     \ (y is zero)
