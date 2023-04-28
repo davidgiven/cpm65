@@ -25,9 +25,9 @@ much less standardised than 8080 and Z80 systems. (The systems above all load
 programs at different base addresses.)
 
 Currently you can cross-assemble programs from a PC, as well as a working C
-toolchain with llvm-mos. For native development, there's a basic assembler but
-currently no (functioning) editor. You need about 20kB to run the assembler at
-all, and of course more memory the bigger the program.
+toolchain with llvm-mos. For native development, there's a basic assembler and
+an even more basic editor. You need about 20kB to run the assembler at all, and
+of course more memory the bigger the program.
 
 No, it won't let you run 8080 programs on the 6502!
 
@@ -152,8 +152,8 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 ### Supported programs
 
 You don't get a lot right now. As transients, you get `DUMP`, `STAT`, `COPY`,
-`SUBMIT` and `ASM`. I'd love more --- send me pull requests! The build system
-supports cc65 assembler and llvm-mos C programs.
+`SUBMIT`, `ASM` and `BEDIT`. I'd love more --- send me pull requests! The build
+system supports cc65 assembler and llvm-mos C programs.
 
 In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
 `SAVE` as on the relocatable CP/M-65 system assembling images in memory is of
@@ -172,6 +172,15 @@ and is likely to have lots of bugs. There is, at least, a port of the DUMP
 program to it which assembles, works, and is ready to play with.
 
 Go read [cpmfs/asm.txt](cpmfs/asm.txt) for the documentation. 
+
+### The editor
+
+BEdit is an incredibly simple line editor modelled after a basic interpreter
+(command entry, with LOAD, SAVE, LIST, line numbers etc). It's written in
+machine code and assembled with the CP/M-65 assembler; you can assemble it
+locally if you have a system with 30kB or more TPA.
+
+Go read [cpmfs/bedit.txt](cpmfs/bedit.txt) for the documentation.
 
 ### Utilities
 

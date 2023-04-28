@@ -13,11 +13,12 @@ APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/dump.com \
-	cpmfs/asm.txt \
-	cpmfs/hello.asm \
 	apps/bedit.asm \
 	apps/dump.asm \
+	cpmfs/asm.txt \
+	cpmfs/bedit.txt \
 	cpmfs/demo.sub \
+	cpmfs/hello.asm \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
