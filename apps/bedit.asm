@@ -429,16 +429,21 @@ syntax_error:
     ldx #0xff
     txs
 
-    lda needs_renumber
-    .zif ne
-        lda #0
-        sta needs_renumber
-        jsr renumber_file
-    .zendif
-
     .label command_tab
 
     .zloop
+        lda needs_renumber
+        .zif ne
+            lda #0
+            sta needs_renumber
+            jsr renumber_file
+        .zendif
+
+        lda dirty
+        .zif ne
+            lda #'*'
+            jsr putchar
+        .zendif
         lda #'>'
         jsr putchar
 
@@ -1000,6 +1005,7 @@ dec_table:
 
     lda #0
     sta text_start
+    sta dirty
     rts
 .zendproc
 
@@ -1166,6 +1172,11 @@ dec_table:
         .byte "No room", 0
     .zendif
 
+    \ This dirties the file.
+
+    lda #1
+    sta dirty
+
     \ Open up space.
 
     ldy #0
@@ -1241,6 +1252,9 @@ dec_table:
     pha
     lda current_line+1
     pha
+
+    lda #1
+    sta dirty
 
     ldy #0
     lda (current_line), y
@@ -1401,11 +1415,7 @@ dec_table:
     lda #1
     sta needs_renumber
 
-    lda #10             \ start line number
-    sta line_number+0
     lda #0
-    sta line_number+1
-
     sta line_length
     sta io_ptr
 
@@ -1458,6 +1468,9 @@ dec_table:
         .zendif
         stx io_ptr
     .zendloop
+
+    lda #0
+    sta dirty
 
     jsr print_free
     rts
@@ -1579,6 +1592,8 @@ io_error:
         .byte "I/O error on write; save failed", 0
     .zendif
 
+    lda #0
+    sta dirty
     rts
 .zendproc
     
