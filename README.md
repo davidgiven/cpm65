@@ -154,7 +154,7 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
   - Standard 720 sectors single-sided single-density disk. The first three
     tracks are reserved (54 sectors). The rest contains a standard CP/M 2.2
-    filesystem.
+    filesystem. Boot with BASIC disabled.
 
   - Uses the Atari OS boot loader to load both BIOS and BDOS to avoid needing
     Atari DOS 2.0 DOS.SYS which would consumes precious memory and is useless
