@@ -52,3 +52,16 @@ diskdef generic-1m
 	os 2.2
 end
 
+# Simple SSSD disk on the Atari 810 or 1050 diskdrive
+# Reserve three tracks for BIOS+BDOS
+# 3*18*128 = 6912 bytes should be enough, right?
+diskdef atari90
+    seclen 128
+    tracks 40
+    sectrk 18
+    blocksize 1024
+    maxdir 64
+    boottrk 3
+    os 2.2
+end
+

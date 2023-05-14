@@ -38,6 +38,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 <a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
+<a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 </div>
 
 
@@ -148,6 +149,20 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
     (but not any aux memory).
 
   - This port runs completely bare-metal and does not use any ROM routines.
+
+### Atari 800 XL/XE notes
+
+  - Standard 720 sectors single-sided single-density disk. The first three
+    tracks are reserved (54 sectors). The rest contains a standard CP/M 2.2
+    filesystem.
+
+  - Uses bootloader to load both BIOS and BDOS to avoid needing Atari DOS 2.0
+    DOS.SYS which would consume precious memory and is useless afterwards.
+
+  - Console is standard 40x24 and it uses the Atari OS routines to read the
+    keyboard and write to the screen.
+
+  - There are 41728 bytes of TPA memory.
 
 ### Supported programs
 

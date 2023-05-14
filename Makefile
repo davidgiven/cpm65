@@ -20,6 +20,15 @@ APPS = \
 	cpmfs/demo.sub \
 	cpmfs/hello.asm \
 
+MINIMAL_APPS = \
+	$(OBJDIR)/submit.com \
+	$(OBJDIR)/stat.com \
+	$(OBJDIR)/copy.com \
+	$(OBJDIR)/asm.com \
+	$(OBJDIR)/apps/bedit.com \
+	$(OBJDIR)/apps/dump.com \
+	apps/dump.asm \
+
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
 	$(OBJDIR)/lib/bdos.o \
@@ -38,7 +47,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 bin/cpmemu
+all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 bin/cpmemu atari800.xfd
 
 $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
@@ -208,6 +217,17 @@ vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
 	$(OBJDIR)/mkcombifs $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f c1541 $@ s 0:cbmfs.sys 0:ccp.sys
+
+$(OBJDIR)/atari800.exe: src/bios/atari800.S
+
+atari800.xfd: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
+			$(MINIMAL_APPS) $(OBJDIR)/ccp.sys
+	dd if=/dev/zero of=$@ bs=128 count=720
+	mkfs.cpm -f atari90 $@
+	cpmcp -f atari90 $@ $(OBJDIR)/ccp.sys $(MINIMAL_APPS) 0:
+	cpmchattr -f atari90 $@ s 0:ccp.sys
+	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc count=6
+	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=6 conv=notrunc count=28
 
 clean:
 	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64
