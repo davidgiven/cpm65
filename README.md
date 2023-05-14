@@ -156,8 +156,9 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
     tracks are reserved (54 sectors). The rest contains a standard CP/M 2.2
     filesystem.
 
-  - Uses bootloader to load both BIOS and BDOS to avoid needing Atari DOS 2.0
-    DOS.SYS which would consume precious memory and is useless afterwards.
+  - Uses the Atari OS boot loader to load both BIOS and BDOS to avoid needing
+    Atari DOS 2.0 DOS.SYS which would consumes precious memory and is useless
+    afterwards. CCP.SYS is loaded from the CP/M filesystem.
 
   - Console is standard 40x24 and it uses the Atari OS routines to read the
     keyboard and write to the screen.
