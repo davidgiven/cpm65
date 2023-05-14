@@ -230,7 +230,7 @@ atari800.xfd: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
 	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=6 conv=notrunc count=28
 
 clean:
-	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64
+	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 atari800.xfd
 
 .DELETE_ON_ERROR:
 .SECONDARY:
