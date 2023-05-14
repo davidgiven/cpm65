@@ -226,8 +226,8 @@ atari800.xfd: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
 	mkfs.cpm -f atari90 $@
 	cpmcp -f atari90 $@ $(OBJDIR)/ccp.sys $(MINIMAL_APPS) 0:
 	cpmchattr -f atari90 $@ s 0:ccp.sys
-	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc count=6
-	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=6 conv=notrunc count=28
+	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc
+	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=6 conv=notrunc
 
 clean:
 	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 atari800.xfd
