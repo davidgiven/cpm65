@@ -200,13 +200,15 @@ zproc entry_CONOUT
 
     cmp #TERM_LF
     zif_eq
-        rts     ; ignore
+        lda #ATARI_EOL
+        bne conout
     zendif
 
     cmp #TERM_CR
     zif_eq
-        lda #ATARI_EOL
-        bne conout
+        lda #0
+        sta COLCRS
+        rts
     zendif
 
     cmp #TERM_BS
