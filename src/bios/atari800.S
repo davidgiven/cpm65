@@ -4,7 +4,10 @@
 
 ; Atari 800 XL/XE Port Copyright © 2023 Ivo van Poorten
 
-; Disk layout SS SD 40 tracjs x 18 sectors = 720 sectors.
+; Disk layout SS SD 40 tracks x 18 sectors = 720 sectors.
+; or
+; 455 tracks x 18 sectors = 8190 sectors (CP/M FS uses 8176)
+
 ; First three tracks are reserved for BIOS and BDOS so there is room to grow.
 ; Use Atari OS bootloader to load BDOS instead of requiring DOS.SYS, which
 ; is pretty big and useless afterwards as it has no ftell()/fseek()
