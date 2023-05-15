@@ -381,7 +381,7 @@ kdevice: .ascii "K"
 ; 54 reserved sectors = 6912 bytes for BIOS and BDOS
 
 #ifdef ATARI_HD
-define_drive dph, 8190, 2048, 64, 54
+define_drive dph, 8190, 2048, 128, 54
 #else
 define_drive dph, 720, 1024, 64, 54
 #endif
