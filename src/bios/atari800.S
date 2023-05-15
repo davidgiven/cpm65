@@ -231,6 +231,12 @@ zproc entry_CONOUT
         bne conout
     zendif
 
+    cmp #TERM_CLS
+    zif_eq
+        lda #ATARI_CLS
+;        bne conout         ; fallthrough
+    zendif
+
 conout:
     sta charout
 
