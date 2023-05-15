@@ -35,7 +35,7 @@ _start:
 #else
     .byte 6 + 28  ; 6 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
-    .word $0700
+    .word $0600
     .word init      ; just use init and never return
 
 init:
@@ -46,6 +46,8 @@ init:
     sta LMARGN
     sta COLCRS      ; leftover cursor will be overwritten by banner
     sta COLCRS+1
+    sta SHFLOK      ; start lower case
+
     lda #$b0        ; green
     sta COLOR2      ; background
     lda #$0f        ; luma only

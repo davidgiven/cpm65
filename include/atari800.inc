@@ -6,6 +6,8 @@ MEMTOP = $02e5
 
 CIOV = $e456
 
+SHFLOK = $02be
+
 ICHID = $0340
 ICDNO = $0341
 ICCOM = $0342
