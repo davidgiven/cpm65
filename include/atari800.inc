@@ -1,5 +1,7 @@
 ; Atari 800 OS defines
 
+MEMTOP = $02e5
+
 ; CIO
 
 CIOV = $e456

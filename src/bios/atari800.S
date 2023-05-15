@@ -27,11 +27,14 @@ _start:
     ; Boot sector
 
     .byte 0
-    .byte 6 + 28    ; 6 + 28 (BIOS+BDOS)
+    .byte 6 + 28    ; 6 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
     .word $0700
     .word init      ; just use init and never return
 
 init:
+    lda MEMTOP+1
+    sta mem_end
+
     lda #0
     sta LMARGN
     sta COLCRS      ; leftover cursor will be overwritten by banner
