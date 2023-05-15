@@ -179,13 +179,7 @@ zproc entry_CONIN
     cmp #ATARI_TAB
     zif_eq
         lda #9
-        rts
-    zendif
-
-    cmp #32
-    zif_cc
-        lda #32
-        rts
+;        rts    [[fallthrough]]
     zendif
 
     rts
