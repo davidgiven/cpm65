@@ -27,7 +27,11 @@ _start:
     ; Boot sector
 
     .byte 0
-    .byte 6 + 28    ; 6 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+#ifdef ATARI_HD
+    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+#else
+    .byte 6 + 28  ; 6 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+#endif
     .word $0700
     .word init      ; just use init and never return
 
@@ -374,7 +378,13 @@ kdevice: .ascii "K"
 
 ; number of sectors, blocksize, direntries, reserved _sectors_
 
-define_drive dph, 720, 1024, 64, 54 ; atari90 (54*128=6912 bytes for BIOS+BDOS)
+; 54 reserved sectors = 6912 bytes for BIOS and BDOS
+
+#ifdef ATARI_HD
+define_drive dph, 8190, 2048, 64, 54
+#else
+define_drive dph, 720, 1024, 64, 54
+#endif
 
 NOINIT
 
