@@ -13,8 +13,14 @@ APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/dinfo.com \
+	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/ls.com \
 	apps/bedit.asm \
 	apps/dump.asm \
+	apps/dinfo.asm \
+	apps/cls.asm \
+	apps/ls.asm \
 	cpmfs/asm.txt \
 	cpmfs/bedit.txt \
 	cpmfs/demo.sub \
@@ -27,6 +33,9 @@ MINIMAL_APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/dinfo.com \
+	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/ls.com \
 	apps/dump.asm \
 
 LIBCPM_OBJS = \
