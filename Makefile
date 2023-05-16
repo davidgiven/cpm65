@@ -13,6 +13,7 @@ APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/capsdrv.com \
 	apps/bedit.asm \
 	apps/dump.asm \
 	cpmfs/asm.txt \
