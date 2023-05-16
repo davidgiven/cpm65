@@ -345,6 +345,18 @@ no_adjust2:
     jsr BDOS
 
 no_sysfile:
+
+    ldy #8
+    lda (pfile),y
+    and #$80
+    beq no_rofile
+
+    ldy #BDOS_PRINTSTRING
+    lda #<rofile
+    ldx #>rofile
+    jsr BDOS
+
+no_rofile:
     ldy #BDOS_CONIO
     lda #13
     jsr BDOS
@@ -593,5 +605,6 @@ too_many_files:
     .byte "too many files\r\n$"
 sysfile:
     .byte " (s)$"
-
+rofile:
+    .byte " (r/o)$"
 
