@@ -33,7 +33,7 @@ _start:
 #ifdef ATARI_HD
     .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #else
-    .byte 6 + 28  ; 6 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
     .word $0600
     .word init      ; just use init and never return
@@ -239,6 +239,26 @@ zproc entry_CONOUT
     cmp #TERM_CLS
     zif_eq
         lda #ATARI_CLS
+        bne conout
+    zendif
+
+; The following two ATARI_ codes need to be escaped to actually print the 
+; associated glyph. The glyph of 127 (the third that needs escaping) is
+; not available because that's ASCII DEL.
+
+    cmp #ATARI_CLS
+    zif_eq
+        lda #27             ; ESC
+        jsr entry_CONOUT
+        lda #ATARI_CLS
+        bne conout
+    zendif
+
+    cmp #ATARI_BS
+    zif_eq
+        lda #27
+        jsr entry_CONOUT
+        lda #ATARI_BS
 ;        bne conout         ; fallthrough
     zendif
 

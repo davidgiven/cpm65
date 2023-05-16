@@ -240,7 +240,7 @@ atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
 	cpmcp -f atari90 $@ $(OBJDIR)/ccp.sys $(MINIMAL_APPS) 0:
 	cpmchattr -f atari90 $@ s 0:ccp.sys
 	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc
-	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=6 conv=notrunc
+	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=8 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
