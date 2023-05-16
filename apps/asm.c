@@ -781,7 +781,10 @@ static SymbolRecord* addOrFindSymbol()
 
 static void symbolExists()
 {
-    fatal("symbol exists");
+	errormessage("symbol exists: ");
+	cpm_printstring(parseBuffer);
+	cr();
+	cpm_warmboot();
 }
 
 static SymbolRecord* addSymbol()
@@ -843,22 +846,28 @@ static char consumeXorY()
     fatal("expected X or Y");
 }
 
+static uint16_t postProcess(uint16_t value)
+{
+    switch (tokenPostProcessing)
+    {
+        case PP_LSB:
+            value = value & 0xff;
+            break;
+
+        case PP_MSB:
+            value = value >> 8;
+            break;
+    }
+    tokenPostProcessing = PP_NONE;
+	return value;
+}
+
 static void postProcessConstant()
 {
     if (tokenVariable)
         return;
 
-    switch (tokenPostProcessing)
-    {
-        case PP_LSB:
-            tokenValue = tokenValue & 0xff;
-            break;
-
-        case PP_MSB:
-            tokenValue = tokenValue >> 8;
-            break;
-    }
-    tokenPostProcessing = PP_NONE;
+	tokenValue = postProcess(tokenValue);
 }
 
 /* Returns the current value, that is, the LHS */
@@ -918,6 +927,9 @@ static void consumeExpression()
             {
                 tokenVariable = r->variable;
                 offset = r->offset;
+
+				if (!tokenVariable)
+					offset = postProcess(offset);
             }
             else
             {
@@ -1496,7 +1508,6 @@ static bool placeCode(uint8_t pass)
 						errormessage("branch to non-text label: ");
 						printSymbol(s->variable);
 						cr();
-						printf("%x\n", s->opcode);
 						cpm_warmboot();
 					}
 

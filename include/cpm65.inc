@@ -88,6 +88,8 @@
 #define BDOS_RESET_DISK 37
 #define BDOS_GET_BIOS 38
 #define BDOS_WRITE_RANDOM_FILLED 40
+#define BDOS_GETTPA 41
+#define BDOS_GETZP 42
 
 /* Error codes returned by various BDOS entrypoints. */
 
@@ -116,6 +118,8 @@
 #define BIOS_GETZP    11 /* gets ZP bounds: A=lo, X=hi */
 #define BIOS_SETZP    12 /* sets ZP bounds: A=lo, X=hi */
 #define BIOS_SETBANK  13 /* sets current memory bank */
+#define BIOS_ADDDRV   14 /* entry: XA=new driver */
+#define BIOS_FINDDRV  15 /* entry: XA=driver ID; exit: XA=driver strategy routine */
 
 /* Memory banks. */
 
