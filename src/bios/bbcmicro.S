@@ -5,11 +5,14 @@
 #include "zif.inc"
 #include "mos.inc"
 #include "cpm65.inc"
+#include "driver.inc"
 
 ZEROPAGE
 
 .global ptr
+.global ptr1
 ptr: .word 0
+ptr1: .word 0
 
 ; --- Initialisation code ---------------------------------------------------
 
@@ -42,6 +45,10 @@ zproc _start
         sta zp_end      ; override zp_end
     zendif
     sty mem_end
+
+    ; BIOS initialisation.
+
+    jsr initdrivers
 
     ; Load the BDOS image.
 
@@ -108,52 +115,38 @@ cpmfs_filename:
     .ascii "CPMFS"
     .byte 13
 
-; --- BIOS entrypoints ------------------------------------------------------
+.data
+.global drvtop
+drvtop: .word drv_TTY
 
-; BIOS entry point. Parameter is in XA, function in Y.
-biosentry:
+; --- TTY driver ------------------------------------------------------------
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+
+; TTY driver strategy routine.
+; Y=TTY opcode.
+zproc drvstrat_TTY
     pha
-    lda biostable_lo, y
+    lda jmptable_lo, y
     sta ptr+0
-    lda biostable_hi, y
+    lda jmptable_hi, y
     sta ptr+1
     pla
     jmp (ptr)
 
-biostable_lo:
-    .byte entry_CONST@mos16lo
-    .byte entry_CONIN@mos16lo
+jmptable_lo:
+    .byte tty_const@mos16lo
+    .byte tty_conin@mos16lo
     .byte OSWRCH@mos16lo
-    .byte entry_SELDSK@mos16lo
-    .byte entry_SETSEC@mos16lo
-    .byte entry_SETDMA@mos16lo
-    .byte entry_READ@mos16lo
-    .byte entry_WRITE@mos16lo
-    .byte entry_RELOCATE@mos16lo
-    .byte entry_GETTPA@mos16lo
-    .byte entry_SETTPA@mos16lo
-    .byte entry_GETZP@mos16lo
-    .byte entry_SETZP@mos16lo
-    .byte entry_SETBANK@mos16lo
-biostable_hi:
-    .byte entry_CONST@mos16hi
-    .byte entry_CONIN@mos16hi
+jmptable_hi:
+    .byte tty_const@mos16hi
+    .byte tty_conin@mos16hi
     .byte OSWRCH@mos16hi
-    .byte entry_SELDSK@mos16hi
-    .byte entry_SETSEC@mos16hi
-    .byte entry_SETDMA@mos16hi
-    .byte entry_READ@mos16hi
-    .byte entry_WRITE@mos16hi
-    .byte entry_RELOCATE@mos16hi
-    .byte entry_GETTPA@mos16hi
-    .byte entry_SETTPA@mos16hi
-    .byte entry_GETZP@mos16hi
-    .byte entry_SETZP@mos16hi
-    .byte entry_SETBANK@mos16hi
+zendproc
 
 ; Blocks and waits for the next keypress; returns it in A.
 
-zproc entry_CONIN
+zproc tty_conin
     lda pending_key
     zif_eq
         zrepeat
@@ -171,7 +164,7 @@ zproc entry_CONIN
     rts
 zendproc
 
-zproc entry_CONST
+zproc tty_const
     lda pending_key
     zif_eq
         lda #$81
@@ -229,12 +222,13 @@ zproc entry_SETSEC
     rts
 zendproc
 
-entry_READ:
+zproc entry_READ
     jsr init_control_block
     lda #3              ; read bytes using pointer
     jmp do_gbpb
+zendproc
 
-entry_WRITE:
+zproc entry_WRITE
     jsr init_control_block
     lda #1              ; write bytes using pointer
 do_gbpb:
@@ -244,6 +238,7 @@ do_gbpb:
     lda #0
     rol a
     rts
+zendproc
 
 zproc init_control_block
     ldy #(osgbpb_block_end - osgbpb_block - 1)

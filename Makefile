@@ -13,6 +13,7 @@ APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/capsdrv.com \
 	apps/bedit.asm \
 	apps/dump.asm \
 	cpmfs/asm.txt \
@@ -27,9 +28,11 @@ LIBCPM_OBJS = \
 
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
+	$(OBJDIR)/src/bios/relocate.o \
+
+LIBCOMMODORE_OBJS = \
 	$(OBJDIR)/src/bios/commodore/ieee488.o \
 	$(OBJDIR)/src/bios/commodore/petscii.o \
-	$(OBJDIR)/src/bios/relocate.o \
 
 CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/main.o \
@@ -84,6 +87,10 @@ $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 
+$(OBJDIR)/libcommodore.a: $(LIBCOMMODORE_OBJS)
+	@mkdir -p $(dir $@)
+	llvm-ar rs $@ $^
+
 $(OBJDIR)/libbios.a: $(LIBBIOS_OBJS)
 	@mkdir -p $(dir $@)
 	llvm-ar rs $@ $^
@@ -121,7 +128,7 @@ $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts
 	
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(OBJDIR)/libbios.a $(LINKFLAGS)
+	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(filter %.a,$^) $(LINKFLAGS)
 
 $(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
 	@mkdir -p $(dir $@)
@@ -139,6 +146,7 @@ bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmi
 		-f $(OBJDIR)/bdos.img -n bdos \
 		-f $(OBJDIR)/bbcmicrofs.img -n cpmfs
 
+$(OBJDIR)/c64.exe: $(OBJDIR)/libcommodore.a
 c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
@@ -158,6 +166,7 @@ $(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
 	cpmcp -f generic-1m $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f generic-1m $@ s 0:ccp.sys
 
+$(OBJDIR)/x16.exe: $(OBJDIR)/libcommodore.a
 x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
 	@rm -f $@
 	zip -9 $@ -j $^
@@ -181,6 +190,7 @@ apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/cc
 	truncate -s 143360 $@
 
 $(OBJDIR)/pet.exe: LINKFLAGS += --no-check-sections
+$(OBJDIR)/pet.exe: $(OBJDIR)/libcommodore.a
 pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
@@ -195,6 +205,7 @@ pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
+$(OBJDIR)/vic20.exe: $(OBJDIR)/libcommodore.a
 $(OBJDIR)/src/bios/vic20.o: $(OBJDIR)/4x8font.inc
 vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
 		$(OBJDIR)/ccp.sys $(OBJDIR)/mkcombifs

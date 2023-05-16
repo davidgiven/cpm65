@@ -5,6 +5,7 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "wait.inc"
+#include "driver.inc"
 
 SCREEN_80STOREOFF = 0xc000
 SCREEN_80STOREON  = 0xc001
@@ -48,6 +49,7 @@ DECODE_TABLE_START = 0x96
 ZEROPAGE
 
 .global ptr
+.global ptr1
 ptr:    .word 0
 ptr1:   .word 0
 dma:    .word 0
@@ -90,6 +92,10 @@ _start:
             zbreakif_eq
         zendif
     zendloop
+
+    ; Initialise it.
+
+    jsr initdrivers
 
     ; Print the startup banner.
 
@@ -228,11 +234,38 @@ zproc entry_SETBANK
     rts
 zendproc
 
-; --- Screen ----------------------------------------------------------------
+; --- TTY driver ------------------------------------------------------------
+
+.data
+.global drvtop
+drvtop: .word drv_TTY
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+
+; TTY driver strategy routine.
+; Y=TTY opcode.
+zproc drvstrat_TTY
+    pha
+    lda jmptable_lo, y
+    sta ptr+0
+    lda jmptable_hi, y
+    sta ptr+1
+    pla
+    jmp (ptr)
+
+jmptable_lo:
+    .byte tty_const@mos16lo
+    .byte tty_conin@mos16lo
+    .byte tty_conout@mos16lo
+jmptable_hi:
+    .byte tty_const@mos16hi
+    .byte tty_conin@mos16hi
+    .byte tty_conout@mos16hi
+zendproc
 
 ; Writes the character in A.
 
-zproc entry_CONOUT
+zproc tty_conout
     cmp #13
     zif_eq
         lda #0
@@ -395,7 +428,7 @@ zendproc
 
 ; --- Keyboard --------------------------------------------------------------
 
-zproc entry_CONST
+zproc tty_const
     ldx motor_countdown
     zif_ne
         dec motor_countdown
@@ -416,7 +449,7 @@ zproc entry_CONST
     rts
 zendproc
 
-zproc entry_CONIN
+zproc tty_conin
     ; Turn the disk motor off.
 
     ldx #DISK_SLOT
