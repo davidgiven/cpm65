@@ -118,8 +118,8 @@
 #define BIOS_GETZP    11 /* gets ZP bounds: A=lo, X=hi */
 #define BIOS_SETZP    12 /* sets ZP bounds: A=lo, X=hi */
 #define BIOS_SETBANK  13 /* sets current memory bank */
-#define BIOS_ADDDRV   14 /* entry: XA=new driver; exit: XA=old driver */
-#define BIOS_FINDDRV  15 /* entry: XA=driver ID; exit: XA=driver routine */
+#define BIOS_ADDDRV   14 /* entry: XA=new driver */
+#define BIOS_FINDDRV  15 /* entry: XA=driver ID; exit: XA=driver strategy routine */
 
 /* Memory banks. */
 

@@ -4,6 +4,7 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "driver.inc"
 
 PIA1    = 0xe810
 PIA1_PA = PIA1 + 0
@@ -45,6 +46,7 @@ VIDEO   = 0x8000
 ZEROPAGE
 
 .global ptr
+.global ptr1
 ptr:              .fill 2
 ptr1:             .fill 2
 dma:              .fill 2    ; current DMA
@@ -146,7 +148,7 @@ zproc _start, .init
         tya
         pha
         lda banner-1, y
-        jsr entry_CONOUT
+        jsr tty_conout
         pla
         tay
         dey
@@ -158,6 +160,7 @@ zproc _start, .init
     sta shift_pressed
     sta pending_key
     sta buffer_dirty
+    jsr initdrivers
 
     jsr ieee_init
 
@@ -202,7 +205,7 @@ zproc _start, .init
             tya
             pha
             lda #'.'
-            jsr entry_CONOUT
+            jsr tty_conout
             pla
             tay
         zendif
@@ -287,9 +290,36 @@ zendproc
 
 ; --- Keyboard handling -----------------------------------------------------
 
+.data
+.global drvtop
+drvtop: .word drv_TTY
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+
+; TTY driver strategy routine.
+; Y=TTY opcode.
+zproc drvstrat_TTY
+    pha
+    lda jmptable_lo, y
+    sta ptr+0
+    lda jmptable_hi, y
+    sta ptr+1
+    pla
+    jmp (ptr)
+
+jmptable_lo:
+    .byte tty_const@mos16lo
+    .byte tty_conin@mos16lo
+    .byte tty_conout@mos16lo
+jmptable_hi:
+    .byte tty_const@mos16hi
+    .byte tty_conin@mos16hi
+    .byte tty_conout@mos16hi
+zendproc
+
 ; Returns 0xff if no key is pending, 0 if one is.
 
-zproc entry_CONST
+zproc tty_const
     jsr scan_keyboard
 
     lda pending_key
@@ -303,7 +333,7 @@ zendproc
 
 ; Blocks until a key is pressed; returns it in A.
 
-zproc entry_CONIN
+zproc tty_conin
     jsr calculate_cursor_address
     lda (ptr), y
     eor #0x80
@@ -454,7 +484,7 @@ zendproc
 
 ; Writes the character in A.
 
-zproc entry_CONOUT
+zproc tty_conout
     cmp #13
     zif_eq
         lda #0

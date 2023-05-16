@@ -4,6 +4,7 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "driver.inc"
 
 READST = $ffb7
 SETLFS = $ffba
@@ -33,7 +34,9 @@ STATUS = $90
 ZEROPAGE
 
 .global ptr
+.global ptr1
 ptr:        .word 0
+ptr1:       .word 0
 dma:        .word 0    ; current DMA
 
     .text
@@ -122,52 +125,36 @@ bdos_filename_end:
 bdos_filename_len = bdos_filename_end - bdos_filename
 zendproc
 
-; --- BIOS entrypoints ------------------------------------------------------
+.data
+.global drvtop
+drvtop: .word drv_TTY
 
-; BIOS entry point. Parameter is in XA, function in Y.
-biosentry:
+defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+
+; TTY driver strategy routine.
+; Y=TTY opcode.
+zproc drvstrat_TTY
     pha
-    lda biostable_lo, y
+    lda jmptable_lo, y
     sta ptr+0
-    lda biostable_hi, y
+    lda jmptable_hi, y
     sta ptr+1
     pla
     jmp (ptr)
 
-biostable_lo:
-    .byte entry_CONST    @mos16lo
-    .byte entry_CONIN    @mos16lo
-    .byte entry_CONOUT   @mos16lo
-    .byte entry_SELDSK   @mos16lo
-    .byte entry_SETSEC   @mos16lo
-    .byte entry_SETDMA   @mos16lo
-    .byte entry_READ     @mos16lo
-    .byte entry_WRITE    @mos16lo
-    .byte entry_RELOCATE @mos16lo
-    .byte entry_GETTPA   @mos16lo
-    .byte entry_SETTPA   @mos16lo
-    .byte entry_GETZP    @mos16lo
-    .byte entry_SETZP    @mos16lo
-    .byte entry_SETBANK  @mos16lo
-biostable_hi:
-    .byte entry_CONST    @mos16hi
-    .byte entry_CONIN    @mos16hi
-    .byte entry_CONOUT   @mos16hi
-    .byte entry_SELDSK   @mos16hi
-    .byte entry_SETSEC   @mos16hi
-    .byte entry_SETDMA   @mos16hi
-    .byte entry_READ     @mos16hi
-    .byte entry_WRITE    @mos16hi
-    .byte entry_RELOCATE @mos16hi
-    .byte entry_GETTPA   @mos16hi
-    .byte entry_SETTPA   @mos16hi
-    .byte entry_GETZP    @mos16hi
-    .byte entry_SETZP    @mos16hi
-    .byte entry_SETBANK  @mos16hi
+jmptable_lo:
+    .byte tty_const@mos16lo
+    .byte tty_conin@mos16lo
+    .byte tty_conout@mos16lo
+jmptable_hi:
+    .byte tty_const@mos16hi
+    .byte tty_conin@mos16hi
+    .byte tty_conout@mos16hi
+zendproc
 
 ; Blocks and waits for the next keypress; returns it in A.
 
-zproc entry_CONIN
+zproc tty_conin
     lda pending_key
     zif_eq
         zrepeat
@@ -187,14 +174,14 @@ zproc entry_CONIN
     rts
 zendproc
 
-zproc entry_CONOUT
+zproc tty_conout
     jsr topetscii
     jsr CHROUT
     clc
     rts
 zendproc
 
-zproc entry_CONST
+zproc tty_const
     lda pending_key
     zif_eq
         jsr GETIN
@@ -680,6 +667,8 @@ zproc init_system
     sta buffered_sector+0
     sta buffered_sector+1
     sta buffered_sector+2
+
+    jsr initdrivers
 
     lda #8
     jsr LISTEN

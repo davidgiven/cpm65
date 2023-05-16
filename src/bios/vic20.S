@@ -5,6 +5,7 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "wait.inc"
+#include "driver.inc"
 
 ;https://www.antimon.org/dl/c64/code/stable.txt
 
@@ -135,6 +136,7 @@ zproc _init, .init
     lda #0x08           ; black border, black background, inverted
     sta 0x900f
 
+    jsr initdrivers
     jsr clear_screen
 
     ldy #banner_end - banner
@@ -285,9 +287,36 @@ zendproc
 
 ; --- Keyboard handling -----------------------------------------------------
 
+.data
+.global drvtop
+drvtop: .word drv_TTY
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+
+; TTY driver strategy routine.
+; Y=TTY opcode.
+zproc drvstrat_TTY
+    pha
+    lda jmptable_lo, y
+    sta ptr+0
+    lda jmptable_hi, y
+    sta ptr+1
+    pla
+    jmp (ptr)
+
+jmptable_lo:
+    .byte tty_const@mos16lo
+    .byte tty_conin@mos16lo
+    .byte tty_conout@mos16lo
+jmptable_hi:
+    .byte tty_const@mos16hi
+    .byte tty_conin@mos16hi
+    .byte tty_conout@mos16hi
+zendproc
+
 ; Returns 0xff if no key is pending, 0 if one is.
 
-zproc entry_CONST
+zproc tty_const
     jsr scan_keyboard
 
     lda pending_key
@@ -301,7 +330,7 @@ zendproc
 
 ; Blocks until a key is pressed; returns it in A.
 
-zproc entry_CONIN
+zproc tty_conin
     jsr toggle_cursor
 
     lda pending_key
@@ -456,7 +485,7 @@ zendproc
 
 ; Writes the character in A.
 
-zproc entry_CONOUT
+zproc tty_conout
     cmp #13
     zif_eq
         lda #0
@@ -1108,6 +1137,7 @@ zendproc
 ZEROPAGE
 
 .global ptr
+.global ptr1
 ptr:             .fill 2
 ptr1:            .fill 2
 ptr2:            .fill 2

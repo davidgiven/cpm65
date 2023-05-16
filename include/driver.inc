@@ -8,11 +8,34 @@
 #define DRVID_SCREEN 2
 #define DRVID_BLOCK  3
 
-; Driver management routine Y values.
+; Driver structure:
+;
+;  +0  driver ID
+;  +2  pointer to strategy routine
+;  +4  pointer to next driver, or 0; filled in when added
+;  +6  zero-terminated name starts here
 
-#define DRVCMD_FIND  0 /* entry: XA=driver ID; exit: XA=strategy routine */
-#define DRVCMD_NAME  1 /* exit: XA=pointer to string */
-#define DRVCMD_NEXT  2 /* exit: XA=next management routine */
+#define DRVSTRUCT_ID    0
+#define DRVSTRUCT_STRAT 2
+#define DRVSTRUCT_NEXT  4
+#define DRVSTRUCT_NAME  6
+
+.macro defdriver name, id, strat, next=0
+.data
+.global drv_\name
+drv_\name:
+    .word \id
+    .word \strat
+    .word \next
+    .ascii "\name"
+    .byte 0
+.endmacro
+
+; TTY driver entrypoints
+
+#define TTY_CONST 0  /* exit: C if no key pending, !C if key pending */
+#define TTY_CONIN 1  /* exit: A=key */
+#define TTY_CONOUT 2 /* entry: A=key */
 
 ; vim: filetype=asm sw=4 ts=4 et
 
