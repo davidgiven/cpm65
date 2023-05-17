@@ -293,7 +293,7 @@ mul128:             \ 24-bit mul, files can be larger than 65535
     sta tmp
     .zif cs
         inc tmp+1
-        .zif cs
+        .zif eq
             inc tmp+2
         .zendif
     .zendif
