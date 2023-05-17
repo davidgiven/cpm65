@@ -244,7 +244,7 @@ no_shift:
     lda dsm+1
     sta val1+1
     ldx count
-    bne no_shift2
+    beq no_shift2
 
     jsr shift_val1_left_by_x
 
