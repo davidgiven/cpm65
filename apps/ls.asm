@@ -15,7 +15,7 @@ cpm_default_dma = pblock + 0x25
 
 BDOS = start-3
 
-BDOS_CONIO             =  6
+BDOS_CONOUT            =  2
 BDOS_PRINTSTRING       =  9
 BDOS_SELECT_DRIVE      = 14
 BDOS_FINDFIRST         = 17
@@ -313,7 +313,7 @@ no_adjust2:
     ldx tmp+1
     jsr print16padded
 
-    ldy #BDOS_CONIO
+    ldy #BDOS_CONOUT
     lda #' "
     jsr BDOS
 
@@ -326,7 +326,7 @@ no_adjust2:
         and #$7f            \ 7-bit ASCII
         sty tmp
 
-        ldy #BDOS_CONIO
+        ldy #BDOS_CONOUT
         jsr BDOS
 
         ldy tmp
@@ -357,10 +357,10 @@ no_sysfile:
     jsr BDOS
 
 no_rofile:
-    ldy #BDOS_CONIO
+    ldy #BDOS_CONOUT
     lda #13
     jsr BDOS
-    ldy #BDOS_CONIO
+    ldy #BDOS_CONOUT
     lda #10
     jsr BDOS
 
@@ -582,7 +582,7 @@ just_one_file:
         stx ptr2+0
         ora #'0'                    \ convert to ASCII
     justprint:
-        ldy #BDOS_CONIO
+        ldy #BDOS_CONOUT
         jsr BDOS
     skip:
         pla
