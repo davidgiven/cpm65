@@ -37,6 +37,7 @@ MINIMAL_APPS = \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/cls.com \
 	$(OBJDIR)/apps/ls.com \
+	$(OBJDIR)/apps/capsdrv.com \
 	apps/dump.asm \
 
 LIBCPM_OBJS = \
