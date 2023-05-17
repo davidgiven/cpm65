@@ -266,7 +266,7 @@ atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.img Makefile \
 	cpmcp -f atarihd $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f atarihd $@ s 0:ccp.sys
 	dd if=$(OBJDIR)/atari800hd.exe of=$@ bs=128 conv=notrunc
-	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=8 conv=notrunc
+	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=10 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@

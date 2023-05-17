@@ -15,12 +15,15 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "atari800.inc"
+#include "driver.inc"
 
 ZEROPAGE
 
 .global ptr
+.global ptr1
 save_y:
 ptr: .word 0
+ptr1: .word 0
 
     .text
 
@@ -31,7 +34,7 @@ _start:
 
     .byte 0
 #ifdef ATARI_HD
-    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 10 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #else
     .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
@@ -61,7 +64,7 @@ init:
     zrepeat
         lda banner - 1, y
         sty save_y
-        jsr entry_CONOUT
+        jsr tty_conout
         ldy save_y
         dey
     zuntil_eq
@@ -85,6 +88,10 @@ init:
     ; Figure out the start and end of the TPA.
     ; mem_base, mem_end are already set correctly for where BDOS loads
 
+    ; BIOS initialisation
+
+    jsr initdrivers
+
     ; Load the BDOS image to mem_base
     ; BDOS is already loaded at mem_base by the Atari OS bootloader
 
@@ -107,56 +114,42 @@ init:
 zendproc
 
 banner: ; reversed!
-    .byte 13
+    .byte 10,13
     .ascii "008 iratA eht rof 56-M/PC"
 banner_end:
 
+.data
+.global drvtop
+drvtop: .word drv_TTY
+
 ; --- BIOS entrypoints ------------------------------------------------------
 
-; BIOS entry point. Parameter is in XA, function in Y.
-biosentry:
+defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+
+; TTY driver strategy routine.
+; Y=TTY opcode.
+zproc drvstrat_TTY
     pha
-    lda biostable_lo, y
+    lda jmptable_lo, y
     sta ptr+0
-    lda biostable_hi, y
+    lda jmptable_hi, y
     sta ptr+1
     pla
     jmp (ptr)
 
-biostable_lo:
-    .byte entry_CONST@mos16lo
-    .byte entry_CONIN@mos16lo
-    .byte entry_CONOUT@mos16lo
-    .byte entry_SELDSK@mos16lo
-    .byte entry_SETSEC@mos16lo
-    .byte entry_SETDMA@mos16lo
-    .byte entry_READ@mos16lo
-    .byte entry_WRITE@mos16lo
-    .byte entry_RELOCATE@mos16lo
-    .byte entry_GETTPA@mos16lo
-    .byte entry_SETTPA@mos16lo
-    .byte entry_GETZP@mos16lo
-    .byte entry_SETZP@mos16lo
-    .byte entry_SETBANK@mos16lo
-biostable_hi:
-    .byte entry_CONST@mos16hi
-    .byte entry_CONIN@mos16hi
-    .byte entry_CONOUT@mos16hi
-    .byte entry_SELDSK@mos16hi
-    .byte entry_SETSEC@mos16hi
-    .byte entry_SETDMA@mos16hi
-    .byte entry_READ@mos16hi
-    .byte entry_WRITE@mos16hi
-    .byte entry_RELOCATE@mos16hi
-    .byte entry_GETTPA@mos16hi
-    .byte entry_SETTPA@mos16hi
-    .byte entry_GETZP@mos16hi
-    .byte entry_SETZP@mos16hi
-    .byte entry_SETBANK@mos16hi
+jmptable_lo:
+    .byte tty_const@mos16lo
+    .byte tty_conin@mos16lo
+    .byte tty_conout@mos16lo
+jmptable_hi:
+    .byte tty_const@mos16hi
+    .byte tty_conin@mos16hi
+    .byte tty_conout@mos16hi
+zendproc
 
 ; Blocks and waits for the next keypress; returns it in A.
 
-zproc entry_CONIN
+zproc tty_conin
     ldx #1*16
     lda #CGBIN
     sta ICCOM,x
@@ -194,15 +187,15 @@ zproc entry_CONIN
     rts
 zendproc
 
-zproc entry_CONST
-    lda #0
+zproc tty_const
+    lda #$00
     clc
     rts
 zendproc
 
 ; Output character in A
 
-zproc entry_CONOUT
+zproc tty_conout
 
     cmp #TERM_LF
     zif_eq
@@ -249,7 +242,7 @@ zproc entry_CONOUT
     cmp #ATARI_CLS
     zif_eq
         lda #27             ; ESC
-        jsr entry_CONOUT
+        jsr tty_conout
         lda #ATARI_CLS
         bne conout
     zendif
@@ -257,7 +250,7 @@ zproc entry_CONOUT
     cmp #ATARI_BS
     zif_eq
         lda #27
-        jsr entry_CONOUT
+        jsr tty_conout
         lda #ATARI_BS
 ;        bne conout         ; fallthrough
     zendif
@@ -324,13 +317,14 @@ zproc entry_SETSEC
     rts
 zendproc
 
-entry_READ:
+zproc entry_READ
     lda #$40        ; data direction receive
     sta DSTATS
     lda #SIO_READ_SECTOR
     bne do_SIO
+zendproc            ; fallthrough
 
-entry_WRITE:
+zproc entry_WRITE
     lda #$80        ; data direction send
     sta DSTATS
     lda #SIO_WRITE_SECTOR
@@ -366,6 +360,7 @@ do_SIO:
 
     lda #0
     rts
+zendproc
 
 zproc entry_GETTPA
     lda mem_base
