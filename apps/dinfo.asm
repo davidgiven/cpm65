@@ -13,10 +13,11 @@ cpm_fcb = pblock
 
 BDOS = start-3
 
-BDOS_CONIO             =  6
+BDOS_CONOUT            =  2
 BDOS_PRINTSTRING       =  9
 BDOS_SELECT_DRIVE      = 14
 BDOS_GET_CURRENT_DRIVE = 25
+BDOS_GET_ALLOC_VECTOR  = 27
 BDOS_GET_DPB           = 31
 
 DPB_BSH     = 2
@@ -31,9 +32,12 @@ FCB_DR      = 0
 .zp dpb, 2
 
 .zp ptr1, 2 \ clobbered by print
-.zp ptr2, 2 \ idem
-
-val1 = ptr1
+.zp pad, 2  \ idem
+.zp val1, 2
+.zp dsm, 2  \ actually dsm+1 which is needed in calculations two times
+            \ and as an endpoint during free space calculations
+.zp bsh, 1
+.zp count, 2
 
 start:
     ldy #BDOS_GET_CURRENT_DRIVE
@@ -71,28 +75,28 @@ success:
 
 \ drive capacity in sectors
 
+\ store dsm+1 as we need it again later
+
     ldy #DPB_DSM
     lda (dpb),y
     clc
     adc #1
     sta val1
+    sta dsm
     iny
     lda (dpb),y
     adc #0
     sta val1+1
+    sta dsm+1
 
 \ shift by BSH
 
     ldy #DPB_BSH
     lda (dpb),y
+    sta bsh
     tax
 
-    clc
-shift16:
-    rol val1
-    rol val1+1
-    dex
-    bne shift16
+    jsr shift_val1_left_by_x
 
     lda val1
     ldx val1+1
@@ -154,7 +158,119 @@ shift16:
     ldx #>ressect
     jsr printstring
 
+\ free space
+
+    lda #<free
+    ldx #>free
+    jsr printstring
+
+\ count unused blocks in val1
+
+    ldy #BDOS_GET_ALLOC_VECTOR
+    jsr BDOS
+    sta ptr1
+    stx ptr1+1
+
+    lda #0
+    sta count
+    sta count+1
+    sta val1
+    sta val1+1
+    tay
+
+.label stop
+
+    .zrepeat
+        lda (ptr1),y
+        ldx #7
+        .zrepeat
+            lsr A
+            bcs used
+            inc val1
+            .zif eq
+                inc val1+1
+            .zendif
+        used:
+            inc count
+            .zif eq
+                inc count+1
+            .zendif
+            pha
+            lda count+1
+            cmp dsm+1
+            bne notyet
+            lda count
+            cmp dsm
+            beq stop    \ stop condition
+        notyet:
+            pla
+            dex
+        .zuntil mi
+
+        inc ptr1
+        .zif eq
+            inc ptr1+1
+        .zendif
+    .zuntil eq          \ which is never
+
+stop:
+    pla                 \ leftover byte
+
+    ldx bsh
+    dex
+    dex
+    dex
+    stx count           \ save bsh-3 for later
+    beq no_shift
+
+    jsr shift_val1_left_by_x
+
+no_shift:
+    lda val1
+    ldx val1+1
+    ldy #0
+    jsr print16paddedY
+
+    lda #<kilobyte
+    ldx #>kilobyte
+    jsr printstring
+
+    lda #'/'
+    ldy #BDOS_CONOUT
+    jsr BDOS
+
+    lda dsm
+    sta val1
+    lda dsm+1
+    sta val1+1
+    ldx count
+    bne no_shift2
+
+    jsr shift_val1_left_by_x
+
+no_shift2:
+    lda val1
+    ldx val1+1
+    ldy #0
+    jsr print16paddedY
+
+    lda #<kilobyte
+    ldx #>kilobyte
+    jsr printstring
+
+    lda #<crlf
+    ldx #>crlf
+    jmp printstring     \ finished
+
+.zproc shift_val1_left_by_x
+    clc
+    .zrepeat
+        rol val1
+        rol val1+1
+        dex
+    .zuntil eq
     rts
+.zendproc
 
 .zproc printstring
     ldy #BDOS_PRINTSTRING
@@ -165,9 +281,12 @@ shift16:
 
 .zproc print16padded
     ldy #' '            \ always pad with ' '
+.zendproc
+
+.zproc print16paddedY
     sta ptr1+0
     stx ptr1+1
-    sty ptr2+0
+    sty pad
 
     .label dec_table
     .label skip
@@ -203,16 +322,16 @@ shift16:
         pha
 
         .zif eq                     \ if digit is zero, check padding
-            lda ptr2+0              \ get the padding character
+            lda pad                 \ get the padding character
             beq skip                \ if zero, no padding
             bne justprint           \ otherwise, use it
         .zendif
 
         ldx #'0'                    \ printing a digit, so reset padding
-        stx ptr2+0
+        stx pad
         ora #'0'                    \ convert to ASCII
     justprint:
-        ldy #BDOS_CONIO
+        ldy #BDOS_CONOUT
         jsr BDOS
     skip:
         pla
@@ -230,7 +349,9 @@ dec_table:
 .zendproc
 
 error:
-    .byte "drive error\r\n$"
+    .byte "drive error"
+crlf:
+    .byte "\r\n$"
 capacity:
     .byte " : Sectors Capacity\r\n$"
 direntries:
@@ -241,5 +362,8 @@ recperentry:
     .byte " : Records Per Entry\r\n$"
 ressect:
     .byte " : Reserved Sectors\r\n$"
-
+free:
+    .byte "Free space: $"
+kilobyte:
+    .byte "kB$"
 
