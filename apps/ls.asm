@@ -425,10 +425,6 @@ done:
 
     ldx #0
     .zrepeat
-        nop
-        nop
-        nop
-
         stx count
 
         lda endcondx
