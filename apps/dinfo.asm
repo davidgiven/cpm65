@@ -34,8 +34,6 @@ FCB_DR      = 0
 .zp ptr2, 2 \ idem
 
 val1 = ptr1
-val2 = ptr2
-.zp val3, 2
 
 start:
     ldy #BDOS_GET_CURRENT_DRIVE
@@ -73,47 +71,17 @@ success:
 
 \ drive capacity in sectors
 
-    lda #1
-    sta val1
-    lda #0
-    sta val1+1
-    sta val3
-    sta val3+1
-
     ldy #DPB_DSM
     lda (dpb),y
     clc
     adc #1
-    sta val2
+    sta val1
     iny
     lda (dpb),y
     adc #0
-    sta val2+1
+    sta val1+1
 
-    \ crude mul by multiple addition
-    \ val3 = val1 * val2
-
-muladd:
-    lda val3
-    clc
-    adc val1
-    sta val3
-    lda val3+1
-    adc val1+1
-    sta val3+1
-
-    lda val2
-    bne dec16
-    dec val2+1
-dec16:
-    dec val2
-
-    lda val2
-    clc
-    adc val2+1
-    bne muladd
-
-    \ shift after muladd, saves 2^bsh adds
+\ shift by BSH
 
     ldy #DPB_BSH
     lda (dpb),y
@@ -121,13 +89,13 @@ dec16:
 
     clc
 shift16:
-    rol val3
-    rol val3+1
+    rol val1
+    rol val1+1
     dex
     bne shift16
 
-    lda val3
-    ldx val3+1
+    lda val1
+    ldx val1+1
     jsr print16padded
  
     lda #<capacity
