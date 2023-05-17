@@ -7,20 +7,21 @@ CFLAGS65 = -Os -g -fnonreentrant -I.
 OBJDIR = .obj
 
 APPS = \
-	$(OBJDIR)/submit.com \
-	$(OBJDIR)/stat.com \
-	$(OBJDIR)/copy.com \
-	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
-	$(OBJDIR)/apps/dump.com \
-	$(OBJDIR)/apps/dinfo.com \
-	$(OBJDIR)/apps/cls.com \
-	$(OBJDIR)/apps/ls.com \
 	$(OBJDIR)/apps/capsdrv.com \
+	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/dinfo.com \
+	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/ls.com \
+	$(OBJDIR)/asm.com \
+	$(OBJDIR)/copy.com \
+	$(OBJDIR)/objdump.com \
+	$(OBJDIR)/stat.com \
+	$(OBJDIR)/submit.com \
 	apps/bedit.asm \
-	apps/dump.asm \
-	apps/dinfo.asm \
 	apps/cls.asm \
+	apps/dinfo.asm \
+	apps/dump.asm \
 	apps/ls.asm \
 	cpmfs/asm.txt \
 	cpmfs/bedit.txt \
@@ -28,16 +29,16 @@ APPS = \
 	cpmfs/hello.asm \
 
 MINIMAL_APPS = \
-	$(OBJDIR)/submit.com \
-	$(OBJDIR)/stat.com \
-	$(OBJDIR)/copy.com \
-	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
-	$(OBJDIR)/apps/dump.com \
-	$(OBJDIR)/apps/dinfo.com \
-	$(OBJDIR)/apps/cls.com \
-	$(OBJDIR)/apps/ls.com \
 	$(OBJDIR)/apps/capsdrv.com \
+	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/dinfo.com \
+	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/ls.com \
+	$(OBJDIR)/asm.com \
+	$(OBJDIR)/copy.com \
+	$(OBJDIR)/stat.com \
+	$(OBJDIR)/submit.com \
 	apps/dump.asm \
 
 LIBCPM_OBJS = \

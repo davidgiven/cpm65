@@ -1515,7 +1515,7 @@ static bool placeCode(uint8_t pass)
                         len = defaultBranchSize;
                     else
                     {
-                        int delta = (s->variable->offset + s->offset) - pc;
+                        int delta = (s->variable->offset + s->offset) - pc - 2;
                         if ((delta >= -128) && (delta <= 127))
                             len = 2;
                         else if (defaultBranchSize == 2)

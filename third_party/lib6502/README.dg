@@ -1,2 +1,3 @@
 This has been crudely hacked by me, dg@cowlark.com, to execute one instruction
-at a time only.
+at a time only and split out the data for use in a disassembler.
+
