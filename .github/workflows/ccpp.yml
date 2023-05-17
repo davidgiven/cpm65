@@ -37,5 +37,7 @@ jobs:
           pet.d64
           x16.zip
           apple2e.po
+          atari800.atr
+          atari800hd.atr
           diskdefs
 

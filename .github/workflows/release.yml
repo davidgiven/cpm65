@@ -49,13 +49,15 @@ jobs:
         token: ${{ github.token }}
         tag: dev
         assets: | 
-          cpm65.zip
+          apple2e.po
+          atari800.atr
+          atari800hd.atr
           bbcmicro.ssd
           c64.d64
+          cpm65.zip
           pet.d64
           vic20.d64
           x16.zip
-          apple2e.po
         fail-if-no-assets: false
 
     - name: release
@@ -69,6 +71,8 @@ jobs:
           vic20.d64
           x16.zip
           apple2e.po
+          atari800.atr
+          atari800hd.atr
         tag_name: dev
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
