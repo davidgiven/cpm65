@@ -540,7 +540,7 @@ zproc entry_READLINE
         cmp #3
         zif_eq
             ldy buffer_pos
-            cpy #1
+            cpy #2
             zif_eq
                 jmp entry_EXIT
             zendif

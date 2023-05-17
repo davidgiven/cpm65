@@ -52,3 +52,28 @@ diskdef generic-1m
 	os 2.2
 end
 
+# Simple SSSD disk on the Atari 810 or 1050 diskdrive
+# Reserve three tracks for BIOS+BDOS
+diskdef atari90
+    seclen 128
+    tracks 40
+    sectrk 18
+    blocksize 1024
+    maxdir 64
+    boottrk 3
+    os 2.2
+end
+
+# Large ATR for use with emulators, hardware drive emulators or mounting
+# with AVG/SIDE cartridges on real hardware. seclen stil 128 so it uses
+# the same BIOS code as before. 8190 sectors. Almost 1MB.
+diskdef atarihd
+    seclen 128
+    tracks 455
+    sectrk 18
+    blocksize 2048
+    maxdir 128
+    boottrk 3
+    os 2.2
+end
+

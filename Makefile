@@ -13,13 +13,32 @@ APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/dinfo.com \
+	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/ls.com \
 	$(OBJDIR)/apps/capsdrv.com \
 	apps/bedit.asm \
 	apps/dump.asm \
+	apps/dinfo.asm \
+	apps/cls.asm \
+	apps/ls.asm \
 	cpmfs/asm.txt \
 	cpmfs/bedit.txt \
 	cpmfs/demo.sub \
 	cpmfs/hello.asm \
+
+MINIMAL_APPS = \
+	$(OBJDIR)/submit.com \
+	$(OBJDIR)/stat.com \
+	$(OBJDIR)/copy.com \
+	$(OBJDIR)/asm.com \
+	$(OBJDIR)/apps/bedit.com \
+	$(OBJDIR)/apps/dump.com \
+	$(OBJDIR)/apps/dinfo.com \
+	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/ls.com \
+	$(OBJDIR)/apps/capsdrv.com \
+	apps/dump.asm \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
@@ -41,7 +60,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 bin/cpmemu
+all: apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 bin/cpmemu atari800.atr atari800hd.atr
 
 $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 	@mkdir -p $(dir $@)
@@ -220,8 +239,43 @@ vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f c1541 $@ s 0:cbmfs.sys 0:ccp.sys
 
+# Atari targets call /usr/bin/printf directly because 'make' calls /bin/sh
+# which might be the Defective Annoying SHell which has a broken printf
+# implementation.
+
+$(OBJDIR)/src/bios/atari800.o: CFLAGS65 += -DATARI_SD
+$(OBJDIR)/atari800.exe:
+atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
+			$(MINIMAL_APPS) $(OBJDIR)/ccp.sys
+	dd if=/dev/zero of=$@ bs=128 count=720
+	mkfs.cpm -f atari90 $@
+	cpmcp -f atari90 $@ $(OBJDIR)/ccp.sys $(MINIMAL_APPS) 0:
+	cpmchattr -f atari90 $@ s 0:ccp.sys
+	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc
+	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=8 conv=notrunc
+	mv $@ $@.raw
+	/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
+	cat $@.raw >> $@
+	rm $@.raw
+
+$(OBJDIR)/src/bios/atari800hd.o: CFLAGS65 += -DATARI_HD
+$(OBJDIR)/atari800hd.exe:
+atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.img Makefile \
+			$(APPS) $(OBJDIR)/ccp.sys
+	dd if=/dev/zero of=$@ bs=128 count=8190
+	mkfs.cpm -f atarihd $@
+	cpmcp -f atarihd $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f atarihd $@ s 0:ccp.sys
+	dd if=$(OBJDIR)/atari800hd.exe of=$@ bs=128 conv=notrunc
+	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=10 conv=notrunc
+	mv $@ $@.raw
+	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
+	cat $@.raw >> $@
+	rm $@.raw
+
+
 clean:
-	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64
+	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet.d64 vic20.d64 atari800.atr atari800hd.atr
 
 .DELETE_ON_ERROR:
 .SECONDARY:
