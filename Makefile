@@ -10,6 +10,7 @@ APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
 	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/devices.com \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/apps/ls.com \
@@ -32,6 +33,7 @@ MINIMAL_APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
 	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/devices.com \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/apps/ls.com \
@@ -103,7 +105,7 @@ $(OBJDIR)/tools/%.o: tools/%.cc
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -c -o $@ $<
 
-$(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc
+$(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc include/driver.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 

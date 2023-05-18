@@ -233,7 +233,6 @@ print:
     jmp BDOS
 .zendproc
 
-
 .zproc newline
 	lda #13
 	jsr printchar

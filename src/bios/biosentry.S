@@ -85,6 +85,16 @@ zproc entry_FINDDRV
 	sta ptr1+0
 	stx ptr1+1
 
+	ora ptr1+1
+	zif_eq
+		; input ID is 0; return first driver structure
+
+		lda drvtop+0
+		ldx drvtop+1
+		clc
+		rts
+	zendif
+
 	lda drvtop+0
 	sta ptr+0
 	lda drvtop+1

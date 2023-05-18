@@ -119,9 +119,124 @@ cpmfs_filename:
 .global drvtop
 drvtop: .word drv_TTY
 
+; --- SCREEN driver ---------------------------------------------------------
+
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    pha
+    lda screen_jmptable_lo, y
+    sta ptr+0
+    lda screen_jmptable_hi, y
+    sta ptr+1
+    pla
+    jmp (ptr)
+
+screen_jmptable_lo:
+    .byte screen_version@mos16lo
+    .byte screen_getsize@mos16lo
+    .byte screen_clear@mos16lo
+    .byte screen_setcursor@mos16lo
+    .byte screen_getcursor@mos16lo
+    .byte OSWRCH@mos16lo
+    .byte screen_putstring@mos16lo
+    .byte screen_getchar@mos16lo
+    .byte fail@mos16lo
+    .byte screen_scrollup@mos16lo
+    .byte screen_scrolldown@mos16lo
+screen_jmptable_hi:
+    .byte screen_version@mos16hi
+    .byte screen_getsize@mos16hi
+    .byte screen_clear@mos16hi
+    .byte screen_setcursor@mos16hi
+    .byte screen_getcursor@mos16hi
+    .byte OSWRCH@mos16hi
+    .byte screen_putstring@mos16hi
+    .byte screen_getchar@mos16hi
+    .byte fail@mos16hi
+    .byte screen_scrollup@mos16hi
+    .byte screen_scrolldown@mos16hi
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+    lda #0xa0           ; read VDU variable
+    ldx #0x0a           ; text window, right column
+    jsr OSBYTE
+    stx ptr+0
+    ldx #0x08           ; text window, bottom row
+    jsr OSBYTE
+    tax
+    lda ptr+0
+    rts
+zendproc
+
+zproc screen_clear
+    lda #12             ; clear screen
+    jmp OSWRCH
+zendproc
+
+zproc screen_setcursor
+    pha
+    lda #31             ; set cursor
+    jsr OSWRCH
+    pla
+    jsr OSWRCH
+    txa
+    jmp OSWRCH
+zendproc
+
+zproc screen_getcursor
+    lda #0x86           ; get cursor
+    jsr OSBYTE
+    tya
+    rts
+zendproc
+
+zproc screen_getchar
+    tay
+    lda #0x81
+    jmp OSBYTE
+zendproc
+
+zproc screen_putstring
+    sta ptr+0
+    stx ptr+1
+    ldy #0
+    zrepeat
+        lda (ptr), y
+        zbreakif_eq
+        jsr OSWRCH
+        iny
+    zuntil_eq ; never 0
+    clc
+    rts
+zendproc
+
+zproc screen_scrollup
+    jsr screen_getsize
+    lda #0
+    jsr screen_setcursor
+    lda #10
+    jmp OSWRCH
+zendproc
+
+zproc screen_scrolldown
+    lda #30
+    jsr OSWRCH
+    lda #11
+    jmp OSWRCH
+zendproc
+
 ; --- TTY driver ------------------------------------------------------------
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -150,10 +265,9 @@ zproc tty_conin
     lda pending_key
     zif_eq
         zrepeat
-            lda #$81
             ldx #$ff
-            ldy #$7f
-            jsr OSBYTE
+            lda #$7f
+            jsr screen_getchar
         zuntil_cc
         txa
         rts
@@ -167,10 +281,9 @@ zendproc
 zproc tty_const
     lda pending_key
     zif_eq
-        lda #$81
         ldx #0
-        ldy #0
-        jsr OSBYTE
+        lda #0
+        jsr screen_getchar
         zif_cs
             lda #0
             rts
@@ -178,6 +291,13 @@ zproc tty_const
         stx pending_key
     zendif
     lda #$ff
+    rts
+zendproc
+
+; --- Rest of the BIOS ---------------------------------------------------
+
+zproc fail
+    sec
     rts
 zendproc
 
@@ -196,10 +316,7 @@ zendproc
 
 zproc entry_SELDSK
     cmp #0
-    zif_ne
-        sec                 ; invalid drive
-        rts
-    zendif
+    bne fail                ; invalid drive
 
     lda #<dph
     ldx #>dph
@@ -321,6 +438,8 @@ dma:         .word 0    ; current DMA
 sector_num:  .fill 3    ; current absolute sector number
 
 directory_buffer: .fill 128
+
+ZEROPAGE
 
 osgbpb_block:           ; block used by entry_READ and entry_WRITE
     .fill $0d
