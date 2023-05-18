@@ -77,6 +77,8 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 	you'll want to define your own disk format and adjust the drive definition
 	in the BIOS to get more space.
 
+  - The BBC Micro port has a SCREEN driver.
+
 ### Commodore 64 notes
 
   - Load and run the `CPM` program to start.
@@ -167,9 +169,9 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Supported programs
 
-You don't get a lot right now. As transients, you get `DUMP`, `STAT`, `COPY`,
-`SUBMIT`, `ASM` and `BEDIT`. I'd love more --- send me pull requests! The build
-system supports cc65 assembler and llvm-mos C programs.
+Commands include `DUMP`, `STAT`, `COPY`, `SUBMIT`, `ASM`, `QE` and `BEDIT`. I'd
+love more --- send me pull requests! The build system supports cc65 assembler
+and llvm-mos C programs.
 
 In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
 `SAVE` as on the relocatable CP/M-65 system assembling images in memory is of
@@ -189,14 +191,19 @@ program to it which assembles, works, and is ready to play with.
 
 Go read [cpmfs/asm.txt](cpmfs/asm.txt) for the documentation. 
 
-### The editor
+### The editors
 
 BEdit is an incredibly simple line editor modelled after a basic interpreter
 (command entry, with LOAD, SAVE, LIST, line numbers etc). It's written in
 machine code and assembled with the CP/M-65 assembler; you can assemble it
-locally if you have a system with 30kB or more TPA.
+locally if you have a system with 30kB or more TPA. It'll run on all platforms.
 
 Go read [cpmfs/bedit.txt](cpmfs/bedit.txt) for the documentation.
+
+QE is a much less simple vi-inspired screen editor, written in C. it's much
+more comfortable to use than BEDIT, but is about five times the size, and will
+only run on systems with a SCREEN driver, as noted above (you can also use the
+`DEVICES` command to see what devices your system supports).
 
 ### Utilities
 
