@@ -452,8 +452,8 @@ syntax_error:
 
         lda #0x7d
         sta cpm_default_dma
-        lda #<cpm_default_dma+0
-        ldx #>cpm_default_dma+1
+        lda #<cpm_default_dma
+        ldx #>cpm_default_dma
         ldy #BDOS_READLINE
         jsr BDOS
         jsr crlf
