@@ -248,16 +248,6 @@ print_next:
     lda (pidx),y
     sta pfile+1
 
-    ldy #11
-    lda (pfile),y
-    sta tmp
-    iny
-    lda (pfile),y
-    sta tmp+1
-    iny
-    lda #0
-    sta tmp+2
-
 \ print flags
 
     ldx #'-'
@@ -317,6 +307,16 @@ no_executable:
     jsr print_string
 
 \ print file size
+
+    ldy #11
+    lda (pfile),y
+    sta tmp
+    iny
+    lda (pfile),y
+    sta tmp+1
+    iny
+    lda #0
+    sta tmp+2
 
     ldx #7
 mul128:             \ 24-bit mul, files can be larger than 65535
