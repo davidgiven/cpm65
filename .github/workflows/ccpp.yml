@@ -27,7 +27,7 @@ jobs:
         cache-name: cache-llvm-mos
       with:
         path: ~/llvm-mos
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.MOS_SDK_VERSION }}
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-ver-${{ env.MOS_SDK_VERSION }}
 
     - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
       name: install llvm-mos
@@ -36,8 +36,8 @@ jobs:
         (cd llvm-mos-sdk/build && cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX=$HOME/llvm-mos ..)
         (cd llvm-mos-sdk/build && ninja install)
 
-    - name: make -C cpm65
-      run: PATH=$PATH:$HOME/llvm-mos/bin make
+    - name: make
+      run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v2
