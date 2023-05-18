@@ -45,13 +45,15 @@ drv_\name:
 #define SCREEN_CLEAR       2 /* also homes cursor */
 #define SCREEN_SETCURSOR   3 /* entry: A=x, X=y; out of bounds undefined */
 #define SCREEN_GETCURSOR   4 /* exit: A=x, X=y */
-#define SCREEN_PUTCHAR     5 /* entry: A=char; moves cursor to right */
+#define SCREEN_PUTCHAR     5 /* entry: A=char; moves cursor to right, possibly scrolling */
 #define SCREEN_PUTSTRING   6 /* entry: XA=nul terminated pointer */
 #define SCREEN_GETCHAR     7 /* entry: XA=timeoutin cs, exit: A=char, or C if timed out */
 #define SCREEN_SHOWCURSOR  8 /* entry: A=0 for off, non-zero for on */
 #define SCREEN_SCROLLUP    9 /* cursor position left undefined */
 #define SCREEN_SCROLLDOWN 10 /* cursor position left undefined */
 #define SCREEN_CLEARTOEOL 11 /* from cursor position to EOL */
+#define SCREEN_NEWLINE    12 /* does a newline, possibly scrolling */
+#define SCREEN_BACKSPACE  13 /* does a backspace-and-erase, possibly scrolling */
 
 ; vim: filetype=asm sw=4 ts=4 et
 

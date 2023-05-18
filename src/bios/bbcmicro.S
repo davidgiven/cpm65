@@ -50,6 +50,15 @@ zproc _start
 
     jsr initdrivers
 
+    lda #0xca
+    ldx #0x30
+    ldy #0x00
+    jsr OSBYTE          ; caps lock off
+
+    lda #0xe5
+    ldx #1
+    jsr OSBYTE          ; disable ESCAPE handling
+
     ; Load the BDOS image.
 
     lda mem_base
@@ -139,26 +148,30 @@ screen_jmptable_lo:
     .byte screen_clear@mos16lo
     .byte screen_setcursor@mos16lo
     .byte screen_getcursor@mos16lo
-    .byte OSWRCH@mos16lo
+    .byte screen_putchar@mos16lo
     .byte screen_putstring@mos16lo
     .byte screen_getchar@mos16lo
     .byte fail@mos16lo
     .byte screen_scrollup@mos16lo
     .byte screen_scrolldown@mos16lo
     .byte screen_cleartoeol@mos16lo
+    .byte OSNEWL@mos16lo
+    .byte screen_backspace@mos16lo
 screen_jmptable_hi:
     .byte screen_version@mos16hi
     .byte screen_getsize@mos16hi
     .byte screen_clear@mos16hi
     .byte screen_setcursor@mos16hi
     .byte screen_getcursor@mos16hi
-    .byte OSWRCH@mos16hi
+    .byte screen_putchar@mos16hi
     .byte screen_putstring@mos16hi
     .byte screen_getchar@mos16hi
     .byte fail@mos16hi
     .byte screen_scrollup@mos16hi
     .byte screen_scrolldown@mos16hi
     .byte screen_cleartoeol@mos16hi
+    .byte OSNEWL@mos16hi
+    .byte screen_backspace@mos16hi
 zendproc
 
 zproc screen_version
@@ -171,9 +184,8 @@ zproc screen_getsize
     ldx #0x0a           ; text window, right column
     jsr OSBYTE
     stx ptr+0
-    ldx #0x08           ; text window, bottom row
+    ldx #0x09           ; text window, bottom row
     jsr OSBYTE
-    tax
     lda ptr+0
     rts
 zendproc
@@ -196,14 +208,42 @@ zendproc
 zproc screen_getcursor
     lda #0x86           ; get cursor
     jsr OSBYTE
-    tya
+    sty ptr+0
+    txa
+    ldx ptr+0
     rts
 zendproc
 
 zproc screen_getchar
+    pha
+    txa
+    and #0x7f
     tay
+    pla
+    tax
     lda #0x81           ; read key with timeout
-    jmp OSBYTE
+    jsr OSBYTE
+    txa
+    zif_cc
+        cmp #127
+        zif_eq
+            lda #8
+        zendif
+        clc
+    zendif
+    rts
+zendproc
+
+zproc screen_putchar
+    cmp #32
+    zif_cc
+        rts
+    zendif
+    cmp #127
+    zif_cs
+        rts
+    zendif
+    jmp OSWRCH
 zendproc
 
 zproc screen_putstring
@@ -238,18 +278,30 @@ zendproc
 zproc screen_cleartoeol
     lda #28             ; set up window
     jsr OSWRCH
+
     jsr screen_getcursor
+    sta ptr+0
+    stx ptr+1
+
     jsr OSWRCH          ; left
     txa
-    pha
     jsr OSWRCH          ; top
     jsr screen_getsize
     jsr OSWRCH          ; right
-    pla
+    lda ptr+1
     jsr OSWRCH          ; bottom
     lda #12             ; clear window
     jsr OSWRCH
     lda #26             ; reset window
+    jsr OSWRCH
+
+    lda ptr+0
+    ldx ptr+1
+    jmp screen_setcursor
+zendproc
+
+zproc screen_backspace
+    lda #127
     jmp OSWRCH
 zendproc
 
@@ -284,11 +336,10 @@ zproc tty_conin
     lda pending_key
     zif_eq
         zrepeat
-            ldx #$ff
-            lda #$7f
+            ldx #$7f
+            lda #$ff
             jsr screen_getchar
         zuntil_cc
-        txa
         rts
     zendif
 
@@ -307,7 +358,7 @@ zproc tty_const
             lda #0
             rts
         zendif
-        stx pending_key
+        sta pending_key
     zendif
     lda #$ff
     rts

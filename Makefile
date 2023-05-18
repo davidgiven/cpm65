@@ -2,7 +2,9 @@ CXX = g++
 CC = gcc
 
 CFLAGS = -Os -g -I.
-CFLAGS65 = -Os -g -fnonreentrant -I.
+CFLAGS65 = -Os -g -fnonreentrant -I. \
+	-Wno-main-return-type \
+	-Wno-incompatible-library-redeclaration
 
 OBJDIR = .obj
 
@@ -17,6 +19,7 @@ APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/objdump.com \
+	$(OBJDIR)/qe.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
 	apps/bedit.asm \
@@ -47,6 +50,7 @@ LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
 	$(OBJDIR)/lib/bdos.o \
 	$(OBJDIR)/lib/xfcb.o \
+	$(OBJDIR)/lib/screen.o \
 
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
