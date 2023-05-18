@@ -6,8 +6,7 @@
 \ see the COPYING file in the root project directory for the full text.
 
 \   C version: 2051 bytes
-\ asm version:  640 bytes (w/o sort)
-\ asm version:  896 bytes (w/  sort)
+\ asm version:  972 bytes (w/ flags)
 
 .bss pblock, 165
 cpm_fcb = pblock
@@ -77,9 +76,7 @@ keepcur:
 
     lda #<error
     ldx #>error
-    ldy #BDOS_PRINTSTRING
-    jsr BDOS
-    rts
+    jmp print_string    \ exits
 
 success:
     lda cpm_fcb+1
@@ -189,11 +186,9 @@ no_fill_wildcards:
         cmp #MAXFILES
         bne found_name
     
-        ldy #BDOS_PRINTSTRING
         lda #<too_many_files
         ldx #>too_many_files
-        jsr BDOS
-        rts
+        jmp print_string        \ exits
     
     found_name:
     
@@ -262,6 +257,66 @@ print_next:
     iny
     lda #0
     sta tmp+2
+
+\ print flags
+
+    ldx #'-'
+    lda #'w'
+    sta flags+3
+
+    ldy #8
+    lda (pfile),y
+    bpl no_rofile
+
+    stx flags+3
+
+no_rofile:
+    stx flags+1
+
+    iny
+    lda (pfile),y
+    bpl no_sysfile
+
+    lda #'s'
+    sta flags+1
+
+no_sysfile:
+    stx flags
+
+    iny
+    lda (pfile),y
+    bpl no_archived
+
+    lda #'a'
+    sta flags
+
+no_archived:
+    stx flags+4
+
+    lda (pfile),y
+    and #$7f
+    cmp #'M'
+    bne no_executable
+    dey
+    lda (pfile),y
+    and #$7f
+    cmp #'O'
+    bne no_executable
+    dey
+    lda (pfile),y
+    and #$7f
+    cmp #'C'
+    bne no_executable
+
+    lda #'x'
+    sta flags+4
+
+no_executable:
+    lda #<flags
+    ldx #>flags
+    jsr print_string
+
+\ print file size
 
     ldx #7
 mul128:             \ 24-bit mul, files can be larger than 65535
@@ -334,29 +389,6 @@ no_adjust2:
         cpy #11
     .zuntil eq
 
-    ldy #9
-    lda (pfile),y
-    and #$80
-    beq no_sysfile
-
-    ldy #BDOS_PRINTSTRING
-    lda #<sysfile
-    ldx #>sysfile
-    jsr BDOS
-
-no_sysfile:
-
-    ldy #8
-    lda (pfile),y
-    and #$80
-    beq no_rofile
-
-    ldy #BDOS_PRINTSTRING
-    lda #<rofile
-    ldx #>rofile
-    jsr BDOS
-
-no_rofile:
     ldy #BDOS_CONOUT
     lda #13
     jsr BDOS
@@ -527,6 +559,13 @@ just_one_file:
     rts
 .zendproc
 
+\ Print string wrapper
+
+.zproc print_string
+    ldy #BDOS_PRINTSTRING
+    jmp BDOS
+.zendproc
+
 \ Prints XA in decimal. Y is the padding char or 0 for no padding.
 
 .zproc print16padded
@@ -599,8 +638,6 @@ error:
     .byte "drive error\r\n$"
 too_many_files:
     .byte "too many files\r\n$"
-sysfile:
-    .byte " (s)$"
-rofile:
-    .byte " (r/o)$"
+flags:
+    .byte "--r-- $"       \ s=system, a=archived, r=read, w=write, x=execute
 
