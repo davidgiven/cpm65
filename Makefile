@@ -19,7 +19,6 @@ APPS = \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/objdump.com \
-	$(OBJDIR)/qe.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
 	apps/bedit.asm \
@@ -31,6 +30,9 @@ APPS = \
 	cpmfs/bedit.txt \
 	cpmfs/demo.sub \
 	cpmfs/hello.asm \
+
+SCREEN_APPS = \
+	$(OBJDIR)/qe.com \
 
 MINIMAL_APPS = \
 	$(OBJDIR)/apps/bedit.com \
@@ -160,9 +162,9 @@ $(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
 	@mkdir -p $(dir $@)
 	bin/fontconvert third_party/tomsfonts/atari-small.bdf > $@
 	
-$(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
+$(OBJDIR)/bbcmicrofs.img: $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
-	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
 	cpmchattr -f bbc192 $@ s 0:ccp.sys
 
 bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmicrofs.img $(OBJDIR)/mkdfs
