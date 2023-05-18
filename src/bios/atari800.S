@@ -36,27 +36,75 @@ _start:
 #ifdef ATARI_HD
     .byte 10 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #else
-    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 10 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
     .word $0600
     .word init      ; just use init and never return
 
 init:
-    lda MEMTOP+1
-    sta mem_end
+    ldx MEMTOP+1
+    stx mem_end
+    stx ptr+1
 
     lda #0
+    sta ptr
     sta LMARGN
     sta COLCRS      ; leftover cursor will be overwritten by banner
     sta COLCRS+1
     sta SHFLOK      ; start lower case
-
-    lda #$b0        ; green
-    sta COLOR2      ; background
-    lda #$0f        ; luma only
-    sta COLOR1      ; foreground
+    sta COLOR2      ; background (black)
+;    stx COLOR1      ; foreground a tad brighter (luma only)
 
     ; IOCB0 E: is already open
+
+    ; ptr points to the last kilobyte of RAM before ROM (48+kB machines) or
+    ; a gap (<48kB machines). This is _always_ true for all models.
+    ; This block contains 32 empty bytes, 32 bytes of display list (DL),
+    ; after which the screen memory starts.
+
+    ; Adjust display list to have a scanline of space between text lines to
+    ; avoid ascenders and descenders touching eachother when we load a
+    ; proper 7x8 font from user space.
+
+    sta SDMCTL      ; turn off screen gracefully while we adjust the DL
+    sta DMACTL      ; hardware register, too, VBI might not occur during SIO
+    sta SDLSTL      ; set DL pointer to MEMTOP+1
+    stx SDLSTL+1
+    tay
+
+    stx dl_prologue+4
+    lda #$40
+    sta dl_prologue+3
+
+    zrepeat
+        lda dl_prologue,y
+        sta (ptr),y
+        iny
+        cpy #5
+    zuntil_eq
+
+    ldx #23
+    zrepeat
+        lda #0      ; 1 black line
+        sta (ptr),y
+        iny
+        lda #2      ; Mode 2
+        sta (ptr),y
+        iny
+        dex
+    zuntil_eq
+
+    lda #$41
+    sta (ptr),y
+    txa
+    iny
+    sta (ptr),y
+    iny
+    lda MEMTOP+1
+    sta (ptr),y
+
+    lda #$22
+    sta SDMCTL      ; turn on screen again
 
     ; Print banner.
 
@@ -112,11 +160,6 @@ init:
     ldx #>biosentry
     rts                 ; indirect jump to BDOS
 zendproc
-
-banner: ; reversed!
-    .byte 10,13
-    .ascii "008 iratA eht rof 56-M/PC"
-banner_end:
 
 .data
 .global drvtop
@@ -397,8 +440,35 @@ zp_end:  .byte __USERZEROPAGE_END__
 mem_base: .byte __USERTPA_START__@mos16hi
 mem_end:  .byte __USERTPA_END__@mos16hi
 
+; Discardable data which is not used anymore after BIOS init
+
+; We have 34 bytes in total here
+
+overwrite_after_display_stretch:        ; 5 bytes
+
+dl_prologue:
+    .byte $70, $30, $42, 0, 0
+
+overwrite_after_banner:                 ; 27 bytes
+
+banner: ; reversed!
+    .byte 10,13
+    .ascii "008 iratA eht rof 56-M/PC"
+banner_end:
+
+overwrite_after_keyboard_init:          ; 2 bytes
+
 kdevice: .ascii "K"
          .byte 155
+
+; Former bss variables
+
+charin       = overwrite_after_display_stretch
+charout      = overwrite_after_display_stretch
+drive_number = overwrite_after_display_stretch + 1
+sector_num   = overwrite_after_display_stretch + 2 ; (and +3, and +4, full)
+
+dma          = overwrite_after_banner   ; (and +1
 
 ; DPH for drive 0 (our only drive)
 
@@ -413,14 +483,6 @@ define_drive dph, 720, 1024, 64, 54
 #endif
 
 NOINIT
-
-charin:
-charout: .byte 0
-
-drive_number: .byte 0
-
-dma:        .word 0     ; current DMA
-sector_num: .fill 3     ; current 24-bit sector number
 
 directory_buffer: .fill 128
 

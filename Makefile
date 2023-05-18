@@ -40,6 +40,7 @@ MINIMAL_APPS = \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
 	apps/dump.asm \
+	apps/ls.asm \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
@@ -157,7 +158,7 @@ $(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
 	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f bbc192 $@ s 0:ccp.sys
+	cpmchattr -f bbc192 $@ sr 0:ccp.sys
 
 bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmicrofs.img $(OBJDIR)/mkdfs
 	$(OBJDIR)/mkdfs -O $@ \
@@ -178,13 +179,13 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 		$@
 	$(OBJDIR)/mkcombifs $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
 
 $(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
 	mkfs.cpm -f generic-1m $@
 	cpmcp -f generic-1m $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f generic-1m $@ s 0:ccp.sys
+	cpmchattr -f generic-1m $@ sr 0:ccp.sys
 
 $(OBJDIR)/x16.exe: $(OBJDIR)/libcommodore.a
 x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
@@ -206,7 +207,7 @@ apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/cc
 	@rm -f $@
 	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.boottracks $@
 	cpmcp -f appleiie $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f appleiie $@ s 0:ccp.sys 0:cbm.sys
+	cpmchattr -f appleiie $@ sr 0:ccp.sys 0:cbm.sys
 	truncate -s 143360 $@
 
 $(OBJDIR)/pet.exe: LINKFLAGS += --no-check-sections
@@ -222,7 +223,7 @@ pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 		$@
 	$(OBJDIR)/mkcombifs $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ s 0:ccp.sys 0:ccp.sys
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/vic20.exe: $(OBJDIR)/libcommodore.a
@@ -238,7 +239,7 @@ vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
 		$@
 	$(OBJDIR)/mkcombifs $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ s 0:cbmfs.sys 0:ccp.sys
+	cpmchattr -f c1541 $@ sr 0:cbmfs.sys 0:ccp.sys
 
 # Atari targets call /usr/bin/printf directly because 'make' calls /bin/sh
 # which might be the Defective Annoying SHell which has a broken printf
@@ -247,13 +248,15 @@ vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
 $(OBJDIR)/src/bios/atari800.o: CFLAGS65 += -DATARI_SD
 $(OBJDIR)/atari800.exe:
 atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
-			$(MINIMAL_APPS) $(OBJDIR)/ccp.sys
+			$(MINIMAL_APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com
 	dd if=/dev/zero of=$@ bs=128 count=720
 	mkfs.cpm -f atari90 $@
+	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
 	cpmcp -f atari90 $@ $(OBJDIR)/ccp.sys $(MINIMAL_APPS) 0:
-	cpmchattr -f atari90 $@ s 0:ccp.sys
+	cpmcp -f atari90 $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/olivetti.fnt 1:
+	cpmchattr -f atari90 $@ sr 0:ccp.sys
 	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc
-	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=8 conv=notrunc
+	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=10 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
@@ -262,11 +265,13 @@ atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
 $(OBJDIR)/src/bios/atari800hd.o: CFLAGS65 += -DATARI_HD
 $(OBJDIR)/atari800hd.exe:
 atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.img Makefile \
-			$(APPS) $(OBJDIR)/ccp.sys
+			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com
 	dd if=/dev/zero of=$@ bs=128 count=8190
 	mkfs.cpm -f atarihd $@
+	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
 	cpmcp -f atarihd $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f atarihd $@ s 0:ccp.sys
+	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/*.fnt 1:
+	cpmchattr -f atarihd $@ sr 0:ccp.sys
 	dd if=$(OBJDIR)/atari800hd.exe of=$@ bs=128 conv=notrunc
 	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=10 conv=notrunc
 	mv $@ $@.raw
