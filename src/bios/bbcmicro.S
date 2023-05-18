@@ -14,6 +14,11 @@ ZEROPAGE
 ptr: .word 0
 ptr1: .word 0
 
+; Only used during startup --- the BIOS will overwrite this once initialisation
+; starts.
+
+bdos_osfile_block:
+
 ; --- Initialisation code ---------------------------------------------------
 
 ; Called once on startup and then never again.
@@ -46,28 +51,14 @@ zproc _start
     zendif
     sty mem_end
 
-    ; BIOS initialisation.
-
-    jsr initdrivers
-
-    lda #0xca
-    ldx #0x30
-    ldy #0x00
-    jsr OSBYTE          ; caps lock off
-
-    lda #0xe5
-    ldx #1
-    jsr OSBYTE          ; disable ESCAPE handling
-
-    ldx #1              ; cursor keys return values
-    jsr set_cursor_keys
-
     ; Load the BDOS image.
 
     lda #<bdos_filename
     sta bdos_osfile_block + 0
     lda #>bdos_filename
     sta bdos_osfile_block + 1
+    lda #0
+    sta bdos_osfile_block + 2
     lda mem_base
     sta bdos_osfile_block + 3
     lda #$ff
@@ -95,6 +86,22 @@ zproc _start
     jsr OSFIND
     sta filehandle
 
+    ; BIOS initialisation.
+
+    jsr initdrivers
+
+    lda #0xca
+    ldx #0x30
+    ldy #0x00
+    jsr OSBYTE          ; caps lock off
+
+    lda #0xe5
+    ldx #1
+    jsr OSBYTE          ; disable ESCAPE handling
+
+    ldx #1              ; cursor keys return values
+    jsr set_cursor_keys
+
     ; Compute the entry address and jump.
 
     lda mem_base
@@ -107,8 +114,6 @@ zproc _start
     rts                 ; indirect jump
 zendproc
 
-bdos_osfile_block = 0x0100
-    
 bdos_filename:
     .ascii "BDOS"
     .byte 13
