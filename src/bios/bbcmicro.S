@@ -59,8 +59,15 @@ zproc _start
     ldx #1
     jsr OSBYTE          ; disable ESCAPE handling
 
+    ldx #1              ; cursor keys return values
+    jsr set_cursor_keys
+
     ; Load the BDOS image.
 
+    lda #<bdos_filename
+    sta bdos_osfile_block + 0
+    lda #>bdos_filename
+    sta bdos_osfile_block + 1
     lda mem_base
     sta bdos_osfile_block + 3
     lda #$ff
@@ -100,22 +107,16 @@ zproc _start
     rts                 ; indirect jump
 zendproc
 
-bdos_osfile_block:
-    .word bdos_filename ; filename
-    .word 0             ; load address low
-    .word 0             ; load address high
-    .word 0             ; exec address low
-    .word 0             ; exec address high
-    .word 0             ; length low
-    .word 0             ; length high
-    .word 0             ; attrs low
-    .word 0             ; attrs high
+bdos_osfile_block = 0x0100
     
 bdos_filename:
     .ascii "BDOS"
     .byte 13
 
 banner: ; reversed!
+    ; The Acorn font has a £ here, where ASCII expects a backtick, so
+    ; redefine it.
+    .byte 0, 0, 0, 0, 0, 0, 0x18, 0x30, '`', 23
     .byte 13, 10
     .ascii "56-M/PC"
 banner_end:
@@ -172,6 +173,11 @@ screen_jmptable_hi:
     .byte screen_cleartoeol@mos16hi
     .byte OSNEWL@mos16hi
     .byte screen_backspace@mos16hi
+zendproc
+
+zproc set_cursor_keys
+    lda #4              ; set cursor key state
+    jmp OSBYTE
 zendproc
 
 zproc screen_version
@@ -335,11 +341,17 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif_eq
+        ldx #0              ; cursor keys edit
+        jsr set_cursor_keys
         zrepeat
             ldx #$7f
             lda #$ff
             jsr screen_getchar
         zuntil_cc
+        pha
+        ldx #1              ; cursor keys return values
+        jsr set_cursor_keys
+        pla
         rts
     zendif
 
