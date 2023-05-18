@@ -17,7 +17,7 @@ ptr1: .word 0
 ; --- Initialisation code ---------------------------------------------------
 
 ; Called once on startup and then never again.
-; TODO: figure out a way to discard this after startup.
+; Will eventually be overwritten by the directory buffer.
 
 zproc _start
     ; Print banner.
@@ -115,9 +115,8 @@ cpmfs_filename:
     .ascii "CPMFS"
     .byte 13
 
-.data
-.global drvtop
-drvtop: .word drv_TTY
+; Everything above here is overwritten by the directory buffer, so make sure
+; it's bigger than 0x80 bytes (currently: 0x87).
 
 ; --- SCREEN driver ---------------------------------------------------------
 
@@ -423,9 +422,14 @@ zendproc
 zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
 
+.global drvtop
+drvtop: .word drv_TTY
+
 ; DPH for drive 0 (our only drive)
 
 define_drive dph, 0x600, 1024, 64, 0
+
+directory_buffer = _start
 
 NOINIT
 
@@ -436,8 +440,6 @@ filehandle:  .byte 0    ; file handle of disk image
 pending_key: .byte 0    ; pending keypress from system
 dma:         .word 0    ; current DMA
 sector_num:  .fill 3    ; current absolute sector number
-
-directory_buffer: .fill 128
 
 ZEROPAGE
 
