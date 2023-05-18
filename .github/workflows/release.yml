@@ -10,9 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        repository: 'davidgiven/cpm65'
+        path: 'cpm65'
+    - uses: actions/checkout@v3
+      with:
+        repository: 'davidgiven/llvm-mos-sdk'
+        path: 'llvm-mos-sdk'
+    - name: get llvm-mos-sdk version
+      run: echo "MOS_SDK_VERSION=$(cd llvm-mos-sdk && git rev-parse --short HEAD)" >> $GITHUB_ENV
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev ninja-build
 
     - name: cache llvm-mos
       id: cache-llvm-mos
@@ -21,15 +30,17 @@ jobs:
         cache-name: cache-llvm-mos
       with:
         path: ~/llvm-mos
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-ver-${{ env.MOS_SDK_VERSION }}
 
     - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
       name: install llvm-mos
       run: |
-        curl -L https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xvJf - -C $HOME
+        mkdir -p llvm-mos-sdk/build
+        (cd llvm-mos-sdk/build && cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX=$HOME/llvm-mos ..)
+        (cd llvm-mos-sdk/build && ninja install)
 
     - name: make
-      run: PATH=$PATH:$HOME/llvm-mos/bin make
+      run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65
 
     - name: date
       run: |
@@ -65,14 +76,14 @@ jobs:
       with:
         name: Development build ${{ env.RELEASE_DATE }}
         files: |
-          bbcmicro.ssd
-          c64.d64
-          pet.d64
-          vic20.d64
-          x16.zip
-          apple2e.po
-          atari800.atr
-          atari800hd.atr
+          cpm65/bbcmicro.ssd
+          cpm65/c64.d64
+          cpm65/pet.d64
+          cpm65/vic20.d64
+          cpm65/x16.zip
+          cpm65/apple2e.po
+          cpm65/atari800.atr
+          cpm65/atari800hd.atr
         tag_name: dev
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
