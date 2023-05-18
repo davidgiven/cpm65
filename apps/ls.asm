@@ -6,7 +6,7 @@
 \ see the COPYING file in the root project directory for the full text.
 
 \   C version: 2051 bytes
-\ asm version:  972 bytes (w/ flags)
+\ asm version: 1024 bytes (w/ flags)
 
 .bss pblock, 165
 cpm_fcb = pblock
