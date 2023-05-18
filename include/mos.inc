@@ -4,6 +4,7 @@
 
 	OSFILE = $ffdd
 	OSRDCH = $ffe0
+    OSNEWL = $ffe7
 	OSWRCH = $ffee
 	OSBYTE = $fff4
 	OSFIND = $ffce

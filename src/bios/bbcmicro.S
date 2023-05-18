@@ -14,10 +14,15 @@ ZEROPAGE
 ptr: .word 0
 ptr1: .word 0
 
+; Only used during startup --- the BIOS will overwrite this once initialisation
+; starts.
+
+bdos_osfile_block:
+
 ; --- Initialisation code ---------------------------------------------------
 
 ; Called once on startup and then never again.
-; TODO: figure out a way to discard this after startup.
+; Will eventually be overwritten by the directory buffer.
 
 zproc _start
     ; Print banner.
@@ -46,12 +51,14 @@ zproc _start
     zendif
     sty mem_end
 
-    ; BIOS initialisation.
-
-    jsr initdrivers
-
     ; Load the BDOS image.
 
+    lda #<bdos_filename
+    sta bdos_osfile_block + 0
+    lda #>bdos_filename
+    sta bdos_osfile_block + 1
+    lda #0
+    sta bdos_osfile_block + 2
     lda mem_base
     sta bdos_osfile_block + 3
     lda #$ff
@@ -79,6 +86,22 @@ zproc _start
     jsr OSFIND
     sta filehandle
 
+    ; BIOS initialisation.
+
+    jsr initdrivers
+
+    lda #0xca
+    ldx #0x30
+    ldy #0x00
+    jsr OSBYTE          ; caps lock off
+
+    lda #0xe5
+    ldx #1
+    jsr OSBYTE          ; disable ESCAPE handling
+
+    ldx #1              ; cursor keys return values
+    jsr set_cursor_keys
+
     ; Compute the entry address and jump.
 
     lda mem_base
@@ -91,22 +114,14 @@ zproc _start
     rts                 ; indirect jump
 zendproc
 
-bdos_osfile_block:
-    .word bdos_filename ; filename
-    .word 0             ; load address low
-    .word 0             ; load address high
-    .word 0             ; exec address low
-    .word 0             ; exec address high
-    .word 0             ; length low
-    .word 0             ; length high
-    .word 0             ; attrs low
-    .word 0             ; attrs high
-    
 bdos_filename:
     .ascii "BDOS"
     .byte 13
 
 banner: ; reversed!
+    ; The Acorn font has a £ here, where ASCII expects a backtick, so
+    ; redefine it.
+    .byte 0, 0, 0, 0, 0, 0, 0x18, 0x30, '`', 23
     .byte 13, 10
     .ascii "56-M/PC"
 banner_end:
@@ -115,13 +130,195 @@ cpmfs_filename:
     .ascii "CPMFS"
     .byte 13
 
-.data
-.global drvtop
-drvtop: .word drv_TTY
+; Everything above here is overwritten by the directory buffer, so make sure
+; it's bigger than 0x80 bytes (currently: 0x87).
+
+; --- SCREEN driver ---------------------------------------------------------
+
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    pha
+    lda screen_jmptable_lo, y
+    sta ptr+0
+    lda screen_jmptable_hi, y
+    sta ptr+1
+    pla
+    jmp (ptr)
+
+screen_jmptable_lo:
+    .byte screen_version@mos16lo
+    .byte screen_getsize@mos16lo
+    .byte screen_clear@mos16lo
+    .byte screen_setcursor@mos16lo
+    .byte screen_getcursor@mos16lo
+    .byte screen_putchar@mos16lo
+    .byte screen_putstring@mos16lo
+    .byte screen_getchar@mos16lo
+    .byte fail@mos16lo
+    .byte screen_scrollup@mos16lo
+    .byte screen_scrolldown@mos16lo
+    .byte screen_cleartoeol@mos16lo
+    .byte OSNEWL@mos16lo
+    .byte screen_backspace@mos16lo
+screen_jmptable_hi:
+    .byte screen_version@mos16hi
+    .byte screen_getsize@mos16hi
+    .byte screen_clear@mos16hi
+    .byte screen_setcursor@mos16hi
+    .byte screen_getcursor@mos16hi
+    .byte screen_putchar@mos16hi
+    .byte screen_putstring@mos16hi
+    .byte screen_getchar@mos16hi
+    .byte fail@mos16hi
+    .byte screen_scrollup@mos16hi
+    .byte screen_scrolldown@mos16hi
+    .byte screen_cleartoeol@mos16hi
+    .byte OSNEWL@mos16hi
+    .byte screen_backspace@mos16hi
+zendproc
+
+zproc set_cursor_keys
+    lda #4              ; set cursor key state
+    jmp OSBYTE
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+    lda #0xa0           ; read VDU variable
+    ldx #0x0a           ; text window, right column
+    jsr OSBYTE
+    stx ptr+0
+    ldx #0x09           ; text window, bottom row
+    jsr OSBYTE
+    lda ptr+0
+    rts
+zendproc
+
+zproc screen_clear
+    lda #12             ; clear screen
+    jmp OSWRCH
+zendproc
+
+zproc screen_setcursor
+    pha
+    lda #31             ; set cursor
+    jsr OSWRCH
+    pla
+    jsr OSWRCH
+    txa
+    jmp OSWRCH
+zendproc
+
+zproc screen_getcursor
+    lda #0x86           ; get cursor
+    jsr OSBYTE
+    sty ptr+0
+    txa
+    ldx ptr+0
+    rts
+zendproc
+
+zproc screen_getchar
+    pha
+    txa
+    and #0x7f
+    tay
+    pla
+    tax
+    lda #0x81           ; read key with timeout
+    jsr OSBYTE
+    txa
+    zif_cc
+        cmp #127
+        zif_eq
+            lda #8
+        zendif
+        clc
+    zendif
+    rts
+zendproc
+
+zproc screen_putchar
+    cmp #32
+    zif_cc
+        rts
+    zendif
+    cmp #127
+    zif_cs
+        rts
+    zendif
+    jmp OSWRCH
+zendproc
+
+zproc screen_putstring
+    sta ptr+0
+    stx ptr+1
+    ldy #0
+    zrepeat
+        lda (ptr), y
+        zbreakif_eq
+        jsr OSWRCH
+        iny
+    zuntil_eq ; never 0
+    clc
+    rts
+zendproc
+
+zproc screen_scrollup
+    jsr screen_getsize
+    lda #0
+    jsr screen_setcursor
+    lda #10
+    jmp OSWRCH
+zendproc
+
+zproc screen_scrolldown
+    lda #30             ; home
+    jsr OSWRCH
+    lda #11             ; cursor up
+    jmp OSWRCH
+zendproc
+
+zproc screen_cleartoeol
+    lda #28             ; set up window
+    jsr OSWRCH
+
+    jsr screen_getcursor
+    sta ptr+0
+    stx ptr+1
+
+    jsr OSWRCH          ; left
+    txa
+    jsr OSWRCH          ; top
+    jsr screen_getsize
+    jsr OSWRCH          ; right
+    lda ptr+1
+    jsr OSWRCH          ; bottom
+    lda #12             ; clear window
+    jsr OSWRCH
+    lda #26             ; reset window
+    jsr OSWRCH
+
+    lda ptr+0
+    ldx ptr+1
+    jmp screen_setcursor
+zendproc
+
+zproc screen_backspace
+    lda #127
+    jmp OSWRCH
+zendproc
 
 ; --- TTY driver ------------------------------------------------------------
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -149,13 +346,17 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif_eq
+        ldx #0              ; cursor keys edit
+        jsr set_cursor_keys
         zrepeat
-            lda #$81
-            ldx #$ff
-            ldy #$7f
-            jsr OSBYTE
+            ldx #$7f
+            lda #$ff
+            jsr screen_getchar
         zuntil_cc
-        txa
+        pha
+        ldx #1              ; cursor keys return values
+        jsr set_cursor_keys
+        pla
         rts
     zendif
 
@@ -167,17 +368,23 @@ zendproc
 zproc tty_const
     lda pending_key
     zif_eq
-        lda #$81
         ldx #0
-        ldy #0
-        jsr OSBYTE
+        lda #0
+        jsr screen_getchar
         zif_cs
             lda #0
             rts
         zendif
-        stx pending_key
+        sta pending_key
     zendif
     lda #$ff
+    rts
+zendproc
+
+; --- Rest of the BIOS ---------------------------------------------------
+
+zproc fail
+    sec
     rts
 zendproc
 
@@ -196,10 +403,7 @@ zendproc
 
 zproc entry_SELDSK
     cmp #0
-    zif_ne
-        sec                 ; invalid drive
-        rts
-    zendif
+    bne fail                ; invalid drive
 
     lda #<dph
     ldx #>dph
@@ -306,9 +510,14 @@ zendproc
 zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
 
+.global drvtop
+drvtop: .word drv_TTY
+
 ; DPH for drive 0 (our only drive)
 
 define_drive dph, 0x600, 1024, 64, 0
+
+directory_buffer = _start
 
 NOINIT
 
@@ -320,7 +529,7 @@ pending_key: .byte 0    ; pending keypress from system
 dma:         .word 0    ; current DMA
 sector_num:  .fill 3    ; current absolute sector number
 
-directory_buffer: .fill 128
+ZEROPAGE
 
 osgbpb_block:           ; block used by entry_READ and entry_WRITE
     .fill $0d

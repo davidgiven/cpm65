@@ -2,7 +2,9 @@ CXX = g++
 CC = gcc
 
 CFLAGS = -Os -g -I.
-CFLAGS65 = -Os -g -fnonreentrant -I.
+CFLAGS65 = -Os -g -fnonreentrant -I. \
+	-Wno-main-return-type \
+	-Wno-incompatible-library-redeclaration
 
 OBJDIR = .obj
 
@@ -10,6 +12,7 @@ APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
 	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/devices.com \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/apps/ls.com \
@@ -28,10 +31,14 @@ APPS = \
 	cpmfs/demo.sub \
 	cpmfs/hello.asm \
 
+SCREEN_APPS = \
+	$(OBJDIR)/qe.com \
+
 MINIMAL_APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
 	$(OBJDIR)/apps/cls.com \
+	$(OBJDIR)/apps/devices.com \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/apps/ls.com \
@@ -46,6 +53,7 @@ LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
 	$(OBJDIR)/lib/bdos.o \
 	$(OBJDIR)/lib/xfcb.o \
+	$(OBJDIR)/lib/screen.o \
 
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
@@ -104,7 +112,7 @@ $(OBJDIR)/tools/%.o: tools/%.cc
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -c -o $@ $<
 
-$(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc
+$(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc include/driver.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 
@@ -155,9 +163,9 @@ $(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
 	@mkdir -p $(dir $@)
 	bin/fontconvert third_party/tomsfonts/atari-small.bdf > $@
 	
-$(OBJDIR)/bbcmicrofs.img: $(APPS) $(OBJDIR)/ccp.sys
+$(OBJDIR)/bbcmicrofs.img: $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
-	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
 	cpmchattr -f bbc192 $@ sr 0:ccp.sys
 
 bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmicrofs.img $(OBJDIR)/mkdfs
