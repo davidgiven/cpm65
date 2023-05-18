@@ -18,7 +18,7 @@ jobs:
       run: echo "MOS_SDK_VERSION=$(cd llvm-mos-sdk && git rev-parse --short HEAD)" >> $GITHUB_ENV
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev ninja
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev ninja-build
 
     - name: cache llvm-mos
       id: cache-llvm-mos
