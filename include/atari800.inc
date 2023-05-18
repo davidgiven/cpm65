@@ -2,10 +2,12 @@
 
 MEMTOP = $02e5
 
-; CIO
+DMACTL = $d400
 
 CIOV = $e456
 
+SDMCTL = $022f
+SDLSTL = $0230
 SHFLOK = $02be
 
 ICHID = $0340
@@ -54,6 +56,7 @@ LMARGN  = $52
 COLCRS  = $55
 COLOR1  = $02c5
 COLOR2  = $02c6
+COLBK   = $02c8
 
 ; SIO Device Control Block
 
