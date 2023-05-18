@@ -145,6 +145,7 @@ screen_jmptable_lo:
     .byte fail@mos16lo
     .byte screen_scrollup@mos16lo
     .byte screen_scrolldown@mos16lo
+    .byte screen_cleartoeol@mos16lo
 screen_jmptable_hi:
     .byte screen_version@mos16hi
     .byte screen_getsize@mos16hi
@@ -157,6 +158,7 @@ screen_jmptable_hi:
     .byte fail@mos16hi
     .byte screen_scrollup@mos16hi
     .byte screen_scrolldown@mos16hi
+    .byte screen_cleartoeol@mos16hi
 zendproc
 
 zproc screen_version
@@ -200,7 +202,7 @@ zendproc
 
 zproc screen_getchar
     tay
-    lda #0x81
+    lda #0x81           ; read key with timeout
     jmp OSBYTE
 zendproc
 
@@ -227,9 +229,27 @@ zproc screen_scrollup
 zendproc
 
 zproc screen_scrolldown
-    lda #30
+    lda #30             ; home
     jsr OSWRCH
-    lda #11
+    lda #11             ; cursor up
+    jmp OSWRCH
+zendproc
+
+zproc screen_cleartoeol
+    lda #28             ; set up window
+    jsr OSWRCH
+    jsr screen_getcursor
+    jsr OSWRCH          ; left
+    txa
+    pha
+    jsr OSWRCH          ; top
+    jsr screen_getsize
+    jsr OSWRCH          ; right
+    pla
+    jsr OSWRCH          ; bottom
+    lda #12             ; clear window
+    jsr OSWRCH
+    lda #26             ; reset window
     jmp OSWRCH
 zendproc
 
