@@ -47,11 +47,12 @@ jobs:
         echo "RELEASE_DATE=$(date --rfc-3339=date)" >> ${GITHUB_ENV}
 
     - name: tag
-      uses: davidgiven/latest-tag@1.0.0
-      with:
-        working-directory: cpm65
-        ref: dev
-        force-branch: false
+      run: |
+        cd cpm65
+        git config user.name "davidgiven"
+        git config user.email "dg@cowlark.com"
+        git tag -f dev
+        git push -f origin dev
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
