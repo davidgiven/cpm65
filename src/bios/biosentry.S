@@ -151,8 +151,8 @@ zproc initdrivers
 	lda #<DRVID_TTY
 	ldx #>DRVID_TTY
 	jsr entry_FINDDRV
-	sta drv_tty+0
-	stx drv_tty+1
+	sta TTY+1
+	stx TTY+2
 	rts
 zendproc
 
@@ -160,18 +160,18 @@ zendproc
 
 zproc entry_CONST
 	ldy #TTY_CONST
-	jmp (drv_tty)
+	jmp TTY
 zendproc
 
 zproc entry_CONIN
 	ldy #TTY_CONIN
-	jmp (drv_tty)
+	jmp TTY
 zendproc
 
 zproc entry_CONOUT
 	ldy #TTY_CONOUT
-	jmp (drv_tty)
 zendproc
-
-.bss
-drv_tty: .fill 2
+	; fall through
+zproc TTY
+	jmp 0xffff
+zendproc
