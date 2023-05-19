@@ -27,6 +27,9 @@ ptr1: .word 0
 
     .text
 
+; Boot code and initialization is ran only once. Eventually it is overwritten
+; by the directory buffer/
+
 .global _start
 _start:
 
@@ -34,9 +37,9 @@ _start:
 
     .byte 0
 #ifdef ATARI_HD
-    .byte 10 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #else
-    .byte 10 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
     .word $0600
     .word init      ; just use init and never return
@@ -161,11 +164,45 @@ init:
     rts                 ; indirect jump to BDOS
 zendproc
 
+; Everything above here is overwritten by the directory buffer, so make sure
+; it's bigger than 0x80 bytes (currently: 0xa3).
+
+directory_buffer = _start
+
+; Below are 34 bytes that become available for overwrite during init. We use
+; them for variables afterwards.
+
+overwrite_after_display_stretch:        ; 5 bytes
+
+dl_prologue:
+    .byte $70, $30, $42, 0, 0
+
+overwrite_after_banner:                 ; 27 bytes
+
+banner: ; reversed!
+    .byte 10,13
+    .ascii "008 iratA eht rof 56-M/PC"
+banner_end:
+
+overwrite_after_keyboard_init:          ; 2 bytes
+
+kdevice: .ascii "K"
+         .byte 155
+
+charin       = overwrite_after_display_stretch
+charout      = overwrite_after_display_stretch
+drive_number = overwrite_after_display_stretch + 1
+sector_num   = overwrite_after_display_stretch + 2 ; (and +3, and +4, full)
+
+dma          = overwrite_after_banner   ; (and +1
+
+; --- BIOS entrypoints ------------------------------------------------------
+
+; TTY DRIVER
+
 .data
 .global drvtop
 drvtop: .word drv_TTY
-
-; --- BIOS entrypoints ------------------------------------------------------
 
 defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
 
@@ -315,6 +352,8 @@ conout:
     jmp CIOV
 zendproc
 
+; ---------------------------------------------------------------------------
+
 ; Sets the current DMA address.
 
 zproc entry_SETDMA
@@ -433,42 +472,14 @@ zproc entry_SETBANK
     rts
 zendproc
 
+; ---------------------------------------------------------------------------
+
     .data
 zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
 
 mem_base: .byte __USERTPA_START__@mos16hi
 mem_end:  .byte __USERTPA_END__@mos16hi
-
-; Discardable data which is not used anymore after BIOS init
-
-; We have 34 bytes in total here
-
-overwrite_after_display_stretch:        ; 5 bytes
-
-dl_prologue:
-    .byte $70, $30, $42, 0, 0
-
-overwrite_after_banner:                 ; 27 bytes
-
-banner: ; reversed!
-    .byte 10,13
-    .ascii "008 iratA eht rof 56-M/PC"
-banner_end:
-
-overwrite_after_keyboard_init:          ; 2 bytes
-
-kdevice: .ascii "K"
-         .byte 155
-
-; Former bss variables
-
-charin       = overwrite_after_display_stretch
-charout      = overwrite_after_display_stretch
-drive_number = overwrite_after_display_stretch + 1
-sector_num   = overwrite_after_display_stretch + 2 ; (and +3, and +4, full)
-
-dma          = overwrite_after_banner   ; (and +1
 
 ; DPH for drive 0 (our only drive)
 
@@ -484,7 +495,7 @@ define_drive dph, 720, 1024, 64, 54
 
 NOINIT
 
-directory_buffer: .fill 128
+; Nothing left for .bss
 
 ; vim: filetype=asm sw=4 ts=4 et
 
