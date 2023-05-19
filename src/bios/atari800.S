@@ -316,24 +316,21 @@ zproc tty_conout
     zendif
 
 ; The following two ATARI_ codes need to be escaped to actually print the 
-; associated glyph. The glyph of 127 (the third that needs escaping) is
-; not available because that's ASCII DEL.
+; associated glyph. The glyph of 127 (which also needs escaping) is not
+; available because it's already interceptede as ASCII DEL.
 
-    cmp #ATARI_CLS
-    zif_eq
-        lda #27             ; ESC
-        jsr tty_conout
-        lda #ATARI_CLS
-        bne conout
-    zendif
-
-    cmp #ATARI_BS
-    zif_eq
-        lda #27
-        jsr tty_conout
-        lda #ATARI_BS
-;        bne conout         ; fallthrough
-    zendif
+    ldx #esc_tab_last_idx
+    zrepeat
+        cmp esc_tab,x
+        bne next
+        pha
+        lda #ATARI_ESC
+        jsr conout          ; do not call tty_conout, because of endless loop
+        pla
+        bvc conout
+next:
+        dex
+    zuntil_mi
 
 conout:
     sta charout
@@ -351,6 +348,12 @@ conout:
     sta ICBAH,x
     jmp CIOV
 zendproc
+
+esc_tab:
+    .byte ATARI_ESC, ATARI_UP_ARROW, ATARI_DOWN_ARROW, ATARI_LEFT_ARROW
+    .byte ATARI_RIGHT_ARROW, ATARI_CLS, ATARI_BS, ATARI_TAB
+
+esc_tab_last_idx = . - esc_tab - 1
 
 ; ---------------------------------------------------------------------------
 
