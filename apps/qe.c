@@ -151,7 +151,7 @@ void set_status_line(const char* message)
     // con_revoff();
     while (length < status_line_length)
     {
-        cpm_bios_conout(' ');
+        screen_putchar(' ');
         length++;
     }
     status_line_length = length;
@@ -205,14 +205,14 @@ uint8_t* draw_line(uint8_t* startp)
 {
     uint8_t* inp = startp;
 
-    uint8_t screenx, screeny, starty;
+    uint8_t screenx, starty;
     screen_getcursor(&screenx, &starty);
 
-    uint16_t xo = 0;
+    uint8_t x = 0;
+	uint8_t y = starty;
     for (;;)
     {
-        screen_getcursor(&screenx, &screeny);
-        if (screeny == viewheight)
+        if (y == viewheight)
             goto bottom_of_screen;
 
         if (inp == gap_start)
@@ -222,7 +222,7 @@ uint8_t* draw_line(uint8_t* startp)
         }
         if (inp == buffer_end)
         {
-            if (xo == 0)
+            if (x == 0)
                 screen_putchar('~');
             break;
         }
@@ -230,26 +230,35 @@ uint8_t* draw_line(uint8_t* startp)
         char c = *inp++;
         if (c == '\n')
             break;
-        else if (c == '\t')
+
+		if (x == width)
+		{
+			x = 0;
+			y++;
+			screen_setcursor(x, y);
+		}
+
+        if (c == '\t')
         {
             do
             {
                 screen_putchar(' ');
-                xo++;
-            } while (xo & 7);
+                x++;
+            } while ((x & 7) || (x == width));
         }
         else
         {
             screen_putchar(c);
-            xo++;
+            x++;
         }
     }
 
-    screen_clear_to_eol();
-    screen_newline();
+	if (x != width)
+		screen_clear_to_eol();
+	screen_setcursor(0, y+1);
 
 bottom_of_screen:
-    display_height[starty] = (xo / width) + 1;
+    display_height[starty] = y - starty + 1;
     line_length[starty] = inp - startp;
 
     return inp;
