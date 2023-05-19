@@ -69,25 +69,22 @@ zproc _start
 
     ; Read the data.
 
-    lda #<__USERTPA_START__
-    sta ptr+0
-    lda #>__USERTPA_START__
-    sta ptr+1
-
     lda #8
     jsr TALK
     lda #$60            ; emit channel 0
     jsr TALKSA
 
-    ldy #0
     zrepeat
+        ldy #0
         sty STATUS
         jsr ACPTR       ; read a byte
-        sta (ptr), y
 
-        inc ptr+0
+    1:
+        sta __USERTPA_START__
+
+        inc 1b+1
         zif_eq
-            inc ptr+1
+            inc 1b+2
             lda #'.'
             jsr entry_CONOUT
         zendif
