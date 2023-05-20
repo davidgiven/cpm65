@@ -14,11 +14,6 @@ ZEROPAGE
 ptr: .word 0
 ptr1: .word 0
 
-; Only used during startup --- the BIOS will overwrite this once initialisation
-; starts.
-
-bdos_osfile_block:
-
 ; --- Initialisation code ---------------------------------------------------
 
 ; Called once on startup and then never again.
@@ -53,12 +48,6 @@ zproc _start
 
     ; Load the BDOS image.
 
-    lda #<bdos_filename
-    sta bdos_osfile_block + 0
-    lda #>bdos_filename
-    sta bdos_osfile_block + 1
-    lda #0
-    sta bdos_osfile_block + 2
     lda mem_base
     sta bdos_osfile_block + 3
     lda #$ff
@@ -117,6 +106,13 @@ zendproc
 bdos_filename:
     .ascii "BDOS"
     .byte 13
+
+bdos_osfile_block:
+    .word bdos_filename
+    .word 0, 0 ; load address
+    .byte 0    ; execution address
+    ; falls through --- the rest of the 0x12-byte structure is write-only, so
+    ; we can overwrite the banner bytes to shave some bytes.
 
 banner: ; reversed!
     ; The Acorn font has a £ here, where ASCII expects a backtick, so

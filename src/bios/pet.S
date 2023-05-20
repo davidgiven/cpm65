@@ -42,6 +42,8 @@ CRTC_STATUS = CRTC+1
 CRTC_DATA = CRTC+1
 
 VIDEO   = 0x8000
+SCREEN_WIDTH = 40
+SCREEN_HEIGHT = 25
 
 ZEROPAGE
 
@@ -138,7 +140,7 @@ zproc _start, .init
     
     ; Initialise the screen.
 
-    jsr clear_screen
+    jsr screen_clear
 
     lda #14
     sta VIA_PCR             ; lowercase
@@ -288,13 +290,251 @@ zproc entry_SETBANK
     rts
 zendproc
 
+; --- SCREEN driver ---------------------------------------------------------
+
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    pha
+    lda screen_jmptable_lo, y
+    sta ptr+0
+    lda screen_jmptable_hi, y
+    sta ptr+1
+    pla
+    jmp (ptr)
+
+screen_jmptable_lo:
+    .byte screen_version@mos16lo
+    .byte screen_getsize@mos16lo
+    .byte screen_clear@mos16lo
+    .byte screen_setcursor@mos16lo
+    .byte screen_getcursor@mos16lo
+    .byte screen_putchar@mos16lo
+    .byte screen_putstring@mos16lo
+    .byte screen_getchar@mos16lo
+    .byte fail@mos16lo
+    .byte screen_scrollup@mos16lo
+    .byte screen_scrolldown@mos16lo
+    .byte screen_cleartoeol@mos16lo
+screen_jmptable_hi:
+    .byte screen_version@mos16hi
+    .byte screen_getsize@mos16hi
+    .byte screen_clear@mos16hi
+    .byte screen_setcursor@mos16hi
+    .byte screen_getcursor@mos16hi
+    .byte screen_putchar@mos16hi
+    .byte screen_putstring@mos16hi
+    .byte screen_getchar@mos16hi
+    .byte fail@mos16hi
+    .byte screen_scrollup@mos16hi
+    .byte screen_scrolldown@mos16hi
+    .byte screen_cleartoeol@mos16hi
+zendproc
+
+zproc fail
+    sec
+    rts
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+    lda #SCREEN_WIDTH-1
+    ldx #SCREEN_HEIGHT-1
+    rts
+zendproc
+
+zproc screen_clear
+    lda #0
+    zrepeat
+        pha
+        jsr calculate_line_address
+
+        ldy #SCREEN_WIDTH-1
+        lda #' '
+        zrepeat
+            sta (ptr), y
+            dey
+        zuntil_mi
+
+        pla
+        clc
+        adc #1
+        cmp #SCREEN_HEIGHT
+    zuntil_eq
+
+    ; SCREEN doesn't specify where the cursor ends up, but this code is used by
+    ; TTY and homing the cursor here simplifies things.
+
+    lda #0
+    sta cursorx
+    sta cursory
+    rts
+zendproc
+
+zproc screen_setcursor
+    sta cursorx
+    stx cursory
+    rts
+zendproc
+
+zproc screen_getcursor
+    lda cursorx
+    ldx cursory
+    rts
+zendproc
+
+zproc screen_getchar
+    jsr calculate_cursor_address
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
+
+    zrepeat
+        jsr scan_keyboard
+        lda pending_key
+    zuntil_ne
+
+    ldx #0
+    stx pending_key
+
+    pha
+    jsr calculate_cursor_address
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
+    pla
+
+    clc
+    rts
+zendproc
+
+zproc screen_putchar
+    pha
+    jsr calculate_cursor_address
+    pla
+    jsr convert_ascii_to_screencode
+    sta (ptr), y
+
+    lda cursorx
+    cmp #SCREEN_WIDTH-1
+    zif_ne
+        inc cursorx
+    zendif
+
+    rts
+zendproc
+
+zproc screen_putstring
+    sta 1f+0
+    stx 1f+1
+
+    jsr calculate_cursor_address
+    ldx #0
+    zloop
+    1:
+        lda 0xffff, x
+        zbreakif_eq
+
+        jsr convert_ascii_to_screencode
+        sta (ptr), y
+        iny
+        inx
+    zendloop
+    rts
+zendproc
+
+zproc screen_scrollup
+    ldx #0              ; current line
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        inx
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #SCREEN_HEIGHT-1
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+zproc screen_scrolldown
+    ldx #39             ; current line
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        dex
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #0
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+zproc screen_cleartoeol
+    jsr calculate_cursor_address
+
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        iny
+        cpy #SCREEN_WIDTH
+    zuntil_eq
+    rts
+zendproc
+
 ; --- Keyboard handling -----------------------------------------------------
 
 .data
 .global drvtop
+; This must point at the _last_ driver.
 drvtop: .word drv_TTY
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -334,30 +574,69 @@ zendproc
 ; Blocks until a key is pressed; returns it in A.
 
 zproc tty_conin
-    jsr calculate_cursor_address
-    lda (ptr), y
-    eor #0x80
-    sta (ptr), y
+    zrepeat
+        lda #0xff
+        ldx #0xff
+        jsr screen_getchar
+    zuntil_cc
 
-    lda pending_key
+    rts
+zendproc
+
+; Writes the character in A.
+
+zproc tty_conout
+    cmp #13
     zif_eq
-        zrepeat
-            jsr scan_keyboard
-            lda pending_key
-        zuntil_ne
+        lda #0
+        sta cursorx
+        rts
     zendif
+    cmp #127
+    zif_eq
+        dec cursorx
+        zif_mi
+            lda #SCREEN_WIDTH-1
+            sta cursorx
 
-    ldx #0
-    stx pending_key
+            dec cursory
+            zif_mi
+                lda #0
+                sta cursory
+                jsr screen_scrolldown
+            zendif
+        zendif
+        jsr calculate_cursor_address
+        lda #' '
+        sta (ptr), y
+        rts
+    zendif
+    cmp #10
+    beq write_nl
 
+    tax
+    lda cursorx
     pha
-    jsr calculate_cursor_address
-    lda (ptr), y
-    eor #0x80
-    sta (ptr), y
-    pla
+    txa
+    jsr screen_putchar
 
-    clc
+    pla
+    cmp #SCREEN_WIDTH-1
+    beq write_nl
+    rts
+zendproc
+
+zproc write_nl
+    lda #0
+    sta cursorx
+
+    inc cursory
+    lda cursory
+    cmp #SCREEN_HEIGHT
+    zif_eq
+        dec cursory
+        jmp screen_scrollup
+    zendif
     rts
 zendproc
 
@@ -480,48 +759,7 @@ keyboard_decode_tab:
     .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
 zendproc
 
-; --- Screen handling -------------------------------------------------------
-
-; Writes the character in A.
-
-zproc tty_conout
-    cmp #13
-    zif_eq
-        lda #0
-        sta cursorx
-        rts
-    zendif
-    cmp #127
-    zif_eq
-        dec cursorx
-        zif_mi
-            inc cursorx
-        zendif
-        jsr calculate_cursor_address
-        lda #' '
-        sta (ptr), y
-        rts
-    zendif
-    cmp #10
-    beq write_nl
-
-    pha
-    jsr calculate_cursor_address
-    pla
-    jsr convert_ascii_to_screencode
-    sta (ptr), y
-
-    inc cursorx
-    lda cursorx
-    cmp #40
-    zif_eq
-        lda #0
-        sta cursorx
-        jmp write_nl
-    zendif
-    rts
-zendproc
-
+; Preserves X and Y.
 zproc convert_ascii_to_screencode
     ; Flip case.
 
@@ -579,75 +817,6 @@ ddRev:
     eor #0x80		; flip bit 7 (reverse on when off and vice versa)
 ddEnd:
 
-    rts
-zendproc
-
-zproc write_nl
-    inc cursory
-    lda cursory
-    cmp #24
-    zif_eq
-        dec cursory
-        jmp scroll_up
-    zendif
-    rts
-zendproc
-
-zproc scroll_up
-    ldx #0              ; current line
-    zrepeat
-        txa
-        jsr calculate_line_address
-        lda ptr+0
-        sta ptr1+0
-        lda ptr+1
-        sta ptr1+1      ; ptr1 is dest pointer
-
-        inx
-        txa
-        jsr calculate_line_address ; ptr is source pointer
-
-        ldy #39
-        zrepeat
-            lda (ptr), y
-            sta (ptr1), y
-            dey
-        zuntil_mi
-
-        cpx #23
-    zuntil_eq
-
-    ldy #39
-    lda #' '
-    zrepeat
-        sta (ptr), y
-        dey
-    zuntil_mi
-    rts
-zendproc
-
-zproc clear_screen
-    lda #0
-    zrepeat
-        pha
-        jsr calculate_line_address
-
-        ldy #39
-        lda #' '
-        zrepeat
-            sta (ptr), y
-            dey
-        zuntil_mi
-
-        pla
-        clc
-        adc #1
-        cmp #25
-    zuntil_eq
-
-    lda #0
-    sta cursorx
-    sta cursory
     rts
 zendproc
 
