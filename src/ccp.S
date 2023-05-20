@@ -737,8 +737,6 @@ zproc entry_TRANSIENT
     txa                     ; set length of command line
     sec
     sbc cmdoffset
-    sec
-    sbc #2
     ldy #XFCB__SIZE
     sta (temp), y
 
