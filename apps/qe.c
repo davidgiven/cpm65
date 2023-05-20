@@ -59,9 +59,20 @@ extern void goto_line(uint16_t lineno);
 /*                                MISCELLANEOUS                            */
 /* ======================================================================= */
 
+void cpm_printstring0(const char* s)
+{
+	for (;;)
+	{
+		char c = *s++;
+		if (!c)
+			return;
+		cpm_conout(c);
+	}
+}
+
 void print_newline(void)
 {
-    cpm_printstring("\r\n");
+    cpm_printstring0("\r\n");
 }
 
 /* Appends a string representation of the FCB to buffer. */
@@ -139,7 +150,7 @@ void set_status_line(const char* message)
 
     uint8_t length = 0;
     goto_status_line();
-    // con_revon();
+	screen_setstyle(1);
     for (;;)
     {
         char c = *message++;
@@ -148,10 +159,10 @@ void set_status_line(const char* message)
         screen_putchar(c);
         length++;
     }
-    // con_revoff();
+	screen_setstyle(0);
     while (length < status_line_length)
     {
-        cpm_bios_conout(' ');
+        screen_putchar(' ');
         length++;
     }
     status_line_length = length;
@@ -205,14 +216,14 @@ uint8_t* draw_line(uint8_t* startp)
 {
     uint8_t* inp = startp;
 
-    uint8_t screenx, screeny, starty;
+    uint8_t screenx, starty;
     screen_getcursor(&screenx, &starty);
 
-    uint16_t xo = 0;
+    uint8_t x = 0;
+	uint8_t y = starty;
     for (;;)
     {
-        screen_getcursor(&screenx, &screeny);
-        if (screeny == viewheight)
+        if (y == viewheight)
             goto bottom_of_screen;
 
         if (inp == gap_start)
@@ -222,7 +233,7 @@ uint8_t* draw_line(uint8_t* startp)
         }
         if (inp == buffer_end)
         {
-            if (xo == 0)
+            if (x == 0)
                 screen_putchar('~');
             break;
         }
@@ -230,26 +241,35 @@ uint8_t* draw_line(uint8_t* startp)
         char c = *inp++;
         if (c == '\n')
             break;
-        else if (c == '\t')
+
+		if (x == width)
+		{
+			x = 0;
+			y++;
+			screen_setcursor(x, y);
+		}
+
+        if (c == '\t')
         {
             do
             {
                 screen_putchar(' ');
-                xo++;
-            } while (xo & 7);
+                x++;
+            } while ((x & 7) || (x == width));
         }
         else
         {
             screen_putchar(c);
-            xo++;
+            x++;
         }
     }
 
-    screen_clear_to_eol();
-    screen_newline();
+	if (x != width)
+		screen_clear_to_eol();
+	screen_setcursor(0, y+1);
 
 bottom_of_screen:
-    display_height[starty] = (xo / width) + 1;
+    display_height[starty] = y - starty + 1;
     line_length[starty] = inp - startp;
 
     return inp;
@@ -408,15 +428,15 @@ void load_file(void)
     goto_line(1);
 }
 
-bool really_save_file(FCB* fcb)
+uint8_t really_save_file(FCB* fcb)
 {
     strcpy(buffer, "Writing ");
     render_fcb(fcb);
     print_status(buffer);
 
     fcb->ex = fcb->s1 = fcb->s2 = fcb->rc = 0;
-    if (cpm_make_file(fcb) == 0xff)
-        return false;
+    if (cpm_make_file(fcb))
+        return 0xff;
     fcb->cr = 0;
 
     const uint8_t* inp = buffer_start;
@@ -448,14 +468,14 @@ bool really_save_file(FCB* fcb)
 
         if (outp == 128)
         {
-            if (cpm_write_sequential(fcb) == 0xff)
+            if (cpm_write_sequential(fcb))
                 goto error;
             outp = 0;
         }
     }
 
     dirty = false;
-    return cpm_close_file(fcb) != 0xff;
+    return cpm_close_file(fcb);
 
 error:
     cpm_close_file(fcb);
@@ -466,18 +486,20 @@ bool save_file(void)
 {
     static FCB tempfcb;
 
-    if (cpm_open_file(&cpm_fcb) == 0xff)
+    cpm_fcb.ex = cpm_fcb.s1 = cpm_fcb.s2 = cpm_fcb.rc = 0;
+    if (cpm_open_file(&cpm_fcb))
     {
+		print_status("New file.");
         /* The file does not exist. */
         if (really_save_file(&cpm_fcb))
         {
-            dirty = false;
-            return true;
-        }
-        else
-        {
             print_status("Failed to save file");
             return false;
+		}
+		else
+		{
+            dirty = false;
+            return true;
         }
     }
 
@@ -485,8 +507,15 @@ bool save_file(void)
 
     strcpy((char*)tempfcb.f, "QETEMP  $$$");
     tempfcb.dr = cpm_fcb.dr;
-    if (!really_save_file(&tempfcb))
+    if (really_save_file(&tempfcb))
         goto tempfile;
+
+    strcpy(buffer, "Removing old ");
+    render_fcb(&cpm_fcb);
+	print_status(buffer);
+
+    if (cpm_delete_file(&cpm_fcb))
+		goto cant_commit;
 
     strcpy(buffer, "Renaming ");
     render_fcb(&tempfcb);
@@ -494,18 +523,16 @@ bool save_file(void)
     render_fcb(&cpm_fcb);
     print_status(buffer);
 
-    if (cpm_delete_file(&cpm_fcb) == 0xff)
-        goto commit;
     memcpy(((uint8_t*)&tempfcb) + 16, &cpm_fcb, 16);
-    if (cpm_rename_file((RCB*)&tempfcb) == 0xff)
-        goto commit;
+    if (cpm_rename_file((RCB*)&tempfcb))
+        goto cant_commit;
     return true;
 
 tempfile:
     print_status("Cannot create QETEMP.$$$ file (it may exist)");
     return false;
 
-commit:
+cant_commit:
     print_status("Cannot commit file; your data may be in QETEMP.$$$");
     return false;
 }
@@ -513,7 +540,7 @@ commit:
 void quit(void)
 {
     goto_status_line();
-    cpm_printstring("Goodbye!\r\n");
+    cpm_printstring0("Goodbye!\r\n");
     cpm_warmboot();
 }
 
@@ -663,7 +690,7 @@ void insert_mode(bool replacing)
             break;
 
         dirty = true;
-        if (c == 8)
+        if (c == 127)
         {
             if (gap_start != current_line)
                 gap_start--;
@@ -964,7 +991,7 @@ void set_current_filename(const char* f)
 {
     if (cpm_parse_filename(&cpm_fcb, f))
 	{
-		cpm_printstring("Bad filename\r\n");
+		cpm_printstring0("Bad filename\r\n");
 		cpm_fcb.f[0] = 0;
 		return;
 	}
@@ -974,17 +1001,17 @@ void set_current_filename(const char* f)
 
 void print_no_filename(void)
 {
-    cpm_printstring("No filename set\r\n");
+    cpm_printstring0("No filename set\r\n");
 }
 
 void print_document_not_saved(void)
 {
-    cpm_printstring("Document not saved (use ! to confirm)\r\n");
+    cpm_printstring0("Document not saved (use ! to confirm)\r\n");
 }
 
 void print_colon_status(const char* s)
 {
-    cpm_printstring(s);
+    cpm_printstring0(s);
     print_newline();
 }
 
@@ -1056,6 +1083,11 @@ void colon(uint16_t count)
                 break;
             }
 
+			case 'p':
+				render_fcb(&cpm_fcb);
+				print_colon_status(buffer);
+				break;
+
             case 'n':
             {
                 if (dirty && (w[1] != '!'))
@@ -1078,7 +1110,7 @@ void colon(uint16_t count)
             }
 
             default:
-                cpm_printstring("Unknown command\r\n");
+                cpm_printstring0("Unknown command\r\n");
         }
     }
 
@@ -1095,7 +1127,7 @@ void main(int argc, const char* argv[])
 {
     if (!screen_init())
     {
-        cpm_printstring("No SCREEN");
+        cpm_printstring0("No SCREEN");
         print_newline();
         return;
     }

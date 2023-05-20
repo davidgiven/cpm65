@@ -935,6 +935,7 @@ zproc entry_DELETEFILE
             lda #FCB_T3+1
             jsr find_next
         zuntil_cs
+        clc
     zendif
 
     rts
@@ -980,6 +981,7 @@ zproc entry_RENAMEFILE
             lda #FCB_T3+1
             jsr find_next
         zuntil_cs
+        clc
     zendif
 
     rts
@@ -1015,6 +1017,7 @@ zproc entry_SETFILEATTRS
             lda #FCB_T3+1
             jsr find_next
         zuntil_cs
+        clc
     zendif
 
     rts

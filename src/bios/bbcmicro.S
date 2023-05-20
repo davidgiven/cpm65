@@ -6,6 +6,7 @@
 #include "mos.inc"
 #include "cpm65.inc"
 #include "driver.inc"
+#include "jumptables.inc"
 
 ZEROPAGE
 
@@ -13,11 +14,6 @@ ZEROPAGE
 .global ptr1
 ptr: .word 0
 ptr1: .word 0
-
-; Only used during startup --- the BIOS will overwrite this once initialisation
-; starts.
-
-bdos_osfile_block:
 
 ; --- Initialisation code ---------------------------------------------------
 
@@ -53,12 +49,6 @@ zproc _start
 
     ; Load the BDOS image.
 
-    lda #<bdos_filename
-    sta bdos_osfile_block + 0
-    lda #>bdos_filename
-    sta bdos_osfile_block + 1
-    lda #0
-    sta bdos_osfile_block + 2
     lda mem_base
     sta bdos_osfile_block + 3
     lda #$ff
@@ -118,6 +108,13 @@ bdos_filename:
     .ascii "BDOS"
     .byte 13
 
+bdos_osfile_block:
+    .word bdos_filename
+    .word 0, 0 ; load address
+    .byte 0    ; execution address
+    ; falls through --- the rest of the 0x12-byte structure is write-only, so
+    ; we can overwrite the banner bytes to shave some bytes.
+
 banner: ; reversed!
     ; The Acorn font has a £ here, where ASCII expects a backtick, so
     ; redefine it.
@@ -140,44 +137,36 @@ defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 ; SCREEN driver strategy routine.
 ; Y=SCREEN opcode.
 zproc drvstrat_SCREEN
-    pha
-    lda screen_jmptable_lo, y
-    sta ptr+0
-    lda screen_jmptable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
 
 screen_jmptable_lo:
-    .byte screen_version@mos16lo
-    .byte screen_getsize@mos16lo
-    .byte screen_clear@mos16lo
-    .byte screen_setcursor@mos16lo
-    .byte screen_getcursor@mos16lo
-    .byte screen_putchar@mos16lo
-    .byte screen_putstring@mos16lo
-    .byte screen_getchar@mos16lo
-    .byte fail@mos16lo
-    .byte screen_scrollup@mos16lo
-    .byte screen_scrolldown@mos16lo
-    .byte screen_cleartoeol@mos16lo
-    .byte OSNEWL@mos16lo
-    .byte screen_backspace@mos16lo
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo fail
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo screen_setstyle
 screen_jmptable_hi:
-    .byte screen_version@mos16hi
-    .byte screen_getsize@mos16hi
-    .byte screen_clear@mos16hi
-    .byte screen_setcursor@mos16hi
-    .byte screen_getcursor@mos16hi
-    .byte screen_putchar@mos16hi
-    .byte screen_putstring@mos16hi
-    .byte screen_getchar@mos16hi
-    .byte fail@mos16hi
-    .byte screen_scrollup@mos16hi
-    .byte screen_scrolldown@mos16hi
-    .byte screen_cleartoeol@mos16hi
-    .byte OSNEWL@mos16hi
-    .byte screen_backspace@mos16hi
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi fail
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi screen_setstyle
 zendproc
 
 zproc set_cursor_keys
@@ -203,6 +192,7 @@ zendproc
 
 zproc screen_clear
     lda #12             ; clear screen
+oswrch:
     jmp OSWRCH
 zendproc
 
@@ -235,26 +225,16 @@ zproc screen_getchar
     lda #0x81           ; read key with timeout
     jsr OSBYTE
     txa
-    zif_cc
-        cmp #127
-        zif_eq
-            lda #8
-        zendif
-        clc
-    zendif
     rts
 zendproc
 
 zproc screen_putchar
     cmp #32
-    zif_cc
-        rts
-    zendif
-    cmp #127
     zif_cs
-        rts
+        cmp #127
+        bcc oswrch
     zendif
-    jmp OSWRCH
+    rts
 zendproc
 
 zproc screen_putstring
@@ -276,14 +256,14 @@ zproc screen_scrollup
     lda #0
     jsr screen_setcursor
     lda #10
-    jmp OSWRCH
+    bne oswrch          ; always taken
 zendproc
 
 zproc screen_scrolldown
     lda #30             ; home
     jsr OSWRCH
     lda #11             ; cursor up
-    jmp OSWRCH
+    bne oswrch          ; always taken
 zendproc
 
 zproc screen_cleartoeol
@@ -311,9 +291,27 @@ zproc screen_cleartoeol
     jmp screen_setcursor
 zendproc
 
-zproc screen_backspace
-    lda #127
+zproc setcolour
+    pha
+    lda #17
+    jsr OSWRCH
+    pla
     jmp OSWRCH
+zendproc
+
+zproc screen_setstyle
+    and #STYLE_REVERSE
+
+    zif_eq
+        lda #7              ; white foreground
+        jsr setcolour
+        lda #128            ; black background
+        jmp setcolour
+    zendif
+    lda #0              ; black foreground
+    jsr setcolour
+    lda #135            ; white background
+    jmp setcolour
 zendproc
 
 ; --- TTY driver ------------------------------------------------------------
@@ -323,22 +321,16 @@ defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
-    pha
-    lda jmptable_lo, y
-    sta ptr+0
-    lda jmptable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+    jmpdispatch tty_jmptable_lo, tty_jmptable_hi
 
-jmptable_lo:
-    .byte tty_const@mos16lo
-    .byte tty_conin@mos16lo
-    .byte OSWRCH@mos16lo
-jmptable_hi:
-    .byte tty_const@mos16hi
-    .byte tty_conin@mos16hi
-    .byte OSWRCH@mos16hi
+tty_jmptable_lo:
+    jmptablo tty_const
+    jmptablo tty_conin
+    jmptabloconst OSWRCH
+tty_jmptable_hi:
+    jmptabhi tty_const
+    jmptabhi tty_conin
+    jmptabhiconst OSWRCH
 zendproc
 
 ; Blocks and waits for the next keypress; returns it in A.
@@ -528,8 +520,6 @@ filehandle:  .byte 0    ; file handle of disk image
 pending_key: .byte 0    ; pending keypress from system
 dma:         .word 0    ; current DMA
 sector_num:  .fill 3    ; current absolute sector number
-
-ZEROPAGE
 
 osgbpb_block:           ; block used by entry_READ and entry_WRITE
     .fill $0d

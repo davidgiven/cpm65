@@ -8,11 +8,11 @@ extern uint16_t _screen_getsize(void);
 extern void _screen_setcursor(uint16_t c);
 extern uint16_t _screen_getcursor(void);
 extern void screen_putchar(char c);
-extern void screen_newline(void);
 extern void screen_putstring(const char* s);
 extern uint16_t screen_getchar(uint16_t timeout_cs);
 extern uint8_t screen_waitchar(void);
 extern void screen_clear_to_eol(void);
+extern void screen_setstyle(uint8_t style);
 
 #define screen_setcursor(x, y) \
 	_screen_setcursor((x) | ((y)<<8))

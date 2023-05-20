@@ -7,6 +7,9 @@
 
 ZEROPAGE
 
+.zeropage ptr
+.zeropage ptr1
+
 ieee_has_buffered_char: .fill 1
 ieee_buffered_char:     .fill 1
 

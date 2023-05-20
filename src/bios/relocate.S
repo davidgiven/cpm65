@@ -5,6 +5,8 @@
 #include "cpm65.inc"
 #include "zif.inc"
 
+.zeropage ptr
+
 ; Relocate an image. High byte of memory address is in A,
 ; zero page address is in X.
 

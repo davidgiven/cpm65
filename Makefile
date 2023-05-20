@@ -220,7 +220,7 @@ apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/cc
 
 $(OBJDIR)/pet.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet.exe: $(OBJDIR)/libcommodore.a
-pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys \
+pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -i 15 -q -n "cp/m-65" $@
@@ -230,7 +230,7 @@ pet.d64: $(OBJDIR)/pet.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
 	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
