@@ -41,17 +41,56 @@ drv_\name:
 
 ; API version 0
 #define SCREEN_VERSION     0 /* exit: A contains API version */
+
+; Returns the current screen size.
+
 #define SCREEN_GETSIZE     1 /* exit: A=width-1, X=height-1 */
-#define SCREEN_CLEAR       2 /* also homes cursor */
-#define SCREEN_SETCURSOR   3 /* entry: A=x, X=y; out of bounds undefined */
+
+; Clears the screen. The cursor position is left undefined.
+
+#define SCREEN_CLEAR       2
+
+; Sets the cursor position. Out of bounds coordinates produces undefined
+; behaviour.
+
+#define SCREEN_SETCURSOR   3 /* entry: A=x, X=y */
+
+; Gets the cursor position.
+
 #define SCREEN_GETCURSOR   4 /* exit: A=x, X=y */
-#define SCREEN_PUTCHAR     5 /* entry: A=char; moves cursor to right, unless at edge of screen */
-#define SCREEN_PUTSTRING   6 /* entry: XA=nul terminated pointer; as above */
-#define SCREEN_GETCHAR     7 /* entry: XA=timeoutin cs, exit: A=char, or C if timed out */
+
+; Writes a single printable character. Behaviour on writing non-printable
+; characters is undefined. The cursor is moved one space to the right; if the
+; cursor hits the edge of the screen, the behaviour is undefined.
+
+#define SCREEN_PUTCHAR     5 /* entry: A=char */
+
+; Writes a sequence of characters, equivalent to repeated calls to
+; SCREEN_PUTCHAR (but hopefully a lot faster).
+
+#define SCREEN_PUTSTRING   6 /* entry: XA=nul terminated pointer */
+
+; Blocks and waits for a input character. XA contains a timeout in
+; centiseconds.  This call may return early.
+
+#define SCREEN_GETCHAR     7 /* entry: XA=timeout in cs, exit: A=char, or C if timed out */
+
+; Sets whether the cursor is displayed or not.
+
 #define SCREEN_SHOWCURSOR  8 /* entry: A=0 for off, non-zero for on */
-#define SCREEN_SCROLLUP    9 /* cursor position left undefined */
-#define SCREEN_SCROLLDOWN 10 /* cursor position left undefined */
-#define SCREEN_CLEARTOEOL 11 /* from cursor position to EOL */
+
+; Scrolls the screen up by one line. The cursor position is left undefined.
+
+#define SCREEN_SCROLLUP    9
+
+; Scrolls the screen down by one line. The cursor position is left undefined.
+
+#define SCREEN_SCROLLDOWN 10
+
+; Clears from the current cursor position to the end of line. The cursor
+; position is left undefined.
+
+#define SCREEN_CLEARTOEOL 11
 
 ; vim: filetype=asm sw=4 ts=4 et
 
