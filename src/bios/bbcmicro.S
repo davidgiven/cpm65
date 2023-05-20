@@ -49,13 +49,6 @@ zproc _start
 
     ; Load the BDOS image.
 
-    ldy #0x11
-    lda #0
-    zrepeat
-        sta bdos_osfile_block, y
-        dey
-    zuntil_mi
-
     lda mem_base
     sta bdos_osfile_block + 3
     lda #$ff
@@ -315,11 +308,11 @@ zproc drvstrat_TTY
 tty_jmptable_lo:
     jmptablo tty_const
     jmptablo tty_conin
-    .byte OSWRCH & 0xff
+    jmptabloconst OSWRCH
 tty_jmptable_hi:
     jmptabhi tty_const
     jmptabhi tty_conin
-    .byte OSWRCH >> 8
+    jmptabhiconst OSWRCH
 zendproc
 
 ; Blocks and waits for the next keypress; returns it in A.

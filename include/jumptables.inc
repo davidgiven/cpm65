@@ -20,5 +20,13 @@
     .byte (\value - 1)@mos16hi
 .endm
 
+.macro jmptabloconst value
+    .byte (\value - 1) & 0xff
+.endm
+
+.macro jmptabhiconst value
+    .byte (\value - 1) >> 8
+.endm
+
 ; vim: filetype=asm sw=4 ts=4 et
 
