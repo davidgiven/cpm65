@@ -21,7 +21,6 @@ APPS = \
 	$(OBJDIR)/objdump.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
-	$(OBJDIR)/apps/fcbtest.com \
 	apps/bedit.asm \
 	apps/cls.asm \
 	apps/dinfo.asm \
