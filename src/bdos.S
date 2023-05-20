@@ -229,9 +229,9 @@ unimplemented:
     rts
 
 icall:
-    lda jumptable_lo, y
-    pha
     lda jumptable_hi, y
+    pha
+    lda jumptable_lo, y
     pha
     rts
 
