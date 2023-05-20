@@ -716,7 +716,7 @@ zproc entry_PARSEFCB
         cmp #':'                    ; colon?
         zif_eq
             lda (param), y
-            and #0xdf               ; to upper case
+            jsr toupper
             sec
             sbc #'A'-1              ; to 1-based drive
             cmp #16
@@ -738,6 +738,7 @@ zproc entry_PARSEFCB
     ldx #8
     zrepeat
         lda (param), y         ; get a character
+        jsr toupper
 
         jsr is_terminator_char
         zif_eq
@@ -785,6 +786,8 @@ zproc entry_PARSEFCB
     ldx #3
     zrepeat
         lda (param), y          ; get a character
+        jsr toupper
+
         jsr is_terminator_char
         zif_eq
             ; Turn "ABC .X" -> "AB     .X"
@@ -877,6 +880,17 @@ is_terminator_char:
     beq 1f
     cmp #'>'
 1:
+    rts
+zendproc
+
+zproc toupper
+    cmp #'a'
+    zif_cs
+        cmp #'z'+1
+        zif_cc
+            and #$5f
+        zendif
+    zendif
     rts
 zendproc
 
