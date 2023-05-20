@@ -92,5 +92,11 @@ drv_\name:
 
 #define SCREEN_CLEARTOEOL 11
 
+; Sets the style bitmap. If not supported, a platform will ignore a given
+; style.
+#define STYLE_REVERSE 1
+
+#define SCREEN_SETSTYLE   12
+
 ; vim: filetype=asm sw=4 ts=4 et
 

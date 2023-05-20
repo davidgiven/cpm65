@@ -152,6 +152,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
+    jmptablo fail
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -165,6 +166,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
+    jmptabhi fail
 zendproc
 
 zproc set_cursor_keys
