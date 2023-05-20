@@ -5,6 +5,7 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "driver.inc"
+#include "jumptables.inc"
 
 PIA1    = 0xe810
 PIA1_PA = PIA1 + 0
@@ -297,40 +298,36 @@ defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 ; SCREEN driver strategy routine.
 ; Y=SCREEN opcode.
 zproc drvstrat_SCREEN
-    pha
-    lda screen_jmptable_lo, y
-    sta ptr+0
-    lda screen_jmptable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
 
 screen_jmptable_lo:
-    .byte screen_version@mos16lo
-    .byte screen_getsize@mos16lo
-    .byte screen_clear@mos16lo
-    .byte screen_setcursor@mos16lo
-    .byte screen_getcursor@mos16lo
-    .byte screen_putchar@mos16lo
-    .byte screen_putstring@mos16lo
-    .byte screen_getchar@mos16lo
-    .byte fail@mos16lo
-    .byte screen_scrollup@mos16lo
-    .byte screen_scrolldown@mos16lo
-    .byte screen_cleartoeol@mos16lo
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo fail
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo fail
 screen_jmptable_hi:
-    .byte screen_version@mos16hi
-    .byte screen_getsize@mos16hi
-    .byte screen_clear@mos16hi
-    .byte screen_setcursor@mos16hi
-    .byte screen_getcursor@mos16hi
-    .byte screen_putchar@mos16hi
-    .byte screen_putstring@mos16hi
-    .byte screen_getchar@mos16hi
-    .byte fail@mos16hi
-    .byte screen_scrollup@mos16hi
-    .byte screen_scrolldown@mos16hi
-    .byte screen_cleartoeol@mos16hi
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi fail
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi fail
 zendproc
 
 zproc fail
@@ -539,22 +536,16 @@ defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
-    pha
-    lda jmptable_lo, y
-    sta ptr+0
-    lda jmptable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+    jmpdispatch jmptable_lo, jmptable_hi
 
 jmptable_lo:
-    .byte tty_const@mos16lo
-    .byte tty_conin@mos16lo
-    .byte tty_conout@mos16lo
+    jmptablo tty_const
+    jmptablo tty_conin
+    jmptablo tty_conout
 jmptable_hi:
-    .byte tty_const@mos16hi
-    .byte tty_conin@mos16hi
-    .byte tty_conout@mos16hi
+    jmptabhi tty_const
+    jmptabhi tty_conin
+    jmptabhi tty_conout
 zendproc
 
 ; Returns 0xff if no key is pending, 0 if one is.
