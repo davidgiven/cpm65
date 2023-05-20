@@ -48,6 +48,8 @@
 
 /* BDOS entrypoints. */
 
+/* These are the same as CP/M 2.2. */
+
 #define BDOS_EXIT_PROGRAM 0
 #define BDOS_CONSOLE_INPUT 1
 #define BDOS_CONSOLE_OUTPUT 2
@@ -86,8 +88,11 @@
 #define BDOS_COMPUTE_FILE_SIZE 35
 #define BDOS_COMPUTE_RANDOM_POINTER 36
 #define BDOS_RESET_DISK 37
-#define BDOS_GET_BIOS 38
+#define BDOS_GET_BIOS 38                /* <-- custom */
 #define BDOS_WRITE_RANDOM_FILLED 40
+
+/* These are custom extensions. */
+
 #define BDOS_GETTPA 41
 #define BDOS_GETZP 42
 

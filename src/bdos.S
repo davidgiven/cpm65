@@ -5,6 +5,7 @@
 
 #include "cpm65.inc"
 #include "zif.inc"
+#include "jumptables.inc"
 
 CPM_MACHINE_TYPE = $f ; 6502!
 CPM_SYSTEM_TYPE = 0
@@ -205,14 +206,8 @@ zproc ENTRY
     lda #0
     sta block_needs_clearing
 
-    lda jumptable_lo, y
-    sta temp+0
-    lda jumptable_hi, y
-    sta temp+1
-    jsr calltemp            ; preserve carry from this!
+    jsr icall               ; preserve carry from this!
     php
-    pha
-    txa
     pha
     tya
     pha
@@ -226,8 +221,6 @@ zproc ENTRY
     pla
     tay
     pla
-    tax
-    pla
     plp
     rts
 
@@ -235,94 +228,101 @@ unimplemented:
     clc
     rts
 
+icall:
+    lda jumptable_lo, y
+    pha
+    lda jumptable_hi, y
+    pha
+    rts
+
 jumptable_lo:
-    .byte entry_EXIT@mos16lo ; exit_program = 0
-    .byte entry_CONIN@mos16lo ; console_input = 1
-    .byte entry_CONOUT@mos16lo ; console_output = 2
-    .byte entry_UNIMPLEMENTED@mos16lo ; aux_input = 3 UNSUPPORTED
-    .byte entry_UNIMPLEMENTED@mos16lo ; aux_output = 4 UNSUPPORTED
-    .byte entry_UNIMPLEMENTED@mos16lo ; printer_output = 5 UNSUPPORTED
-    .byte entry_DIRECTIO@mos16lo ; direct_io = 6
-    .byte entry_GETIOBYTE@mos16lo ; get_io_byte = 7 UNSUPPORTED
-    .byte entry_UNIMPLEMENTED@mos16lo ; set_io_byte = 8 UNSUPPORTED
-    .byte entry_WRITESTRING@mos16lo ; write_string = 9
-    .byte entry_READLINE@mos16lo ; read_line = 10
-    .byte entry_GETCONSOLESTATUS@mos16lo ; console_status = 11
-    .byte entry_GETVERSION@mos16lo ; get_version = 12
-    .byte entry_RESET@mos16lo ; reset_disks = 13
-    .byte entry_LOGINDRIVE@mos16lo ; select_disk = 14
-    .byte entry_OPENFILE@mos16lo ; open_file = 15
-    .byte entry_CLOSEFILE@mos16lo ; close_file = 16
-    .byte entry_FINDFIRST@mos16lo ; find_first = 17
-    .byte entry_FINDNEXT@mos16lo ; find_next = 18
-    .byte entry_DELETEFILE@mos16lo ; delete_file = 19
-    .byte entry_READSEQUENTIAL@mos16lo ; read_sequential = 20
-    .byte entry_WRITESEQUENTIAL@mos16lo ; write_sequential = 21
-    .byte entry_CREATEFILE@mos16lo ; create_file = 22
-    .byte entry_RENAMEFILE@mos16lo ; rename_file = 23
-    .byte entry_GETLOGINBITMAP@mos16lo ; get_login_bitmap = 24
-    .byte entry_GETDRIVE@mos16lo ; get_current_drive = 25
-    .byte entry_SETDMAADDRESS@mos16lo ; set_dma_address = 26
-    .byte entry_GETALLOCATIONBITMAP@mos16lo ; get_allocation_bitmap = 27
-    .byte entry_SETDRIVEREADONLY@mos16lo ; set_drive_readonly = 28
-    .byte entry_GETREADONLYBITMAP@mos16lo ; get_readonly_bitmap = 29
-    .byte entry_SETFILEATTRS@mos16lo ; set_file_attributes = 30
-    .byte entry_GETDPB@mos16lo ; get_DPB = 31
-    .byte entry_GETSETUSER@mos16lo ; get_set_user_number = 32
-    .byte entry_READRANDOM@mos16lo ; read_random = 33
-    .byte entry_WRITERANDOM@mos16lo ; write_random = 34
-    .byte entry_COMPUTEFILESIZE@mos16lo ; compute_file_size = 35
-    .byte entry_COMPUTEPOINTER@mos16lo ; compute_random_pointer = 36
-    .byte entry_RESETDISK@mos16lo ; reset_disk = 37
-    .byte entry_GETBIOS@mos16lo ; get_bios = 38
-    .byte unimplemented@mos16lo ; 39
-    .byte entry_WRITERANDOMFILLED@mos16lo ; write_random_filled = 40
-    .byte bios_GETTPA@mos16lo ; get_tpa = 41
-    .byte bios_GETZP@mos16lo ; get_zp = 42
+    jmptablo entry_EXIT ; exit_program = 0
+    jmptablo entry_CONIN ; console_input = 1
+    jmptablo entry_CONOUT ; console_output = 2
+    jmptablo entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
+    jmptablo entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
+    jmptablo entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
+    jmptablo entry_DIRECTIO ; direct_io = 6
+    jmptablo entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
+    jmptablo entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
+    jmptablo entry_WRITESTRING ; write_string = 9
+    jmptablo entry_READLINE ; read_line = 10
+    jmptablo entry_GETCONSOLESTATUS ; console_status = 11
+    jmptablo entry_GETVERSION ; get_version = 12
+    jmptablo entry_RESET ; reset_disks = 13
+    jmptablo entry_LOGINDRIVE ; select_disk = 14
+    jmptablo entry_OPENFILE ; open_file = 15
+    jmptablo entry_CLOSEFILE ; close_file = 16
+    jmptablo entry_FINDFIRST ; find_first = 17
+    jmptablo entry_FINDNEXT ; find_next = 18
+    jmptablo entry_DELETEFILE ; delete_file = 19
+    jmptablo entry_READSEQUENTIAL ; read_sequential = 20
+    jmptablo entry_WRITESEQUENTIAL ; write_sequential = 21
+    jmptablo entry_CREATEFILE ; create_file = 22
+    jmptablo entry_RENAMEFILE ; rename_file = 23
+    jmptablo entry_GETLOGINBITMAP ; get_login_bitmap = 24
+    jmptablo entry_GETDRIVE ; get_current_drive = 25
+    jmptablo entry_SETDMAADDRESS ; set_dma_address = 26
+    jmptablo entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
+    jmptablo entry_SETDRIVEREADONLY ; set_drive_readonly = 28
+    jmptablo entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
+    jmptablo entry_SETFILEATTRS ; set_file_attributes = 30
+    jmptablo entry_GETDPB ; get_DPB = 31
+    jmptablo entry_GETSETUSER ; get_set_user_number = 32
+    jmptablo entry_READRANDOM ; read_random = 33
+    jmptablo entry_WRITERANDOM ; write_random = 34
+    jmptablo entry_COMPUTEFILESIZE ; compute_file_size = 35
+    jmptablo entry_COMPUTEPOINTER ; compute_random_pointer = 36
+    jmptablo entry_RESETDISK ; reset_disk = 37
+    jmptablo entry_GETBIOS ; get_bios = 38
+    jmptablo unimplemented ; 39
+    jmptablo entry_WRITERANDOMFILLED ; write_random_filled = 40
+    jmptablo bios_GETTPA ; get_tpa = 41
+    jmptablo bios_GETZP ; get_zp = 42
 jumptable_hi:
-    .byte entry_EXIT@mos16hi ;exit_program = 0
-    .byte entry_CONIN@mos16hi ; console_input = 1
-    .byte entry_CONOUT@mos16hi ; console_output = 2
-    .byte entry_UNIMPLEMENTED@mos16hi ; aux_input = 3 UNSUPPORTED
-    .byte entry_UNIMPLEMENTED@mos16hi ; aux_output = 4 UNSUPPORTED
-    .byte entry_UNIMPLEMENTED@mos16hi ; printer_output = 5 UNSUPPORTED
-    .byte entry_DIRECTIO@mos16hi ; direct_console_io = 6
-    .byte entry_GETIOBYTE@mos16hi ; get_io_byte = 7 UNSUPPORTED
-    .byte entry_UNIMPLEMENTED@mos16hi ; set_io_byte = 8 UNSUPPORTED
-    .byte entry_WRITESTRING@mos16hi ; write_string = 9
-    .byte entry_READLINE@mos16hi ; read_line = 10
-    .byte entry_GETCONSOLESTATUS@mos16hi ; console_status = 11
-    .byte entry_GETVERSION@mos16hi ; get_version = 12
-    .byte entry_RESET@mos16hi ; reset_disks = 13
-    .byte entry_LOGINDRIVE@mos16hi ; select_disk = 14
-    .byte entry_OPENFILE@mos16hi ; open_file = 15
-    .byte entry_CLOSEFILE@mos16hi ; close_file = 16
-    .byte entry_FINDFIRST@mos16hi ; find_first = 17
-    .byte entry_FINDNEXT@mos16hi ; find_next = 18
-    .byte entry_DELETEFILE@mos16hi ; delete_file = 19
-    .byte entry_READSEQUENTIAL@mos16hi ; read_sequential = 20
-    .byte entry_WRITESEQUENTIAL@mos16hi ; write_sequential = 21
-    .byte entry_CREATEFILE@mos16hi ; create_file = 22
-    .byte entry_RENAMEFILE@mos16hi ; rename_file = 23
-    .byte entry_GETLOGINBITMAP@mos16hi ; get_login_bitmap = 24
-    .byte entry_GETDRIVE@mos16hi ; get_current_drive = 25
-    .byte entry_SETDMAADDRESS@mos16hi ; set_dma_address = 26
-    .byte entry_GETALLOCATIONBITMAP@mos16hi ; get_allocation_bitmap = 27
-    .byte entry_SETDRIVEREADONLY@mos16hi ; set_drive_readonly = 28
-    .byte entry_GETREADONLYBITMAP@mos16hi ; get_readonly_bitmap = 29
-    .byte entry_SETFILEATTRS@mos16hi ; set_file_attributes = 30
-    .byte entry_GETDPB@mos16hi ; get_dpb = 31
-    .byte entry_GETSETUSER@mos16hi ; get_set_user_number = 32
-    .byte entry_READRANDOM@mos16hi ; read_random = 33
-    .byte entry_WRITERANDOM@mos16hi ; write_random = 34
-    .byte entry_COMPUTEFILESIZE@mos16hi ; compute_file_size = 35
-    .byte entry_COMPUTEPOINTER@mos16hi ; compute_random_pointer = 36
-    .byte entry_RESETDISK@mos16hi ; reset_disk = 37
-    .byte entry_GETBIOS@mos16hi ; 38
-    .byte unimplemented@mos16hi ; 39
-    .byte entry_WRITERANDOMFILLED@mos16hi ; write_random_filled = 40
-    .byte bios_GETTPA@mos16hi ; get_tpa = 41
-    .byte bios_GETZP@mos16hi ; get_zp = 42
+    jmptabhi entry_EXIT ;exit_program = 0
+    jmptabhi entry_CONIN ; console_input = 1
+    jmptabhi entry_CONOUT ; console_output = 2
+    jmptabhi entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
+    jmptabhi entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
+    jmptabhi entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
+    jmptabhi entry_DIRECTIO ; direct_console_io = 6
+    jmptabhi entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
+    jmptabhi entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
+    jmptabhi entry_WRITESTRING ; write_string = 9
+    jmptabhi entry_READLINE ; read_line = 10
+    jmptabhi entry_GETCONSOLESTATUS ; console_status = 11
+    jmptabhi entry_GETVERSION ; get_version = 12
+    jmptabhi entry_RESET ; reset_disks = 13
+    jmptabhi entry_LOGINDRIVE ; select_disk = 14
+    jmptabhi entry_OPENFILE ; open_file = 15
+    jmptabhi entry_CLOSEFILE ; close_file = 16
+    jmptabhi entry_FINDFIRST ; find_first = 17
+    jmptabhi entry_FINDNEXT ; find_next = 18
+    jmptabhi entry_DELETEFILE ; delete_file = 19
+    jmptabhi entry_READSEQUENTIAL ; read_sequential = 20
+    jmptabhi entry_WRITESEQUENTIAL ; write_sequential = 21
+    jmptabhi entry_CREATEFILE ; create_file = 22
+    jmptabhi entry_RENAMEFILE ; rename_file = 23
+    jmptabhi entry_GETLOGINBITMAP ; get_login_bitmap = 24
+    jmptabhi entry_GETDRIVE ; get_current_drive = 25
+    jmptabhi entry_SETDMAADDRESS ; set_dma_address = 26
+    jmptabhi entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
+    jmptabhi entry_SETDRIVEREADONLY ; set_drive_readonly = 28
+    jmptabhi entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
+    jmptabhi entry_SETFILEATTRS ; set_file_attributes = 30
+    jmptabhi entry_GETDPB ; get_dpb = 31
+    jmptabhi entry_GETSETUSER ; get_set_user_number = 32
+    jmptabhi entry_READRANDOM ; read_random = 33
+    jmptabhi entry_WRITERANDOM ; write_random = 34
+    jmptabhi entry_COMPUTEFILESIZE ; compute_file_size = 35
+    jmptabhi entry_COMPUTEPOINTER ; compute_random_pointer = 36
+    jmptabhi entry_RESETDISK ; reset_disk = 37
+    jmptabhi entry_GETBIOS ; 38
+    jmptabhi unimplemented ; 39
+    jmptabhi entry_WRITERANDOMFILLED ; write_random_filled = 40
+    jmptabhi bios_GETTPA ; get_tpa = 41
+    jmptabhi bios_GETZP ; get_zp = 42
 zendproc
 
 ; --- Misc ------------------------------------------------------------------
