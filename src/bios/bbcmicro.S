@@ -528,8 +528,6 @@ pending_key: .byte 0    ; pending keypress from system
 dma:         .word 0    ; current DMA
 sector_num:  .fill 3    ; current absolute sector number
 
-ZEROPAGE
-
 osgbpb_block:           ; block used by entry_READ and entry_WRITE
     .fill $0d
 osgbpb_block_end:
