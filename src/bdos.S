@@ -707,29 +707,27 @@ zproc entry_PARSEFCB
     ; Check for drive.
 
     ldy #0
-    lda (param), y              ; drive letter
-    zif_eq
-        clc
-        rts
-    zendif
-    iny
-    lda (param), y
-    dey
     ldx #0                      ; drive byte
-    cmp #':'                    ; colon?
-    zif_eq
+    lda (param), y              ; drive letter
+    zif_ne
+        iny
         lda (param), y
-        and #0xdf               ; to upper case
-        sec
-        sbc #'A'-1              ; to 1-based drive
-        cmp #16
-        zif_cs
-            dec temp+1
-        zendif
+        dey
+        cmp #':'                    ; colon?
+        zif_eq
+            lda (param), y
+            and #0xdf               ; to upper case
+            sec
+            sbc #'A'-1              ; to 1-based drive
+            cmp #16
+            zif_cs
+                dec temp+1
+            zendif
 
-        tax
-        iny
-        iny
+            tax
+            iny
+            iny
+        zendif
     zendif
     txa
     pha
