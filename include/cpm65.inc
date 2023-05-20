@@ -48,6 +48,8 @@
 
 /* BDOS entrypoints. */
 
+/* These are the same as CP/M 2.2. */
+
 #define BDOS_EXIT_PROGRAM 0
 #define BDOS_CONSOLE_INPUT 1
 #define BDOS_CONSOLE_OUTPUT 2
@@ -86,10 +88,22 @@
 #define BDOS_COMPUTE_FILE_SIZE 35
 #define BDOS_COMPUTE_RANDOM_POINTER 36
 #define BDOS_RESET_DISK 37
-#define BDOS_GET_BIOS 38
+#define BDOS_GET_BIOS 38                /* <-- custom */
 #define BDOS_WRITE_RANDOM_FILLED 40
-#define BDOS_GETTPA 41
-#define BDOS_GETZP 42
+
+/* These are custom extensions. */
+
+#define BDOS_GETTPA 41      /* forwards to BIOS */
+#define BDOS_GETZP 42       /* forwards to BIOS */
+
+/* DMA points at an FCB structure; the filename pointed to by XA is parsed
+ * into it. The updated XA pointing to the end of the filename is returned.
+ * If the filename is invalid, C is set on return (but CP/M filenames are
+ * so vague that the only real time when this can happen is if the drive
+ * letter is wrong).
+ */
+
+#define BDOS_PARSEFILENAME 43
 
 /* Error codes returned by various BDOS entrypoints. */
 

@@ -383,6 +383,7 @@ void insert_file(void)
     if (cpm_open_file(&cpm_fcb))
         goto error;
 
+	cpm_set_dma(cpm_default_dma);
     for (;;)
     {
         if (cpm_read_sequential(&cpm_fcb))
@@ -438,6 +439,8 @@ uint8_t really_save_file(FCB* fcb)
     if (cpm_make_file(fcb))
         return 0xff;
     fcb->cr = 0;
+
+	cpm_set_dma(cpm_default_dma);
 
     const uint8_t* inp = buffer_start;
     uint8_t pushed = 0;
@@ -989,7 +992,8 @@ const struct bindings zed_bindings = {"Zed", zed_keys, zed_cbs};
 
 void set_current_filename(const char* f)
 {
-    if (cpm_parse_filename(&cpm_fcb, f))
+	cpm_set_dma(&cpm_fcb);
+    if (!cpm_parse_filename(f))
 	{
 		cpm_printstring0("Bad filename\r\n");
 		cpm_fcb.f[0] = 0;
@@ -1058,7 +1062,8 @@ void colon(uint16_t count)
                     FCB backupfcb;
 
                     memcpy(&backupfcb, &cpm_fcb, sizeof(FCB));
-                    cpm_parse_filename(&cpm_fcb, arg);
+					cpm_set_dma(&cpm_fcb);
+                    cpm_parse_filename(arg);
 					if (cpm_fcb.f[0])
 						insert_file();
                     memcpy(&cpm_fcb, &backupfcb, sizeof(FCB));

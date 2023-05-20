@@ -92,7 +92,7 @@ MAINLOOP:
 
         lda #<cmdfcb
         ldx #>cmdfcb
-        jsr parse_fcb
+        jsr parse_filename
 
         ; Decode.
 
@@ -207,7 +207,7 @@ zendproc
 zproc parse_valid_userfcb
     lda #<userfcb
     ldx #>userfcb
-    jsr parse_fcb
+    jsr parse_filename
     bcs invalid_filename
     rts
 zendproc
@@ -215,7 +215,7 @@ zendproc
 zproc parse_valid_userfcb2
     lda #<(userfcb2)
     ldx #>(userfcb2)
-    jsr parse_fcb
+    jsr parse_filename
     bcs invalid_filename
     rts
 zendproc
@@ -708,7 +708,7 @@ zproc entry_TRANSIENT
 
     lda temp+0
     ldx temp+1
-    jsr parse_fcb           ; first parameter
+    jsr parse_filename           ; first parameter
     zif_cc
         lda temp+0
         clc
@@ -717,7 +717,7 @@ zproc entry_TRANSIENT
         zif_cs
             inx
         zendif
-        jsr parse_fcb       ; second parameter
+        jsr parse_filename       ; second parameter
     zendif
 
     ; Copy the command line into the program's PBLOCK.
@@ -737,8 +737,6 @@ zproc entry_TRANSIENT
     txa                     ; set length of command line
     sec
     sbc cmdoffset
-    sec
-    sbc #2
     ldy #XFCB__SIZE
     sta (temp), y
 
@@ -876,10 +874,36 @@ zendproc
 
 ; Parses text at cmdoffset into the xfcb at XA, which becomes the
 ; current one.
-zproc parse_fcb
+zproc parse_filename
     sta fcb+0
     stx fcb+1
     jsr skip_whitespace
+
+    ; Call the BDOS to actually parse it.
+
+    lda fcb+0
+    ldx fcb+1
+    jsr bdos_SETDMA
+
+    lda #<cmdline
+    ldx #>cmdline
+    clc
+    adc cmdoffset
+    zif_cs
+        inx
+    zendif
+    ldy #BDOS_PARSEFILENAME
+    jsr BDOS
+
+    zif_cs
+        rts
+    zendif
+
+    ; Update cmdoffset.
+
+    sec
+    sbc #<cmdline
+    sta cmdoffset
 
     ; Set the user number field in the XFCB.
 
@@ -888,166 +912,6 @@ zproc parse_fcb
     ldy #XFCB_US
     sta (fcb), y
 
-    ; Wipe FCB.
-
-    ldy #FCB_DR
-    lda #0
-    sta (fcb), y                ; drive
-    lda #' '
-    zrepeat                     ; 11 bytes of filename
-        iny
-        sta (fcb), y
-        cpy #FCB_T3
-    zuntil_eq
-    lda #0
-    zrepeat                     ; 4 bytes of metadata
-        iny
-        sta (fcb), y
-        cpy #FCB_RC
-    zuntil_eq
-
-    ; Check for drive.
-
-    ldx cmdoffset
-    lda cmdline, x            ; drive letter
-    zif_eq
-        clc
-        rts
-    zendif
-    ldy cmdline+1, x
-    cpy #':'                    ; colon?
-    zif_eq
-        sec
-        sbc #'A'-1              ; to 1-based drive
-        cmp #16
-        zif_cs                  ; out of range drive
-            rts
-        zendif
-        ldy #FCB_DR
-        sta (fcb), y            ; store
-
-        inx
-        inx
-    zendif
-
-    ; Read the filename.
-
-    ; x = cmdoffset
-    ldy #FCB_F1
-    zloop
-        lda cmdline, x        ; get a character
-        beq parse_fcb_exit      ; end of line
-        cpy #FCB_F8+1
-        zbreakif_eq
-        jsr is_terminator_char
-        bcs parse_fcb_exit
-        cmp #'.'
-        zbreakif_eq
-        cmp #'*'
-        zif_eq
-            ; Turn "ABC*.X" -> "ABC?????.X"
-            lda #'?'
-            dex                 ; reread the * again next time
-        zendif
-        jsr is_valid_filename_char
-        bcs return_with_carry
-        sta (fcb), y
-        iny
-        inx
-    zendloop
-    ; A is the character just read
-    ; X is cmdoffset
-
-    ; Skip non-dot filename characters.
-
-    zrepeat
-        cmp #'.'
-        zbreakif_eq
-        jsr is_terminator_char
-        bcs parse_fcb_exit
-        jsr is_valid_filename_char
-        bcs return_with_carry
-
-        inx
-        lda cmdline, x
-    zuntil_eq
-    ; A is the character just read
-    ; X is cmdoffset
-
-    ; Read the extension
-
-    inx                         ; skip dot
-    ldy #FCB_T1
-    zloop
-        lda cmdline, x        ; get a character
-        beq parse_fcb_exit      ; end of line
-        cpy #FCB_T3+1
-        zbreakif_eq
-        jsr is_terminator_char
-        bcs parse_fcb_exit
-        cmp #'*'
-        zif_eq
-            ; Turn "ABC.X*" -> "ABC.X*"
-            lda #'?'
-            dex                 ; reread the * again next time
-        zendif
-        jsr is_valid_filename_char
-        bcs return_with_carry
-        sta (fcb), y
-        iny
-        inx
-    zendloop
-        
-    ; Discard any remaining filename characters.
-
-    zrepeat
-        jsr is_terminator_char
-        zbreakif_cs
-        jsr is_valid_filename_char
-        bcs return_with_carry
-
-        inx
-        lda cmdline, x
-    zuntil_eq
-
-    ; Now A contains the terminating character --- either a space or \0.  We
-    ; have a valid FCB!
-
-parse_fcb_exit:
-    stx cmdoffset               ; update cmdoffset
-    clc
-    rts
-
-return_with_carry:
-    sec
-    rts
-
-return_without_carry:
-    clc
-    rts
-
-zproc is_terminator_char
-    cmp #' '
-    beq return_with_carry
-    cmp #'='
-    beq return_with_carry
-    clc
-    rts
-zendproc
-
-is_valid_filename_char:
-    cmp #32
-    bcc return_with_carry
-    cmp #127
-    bcs return_with_carry
-    cmp #':'
-    beq return_with_carry
-    cmp #';'
-    beq return_with_carry
-    cmp #'<'
-    beq return_with_carry
-    cmp #'>'
-    beq return_with_carry
     clc
     rts
 zendproc
