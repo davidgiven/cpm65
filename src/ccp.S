@@ -936,7 +936,6 @@ zproc parse_fcb
     ldy #FCB_F1
     zloop
         lda cmdline, x        ; get a character
-        beq parse_fcb_exit      ; end of line
         cpy #FCB_F8+1
         zbreakif_eq
         jsr is_terminator_char
@@ -960,7 +959,7 @@ zproc parse_fcb
 
     ; Skip non-dot filename characters.
 
-    zrepeat
+    zloop
         cmp #'.'
         zbreakif_eq
         jsr is_terminator_char
@@ -970,7 +969,7 @@ zproc parse_fcb
 
         inx
         lda cmdline, x
-    zuntil_eq
+    zendloop
     ; A is the character just read
     ; X is cmdoffset
 
@@ -980,7 +979,6 @@ zproc parse_fcb
     ldy #FCB_T1
     zloop
         lda cmdline, x        ; get a character
-        beq parse_fcb_exit      ; end of line
         cpy #FCB_T3+1
         zbreakif_eq
         jsr is_terminator_char
@@ -1015,6 +1013,7 @@ zproc parse_fcb
 
 parse_fcb_exit:
     stx cmdoffset               ; update cmdoffset
+return_without_carry:
     clc
     rts
 
@@ -1022,11 +1021,10 @@ return_with_carry:
     sec
     rts
 
-return_without_carry:
-    clc
-    rts
 
 zproc is_terminator_char
+    cmp #0
+    beq return_with_carry
     cmp #' '
     beq return_with_carry
     cmp #'='
