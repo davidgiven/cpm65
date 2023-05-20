@@ -58,11 +58,6 @@ zproc screen_clear_to_eol, .text.screen_clear_to_eol
 	jmp _call_screen
 zendproc
 
-zproc screen_newline, .text.screen_newline
-	ldy #SCREEN_NEWLINE
-	jmp _call_screen
-zendproc
-
 zproc screen_waitchar, .text.waitchar
 	zrepeat
 		lda #0xff

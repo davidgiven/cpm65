@@ -53,6 +53,13 @@ zproc _start
 
     ; Load the BDOS image.
 
+    ldy #0x11
+    lda #0
+    zrepeat
+        sta bdos_osfile_block, y
+        dey
+    zuntil_mi
+
     lda #<bdos_filename
     sta bdos_osfile_block + 0
     lda #>bdos_filename
@@ -161,8 +168,6 @@ screen_jmptable_lo:
     .byte screen_scrollup@mos16lo
     .byte screen_scrolldown@mos16lo
     .byte screen_cleartoeol@mos16lo
-    .byte OSNEWL@mos16lo
-    .byte screen_backspace@mos16lo
 screen_jmptable_hi:
     .byte screen_version@mos16hi
     .byte screen_getsize@mos16hi
@@ -176,8 +181,6 @@ screen_jmptable_hi:
     .byte screen_scrollup@mos16hi
     .byte screen_scrolldown@mos16hi
     .byte screen_cleartoeol@mos16hi
-    .byte OSNEWL@mos16hi
-    .byte screen_backspace@mos16hi
 zendproc
 
 zproc set_cursor_keys
@@ -203,6 +206,7 @@ zendproc
 
 zproc screen_clear
     lda #12             ; clear screen
+oswrch:
     jmp OSWRCH
 zendproc
 
@@ -247,14 +251,11 @@ zendproc
 
 zproc screen_putchar
     cmp #32
-    zif_cc
-        rts
-    zendif
-    cmp #127
     zif_cs
-        rts
+        cmp #127
+        bcc oswrch
     zendif
-    jmp OSWRCH
+    rts
 zendproc
 
 zproc screen_putstring
@@ -276,14 +277,14 @@ zproc screen_scrollup
     lda #0
     jsr screen_setcursor
     lda #10
-    jmp OSWRCH
+    bne oswrch          ; always taken
 zendproc
 
 zproc screen_scrolldown
     lda #30             ; home
     jsr OSWRCH
     lda #11             ; cursor up
-    jmp OSWRCH
+    bne oswrch          ; always taken
 zendproc
 
 zproc screen_cleartoeol
@@ -311,11 +312,6 @@ zproc screen_cleartoeol
     jmp screen_setcursor
 zendproc
 
-zproc screen_backspace
-    lda #127
-    jmp OSWRCH
-zendproc
-
 ; --- TTY driver ------------------------------------------------------------
 
 defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
@@ -323,22 +319,22 @@ defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
+    sta ptr
+    lda jmptable_hi, y
     pha
     lda jmptable_lo, y
-    sta ptr+0
-    lda jmptable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+    pha
+    lda ptr
+    rts
 
 jmptable_lo:
-    .byte tty_const@mos16lo
-    .byte tty_conin@mos16lo
-    .byte OSWRCH@mos16lo
+    .byte (tty_const-1)@mos16lo
+    .byte (tty_conin-1)@mos16lo
+    .byte (OSWRCH-1) & 0xff
 jmptable_hi:
-    .byte tty_const@mos16hi
-    .byte tty_conin@mos16hi
-    .byte OSWRCH@mos16hi
+    .byte (tty_const-1)@mos16hi
+    .byte (tty_conin-1)@mos16hi
+    .byte (OSWRCH-1) >> 8
 zendproc
 
 ; Blocks and waits for the next keypress; returns it in A.
