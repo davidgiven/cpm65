@@ -10,6 +10,9 @@
 
 .global drvtop
 
+.zeropage ptr
+.zeropage ptr1
+
 ; BIOS entry point. Parameter is in XA, function in Y.
 zproc biosentry
 	jmpdispatch biostable_lo, biostable_hi
