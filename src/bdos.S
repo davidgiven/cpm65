@@ -741,7 +741,7 @@ zproc entry_PARSEFCB
         jsr toupper
 
         jsr is_terminator_char
-        zif_eq
+        zif_cs
             ; Turn "ABC .X" -> "AB     .X"
             lda #' '
             dey                 ; reread the char again next time
@@ -766,7 +766,7 @@ zproc entry_PARSEFCB
         cmp #'.'
         zbreakif_eq
         jsr is_terminator_char
-        zif_eq
+        zif_cs
             lda #' '            ; filename has no extension
             pha
             pha
@@ -789,7 +789,7 @@ zproc entry_PARSEFCB
         jsr toupper
 
         jsr is_terminator_char
-        zif_eq
+        zif_cs
             ; Turn "ABC .X" -> "AB     .X"
             lda #' '
             dey                 ; reread the char again next time
@@ -860,27 +860,22 @@ parse_filename_exit:
     rts
 
 is_terminator_char:
-    cmp #0
-    beq 1f
-    cmp #' '
-    beq 1f
-    cmp #'.'
-    beq 1f
-    cmp #'='
-    beq 1f
-    cmp #32
-    bcc 1f
-    cmp #127
-    bcs 1f
-    cmp #':'
-    beq 1f
-    cmp #';'
-    beq 1f
-    cmp #'<'
-    beq 1f
-    cmp #'>'
+    stx temp+2
+    ldx #(terminators_end - terminators) - 1
+    zrepeat
+        cmp terminators, x
+        beq 1f                  ; carry set on branch
+        dex
+    zuntil_mi
+    clc
 1:
+    ldx temp+2
     rts
+
+terminators:
+    .ascii " =><.:,[]/|"
+    .byte 10, 13, 127, 9, 0
+terminators_end:
 zendproc
 
 zproc toupper
