@@ -6,53 +6,48 @@
 #include "mos.inc"
 #include "cpm65.inc"
 #include "driver.inc"
+#include "jumptables.inc"
 
 .global drvtop
 
 ; BIOS entry point. Parameter is in XA, function in Y.
 zproc biosentry
-    pha
-    lda biostable_lo, y
-    sta ptr+0
-    lda biostable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+	jmpdispatch biostable_lo, biostable_hi
 
 biostable_lo:
-    .byte entry_CONST@mos16lo
-    .byte entry_CONIN@mos16lo
-    .byte entry_CONOUT@mos16lo
-    .byte entry_SELDSK@mos16lo
-    .byte entry_SETSEC@mos16lo
-    .byte entry_SETDMA@mos16lo
-    .byte entry_READ@mos16lo
-    .byte entry_WRITE@mos16lo
-    .byte entry_RELOCATE@mos16lo
-    .byte entry_GETTPA@mos16lo
-    .byte entry_SETTPA@mos16lo
-    .byte entry_GETZP@mos16lo
-    .byte entry_SETZP@mos16lo
-    .byte entry_SETBANK@mos16lo
-	.byte entry_ADDDRV@mos16lo
-	.byte entry_FINDDRV@mos16lo
+    jmptablo entry_CONST
+    jmptablo entry_CONIN
+    jmptablo entry_CONOUT
+    jmptablo entry_SELDSK
+    jmptablo entry_SETSEC
+    jmptablo entry_SETDMA
+    jmptablo entry_READ
+    jmptablo entry_WRITE
+    jmptablo entry_RELOCATE
+    jmptablo entry_GETTPA
+    jmptablo entry_SETTPA
+    jmptablo entry_GETZP
+    jmptablo entry_SETZP
+    jmptablo entry_SETBANK
+	jmptablo entry_ADDDRV
+	jmptablo entry_FINDDRV
 biostable_hi:
-    .byte entry_CONST@mos16hi
-    .byte entry_CONIN@mos16hi
-    .byte entry_CONOUT@mos16hi
-    .byte entry_SELDSK@mos16hi
-    .byte entry_SETSEC@mos16hi
-    .byte entry_SETDMA@mos16hi
-    .byte entry_READ@mos16hi
-    .byte entry_WRITE@mos16hi
-    .byte entry_RELOCATE@mos16hi
-    .byte entry_GETTPA@mos16hi
-    .byte entry_SETTPA@mos16hi
-    .byte entry_GETZP@mos16hi
-    .byte entry_SETZP@mos16hi
-    .byte entry_SETBANK@mos16hi
-	.byte entry_ADDDRV@mos16hi
-	.byte entry_FINDDRV@mos16hi
+    jmptabhi entry_CONST
+    jmptabhi entry_CONIN
+    jmptabhi entry_CONOUT
+    jmptabhi entry_SELDSK
+    jmptabhi entry_SETSEC
+    jmptabhi entry_SETDMA
+    jmptabhi entry_READ
+    jmptabhi entry_WRITE
+    jmptabhi entry_RELOCATE
+    jmptabhi entry_GETTPA
+    jmptabhi entry_SETTPA
+    jmptabhi entry_GETZP
+    jmptabhi entry_SETZP
+    jmptabhi entry_SETBANK
+	jmptabhi entry_ADDDRV
+	jmptabhi entry_FINDDRV
 zendproc
 
 zproc entry_ADDDRV

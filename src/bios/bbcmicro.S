@@ -6,6 +6,7 @@
 #include "mos.inc"
 #include "cpm65.inc"
 #include "driver.inc"
+#include "jumptables.inc"
 
 ZEROPAGE
 
@@ -143,40 +144,34 @@ defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 ; SCREEN driver strategy routine.
 ; Y=SCREEN opcode.
 zproc drvstrat_SCREEN
-    pha
-    lda screen_jmptable_lo, y
-    sta ptr+0
-    lda screen_jmptable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
 
 screen_jmptable_lo:
-    .byte screen_version@mos16lo
-    .byte screen_getsize@mos16lo
-    .byte screen_clear@mos16lo
-    .byte screen_setcursor@mos16lo
-    .byte screen_getcursor@mos16lo
-    .byte screen_putchar@mos16lo
-    .byte screen_putstring@mos16lo
-    .byte screen_getchar@mos16lo
-    .byte fail@mos16lo
-    .byte screen_scrollup@mos16lo
-    .byte screen_scrolldown@mos16lo
-    .byte screen_cleartoeol@mos16lo
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo fail
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
 screen_jmptable_hi:
-    .byte screen_version@mos16hi
-    .byte screen_getsize@mos16hi
-    .byte screen_clear@mos16hi
-    .byte screen_setcursor@mos16hi
-    .byte screen_getcursor@mos16hi
-    .byte screen_putchar@mos16hi
-    .byte screen_putstring@mos16hi
-    .byte screen_getchar@mos16hi
-    .byte fail@mos16hi
-    .byte screen_scrollup@mos16hi
-    .byte screen_scrolldown@mos16hi
-    .byte screen_cleartoeol@mos16hi
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi fail
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
 zendproc
 
 zproc set_cursor_keys
@@ -315,22 +310,16 @@ defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
-    sta ptr
-    lda jmptable_hi, y
-    pha
-    lda jmptable_lo, y
-    pha
-    lda ptr
-    rts
+    jmpdispatch tty_jmptable_lo, tty_jmptable_hi
 
-jmptable_lo:
-    .byte (tty_const-1)@mos16lo
-    .byte (tty_conin-1)@mos16lo
-    .byte (OSWRCH-1) & 0xff
-jmptable_hi:
-    .byte (tty_const-1)@mos16hi
-    .byte (tty_conin-1)@mos16hi
-    .byte (OSWRCH-1) >> 8
+tty_jmptable_lo:
+    jmptablo tty_const
+    jmptablo tty_conin
+    .byte OSWRCH & 0xff
+tty_jmptable_hi:
+    jmptabhi tty_const
+    jmptabhi tty_conin
+    .byte OSWRCH >> 8
 zendproc
 
 ; Blocks and waits for the next keypress; returns it in A.
