@@ -771,7 +771,7 @@ zproc entry_PARSEFCB
             pha
             pha
             pha
-            bne parse_fcb_exit  ; always taken
+            bne parse_filename_exit  ; always taken
         zendif
 
         iny
@@ -816,7 +816,7 @@ zproc entry_PARSEFCB
         lda (param), y
     zuntil_eq
 
-parse_fcb_exit:
+parse_filename_exit:
     ; Push the four zeroes for the metadata.
 
     lda #0

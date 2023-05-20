@@ -92,7 +92,7 @@ MAINLOOP:
 
         lda #<cmdfcb
         ldx #>cmdfcb
-        jsr parse_fcb
+        jsr parse_filename
 
         ; Decode.
 
@@ -207,7 +207,7 @@ zendproc
 zproc parse_valid_userfcb
     lda #<userfcb
     ldx #>userfcb
-    jsr parse_fcb
+    jsr parse_filename
     bcs invalid_filename
     rts
 zendproc
@@ -215,7 +215,7 @@ zendproc
 zproc parse_valid_userfcb2
     lda #<(userfcb2)
     ldx #>(userfcb2)
-    jsr parse_fcb
+    jsr parse_filename
     bcs invalid_filename
     rts
 zendproc
@@ -708,7 +708,7 @@ zproc entry_TRANSIENT
 
     lda temp+0
     ldx temp+1
-    jsr parse_fcb           ; first parameter
+    jsr parse_filename           ; first parameter
     zif_cc
         lda temp+0
         clc
@@ -717,7 +717,7 @@ zproc entry_TRANSIENT
         zif_cs
             inx
         zendif
-        jsr parse_fcb       ; second parameter
+        jsr parse_filename       ; second parameter
     zendif
 
     ; Copy the command line into the program's PBLOCK.
@@ -874,7 +874,7 @@ zendproc
 
 ; Parses text at cmdoffset into the xfcb at XA, which becomes the
 ; current one.
-zproc parse_fcb
+zproc parse_filename
     sta fcb+0
     stx fcb+1
     jsr skip_whitespace
@@ -892,7 +892,7 @@ zproc parse_fcb
     zif_cs
         inx
     zendif
-    ldy #BDOS_PARSEFCB
+    ldy #BDOS_PARSEFILENAME
     jsr BDOS
 
     zif_cs

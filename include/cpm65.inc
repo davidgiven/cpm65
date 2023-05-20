@@ -98,10 +98,12 @@
 
 /* DMA points at an FCB structure; the filename pointed to by XA is parsed
  * into it. The updated XA pointing to the end of the filename is returned.
- * If the filename is invalid, fcb->f[0] will be zero.
+ * If the filename is invalid, C is set on return (but CP/M filenames are
+ * so vague that the only real time when this can happen is if the drive
+ * letter is wrong).
  */
 
-#define BDOS_PARSEFCB 43
+#define BDOS_PARSEFILENAME 43
 
 /* Error codes returned by various BDOS entrypoints. */
 

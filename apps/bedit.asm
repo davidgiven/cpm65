@@ -48,7 +48,7 @@ BDOS_GET_BIOS          = 38
 BDOS_WRITE_RANDOM_FILL = 40
 BDOS_GETZP             = 41
 BDOS_GETTPA            = 42
-BDOS_PARSE_FCB         = 43
+BDOS_PARSE_FILENAME         = 43
 
 FCB_DR = 0x00
 FCB_F1 = 0x01
@@ -585,7 +585,7 @@ command_tab:
 \ Parses a filename from the line buffer into cpm_fcb.
 \ Returns with C set if the filename is invalid.
 
-.zproc parse_fcb
+.zproc parse_filename
     lda #<cpm_fcb
     ldx #>cpm_fcb
     ldy #BDOS_SET_DMA
@@ -593,7 +593,7 @@ command_tab:
 
     lda #<line_buffer
     ldx #>line_buffer
-    ldy #BDOS_PARSE_FCB
+    ldy #BDOS_PARSE_FILENAME
     jsr BDOS
     rts
 .zendproc
@@ -1352,7 +1352,7 @@ dec_table:
     jsr has_command_word
     bne syntax_error
 
-    jsr parse_fcb
+    jsr parse_filename
 .zendproc
     \ falls through
 
@@ -1472,7 +1472,7 @@ dec_table:
     jsr has_command_word
     bne syntax_error
 
-    jsr parse_fcb
+    jsr parse_filename
 .zendproc
     \ falls through
 
