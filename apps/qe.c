@@ -150,7 +150,7 @@ void set_status_line(const char* message)
 
     uint8_t length = 0;
     goto_status_line();
-    // con_revon();
+	screen_setstyle(1);
     for (;;)
     {
         char c = *message++;
@@ -159,7 +159,7 @@ void set_status_line(const char* message)
         screen_putchar(c);
         length++;
     }
-    // con_revoff();
+	screen_setstyle(0);
     while (length < status_line_length)
     {
         screen_putchar(' ');

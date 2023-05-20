@@ -152,7 +152,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
-    jmptablo fail
+    jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -166,7 +166,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-    jmptabhi fail
+    jmptabhi screen_setstyle
 zendproc
 
 zproc set_cursor_keys
@@ -296,6 +296,29 @@ zproc screen_cleartoeol
     lda ptr+0
     ldx ptr+1
     jmp screen_setcursor
+zendproc
+
+zproc setcolour
+    pha
+    lda #17
+    jsr OSWRCH
+    pla
+    jmp OSWRCH
+zendproc
+
+zproc screen_setstyle
+    and #STYLE_REVERSE
+
+    zif_eq
+        lda #7              ; white foreground
+        jsr setcolour
+        lda #128            ; black background
+        jmp setcolour
+    zendif
+    lda #0              ; black foreground
+    jsr setcolour
+    lda #135            ; white background
+    jmp setcolour
 zendproc
 
 ; --- TTY driver ------------------------------------------------------------
