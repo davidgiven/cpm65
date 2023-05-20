@@ -71,7 +71,10 @@ drv_\name:
 #define SCREEN_PUTSTRING   6 /* entry: XA=nul terminated pointer */
 
 ; Blocks and waits for a input character. XA contains a timeout in
-; centiseconds.  This call may return early.
+; centiseconds. This call may return early.
+; ESCAPE returns 27.
+; DELETE returns 127 (not 8!).
+; Control+Letter returns the usual codes from 1 to 26.
 
 #define SCREEN_GETCHAR     7 /* entry: XA=timeout in cs, exit: A=char, or C if timed out */
 

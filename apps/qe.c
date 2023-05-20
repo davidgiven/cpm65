@@ -690,7 +690,7 @@ void insert_mode(bool replacing)
             break;
 
         dirty = true;
-        if (c == 8)
+        if (c == 127)
         {
             if (gap_start != current_line)
                 gap_start--;

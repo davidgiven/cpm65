@@ -225,13 +225,6 @@ zproc screen_getchar
     lda #0x81           ; read key with timeout
     jsr OSBYTE
     txa
-    zif_cc
-        cmp #127
-        zif_eq
-            lda #8
-        zendif
-        clc
-    zendif
     rts
 zendproc
 
