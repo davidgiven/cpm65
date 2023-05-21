@@ -257,7 +257,12 @@ allocate_cmd_end:
 
 banner: ; reversed!
     .byte 13, 10
-    .ascii "TEP erodommoC eht rof 56-M/PC"
+#if defined PET4032
+    .ascii "2304"
+#elif defined PET8032
+    .ascii "2308"
+#endif
+    .ascii " TEP erodommoC eht rof 56-M/PC"
 banner_end:
 zendproc
 
