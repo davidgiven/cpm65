@@ -64,11 +64,29 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### BBC Micro notes
 
-  - It'll autodetect the amount of available memory. If you're on a Master or
-    Tube system, I'd suggest making sure you're in mode 0 or 3 before running.
-    On a BBC Micro... well, it _will_ run in mode 0, but you'll only get a
-    2.5kB TPA! I suggest mode 7. On the Electron you have to use mode 6 which
-    gives you 14kB of TPA, which isn't enough to run the assembler.
+  - To run, do SHIFT+BREAK.
+
+  - Alternatively, if you're on a Tube system, do:
+
+    ```
+    MODE 3
+    *!BOOT
+    ```
+
+  - Alternatively alternatively, if you're on a Master system, do:
+
+    ```
+    MODE 131
+    *DISK
+    *!BOOT
+    ```
+
+  - It'll autodetect the amount of available memory. If you're _not_ on a Tube
+    or Master system with shadow RAM, then your screen mode will consume TPA
+    space. On a stock BBC Micro it _will_ run in mode 0, but you'll only get a
+    2.5kB TPA! Mode 7 will work better here. It will work on the Electron, but
+    you'll have to use mode 6 which will leave you 14kB of TPA. That's
+    unfortunately not enough to run the assembler.
 
   - The CP/M file system is stored in a big file (called cpmfs). This will
 	expand up to the size defined in diskdefs: currently, 192kB (the largest
@@ -128,6 +146,8 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
   - It supports drive 0: only.
 
   - This port runs completely bare-metal and does not use any ROM routines.
+
+  - The PET port has a SCREEN driver.
 
 ### Commander X16 notes
 
