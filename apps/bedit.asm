@@ -46,21 +46,9 @@ BDOS_SEEK_TO_SEQ_POS   = 36
 BDOS_RESET_DRIVES      = 37
 BDOS_GET_BIOS          = 38
 BDOS_WRITE_RANDOM_FILL = 40
-
-BIOS_CONST             = 0
-BIOS_CONIN             = 1
-BIOS_CONOUT            = 2
-BIOS_SELDSK            = 3
-BIOS_SETSEC            = 4
-BIOS_SETDMA            = 5
-BIOS_READ              = 6
-BIOS_WRITE             = 7
-BIOS_RELOCATE          = 8
-BIOS_GETTPA            = 9
-BIOS_SETTPA            = 10
-BIOS_GETZP             = 11
-BIOS_SETZP             = 12
-BIOS_SETBANK           = 13
+BDOS_GETZP             = 41
+BDOS_GETTPA            = 42
+BDOS_PARSE_FILENAME         = 43
 
 FCB_DR = 0x00
 FCB_F1 = 0x01
@@ -132,13 +120,8 @@ command_buffer = cpm_default_dma + 2
     ldy #BDOS_SET_DMA
     jsr BDOS
 
-    ldy #BDOS_GET_BIOS
+    ldy #BDOS_GETTPA
     jsr BDOS
-    sta BIOS+1
-    stx BIOS+2
-
-    ldy #BIOS_GETTPA
-    jsr BIOS
     stx himem
 
     lda #0
@@ -602,117 +585,16 @@ command_tab:
 \ Parses a filename from the line buffer into cpm_fcb.
 \ Returns with C set if the filename is invalid.
 
-.zproc parse_fcb
-    .label exit
+.zproc parse_filename
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_SET_DMA
+    jsr BDOS
 
-    \ Basic sanity test.
-
-    lda line_length
-    .zif eq
-        sec
-        rts
-    .zendif
-
-    \ Wipe FCB.
-
-    lda #0
-    sta cpm_fcb+0               \ drive
-    lda #' '
-    ldy #FCB_F1
-    .zrepeat                    \ 11 bytes of filename
-        sta cpm_fcb, y
-        iny
-        cpy #FCB_T3+1
-    .zuntil eq
-    lda #0
-    .zrepeat                    \ 4 bytes of metadata
-        sta cpm_fcb, y
-        iny
-        cpy #FCB_RC+1
-    .zuntil eq
-
-    \ Check for drive.
-
-    ldx #0                      \ offset into filename
-    lda line_length
-    cmp #1
-    .zif ne
-        ldy line_buffer+1
-        cpy #':'                    \ colon?
-        .zif eq
-            lda line_buffer+0
-            jsr toupper                 \ must be upper case
-            sec
-            sbc #'A'-1              \ to 1-based drive
-            cmp #16
-            .zif cs                 \ out of range drive
-                rts
-            .zendif
-            sta cpm_fcb+0           \ store
-
-            ldx #2                  \ skip drive letter
-        .zendif
-    .zendif
-
-    \ Read the filename.
-
-    \ x = offset
-    ldy #FCB_F1
-    .zloop
-        cpx line_length
-        beq exit                \ end of filename
-        cpy #FCB_F8+1
-        .zbreak eq              \ maximum number of characters
-        lda line_buffer, x
-        cmp #'.'
-        .zbreak eq
-
-        jsr toupper             \ must be upper case
-        sta cpm_fcb, y
-        iny
-        inx
-    .zendloop
-    \ A is the character just read
-    \ X is cmdoffset
-
-    \ Skip non-dot filename characters.
-
-    .zloop
-        cpx line_length
-        beq exit                \ end of filename
-        lda line_buffer, x
-        cmp #'.'
-        .zbreak eq
-
-        inx
-        lda line_buffer, x
-    .zendloop
-    \ A is the character just read
-    \ X is cmdoffset
-
-    \ Read the extension
-
-    inx                         \ skip dot
-    ldy #FCB_T1
-    .zloop
-        cpx line_length
-        .zbreak eq              \ end of filename
-        cpy #FCB_T3+1
-        .zbreak eq
-        lda line_buffer, x      \ get a character
-        cmp #'.'
-        .zbreak eq
-
-        jsr toupper             \ must be upper case
-        sta cpm_fcb, y
-        iny
-        inx
-    .zendloop
-        
-    \ Any remaining filename characters are simply ignored.
-
-exit:
-    clc
+    lda #<line_buffer
+    ldx #>line_buffer
+    ldy #BDOS_PARSE_FILENAME
+    jsr BDOS
     rts
 .zendproc
 
@@ -1470,7 +1352,7 @@ dec_table:
     jsr has_command_word
     bne syntax_error
 
-    jsr parse_fcb
+    jsr parse_filename
 .zendproc
     \ falls through
 
@@ -1501,6 +1383,11 @@ dec_table:
     lda #0
     sta line_length
     sta io_ptr
+
+    lda #<cpm_default_dma
+    ldx #>cpm_default_dma
+    ldy #BDOS_SET_DMA
+    jsr BDOS
 
     .zloop
         ldx io_ptr
@@ -1585,7 +1472,7 @@ dec_table:
     jsr has_command_word
     bne syntax_error
 
-    jsr parse_fcb
+    jsr parse_filename
 .zendproc
     \ falls through
 
@@ -1626,6 +1513,11 @@ dec_table:
 
     .label write_char
     .label io_error
+
+    lda #<cpm_default_dma
+    ldx #>cpm_default_dma
+    ldy #BDOS_SET_DMA
+    jsr BDOS
 
     .zloop
         ldy #0
