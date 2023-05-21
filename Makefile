@@ -27,7 +27,6 @@ APPS = \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/apps/ls.com \
-	$(OBJDIR)/apps/fcbtest.com \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/objdump.com \
