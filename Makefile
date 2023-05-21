@@ -232,7 +232,7 @@ apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/cc
 
 $(OBJDIR)/pet4032.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet4032.exe: $(OBJDIR)/libcommodore.a
-$(OBJDIR)/src/bios/pet4032.S: CFLAGS += -DPET4032
+$(OBJDIR)/src/bios/pet4032.o: CFLAGS65 += -DPET4032
 pet4032.d64: $(OBJDIR)/pet4032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
@@ -248,7 +248,7 @@ pet4032.d64: $(OBJDIR)/pet4032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_
 
 $(OBJDIR)/pet8032.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet8032.exe: $(OBJDIR)/libcommodore.a
-$(OBJDIR)/src/bios/pet8032.S: CFLAGS += -DPET4032
+$(OBJDIR)/src/bios/pet8032.o: CFLAGS65 += -DPET8032
 pet8032.d64: $(OBJDIR)/pet8032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@

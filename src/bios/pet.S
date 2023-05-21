@@ -43,7 +43,11 @@ CRTC_STATUS = CRTC+1
 CRTC_DATA = CRTC+1
 
 VIDEO   = 0x8000
+#if defined PET4032
 SCREEN_WIDTH = 40
+#elif defined PET8032
+SCREEN_WIDTH = 80
+#endif
 SCREEN_HEIGHT = 25
 
 ZEROPAGE
@@ -702,22 +706,24 @@ zendproc
 ; the top bit of ptr1+1.
 
 zproc change_key_state
+#if defined PET4032
     cpy #0x47               ; left shift
     beq shift_change
     cpy #0x42               ; right shift
     beq shift_change
+#elif defined PET8032
+    cpy #0x37               ; left shift
+    beq shift_change
+    cpy #0x31               ; right shift
+    beq shift_change
+#endif
 
     bit ptr1+1
     zif_pl
         lda keyboard_decode_tab, y
-
         bit shift_pressed
         zif_pl
-            cmp #'a'
-            zif_cs
-                cmp #'z'+1
-                eor #0x20
-            zendif
+            lda keyboard_decode_tab_shifted, y
         zendif
         sta pending_key
     zendif
@@ -726,6 +732,7 @@ zproc change_key_state
     ; Shift gets special treatment because we care about ups as well as downs.
 
 shift_change:
+#if defined PET4032
     lda keyboard_state + 8
     rol a
     rol a
@@ -734,10 +741,20 @@ shift_change:
     and keyboard_state + 8  ; right shift state in bit 0
     ror a
     ror a
+#elif defined PET8032
+    lda keyboard_state + 6
+    rol a
+    rol a
+    rol a                   ; right shift state in bit 0
+    and keyboard_state + 6  ; left shift state in bit 0
+    ror a
+    ror a
+#endif
     sta shift_pressed       ; new state in top bit
     rts
 
 keyboard_decode_tab:
+#if defined PET4032
     .byte 0x00, 0x00, '_',  '(',  '&',  '%',  '#',  '!'  ; 0x00
     .byte 0x7f, 0x00, 0x00, ')',  '\\', '\'', '$',  '"'  ; 0x08
     .byte '9',  '7',  '^',  'o',  'u',  't',  'e',  'q'  ; 0x10
@@ -748,6 +765,43 @@ keyboard_decode_tab:
     .byte '+',  '2',  0x00, '?',  '.',  'n',  'v',  'x'  ; 0x38
     .byte '-',  '0',  0x00, '>',  0x00, ']',  '@',  0x00 ; 0x40
     .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
+#elif defined PET8032
+    .byte '.',  0x00, 0x00, '8',  '-',  '8',  '5',  '2'  ; 0x00
+    .byte '9',  0x00, '^',  '7',  '0',  '7',  '4',  '1'  ; 0x08
+    .byte '5',  ';',  'k',  ']',  'h',  'f',  's',  0x1b ; 0x10
+    .byte '6',  '@',  'l',  0x0d, 'j',  'g',  'd',  'a'  ; 0x18
+    .byte 0x7f, 'p',  'i',  '\\', 'y',  'r',  'w',  0x09 ; 0x20
+    .byte '4',  '[',  'o',  0x00, 'u',  't',  'e',  'q'  ; 0x28
+    .byte '3',  0x00, 0x00, '.',  '.',  'b',  'c',  0x00 ; 0x30
+    .byte '2',  0x00, 0x00, '0',  ',',  'n',  'v',  'z'  ; 0x38
+    .byte '1',  '/',  0x00, 0x00, 'm',  ' ',  'x',  0x00 ; 0x40
+    .byte 0x00, 0x00, ':',  0x1b, '9',  '6',  '3',  0x00 ; 0x48
+#endif
+
+keyboard_decode_tab_shifted:
+#if defined PET4032
+    .byte 0x00, 0x00, '_',  '(',  '&',  '%',  '#',  '!'  ; 0x00
+    .byte 0x7f, 0x00, 0x00, ')',  '\\', '\'', '$',  '"'  ; 0x08
+    .byte '9',  '7',  '^',  'O',  'U',  'T',  'E',  'Q'  ; 0x10
+    .byte '/',  '8',  0x00, 'P',  'I',  'Y',  'R',  'W'  ; 0x18
+    .byte '6',  '4',  0x00, 'L',  'J',  'G',  'D',  'A'  ; 0x20
+    .byte '*',  '5',  0x00, ':',  'K',  'H',  'F',  'S'  ; 0x28
+    .byte '3',  '1',  0x0d, ';',  'M',  'B',  'C',  'Z'  ; 0x30
+    .byte '+',  '2',  0x00, '?',  '.',  'N',  'V',  'X'  ; 0x38
+    .byte '-',  '0',  0x00, '>',  0x00, ']',  '@',  0x00 ; 0x40
+    .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
+#elif defined PET8032
+    .byte '.',  0x00, 0x00, '8',  '=',  '(',  '%',  '"'  ; 0x00
+    .byte '9',  0x00, '^',  '7',  '0',  '\'', '$',  '!'  ; 0x08
+    .byte '5',  '+',  'K',  ']',  'H',  'F',  'S',  0x1b ; 0x10
+    .byte '6',  '@',  'L',  0x0D, 'J',  'G',  'D',  'A'  ; 0x18
+    .byte 0x7f, 'P',  'I',  '\\', 'Y',  'R',  'W',  0x09 ; 0x20
+    .byte '4',  '[',  'O',  0x00, 'U',  'T',  'E',  'Q'  ; 0x28
+    .byte '3',  0x00, 0x00, '.',  '>',  'B',  'C',  0x00 ; 0x30
+    .byte '2',  0x00, 0x00, '0',  '<',  'N',  'V',  'Z'  ; 0x38
+    .byte '1',  '?',  0x00, 0x00, 'M',  ' ',  'X',  0x00 ; 0x40
+    .byte 0x00, 0x00, '*',  0x00, ')',  '&',  '#',  0x00 ; 0x48
+#endif
 zendproc
 
 ; Preserves X and Y.
@@ -845,10 +899,18 @@ zproc calculate_line_address
         inc ptr+1
     zendif
 
+#if defined PET8032
+    ; The 8032 has an 80-column screen, so to get x80 from x40 we do another
+    ; x2.
+
+    asl ptr+0
+    rol ptr+1
+#endif
+
     ; Or in the video address.
 
     lda ptr+1
-    and #0b00000011
+    and #0b00000111
     ora #>VIDEO
     sta ptr+1
 
