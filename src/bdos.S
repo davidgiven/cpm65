@@ -808,6 +808,7 @@ zproc entry_PARSEFCB
         
     ; Discard any remaining filename characters.
 
+    lda (param), y          ; get a character
     zrepeat
         jsr is_terminator_char
         zbreakif_cs
