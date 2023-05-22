@@ -1,4 +1,5 @@
 *~
+.*.swp
 .obj
 apple2e.po
 atari800.atr
@@ -8,4 +9,6 @@ bin
 c64.d64
 pet.d64
 vic20.d64
+pet4032.d64
+pet8032.d64
 x16.zip
