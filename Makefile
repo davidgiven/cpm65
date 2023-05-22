@@ -223,16 +223,15 @@ x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.sys $(OBJDIR)/generic-1m-cpmfs.img
 $(OBJDIR)/apple2e.bios.swapped: $(OBJDIR)/apple2e.bios bin/shuffle
 	bin/shuffle -i $< -o $@ -b 256 -t 16 -r -m 02468ace13579bdf
 
-$(OBJDIR)/apple2e.boottracks: $(OBJDIR)/apple2e.bios.swapped $(OBJDIR)/bdos.sys
+$(OBJDIR)/apple2e.boottracks: $(OBJDIR)/apple2e.bios.swapped
 	cp $(OBJDIR)/apple2e.bios.swapped $@
 	truncate -s 4096 $@
-	cat $(OBJDIR)/bdos.sys >> $@
 
 apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.sys $(APPS) $(OBJDIR)/ccp.sys Makefile diskdefs bin/shuffle
 	@rm -f $@
 	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.boottracks $@
-	cpmcp -f appleiie $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f appleiie $@ sr 0:ccp.sys
+	cpmcp -f appleiie $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f appleiie $@ sr 0:ccp.sys 0:bdos.sys
 	truncate -s 143360 $@
 
 $(OBJDIR)/pet4032.exe: LINKFLAGS += --no-check-sections

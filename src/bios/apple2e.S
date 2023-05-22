@@ -150,37 +150,14 @@ _start:
     dex
     stx buffered_track
 
-    ; Read the BDOS from track 1 into the track buffer..
+    ; Read the BDOS.
 
-    lda #1
-    jsr seek_to_track
-    jsr read_track
-    
-    ; Copy it to the beginning of TPA1.
+    lda #<bdos_filename
+    ldx #>bdos_filename
+    ldy #>__TPA1_START__
+    jsr loadfile_small
 
-    lda #0
-    sta ptr+0
-    sta ptr1+0
-    lda #>track_buffer
-    sta ptr1+1
-    lda #>__TPA1_START__
-    sta ptr+1
-
-    zrepeat
-        ldy #0
-        zrepeat
-            lda (ptr1), y
-            sta (ptr), y
-            dey
-        zuntil_eq
-
-        inc ptr+1
-        inc ptr1+1
-        lda ptr+1
-        and #0x0f
-    zuntil_eq
-
-    ; Relocate the BDOS.
+    ; Relocate it.
 
     lda #>__TPA1_START__
     ldx #__ZEROPAGE_START__
@@ -191,6 +168,9 @@ _start:
     lda #<biosentry
     ldx #>biosentry
     jmp __TPA1_START__ + COMHDR_ENTRY
+
+bdos_filename:
+    .ascii "BDOS    SYS"
 
 banner: ; reversed!
     .byte 13, 10
@@ -1103,12 +1083,13 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 0x42e, 1024, 64, 64
+define_drive dph, 0x42e, 1024, 64, 32
 
 .section aligneddata, "ax", @nobits
 disk_twos_buffer:   .fill 86 ; must be aligned
 encode_tab:         .fill 64 ; must be within one page
 
+.global directory_buffer
 .bss
 cursorx:            .fill 1
 cursory:            .fill 1
