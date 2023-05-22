@@ -1085,15 +1085,7 @@ zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA_START__@mos16hi
 mem_end:    .byte __TPA_END__@mos16hi
 
-; DPH for drive 0 (our only drive)
-
-define_drive dph, 136*10, 1024, 64, 0
-
 .bss
-
-.global directory_buffer
-directory_buffer: .fill 128
-disk_buffer:      .fill 256
 
 keyboard_state:   .fill 10
 shift_pressed:    .fill 1
