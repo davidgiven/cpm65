@@ -49,9 +49,9 @@ _start:
 
     .byte 0
 #ifdef ATARI_HD
-    .byte 10 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 10
 #else
-    .byte 10 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 10
 #endif
     .word $0500
     .word init      ; just use init and never return
@@ -68,6 +68,7 @@ init:
     sta COLCRS+1
     sta SHFLOK      ; start lower case
     sta COLOR2      ; background (black)
+    sta COLPF2      ; hardware register, too, VBI might not occur during SIO
 ;    stx COLOR1      ; foreground a tad brighter (luma only)
 
     ; IOCB0 E: is already open
@@ -84,7 +85,9 @@ init:
     sta SDMCTL      ; turn off screen gracefully while we adjust the DL
     sta DMACTL      ; hardware register, too, VBI might not occur during SIO
     sta SDLSTL      ; set DL pointer to MEMTOP+1
+    sta DLISTL      ; hardware registers, too
     stx SDLSTL+1
+    stx DLISTH
     tay
 
     stx dl_prologue+4
@@ -120,6 +123,7 @@ init:
 
     lda #$22
     sta SDMCTL      ; turn on screen again
+    sta DMACTL      ; and hardware register, too
 
     ; Print banner.
 
@@ -156,7 +160,8 @@ init:
     jsr initdrivers
 
     ; Load the BDOS image to mem_base
-    ; BDOS is already loaded at mem_base by the Atari OS bootloader
+
+    jsr load_bdos
 
     ; Relocate it.
 
@@ -758,6 +763,56 @@ zendproc
 
 ; ---------------------------------------------------------------------------
 
+DIRSECT  = RESERVED
+BDOSSECT = DIRSECT + (DIRENTRIES*32)/128
+DIRE_RC  = 15
+
+zproc load_bdos
+    lda #0
+    jsr entry_SELDSK
+
+    lda #<__USERTPA_START__
+    ldx #>__USERTPA_START__
+    jsr entry_SETDMA
+
+    lda #<DIRSECT
+    sta sector_num
+    lda #>DIRSECT
+    sta sector_num+1
+
+    jsr entry_READ
+
+    lda #<BDOSSECT
+    sta sector_num
+    lda #>BDOSSECT
+    sta sector_num+1
+
+    ldx __USERTPA_START__ + DIRE_RC
+
+    zrepeat
+        stx save_x
+        jsr entry_READ
+
+        lda dma
+        clc
+        adc #128
+        sta dma
+        zif_cs
+            inc dma+1
+        zendif
+        inc sector_num
+        zif_eq
+            inc sector_num+1
+        zendif
+        ldx save_x
+        dex
+    zuntil_eq
+
+    rts
+zendproc
+
+; ---------------------------------------------------------------------------
+
     .data
 zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
@@ -772,10 +827,18 @@ mem_end:  .byte __USERTPA_END__@mos16hi
 ; 54 reserved sectors = 6912 bytes for BIOS and BDOS
 
 #ifdef ATARI_HD
-define_drive dph, 8190, 2048, 128, 54
+NUMSECTORS = 8190
+BLOCKSIZE  = 2048
+DIRENTRIES = 128
+RESERVED    = 54
 #else
-define_drive dph, 720, 1024, 64, 54
+NUMSECTORS = 720
+BLOCKSIZE  = 1024
+DIRENTRIES = 64
+RESERVED   = 54
 #endif
+
+define_drive dph, NUMSECTORS, BLOCKSIZE, DIRENTRIES, RESERVED
 
 NOINIT
 
