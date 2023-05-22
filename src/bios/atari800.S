@@ -21,9 +21,12 @@ ZEROPAGE
 
 .global ptr
 .global ptr1
+
 save_y:
-ptr: .word 0
-ptr1: .word 0
+ptr = FMSZPG
+ptr1 = FMSZPG+2
+
+; 3 bytes of FMSZPG left, and PTEMP
 
     .text
 

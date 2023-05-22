@@ -1,5 +1,8 @@
 ; Atari 800 OS defines
 
+PTEMP  = $1f    ; P: handler temporary we can use freely, unless we print
+FMSZPG = $43    ; FMS zero page, but we don't use Atari DOS.SYS (7 bytes)
+
 MEMTOP = $02e5
 
 DMACTL = $d400
