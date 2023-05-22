@@ -8,6 +8,9 @@ SECTIONS {
 		*(.zp .zp.*)
 		__USERZEROPAGE_START__ = .;
 		__USERZEROPAGE_END__ = 0xff;
+
+        . = 0xf0;
+        *(.loaderzp)
 	} >zp
 
 	.text : {
