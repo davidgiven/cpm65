@@ -216,7 +216,7 @@ zproc _start, .init
     lda #<bdos_filename
     ldx #>bdos_filename
     ldy #>__TPA_START__
-    jsr loadfile_small
+    jsr loadfile
 
     ; Relocate the BDOS.
 

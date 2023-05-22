@@ -16,16 +16,12 @@
 ;   - the file occupies exactly one extent
 ;   - it contains no empty blocks
 ;   - it's on drive 0
-;   - the file exists
+;   - the file exists (the system hangs if it doesn't!)
 ;
 ; To use, set Y to the page number of the destination address, and XA to a
 ; 11-byte expanded filename.
 
-#if defined LARGEDISK
-zproc loadfile_large
-#elif defined SMALLDISK
-zproc loadfile_small
-#endif
+zproc loadfile
     sta filename+0
     stx filename+1
 
@@ -64,6 +60,9 @@ zproc loadfile_small
     lda (ptr1), y
     sta reserved_sectors+1
     sta current_sector+1
+    ldy #DPB_DSM+1
+    lda (ptr1), y
+    sta large_disk
 
     lda #0
     sta current_sector+2
@@ -107,28 +106,28 @@ found:
     zrepeat
         ldx directory_offset
         ldy #0
-        #if defined LARGEDISK
-            lda directory_buffer, x
-            sta current_sector+0
-            inx
+
+        lda directory_buffer, x
+        sta current_sector+0
+        inx
+
+        sty current_sector+1
+        lda large_disk
+        zif_ne
+            ; This is a large disk; it's using two-byte block numbers.
+
             lda directory_buffer, x
             sta current_sector+1
             inx
-        #elif defined SMALLDISK
-            lda directory_buffer, x
-            sta current_sector+0
-            inx
-            sty current_sector+1
-        #endif
+        zendif
+
         sty current_sector+3
         stx directory_offset
 
         ; Check for EOF.
 
         lda current_sector+0
-        #if defined LARGEDISK
-            ora current_sector+1
-        #endif
+        ora current_sector+1
         zbreakif_eq
 
         ; Convert block number to sector number.
@@ -245,6 +244,7 @@ current_sector:   .fill 3 ; current sector
 destination_addr: .fill 2 ; where we're currently writing
 directory_offset: .fill 1 ; offset into directory buffer
 sector_count:     .fill 1 ; number of sectors left in current block
+large_disk:       .fill 1 ; non-zero if this disk uses two-byte block numbers
 
 ; vim: sw=4 ts=4 et ft=asm
 

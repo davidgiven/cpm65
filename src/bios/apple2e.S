@@ -155,7 +155,7 @@ _start:
     lda #<bdos_filename
     ldx #>bdos_filename
     ldy #>__TPA1_START__
-    jsr loadfile_small
+    jsr loadfile
 
     ; Relocate it.
 

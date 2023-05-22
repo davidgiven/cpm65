@@ -70,11 +70,7 @@ LIBCPM_OBJS = \
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
 	$(OBJDIR)/src/bios/relocate.o \
-	$(OBJDIR)/src/bios/loader_largedisk.o \
-	$(OBJDIR)/src/bios/loader_smalldisk.o \
-
-$(OBJDIR)/src/bios/loader_largedisk.o: CFLAGS65 += -DLARGEDISK
-$(OBJDIR)/src/bios/loader_smalldisk.o: CFLAGS65 += -DSMALLDISK
+	$(OBJDIR)/src/bios/loader.o \
 
 LIBCOMMODORE_OBJS = \
 	$(OBJDIR)/src/bios/commodore/ieee488.o \
