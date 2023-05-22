@@ -18,7 +18,6 @@ SECTIONS {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		__USERTPA_START__ = .;
-		__USERTPA_END__ = 0xbc00;
 	} >ram
 }
 

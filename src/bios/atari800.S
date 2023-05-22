@@ -818,7 +818,7 @@ zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
 
 mem_base: .byte __USERTPA_START__@mos16hi
-mem_end:  .byte __USERTPA_END__@mos16hi
+mem_end:  .byte 0
 
 ; DPH for drive 0 (our only drive)
 
