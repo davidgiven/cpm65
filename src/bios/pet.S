@@ -231,7 +231,7 @@ zproc _start, .init
     jmp __TPA_START__ + COMHDR_ENTRY
 
 bdos_filename:
-    .ascii "BDOS    IMG"
+    .ascii "BDOS    SYS"
 bdos_filename_end:
 
 allocate_cmd: ; reversed!
