@@ -15,6 +15,7 @@ TARGETS = \
 	x16.zip \
 	pet4032.d64 \
 	pet8032.d64 \
+	pet8096.d64 \
 	vic20.d64 \
 	atari800.atr \
 	atari800hd.atr \
@@ -245,6 +246,22 @@ pet4032.d64: $(OBJDIR)/pet4032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
 	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
 
+$(OBJDIR)/pet8096.exe: LINKFLAGS += --no-check-sections
+$(OBJDIR)/pet8096.exe: $(OBJDIR)/libcommodore.a
+$(OBJDIR)/src/bios/pet8096.o: CFLAGS65 += -DPET8096
+pet8096.d64: $(OBJDIR)/pet8096.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
+		$(OBJDIR)/mkcombifs
+	@rm -f $@
+	cc1541 -i 15 -q -n "cp/m-65" $@
+	cc1541 -q \
+		-t -u 0 \
+		-r 18 -f cpm -w $(OBJDIR)/pet8096.exe \
+		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
+		$@
+	$(OBJDIR)/mkcombifs $@
+	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+
 $(OBJDIR)/pet8032.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet8032.exe: $(OBJDIR)/libcommodore.a
 $(OBJDIR)/src/bios/pet8032.o: CFLAGS65 += -DPET8032
@@ -317,7 +334,7 @@ atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.img Makefile \
 
 
 clean:
-	rm -rf $(OBJDIR) bin apple2e.po c64.d64 bbcmicro.ssd x16.zip pet4032.d64 vic20.d64 atari800.atr atari800hd.atr
+	rm -rf $(OBJDIR) bin $(TARGETS)
 
 .DELETE_ON_ERROR:
 .SECONDARY:
