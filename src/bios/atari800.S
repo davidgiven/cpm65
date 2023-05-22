@@ -53,7 +53,7 @@ _start:
 #else
     .byte 10 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
-    .word $0600
+    .word $0500
     .word init      ; just use init and never return
 
 init:
