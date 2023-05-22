@@ -49,9 +49,9 @@ _start:
 
     .byte 0
 #ifdef ATARI_HD
-    .byte 10 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 12
 #else
-    .byte 10 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 12
 #endif
     .word $0500
     .word init      ; just use init and never return
@@ -156,12 +156,16 @@ init:
     jsr initdrivers
 
     ; Load the BDOS image to mem_base
-    ; BDOS is already loaded at mem_base by the Atari OS bootloader
+
+    lda #<bdos_filename
+    ldx #>bdos_filename
+    ldy #>__USERTPA_START__
+    jsr loadfile
 
     ; Relocate it.
 
-    lda mem_base
-    ldx zp_base
+    lda #>__USERTPA_START__
+    ldx #__USERZEROPAGE_START__
     jsr entry_RELOCATE
 
     ; Compute the entry address and jump.
@@ -179,6 +183,7 @@ zendproc
 ; Everything above here is overwritten by the directory buffer, so make sure
 ; it's bigger than 0x80 bytes (currently: 0xa3).
 
+.global directory_buffer
 directory_buffer = _start
 
 ; Below are 34 bytes that become available for overwrite during init. We use
@@ -200,6 +205,9 @@ overwrite_after_keyboard_init:          ; 2 bytes
 
 kdevice: .ascii "K"
          .byte 155
+
+bdos_filename:
+    .ascii "BDOS    SYS"
 
 charin       = overwrite_after_display_stretch
 charout      = overwrite_after_display_stretch
@@ -772,9 +780,9 @@ mem_end:  .byte __USERTPA_END__@mos16hi
 ; 54 reserved sectors = 6912 bytes for BIOS and BDOS
 
 #ifdef ATARI_HD
-define_drive dph, 8190, 2048, 128, 54
+define_drive dph, 8190, 2048, 128, 18
 #else
-define_drive dph, 720, 1024, 64, 54
+define_drive dph, 720, 1024, 64, 18
 #endif
 
 NOINIT
