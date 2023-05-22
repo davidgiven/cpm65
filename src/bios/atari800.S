@@ -37,9 +37,9 @@ _start:
 
     .byte 0
 #ifdef ATARI_HD
-    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 8 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #else
-    .byte 8 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 8 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
     .word $0600
     .word init      ; just use init and never return
