@@ -68,6 +68,7 @@ init:
     sta COLCRS+1
     sta SHFLOK      ; start lower case
     sta COLOR2      ; background (black)
+    sta COLPF2      ; hardware register, too, VBI might not occur during SIO
 ;    stx COLOR1      ; foreground a tad brighter (luma only)
 
     ; IOCB0 E: is already open
@@ -82,9 +83,11 @@ init:
     ; proper 7x8 font from user space.
 
     sta SDMCTL      ; turn off screen gracefully while we adjust the DL
-    sta DMACTL      ; hardware register, too, VBI might not occur during SIO
+    sta DMACTL      ; hardware register
     sta SDLSTL      ; set DL pointer to MEMTOP+1
+    sta DLISTL
     stx SDLSTL+1
+    stx DLISTH
     tay
 
     stx dl_prologue+4
@@ -120,6 +123,7 @@ init:
 
     lda #$22
     sta SDMCTL      ; turn on screen again
+    sta DMACTL
 
     ; Print banner.
 

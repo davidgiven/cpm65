@@ -5,7 +5,11 @@ FMSZPG = $43    ; FMS zero page, but we don't use Atari DOS.SYS (7 bytes)
 
 MEMTOP = $02e5
 
+COLPF2 = $d018
+
 DMACTL = $d400
+DLISTL = $d402
+DLISTH = $d403
 
 CIOV = $e456
 
