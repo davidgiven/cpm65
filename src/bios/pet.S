@@ -42,13 +42,33 @@ CRTC_ADDR = CRTC+0
 CRTC_STATUS = CRTC+1
 CRTC_DATA = CRTC+1
 
+MEMCTRL = 0xfff0
+
 VIDEO   = 0x8000
 #if defined PET4032
 SCREEN_WIDTH = 40
-#elif defined PET8032
+#elif defined PET8032 || defined PET8096
 SCREEN_WIDTH = 80
 #endif
 SCREEN_HEIGHT = 25
+
+#if defined PET8096
+.macro IO_ON
+    lda #0b11100000
+    sta MEMCTRL
+.endm
+
+.macro IO_OFF
+    lda #0b10000000
+    sta MEMCTRL
+.endm
+#else
+.macro IO_ON
+.endm
+
+.macro IO_OFF
+.endm
+#endif
 
 ZEROPAGE
 
@@ -115,8 +135,8 @@ cursory:          .fill 1
 
 zproc _start, .init
     ; Copy the BIOS to its final location at 0x200. This overwrites the current
-    ; memory image, so care needs to be taken. This routine is _last_ in the
-    ; file, so it doesn't get overwritten.
+    ; memory image, so care needs to be taken. This routine runs at 0x7000 so
+    ; it is unaffected.
 
     ; Relocate the BIOS to the bottom of memory.
 
@@ -147,6 +167,7 @@ zproc _start, .init
 
     jsr screen_clear
 
+    IO_ON
     lda #14
     sta VIA_PCR             ; lowercase
 
@@ -261,6 +282,8 @@ banner: ; reversed!
     .ascii "2304"
 #elif defined PET8032
     .ascii "2308"
+#elif defined PET8096
+    .ascii "6908"
 #endif
     .ascii " TEP erodommoC eht rof 56-M/PC"
 banner_end:
@@ -356,6 +379,7 @@ zproc screen_getsize
 zendproc
 
 zproc screen_clear
+    IO_ON
     lda #0
     zrepeat
         pha
@@ -373,6 +397,7 @@ zproc screen_clear
         adc #1
         cmp #SCREEN_HEIGHT
     zuntil_eq
+    IO_OFF
 
     ; SCREEN doesn't specify where the cursor ends up, but this code is used by
     ; TTY and homing the cursor here simplifies things.
@@ -396,6 +421,8 @@ zproc screen_getcursor
 zendproc
 
 zproc screen_getchar
+    IO_ON
+
     jsr calculate_cursor_address
     lda (ptr), y
     eor #0x80
@@ -414,6 +441,8 @@ zproc screen_getchar
     lda (ptr), y
     eor #0x80
     sta (ptr), y
+
+    IO_OFF
     pla
 
     clc
@@ -422,6 +451,7 @@ zendproc
 
 zproc screen_putchar
     pha
+    IO_ON
     jsr calculate_cursor_address
     pla
     jsr convert_ascii_to_screencode
@@ -433,6 +463,7 @@ zproc screen_putchar
         inc cursorx
     zendif
 
+    IO_OFF
     rts
 zendproc
 
@@ -440,6 +471,7 @@ zproc screen_putstring
     sta 1f+0
     stx 1f+1
 
+    IO_ON
     jsr calculate_cursor_address
     ldx #0
     zloop
@@ -452,11 +484,14 @@ zproc screen_putstring
         iny
         inx
     zendloop
+
+    IO_OFF
     rts
 zendproc
 
 zproc screen_scrollup
     ldx #0              ; current line
+    IO_ON
     zrepeat
         txa
         jsr calculate_line_address
@@ -485,11 +520,13 @@ zproc screen_scrollup
         sta (ptr), y
         dey
     zuntil_mi
+    IO_OFF
     rts
 zendproc
 
 zproc screen_scrolldown
-    ldx #39             ; current line
+    ldx #SCREEN_HEIGHT-1 ; current line
+    IO_ON
     zrepeat
         txa
         jsr calculate_line_address
@@ -518,18 +555,21 @@ zproc screen_scrolldown
         sta (ptr), y
         dey
     zuntil_mi
+    IO_OFF
     rts
 zendproc
 
 zproc screen_cleartoeol
     jsr calculate_cursor_address
 
+    IO_ON
     lda #' '
     zrepeat
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
     zuntil_eq
+    IO_OFF
     rts
 zendproc
 
@@ -560,7 +600,9 @@ zendproc
 ; Returns 0xff if no key is pending, 0 if one is.
 
 zproc tty_const
+    IO_ON
     jsr scan_keyboard
+    IO_OFF
 
     lda pending_key
     zif_ne
@@ -607,8 +649,10 @@ zproc tty_conout
             zendif
         zendif
         jsr calculate_cursor_address
+        IO_ON
         lda #' '
         sta (ptr), y
+        IO_OFF
         rts
     zendif
     cmp #10
@@ -642,6 +686,8 @@ zendproc
 
 ; Does a single keyboard scan, processing any pressed keys. Last pressed key
 ; wins.
+;
+; Must be called with IO_ON.
 
 zproc scan_keyboard
     ldy #0
@@ -716,7 +762,7 @@ zproc change_key_state
     beq shift_change
     cpy #0x42               ; right shift
     beq shift_change
-#elif defined PET8032
+#elif defined PET8032 || defined PET8096
     cpy #0x37               ; left shift
     beq shift_change
     cpy #0x31               ; right shift
@@ -746,7 +792,7 @@ shift_change:
     and keyboard_state + 8  ; right shift state in bit 0
     ror a
     ror a
-#elif defined PET8032
+#elif defined PET8032 || defined PET8096
     lda keyboard_state + 6
     rol a
     rol a
@@ -770,7 +816,7 @@ keyboard_decode_tab:
     .byte '+',  '2',  0x00, '?',  '.',  'n',  'v',  'x'  ; 0x38
     .byte '-',  '0',  0x00, '>',  0x00, ']',  '@',  0x00 ; 0x40
     .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
-#elif defined PET8032
+#elif defined PET8032 || defined PET8096
     .byte '.',  0x00, 0x00, '8',  '-',  '8',  '5',  '2'  ; 0x00
     .byte '9',  0x00, '^',  '7',  '0',  '7',  '4',  '1'  ; 0x08
     .byte '5',  ';',  'k',  ']',  'h',  'f',  's',  0x1b ; 0x10
@@ -795,7 +841,7 @@ keyboard_decode_tab_shifted:
     .byte '+',  '2',  0x00, '?',  '.',  'N',  'V',  'X'  ; 0x38
     .byte '-',  '0',  0x00, '>',  0x00, ']',  '@',  0x00 ; 0x40
     .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
-#elif defined PET8032
+#elif defined PET8032 || defined PET8096
     .byte '.',  0x00, 0x00, '8',  '=',  '(',  '%',  '"'  ; 0x00
     .byte '9',  0x00, '^',  '7',  '0',  '\'', '$',  '!'  ; 0x08
     .byte '5',  '+',  'K',  ']',  'H',  'F',  'S',  0x1b ; 0x10
@@ -904,9 +950,9 @@ zproc calculate_line_address
         inc ptr+1
     zendif
 
-#if defined PET8032
-    ; The 8032 has an 80-column screen, so to get x80 from x40 we do another
-    ; x2.
+#if defined PET8032 || defined PET8096
+    ; The 8032 and 8096 have 80-column screens, so to get x80 from x40 we do
+    ; another x2.
 
     asl ptr+0
     rol ptr+1
@@ -939,26 +985,34 @@ zendproc
 .endm
 
 zproc ieee_mode_atn
+    IO_ON
     set0 VIA_PB, VIA_PB_ATN_OUT
+    IO_OFF
     rts
 zendproc
 
 zproc ieee_mode_talk
+    IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
+    IO_OFF
     rts
 zendproc
 
 ; Switch from ATN mode to LISTEN mode.
 
 zproc ieee_mode_listen
+    IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
+    IO_OFF
     rts
 zendproc
 
 zproc ieee_puteoib
     pha
+    IO_ON
     lda #0x34               ; assert EOI
     sta PIA1_CA
+    IO_OFF
     pla
 
     bne ieee_putb           ; always taken
@@ -968,6 +1022,7 @@ zproc ieee_putb
     ; Deassert our own NRFD and NDAC and wait for NRFD=0 (i.e. ready for data)
 
     pha
+    IO_ON
     set1 VIA_PB, VIA_PB_NRFD_OUT
     set1 PIA2_CA, PIA2_CA_NDAC_OUT
     zrepeat
@@ -999,6 +1054,7 @@ zproc ieee_putb
     sta PIA1_CA
     lda #0xff
     sta PIA2_PB
+    IO_OFF
 
     rts
 zendproc
@@ -1006,6 +1062,8 @@ zendproc
 ; Receives a byte into A. Sets C on EOI.
 
 zproc ieee_getb
+    IO_ON
+
     ; Set NRFD = 1 (indicating we are ready for data).
     ; Set NDAC = 0 (no data acknowledgement).
 
@@ -1053,6 +1111,7 @@ zproc ieee_getb
 
     set0 PIA2_CA, PIA2_CA_NDAC_OUT
 
+    IO_OFF
     pla
     rts
 zendproc

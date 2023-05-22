@@ -68,7 +68,9 @@ jobs:
           bbcmicro.ssd
           c64.d64
           cpm65.zip
-          pet.d64
+          pet4032.d64
+          pet8032.d64
+          pet8096.d64
           vic20.d64
           x16.zip
         fail-if-no-assets: false
@@ -80,7 +82,9 @@ jobs:
         files: |
           cpm65/bbcmicro.ssd
           cpm65/c64.d64
-          cpm65/pet.d64
+          cpm65/pet4032.d64
+          cpm65/pet8032.d64
+          cpm65/pet8096.d64
           cpm65/vic20.d64
           cpm65/x16.zip
           cpm65/apple2e.po
