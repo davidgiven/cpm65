@@ -1,6 +1,6 @@
 MEMORY {
     zp : ORIGIN = 2, LENGTH = 0x8e
-    ram (rw) : ORIGIN = 0x7ff, LENGTH = 0x800
+    ram (rw) : ORIGIN = 0x7ff, LENGTH = 0x1000
 }
 
 SECTIONS {
@@ -8,6 +8,9 @@ SECTIONS {
 		*(.zp .zp.*)
 		__USERZEROPAGE_START__ = .;
 		__USERZEROPAGE_END__ = 0x90;
+
+		. = 0x80;
+		*(.loaderzp)
 	} >zp
 
 	.text : {

@@ -70,6 +70,7 @@ LIBCPM_OBJS = \
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
 	$(OBJDIR)/src/bios/relocate.o \
+	$(OBJDIR)/src/bios/loader.o \
 
 LIBCOMMODORE_OBJS = \
 	$(OBJDIR)/src/bios/commodore/ieee488.o \
@@ -154,7 +155,7 @@ $(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu
 		a:$(notdir $<) b:$(notdir $@)
 	test -f $@
 
-$(OBJDIR)/bdos.img: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
+$(OBJDIR)/bdos.sys: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
@@ -180,119 +181,113 @@ $(OBJDIR)/bbcmicrofs.img: $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys
 	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
 	cpmchattr -f bbc192 $@ sr 0:ccp.sys
 
-bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.img Makefile $(OBJDIR)/bbcmicrofs.img $(OBJDIR)/mkdfs
+bbcmicro.ssd: $(OBJDIR)/bbcmicro.exe $(OBJDIR)/bdos.sys Makefile $(OBJDIR)/bbcmicrofs.img $(OBJDIR)/mkdfs
 	$(OBJDIR)/mkdfs -O $@ \
 		-N CP/M-65 \
 		-f $(OBJDIR)/bbcmicro.exe -n \!boot -l 0x400 -e 0x400 -B 2 \
-		-f $(OBJDIR)/bdos.img -n bdos \
+		-f $(OBJDIR)/bdos.sys -n bdos \
 		-f $(OBJDIR)/bbcmicrofs.img -n cpmfs
 
 $(OBJDIR)/c64.exe: $(OBJDIR)/libcommodore.a
-c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys \
+c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -q -n "cp/m-65" $@
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/c64.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:bdos.sys 0:ccp.sys 0:cbmfs.sys
 
-$(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
+$(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.sys $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
 	mkfs.cpm -f generic-1m $@
 	cpmcp -f generic-1m $@ $(OBJDIR)/ccp.sys $(APPS) 0:
 	cpmchattr -f generic-1m $@ sr 0:ccp.sys
 
 $(OBJDIR)/x16.exe: $(OBJDIR)/libcommodore.a
-x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.img $(OBJDIR)/generic-1m-cpmfs.img
+x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.sys $(OBJDIR)/generic-1m-cpmfs.img
 	@rm -f $@
 	zip -9 $@ -j $^
 	printf "@ x16.exe\n@=CPM\n" | zipnote -w $@
-	printf "@ bdos.img\n@=BDOS\n" | zipnote -w $@
+	printf "@ bdos.sys\n@=BDOS\n" | zipnote -w $@
 	printf "@ generic-1m-cpmfs.img\n@=CPMFS\n" | zipnote -w $@
 
 $(OBJDIR)/apple2e.bios.swapped: $(OBJDIR)/apple2e.bios bin/shuffle
 	bin/shuffle -i $< -o $@ -b 256 -t 16 -r -m 02468ace13579bdf
 
-$(OBJDIR)/apple2e.boottracks: $(OBJDIR)/apple2e.bios.swapped $(OBJDIR)/bdos.img
+$(OBJDIR)/apple2e.boottracks: $(OBJDIR)/apple2e.bios.swapped
 	cp $(OBJDIR)/apple2e.bios.swapped $@
 	truncate -s 4096 $@
-	cat $(OBJDIR)/bdos.img >> $@
 
-apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys Makefile diskdefs bin/shuffle
+apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.sys $(APPS) $(OBJDIR)/ccp.sys Makefile diskdefs bin/shuffle
 	@rm -f $@
 	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.boottracks $@
-	cpmcp -f appleiie $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f appleiie $@ sr 0:ccp.sys 0:cbm.sys
+	cpmcp -f appleiie $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f appleiie $@ sr 0:ccp.sys 0:bdos.sys
 	truncate -s 143360 $@
 
 $(OBJDIR)/pet4032.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet4032.exe: $(OBJDIR)/libcommodore.a
 $(OBJDIR)/src/bios/pet4032.o: CFLAGS65 += -DPET4032
-pet4032.d64: $(OBJDIR)/pet4032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
+pet4032.d64: $(OBJDIR)/pet4032.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -i 15 -q -n "cp/m-65" $@
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/pet4032.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:cbmfs.sys 0:bdos.sys
 
 $(OBJDIR)/pet8096.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet8096.exe: $(OBJDIR)/libcommodore.a
 $(OBJDIR)/src/bios/pet8096.o: CFLAGS65 += -DPET8096
-pet8096.d64: $(OBJDIR)/pet8096.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
+pet8096.d64: $(OBJDIR)/pet8096.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -i 15 -q -n "cp/m-65" $@
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/pet8096.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:cbmfs.sys 0:bdos.sys
 
 $(OBJDIR)/pet8032.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet8032.exe: $(OBJDIR)/libcommodore.a
 $(OBJDIR)/src/bios/pet8032.o: CFLAGS65 += -DPET8032
-pet8032.d64: $(OBJDIR)/pet8032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
+pet8032.d64: $(OBJDIR)/pet8032.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -i 15 -q -n "cp/m-65" $@
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/pet8032.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:cbmfs.sys 0:bdos.sys
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/vic20.exe: $(OBJDIR)/libcommodore.a
 $(OBJDIR)/src/bios/vic20.o: $(OBJDIR)/4x8font.inc
-vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
+vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.sys Makefile $(APPS) \
 		$(OBJDIR)/ccp.sys $(OBJDIR)/mkcombifs
 	@rm -f $@
 	cc1541 -i 15 -q -n "cp/m-65" $@
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/vic20.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:cbmfs.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:cbmfs.sys 0:ccp.sys 0:bdos.sys
 
 # Atari targets call /usr/bin/printf directly because 'make' calls /bin/sh
 # which might be the Defective Annoying SHell which has a broken printf
@@ -300,7 +295,7 @@ vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.img Makefile $(APPS) \
 
 $(OBJDIR)/src/bios/atari800.o: CFLAGS65 += -DATARI_SD
 $(OBJDIR)/atari800.exe:
-atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
+atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.sys Makefile \
 			$(MINIMAL_APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com \
 			$(SCREEN_APPS)
 	dd if=/dev/zero of=$@ bs=128 count=720
@@ -318,7 +313,7 @@ atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
 
 $(OBJDIR)/src/bios/atari800hd.o: CFLAGS65 += -DATARI_HD
 $(OBJDIR)/atari800hd.exe:
-atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.img Makefile \
+atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.sys Makefile \
 			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com \
 			$(SCREEN_APPS)
 	dd if=/dev/zero of=$@ bs=128 count=8190

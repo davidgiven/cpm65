@@ -1,5 +1,5 @@
 MEMORY {
-    zp : ORIGIN = 2, LENGTH = 0x8e
+    zp : ORIGIN = 0, LENGTH = 0xff
     ram (rw) : ORIGIN = 0x200, LENGTH = 0x8000
 	basic (rw) : ORIGIN = 0x11ff, LENGTH = 0x3000
 	init (rw) : ORIGIN = 0x7000, LENGTH = 0x1000
@@ -16,6 +16,9 @@ SECTIONS {
 		*(.zp .zp.*)
 		__ZEROPAGE_START__ = .;
 		__ZEROPAGE_END__ = 0xff;
+
+		. = 0xf0;
+		*(.loaderzp)
 	} >zp
 
 	.head : {
@@ -26,6 +29,7 @@ SECTIONS {
 		init_exec_addr = .;
 		init_load_addr = LOADADDR(.init);
 		*(.init .init.*)
+		*loader.o(.text .text.*)
 		init_end_addr = .;
 	} >init AT>basic
 

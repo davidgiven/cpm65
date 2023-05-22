@@ -151,6 +151,16 @@
 #define DPH_CSV      12  /* pointer to checksum vector */
 #define DPH_ALV      14  /* pointer to allocation vector */
 
+#define DPB_SPT      0   /* unused in CP/M-65 */
+#define DPB_BSH      2   /* block shift */
+#define DPB_BLM      3   /* block mask */
+#define DPB_EXM      4   /* extent mask */
+#define DPB_DSM      5   /* blocks on disk minus one */
+#define DPB_DRM      7   /* number of directory entries minus one */
+#define DPB_AL       9   /* allocation bitmap */
+#define DPB_CKS      11  /* checksum vector size */
+#define DPB_OFF      13  /* number of reserved sectors */
+
 .macro define_drive name, sectors, blocksize, dirents, reserved
     .if \blocksize == 1024
         block_shift = 3

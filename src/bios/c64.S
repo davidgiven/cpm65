@@ -50,54 +50,12 @@ dma:        .word 0    ; current DMA
 zproc _start
     jsr init_system
 
-    ; Open the BDOS file (using low level disk access).
+    ; Load the BDOS.
 
-    lda #8
-    jsr LISTEN
-    lda #$f0            ; open channel 0
-    jsr SECOND
-
-    ldx #0x100 - bdos_filename_len
-    zrepeat
-        lda bdos_filename_end - 0x100, x
-        jsr CIOUT
-
-        inx
-    zuntil_eq
-
-    jsr UNLSN
-
-    ; Read the data.
-
-    lda #8
-    jsr TALK
-    lda #$60            ; emit channel 0
-    jsr TALKSA
-
-    zrepeat
-        ldy #0
-        sty STATUS
-        jsr ACPTR       ; read a byte
-
-    1:
-        sta __USERTPA_START__
-
-        inc 1b+1
-        zif_eq
-            inc 1b+2
-            lda #'.'
-            jsr entry_CONOUT
-        zendif
-
-        lda STATUS      ; check for EOF
-    zuntil_ne
-    ; The drive will UNTALK automatically on EOF.
-
-    lda #8
-    jsr LISTEN
-    lda #$e0            ; close channel 0
-    jsr SECOND
-    jsr UNLSN
+    lda #<bdos_filename
+    ldx #>bdos_filename
+    ldy mem_base
+    jsr loadfile
 
     ; Relocate the BDOS.
 
@@ -117,9 +75,7 @@ zproc _start
     rts                 ; indirect jump
 
 bdos_filename:
-    .ascii "BDOS,P,R"
-bdos_filename_end:
-bdos_filename_len = bdos_filename_end - bdos_filename
+    .ascii "BDOS    SYS"
 zendproc
 
 .data
@@ -701,6 +657,7 @@ sector_num:      .fill 3 ; current absolute sector number
 buffered_sector: .fill 3 ; sector currently in disk buffer
 buffer_dirty:    .fill 1 ; non-zero if sector needs flushing
 
+.global directory_buffer
 directory_buffer: .fill 128
 disk_buffer: .fill 256
 

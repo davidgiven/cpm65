@@ -480,6 +480,7 @@ buffered_sector: .fill 3 ; sector currently in disk buffer
 
 .bss
 
+.global directory_buffer
 directory_buffer: .fill 128
 disk_buffer:      .fill 256
 buffer_dirty:     .fill 1 ; non-zero if sector needs flushing

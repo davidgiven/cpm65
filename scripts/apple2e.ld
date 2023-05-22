@@ -10,10 +10,14 @@ SECTIONS {
 		*(.zp .zp.*)
 		__ZEROPAGE_START__ = .;
 		__ZEROPAGE_END__ = 0xff;
+
+		. = 0xf0;
+		*(.loaderzp)
 	} >zp
 
 	.loader : {
 		*(loader)
+		*loader.o(.text .text.*)
 	} >ram
 
 	BIOS_SIZE_ROUNDED_UP = (BIOS_SIZE + 255) & 0xff00;
