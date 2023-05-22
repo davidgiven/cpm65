@@ -38,6 +38,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 <a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
 <a href="doc/pet8032.png"><img src="doc/pet8032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 8032"></a>
+<a href="doc/pet8096.png"><img src="doc/pet8096.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 8096"></a>
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 </div>
@@ -129,14 +130,15 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Commodore PET notes
 
-  - You need a PET 4032 or 8032 (no other models) and either a 4040 disk drive
-    or something else which supports the same geometry. The disk image is for a
-    35-track SSSD system (I made it with cc1541). Adapting it for other drives
-    should be easy.
+  - You need a PET 4032, 8032 or 8096 and either a 4040 disk drive or something
+    else which supports the same geometry. The disk image is for a 35-track
+    SSSD system (I made it with cc1541). Adapting it for other drives should be
+    easy.
 
-  - The 4032 is set up for the Graphics Keyboard. The 8032 is set up for the
-    Business Keyboard.  (It would also be trivial to emulate the Business
-    Keyboard on the Graphics Keyboard, but that is likely to be confusing.)
+  - The 4032 is set up for the Graphics Keyboard. The 8032 and 8096 are set up
+    for the Business Keyboard. (It would also be trivial to emulate the
+    Business Keyboard on the Graphics Keyboard, but that is likely to be
+    confusing.)
 
   - It's much faster than the Comodore 64 --- you can run the assembler in real
     time without having to worry about retirement.
@@ -144,6 +146,9 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
   - It supports drive 0: only.
 
   - This port runs completely bare-metal and does not use any ROM routines.
+
+  - The 8096 port uses the extra memory, giving an impressive 56.5kB TPA. The
+    other ports have a less impressive 25kB.
 
   - The PET port has a SCREEN driver.
 
