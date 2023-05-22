@@ -39,6 +39,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 <a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
+<a href="doc/pet8032.png"><img src="doc/pet8032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 8032"></a>
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 </div>
@@ -66,11 +67,29 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### BBC Micro notes
 
-  - It'll autodetect the amount of available memory. If you're on a Master or
-    Tube system, I'd suggest making sure you're in mode 0 or 3 before running.
-    On a BBC Micro... well, it _will_ run in mode 0, but you'll only get a
-    2.5kB TPA! I suggest mode 7. On the Electron you have to use mode 6 which
-    gives you 14kB of TPA, which isn't enough to run the assembler.
+  - To run, do SHIFT+BREAK.
+
+  - Alternatively, if you're on a Tube system, do:
+
+    ```
+    MODE 3
+    *!BOOT
+    ```
+
+  - Alternatively alternatively, if you're on a Master system, do:
+
+    ```
+    MODE 131
+    *DISK
+    *!BOOT
+    ```
+
+  - It'll autodetect the amount of available memory. If you're _not_ on a Tube
+    or Master system with shadow RAM, then your screen mode will consume TPA
+    space. On a stock BBC Micro it _will_ run in mode 0, but you'll only get a
+    2.5kB TPA! Mode 7 will work better here. It will work on the Electron, but
+    you'll have to use mode 6 which will leave you 14kB of TPA. That's
+    unfortunately not enough to run the assembler.
 
   - The CP/M file system is stored in a big file (called cpmfs). This will
 	expand up to the size defined in diskdefs: currently, 192kB (the largest
@@ -112,24 +131,23 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Commodore PET notes
 
-  - You need a PET 4032 (no other model) and, probably, a 4040 disk drive. The
-    disk image is for a 35-track SSSD system (I made it with cc1541). You could
-    probably adapt things to work on other disk systems or other systems
-    easily; the top end PET floppy drives could store a megabyte on a disk and
-    would go nicely with the 8032's 80-column display.
+  - You need a PET 4032 or 8032 (no other models) and either a 4040 disk drive
+    or something else which supports the same geometry. The disk image is for a
+    35-track SSSD system (I made it with cc1541). Adapting it for other drives
+    should be easy.
 
-  - This is set up for the Graphics Keyboard, which was a bad idea, but that's
-    what my emulator was set up for. If you actually want to do anything with
-    it, ask me and I'll do a Business Keyboard keymap. (Or I could emulate the
-    Business Keyboard on the Graphics Keyboard.)
+  - The 4032 is set up for the Graphics Keyboard. The 8032 is set up for the
+    Business Keyboard.  (It would also be trivial to emulate the Business
+    Keyboard on the Graphics Keyboard, but that is likely to be confusing.)
 
-  - It's faster than the Comodore 64 version, but still not brilliant --- but
-    you can run the assembler in real time without having to worry about
-    retirement.
+  - It's much faster than the Comodore 64 --- you can run the assembler in real
+    time without having to worry about retirement.
 
   - It supports drive 0: only.
 
   - This port runs completely bare-metal and does not use any ROM routines.
+
+  - The PET port has a SCREEN driver.
 
 ### Commander X16 notes
 
