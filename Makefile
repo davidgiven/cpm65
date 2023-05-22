@@ -196,11 +196,10 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(OBJDIR)/ccp.sys
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/c64.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.sys \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:bdos.sys 0:ccp.sys 0:cbmfs.sys
 
 $(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.sys $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
@@ -285,11 +284,10 @@ vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.sys Makefile $(APPS) \
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/vic20.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.sys \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:cbmfs.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:cbmfs.sys 0:ccp.sys 0:bdos.sys
 
 # Atari targets call /usr/bin/printf directly because 'make' calls /bin/sh
 # which might be the Defective Annoying SHell which has a broken printf

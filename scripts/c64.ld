@@ -1,6 +1,6 @@
 MEMORY {
     zp : ORIGIN = 2, LENGTH = 0x8e
-    ram (rw) : ORIGIN = 0x7ff, LENGTH = 0x800
+    ram (rw) : ORIGIN = 0x7ff, LENGTH = 0x1000
 }
 
 SECTIONS {
