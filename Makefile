@@ -311,7 +311,6 @@ atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.img Makefile \
 	cpmcp -f atari90 $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/olivetti.fnt 1:
 	cpmchattr -f atari90 $@ sr 0:bdos.sys 0:ccp.sys
 	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc
-	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=10 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
@@ -330,7 +329,6 @@ atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.img Makefile \
 	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/*.fnt 1:
 	cpmchattr -f atarihd $@ sr 0:bdos.sys 0:ccp.sys
 	dd if=$(OBJDIR)/atari800hd.exe of=$@ bs=128 conv=notrunc
-	dd if=$(OBJDIR)/bdos.img of=$@ bs=128 seek=10 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
