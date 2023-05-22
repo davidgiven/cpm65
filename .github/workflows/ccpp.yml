@@ -46,7 +46,9 @@ jobs:
         path: |
           cpm65/bbcmicro.ssd
           cpm65/c64.d64
-          cpm65/pet.d64
+          cpm65/pet4032.d64
+          cpm65/pet8032.d64
+          cpm65/pet8096.d64
           cpm65/x16.zip
           cpm65/apple2e.po
           cpm65/atari800.atr
