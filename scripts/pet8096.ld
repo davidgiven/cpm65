@@ -23,7 +23,7 @@ SECTIONS {
 		init_exec_addr = .;
 		init_load_addr = LOADADDR(.init);
 		*(.init .init.*)
-		*loader_smalldisk.o(.text .text.*)
+		*loader.o(.text .text.*)
 		init_end_addr = .;
 	} >initram AT>reloram
 
