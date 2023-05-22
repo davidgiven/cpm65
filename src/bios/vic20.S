@@ -164,44 +164,7 @@ zproc _init, .init
         dey
     zuntil_mi
 
-    ; Load the BDOS.
-
-    lda #0xf0               ; OPEN channel 0
-    jsr ieee_listen
-    ldx #bdos_filename_end - bdos_filename
-    zrepeat
-        lda bdos_filename-1, x
-        jsr ieee_write
-
-        dex
-    zuntil_eq
-    jsr ieee_unlisten
-
-    lda #0x60
-    jsr ieee_talk
-
-    sei
-    zrepeat
-        jsr ieee_getb
-        php
-
-    1:
-        sta __HIGHTPA_START__
-
-        inc 1b+1
-        zif_eq
-            inc 1b+2
-
-            lda #'.'
-            jsr entry_CONOUT
-        zendif
-        plp
-    zuntil_cs
-    jsr ieee_untalk
-
-    lda #0xe0               ; CLOSE channel 0
-    jsr ieee_listen
-    jsr ieee_unlisten
+    ; Set up for sector I/O.
 
     lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
     jsr ieee_listen
@@ -212,6 +175,13 @@ zproc _init, .init
         dex
     zuntil_eq
     jsr ieee_unlisten
+
+    ; Load the BDOS.
+
+    lda #<bdos_filename
+    ldx #>bdos_filename
+    ldy #>__HIGHTPA_START__
+    jsr loadfile
 
     ; Relocate the BDOS.
 
@@ -225,9 +195,8 @@ zproc _init, .init
     ldx #>biosentry
     jmp __HIGHTPA_START__ + COMHDR_ENTRY
 
-bdos_filename: ; reversed!
-    .ascii "R,P,SODB"
-bdos_filename_end:
+bdos_filename:
+    .ascii "BDOS    SYS"
 
 allocate_cmd: ; reversed!
     .ascii "2#"

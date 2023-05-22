@@ -7,19 +7,22 @@ What?
 This is a native port of Digital Research's seminal 1977 operating system CP/M
 to the 6502. So far it runs on:
 
-  - The BBC Micro family, including Master, Tube, and Electron; TPA ranges from 14kB on the Electron to 57kB on the Tube.
+  - The BBC Micro family, including Master, Tube, and Electron; TPA ranges from
+    14kB on the Electron to 57kB on the Tube.
 
   - Commodore 64; TPA is 46kB.
   
   - Commodore VIC-20; TPA is 24kB.
 
-  - Commodore PET 4032; TPA is 26kB --- the assembler will run, just.
+  - Commodore PET 4032, 8032 and 8096; the TPA ranges from 25kB to 57kB on the
+    8096.
 
   - Commander X16; TPA is 46kB.
 
   - Apple IIe; TPA is 46kB.
 
-   - Atari 400/800 XL/XE; 16kB minimum; TPA ranging from 8.5kB up to 42kB on a 48+kB machine.
+  - Atari 400/800 XL/XE; 16kB minimum; TPA ranging from 8.5kB up to 42kB on a
+    48+kB machine.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -148,9 +151,6 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
   - It supports drive 0: only.
 
   - This port runs completely bare-metal and does not use any ROM routines.
-
-  - The 8096 port uses the extra memory, giving an impressive 56.5kB TPA. The
-    other ports have a less impressive 25kB.
 
   - The PET port has a SCREEN driver.
 

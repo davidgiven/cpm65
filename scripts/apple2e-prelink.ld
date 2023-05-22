@@ -14,10 +14,14 @@ SECTIONS {
 		*(.zp .zp.*)
 		__ZEROPAGE_START__ = .;
 		__ZEROPAGE_END__ = 0xff;
+
+		. = 0xf0;
+		*(.loaderzp)
 	} >zp
 
 	.loader : {
 		*(loader)
+		*loader.o(.text .text.*)
 	} >ram
 
 	.bss (0x10000-BIOS_SIZE) (NOLOAD) : {
