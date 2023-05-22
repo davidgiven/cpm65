@@ -1,5 +1,8 @@
 ; Atari 800 OS defines
 
+PTEMP  = $1f    ; P: handler temporary we can use freely, unless we print
+FMSZPG = $43    ; FMS zero page, but we don't use Atari DOS.SYS (7 bytes)
+
 MEMTOP = $02e5
 
 DMACTL = $d400
@@ -34,6 +37,11 @@ CPTXT = 9
 CGBIN = 7
 CPBIN = 11
 
+ATARI_ESC         = 27
+ATARI_UP_ARROW    = 28
+ATARI_DOWN_ARROW  = 29
+ATARI_LEFT_ARROW  = 30
+ATARI_RIGHT_ARROW = 31
 ATARI_CLS      = 125
 ATARI_BS       = 126
 ATARI_TAB      = 127
@@ -53,7 +61,9 @@ TERM_CR  = 13
 TERM_DEL = 127
 
 LMARGN  = $52
+ROWCRS  = $54
 COLCRS  = $55
+SAVMSC  = $58
 COLOR1  = $02c5
 COLOR2  = $02c6
 COLBK   = $02c8

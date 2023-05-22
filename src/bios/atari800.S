@@ -16,16 +16,31 @@
 #include "cpm65.inc"
 #include "atari800.inc"
 #include "driver.inc"
+#include "jumptables.inc"
 
 ZEROPAGE
 
 .global ptr
 .global ptr1
-save_y:
-ptr: .word 0
-ptr1: .word 0
+
+ptr = FMSZPG
+ptr1 = FMSZPG+2
+
+save_x = FMSZPG+4
+save_y = FMSZPG+5
+
+; 1 byte of FMSZPG left, and PTEMP
+
+SCREEN_WIDTH = 40
+SCREEN_HEIGHT = 24
+
+cursorx = COLCRS
+cursory = ROWCRS
 
     .text
+
+; Boot code and initialization is ran only once. Eventually it is overwritten
+; by the directory buffer/
 
 .global _start
 _start:
@@ -34,11 +49,11 @@ _start:
 
     .byte 0
 #ifdef ATARI_HD
-    .byte 10 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 10 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #else
-    .byte 10 + 28  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
+    .byte 10 + 30  ; 8 + 28 (BIOS+BDOS) (BIOS must be multiple of 2, one page)
 #endif
-    .word $0600
+    .word $0500
     .word init      ; just use init and never return
 
 init:
@@ -161,34 +176,280 @@ init:
     rts                 ; indirect jump to BDOS
 zendproc
 
+; Everything above here is overwritten by the directory buffer, so make sure
+; it's bigger than 0x80 bytes (currently: 0xa3).
+
+directory_buffer = _start
+
+; Below are 34 bytes that become available for overwrite during init. We use
+; them for variables afterwards.
+
+overwrite_after_display_stretch:        ; 5 bytes
+
+dl_prologue:
+    .byte $70, $30, $42, 0, 0
+
+overwrite_after_banner:                 ; 27 bytes
+
+banner: ; reversed!
+    .byte 10,13
+    .ascii "008 iratA eht rof 56-M/PC"
+banner_end:
+
+overwrite_after_keyboard_init:          ; 2 bytes
+
+kdevice: .ascii "K"
+         .byte 155
+
+charin       = overwrite_after_display_stretch
+charout      = overwrite_after_display_stretch
+drive_number = overwrite_after_display_stretch + 1
+sector_num   = overwrite_after_display_stretch + 2 ; (and +3, and +4, full)
+
+dma          = overwrite_after_banner   ; (and +1
+
+; --- BIOS entrypoints ------------------------------------------------------
+
 .data
 .global drvtop
 drvtop: .word drv_TTY
 
-; --- BIOS entrypoints ------------------------------------------------------
-
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
-    pha
-    lda jmptable_lo, y
-    sta ptr+0
-    lda jmptable_hi, y
-    sta ptr+1
-    pla
-    jmp (ptr)
+    jmpdispatch jmptable_lo, jmptable_hi
 
 jmptable_lo:
-    .byte tty_const@mos16lo
-    .byte tty_conin@mos16lo
-    .byte tty_conout@mos16lo
+    jmptablo tty_const
+    jmptablo tty_conin
+    jmptablo tty_conout
 jmptable_hi:
-    .byte tty_const@mos16hi
-    .byte tty_conin@mos16hi
-    .byte tty_conout@mos16hi
+    jmptabhi tty_const
+    jmptabhi tty_conin
+    jmptabhi tty_conout
 zendproc
+
+; --- SCREEN driver ---------------------------------------------------------
+
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
+
+screen_jmptable_lo:
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo fail
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo fail
+screen_jmptable_hi:
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi fail
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi fail
+zendproc
+
+zproc fail
+    sec
+    rts
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+    lda #SCREEN_WIDTH-1
+    ldx #SCREEN_HEIGHT-1
+    rts
+zendproc
+
+zproc screen_clear
+    lda #0
+    zrepeat
+        pha
+        jsr calculate_line_address
+
+        ldy #SCREEN_WIDTH-1
+        lda #0                      ; screen memory space
+        zrepeat
+            sta (ptr), y
+            dey
+        zuntil_mi
+
+        pla
+        clc
+        adc #1
+        cmp #SCREEN_HEIGHT
+    zuntil_eq
+
+    ; SCREEN doesn't specify where the cursor ends up, but this code is used by
+    ; TTY and homing the cursor here simplifies things.
+
+    lda #0
+    sta cursorx
+    sta cursory
+    jmp show_cursor 
+zendproc
+
+zproc screen_setcursor
+    pha
+    jsr hide_cursor
+    pla
+    sta cursorx
+    stx cursory
+    jmp show_cursor
+zendproc
+
+zproc screen_getcursor
+    lda cursorx
+    ldx cursory
+    rts
+zendproc
+
+zproc screen_getchar
+    jsr tty_conin
+    clc
+    rts
+zendproc
+
+zproc screen_putchar
+    pha
+    jsr calculate_cursor_address
+    pla
+    jsr convert_ascii_to_screencode
+    sta (ptr), y
+
+    lda cursorx
+    cmp #SCREEN_WIDTH-1
+    zif_ne
+        inc cursorx
+    zendif
+
+    rts
+zendproc
+
+zproc screen_putstring
+    sta 1f+0
+    stx 1f+1
+
+    jsr calculate_cursor_address
+    ldx #0
+    zloop
+    1:
+        lda 0xffff, x
+        zbreakif_eq
+
+        jsr convert_ascii_to_screencode
+        sta (ptr), y
+        iny
+        inx
+    zendloop
+    rts
+zendproc
+
+zproc screen_scrollup
+    ldx #0              ; current line
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+        inx
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #SCREEN_HEIGHT-1
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #0                  ; screen memory space
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+zproc screen_scrolldown
+    ldx #39             ; current line
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        dex
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #0
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+zproc screen_cleartoeol
+; cursor is overwritten
+    jsr calculate_cursor_address
+
+    lda #0                          ; screen memory space
+    zrepeat
+        sta (ptr), y
+        iny
+        cpy #SCREEN_WIDTH
+    zuntil_eq
+
+    jmp show_cursor
+zendproc
+
+; --- TTY DRIVER ------------------------------------------------------------
 
 ; Blocks and waits for the next keypress; returns it in A.
 
@@ -217,7 +478,7 @@ zproc tty_conin
 
     cmp #ATARI_BS
     zif_eq
-        lda #8
+        lda #127            ; DEL not BS
         rts
     zendif
 
@@ -239,81 +500,143 @@ zendproc
 ; Output character in A
 
 zproc tty_conout
-
-    cmp #TERM_LF
-    zif_eq
-        lda #ATARI_EOL
-        bne conout
-    zendif
-
-    cmp #TERM_CR
+    pha
+    jsr hide_cursor
+    pla
+    cmp #13
     zif_eq
         lda #0
-        sta COLCRS
+        sta cursorx
+        jmp show_cursor
+    zendif
+    cmp #127
+    zif_eq
+        dec cursorx
+        zif_mi
+            lda #SCREEN_WIDTH-1
+            sta cursorx
+
+            dec cursory
+            zif_mi
+                lda #0
+                sta cursory
+                jsr screen_scrolldown
+            zendif
+        zendif
+        jsr calculate_cursor_address
+        lda #$80            ; screen memory inverse space saves show_cursor
+        sta (ptr), y
         rts
     zendif
+    cmp #10
+    beq write_nl
 
-    cmp #TERM_BS
-    zif_eq
-        lda #ATARI_BS
-        bne conout
-    zendif
+    tax
+    lda cursorx
+    pha
+    txa
+    jsr screen_putchar
 
-    cmp #TERM_TAB
-    zif_eq
-        lda #ATARI_TAB
-        bne conout
-    zendif
+    pla
+    cmp #SCREEN_WIDTH-1
+    beq write_nl
 
-    cmp #TERM_DEL
-    zif_eq
-;        lda #ATARI_DEL
-        lda #ATARI_BS       ; DEL=BS apparently
-        bne conout
-    zendif
-
-    cmp #TERM_CLS
-    zif_eq
-        lda #ATARI_CLS
-        bne conout
-    zendif
-
-; The following two ATARI_ codes need to be escaped to actually print the 
-; associated glyph. The glyph of 127 (the third that needs escaping) is
-; not available because that's ASCII DEL.
-
-    cmp #ATARI_CLS
-    zif_eq
-        lda #27             ; ESC
-        jsr tty_conout
-        lda #ATARI_CLS
-        bne conout
-    zendif
-
-    cmp #ATARI_BS
-    zif_eq
-        lda #27
-        jsr tty_conout
-        lda #ATARI_BS
-;        bne conout         ; fallthrough
-    zendif
-
-conout:
-    sta charout
-
-    ldx #0          ; IOCB number $00, $10, etc...
-    lda #CPBIN
-    sta ICCOM,x
-    lda #1          ; length
-    sta ICBLL,x
-    lda #0
-    sta ICBLH,x
-    lda #<charout
-    sta ICBAL,x
-    lda #>charout
-    sta ICBAH,x
-    jmp CIOV
+    jmp show_cursor
 zendproc
+
+zproc write_nl
+    lda #0
+    sta cursorx
+
+    inc cursory
+    lda cursory
+    cmp #SCREEN_HEIGHT
+    zif_eq
+        dec cursory
+        jmp screen_scrollup
+    zendif
+    jmp show_cursor
+zendproc
+
+; Preserves X and Y.
+zproc convert_ascii_to_screencode
+    cmp #32
+    zif_cc
+        clc
+        adc #64
+        rts
+    zendif
+    cmp #96
+    zif_cc
+        sec
+        sbc #32
+        rts
+    zendif
+    rts
+zendproc
+
+; Sets (ptr), y to the location of the cursor.
+zproc calculate_cursor_address
+    ldy cursorx
+    lda cursory
+    ; fall through
+zendproc
+; Sets ptr to the address of screen line A.
+zproc calculate_line_address
+    ; x*40 = x*8 + x*32.
+
+    ; We have 24 lines. As 24*8 will fit in a byte, we can do this easily.
+
+    asl a               ; a = y*2
+    asl a               ; a = y*4
+    asl a               ; a = y*8
+    sta ptr+0           ; store y*8
+
+    ; Anything more than this needs to be 16-bit arithmetic.
+
+    asl a               ; = y*16
+    rol ptr+1
+
+    asl a               ; = y*13
+    rol ptr+1
+
+    ; Add.
+
+    clc
+    adc ptr+0
+    sta ptr+0
+    zif_cs
+        inc ptr+1
+    zendif
+
+    lda ptr+0
+    clc
+    adc SAVMSC
+    sta ptr+0
+    lda ptr+1
+    and #3
+    adc SAVMSC+1
+    sta ptr+1
+
+    rts
+
+zproc hide_cursor
+    jsr calculate_cursor_address
+    lda (ptr),y
+    and #$7f
+    sta (ptr),y
+    rts
+zendproc
+
+zproc show_cursor
+    jsr calculate_cursor_address
+    lda (ptr),y
+    ora #$80
+    sta (ptr),y
+    rts
+zendproc
+
+; ---------------------------------------------------------------------------
 
 ; Sets the current DMA address.
 
@@ -433,42 +756,14 @@ zproc entry_SETBANK
     rts
 zendproc
 
+; ---------------------------------------------------------------------------
+
     .data
 zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
 
 mem_base: .byte __USERTPA_START__@mos16hi
 mem_end:  .byte __USERTPA_END__@mos16hi
-
-; Discardable data which is not used anymore after BIOS init
-
-; We have 34 bytes in total here
-
-overwrite_after_display_stretch:        ; 5 bytes
-
-dl_prologue:
-    .byte $70, $30, $42, 0, 0
-
-overwrite_after_banner:                 ; 27 bytes
-
-banner: ; reversed!
-    .byte 10,13
-    .ascii "008 iratA eht rof 56-M/PC"
-banner_end:
-
-overwrite_after_keyboard_init:          ; 2 bytes
-
-kdevice: .ascii "K"
-         .byte 155
-
-; Former bss variables
-
-charin       = overwrite_after_display_stretch
-charout      = overwrite_after_display_stretch
-drive_number = overwrite_after_display_stretch + 1
-sector_num   = overwrite_after_display_stretch + 2 ; (and +3, and +4, full)
-
-dma          = overwrite_after_banner   ; (and +1
 
 ; DPH for drive 0 (our only drive)
 
@@ -484,7 +779,7 @@ define_drive dph, 720, 1024, 64, 54
 
 NOINIT
 
-directory_buffer: .fill 128
+; Nothing left for .bss
 
 ; vim: filetype=asm sw=4 ts=4 et
 

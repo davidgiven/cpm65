@@ -11,13 +11,15 @@ to the 6502. So far it runs on:
 
   - Commodore 64; TPA is 46kB.
   
-  - Commodore VIC-20: TPA is 24kB.
+  - Commodore VIC-20; TPA is 24kB.
 
   - Commodore PET 4032; TPA is 26kB --- the assembler will run, just.
 
   - Commander X16; TPA is 46kB.
 
   - Apple IIe; TPA is 46kB.
+
+   - Atari 400/800 XL/XE; 16kB minimum; TPA ranging from 8.5kB up to 42kB on a 48+kB machine.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be

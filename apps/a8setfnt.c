@@ -15,6 +15,12 @@ int main() {
         goto errout;
     }
 
+    if (cpm_fcb.f[8] == ' ' && cpm_fcb.f[9] == ' ' && cpm_fcb.f[10] == ' ') {
+        cpm_fcb.f[8]  = 'F';
+        cpm_fcb.f[9]  = 'N';
+        cpm_fcb.f[10] = 'T';
+    }
+
     cpm_fcb.ex = 0;
     cpm_fcb.cr = 0;
     if (cpm_open_file(&cpm_fcb)) {
