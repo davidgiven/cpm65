@@ -70,6 +70,11 @@ LIBCPM_OBJS = \
 LIBBIOS_OBJS = \
 	$(OBJDIR)/src/bios/biosentry.o \
 	$(OBJDIR)/src/bios/relocate.o \
+	$(OBJDIR)/src/bios/loader_largedisk.o \
+	$(OBJDIR)/src/bios/loader_smalldisk.o \
+
+$(OBJDIR)/src/bios/loader_largedisk.o: CFLAGS65 += -DLARGEDISK
+$(OBJDIR)/src/bios/loader_smalldisk.o: CFLAGS65 += -DSMALLDISK
 
 LIBCOMMODORE_OBJS = \
 	$(OBJDIR)/src/bios/commodore/ieee488.o \
@@ -199,7 +204,7 @@ c64.d64: $(OBJDIR)/c64.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(OBJDIR)/ccp.sys
 		$@
 	$(OBJDIR)/mkcombifs $@
 	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmchattr -f c1541 $@ sr 0:ccp.sys
 
 $(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
@@ -227,7 +232,7 @@ apple2e.po: $(OBJDIR)/apple2e.boottracks $(OBJDIR)/bdos.img $(APPS) $(OBJDIR)/cc
 	@rm -f $@
 	mkfs.cpm -f appleiie -b $(OBJDIR)/apple2e.boottracks $@
 	cpmcp -f appleiie $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	cpmchattr -f appleiie $@ sr 0:ccp.sys 0:cbm.sys
+	cpmchattr -f appleiie $@ sr 0:ccp.sys
 	truncate -s 143360 $@
 
 $(OBJDIR)/pet4032.exe: LINKFLAGS += --no-check-sections
@@ -240,11 +245,10 @@ pet4032.d64: $(OBJDIR)/pet4032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/pet4032.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.img $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:cbmfs.sys 0:bdos.img
 
 $(OBJDIR)/pet8096.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet8096.exe: $(OBJDIR)/libcommodore.a
@@ -256,11 +260,10 @@ pet8096.d64: $(OBJDIR)/pet8096.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/pet8096.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.img $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:cbmfs.sys 0:bdos.img
 
 $(OBJDIR)/pet8032.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/pet8032.exe: $(OBJDIR)/libcommodore.a
@@ -272,11 +275,10 @@ pet8032.d64: $(OBJDIR)/pet8032.exe $(OBJDIR)/bdos.img Makefile $(APPS) $(SCREEN_
 	cc1541 -q \
 		-t -u 0 \
 		-r 18 -f cpm -w $(OBJDIR)/pet8032.exe \
-		-r 18 -s 1 -f bdos -w $(OBJDIR)/bdos.img \
 		$@
 	$(OBJDIR)/mkcombifs $@
-	cpmcp -f c1541 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:ccp.sys
+	cpmcp -f c1541 $@ $(OBJDIR)/bdos.img $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f c1541 $@ sr 0:ccp.sys 0:cbmfs.sys 0:bdos.img
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/vic20.exe: $(OBJDIR)/libcommodore.a

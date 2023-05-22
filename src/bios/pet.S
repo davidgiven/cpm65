@@ -199,53 +199,8 @@ zproc _start, .init
         dex
     zuntil_mi
 
-    ; Load the BDOS.
-
-    lda #0xf0               ; OPEN channel 0
-    jsr ieee_listen
-
-    ldx #bdos_filename_end - bdos_filename
-    zrepeat
-        lda bdos_filename-1, x
-        jsr ieee_write
-        dex
-    zuntil_eq
-    jsr ieee_unlisten
-
-    lda #0                  ; channel 0
-    jsr ieee_talk
-
-    lda #>__TPA_START__
-    sta ptr1+1
-    lda #0
-    sta ptr1+0
-
-    ldy #0
-    zrepeat
-        jsr ieee_getb
-        php
-        sta (ptr1), y
-
-        iny
-        zif_eq
-            inc ptr1+1
-
-            tya
-            pha
-            lda #'.'
-            jsr tty_conout
-            pla
-            tay
-        zendif
-        plp
-    zuntil_cs
-
-    jsr ieee_untalk
-
-    lda #0xe0               ; CLOSE channel 0
-    jsr ieee_listen
-    jsr ieee_unlisten
-
+    ; Set up sector IO.
+    
     lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
     jsr ieee_listen
     ldx #allocate_cmd_end - allocate_cmd
@@ -255,6 +210,13 @@ zproc _start, .init
         dex
     zuntil_eq
     jsr ieee_unlisten
+
+    ; Load the BDOS.
+
+    lda #<bdos_filename
+    ldx #>bdos_filename
+    ldy #>__TPA_START__
+    jsr loadfile_small
 
     ; Relocate the BDOS.
 
@@ -268,8 +230,8 @@ zproc _start, .init
     ldx #>biosentry
     jmp __TPA_START__ + COMHDR_ENTRY
 
-bdos_filename: ; reversed!
-    .ascii "R,P,SODB"
+bdos_filename:
+    .ascii "BDOS    IMG"
 bdos_filename_end:
 
 allocate_cmd: ; reversed!
@@ -1129,6 +1091,7 @@ define_drive dph, 136*10, 1024, 64, 0
 
 .bss
 
+.global directory_buffer
 directory_buffer: .fill 128
 disk_buffer:      .fill 256
 
