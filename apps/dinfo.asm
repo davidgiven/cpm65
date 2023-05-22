@@ -89,6 +89,14 @@ success:
     sta val1+1
     sta dsm+1
 
+	lda val1
+	ldx val1+1
+	jsr print16padded
+
+	lda #<blocks
+	ldx #>blocks
+	jsr printstring
+
 \ shift by BSH
 
     ldy #DPB_BSH
@@ -352,6 +360,8 @@ error:
     .byte "drive error"
 crlf:
     .byte "\r\n$"
+blocks:
+	.byte " : Number of blocks\r\n$"
 capacity:
     .byte " : Sectors Capacity\r\n$"
 direntries:
