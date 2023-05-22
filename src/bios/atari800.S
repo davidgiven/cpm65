@@ -824,18 +824,16 @@ mem_end:  .byte 0
 
 ; number of sectors, blocksize, direntries, reserved _sectors_
 
-; 54 reserved sectors = 6912 bytes for BIOS and BDOS
-
 #ifdef ATARI_HD
 NUMSECTORS = 8190
 BLOCKSIZE  = 2048
 DIRENTRIES = 128
-RESERVED    = 54
+RESERVED    = 18
 #else
 NUMSECTORS = 720
 BLOCKSIZE  = 1024
 DIRENTRIES = 64
-RESERVED   = 54
+RESERVED   = 18
 #endif
 
 define_drive dph, NUMSECTORS, BLOCKSIZE, DIRENTRIES, RESERVED
