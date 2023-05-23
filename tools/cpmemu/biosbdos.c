@@ -459,6 +459,62 @@ static void bdos_getsetuser(void)
         set_result(0, true);
 }
 
+static const char* fill(uint8_t* dest, const char* src, int len)
+{
+    do
+    {
+        char c = toupper(*src);
+        if (!c || (c == '.'))
+            c = ' ';
+        else if (c == '*')
+            c = '?';
+        else
+            src++;
+        *dest++ = c;
+    }
+    while (--len);
+    return src;
+}
+
+void parse_filename(uint8_t fcb[16], const char* filename)
+{
+    memset(fcb, 0, 16);
+    memset(fcb+1, ' ', 11);
+
+    {
+        const char* colon = strchr(filename, ':');
+        if (colon)
+        {
+            char c = *filename++;
+            c = toupper(c);
+            if (isalpha(c))
+            {
+                fcb[0] = c - '@';
+                c = *filename++;
+            }
+
+            filename = colon + 1;
+        }
+    }
+
+    /* Read filename part. */
+
+    filename = fill(fcb+1, filename, 8);
+    filename = strchr(filename, '.');
+    if (filename)
+        fill(fcb+9, filename+1, 3);
+
+	set_result(get_xa(), filename);
+}
+
+static void bdos_parsefilename(void)
+{
+	uint8_t* fcb = &ram[dma];
+    const char* filename = &ram[get_xa()];
+
+	parse_filename(fcb, filename);
+}
+
 void bdos_entry(uint8_t bdos_call)
 {
     switch (bdos_call)
@@ -495,7 +551,8 @@ void bdos_entry(uint8_t bdos_call)
         case 35: bdos_filelength(); return;
 		case 38: set_result(BIOS_ADDRESS, true); return;
         case 40: bdos_readwriterandom(file_write); return;
-		case 41: set_result((TPA_BASE>>8) | (himem&0xff00), true); return;
+		case 42: set_result((TPA_BASE>>8) | (himem&0xff00), true); return;
+		case 43: bdos_parsefilename(); return;
             // clang-format on
     }
 
