@@ -38,6 +38,8 @@ APPS = \
 	apps/dinfo.asm \
 	apps/dump.asm \
 	apps/ls.asm \
+	apps/cpm65.inc \
+	apps/drivers.inc \
 	cpmfs/asm.txt \
 	cpmfs/bedit.txt \
 	cpmfs/demo.sub \
@@ -149,7 +151,7 @@ $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
-$(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu
+$(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu $(wildcard apps/*.inc)
 	@mkdir -p $(dir $@)
 	bin/cpmemu $(OBJDIR)/asm.com -pA=$(dir $<) -pB=$(dir $@) \
 		a:$(notdir $<) b:$(notdir $@)
@@ -326,7 +328,6 @@ atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.sys Makefile \
 	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
 	rm $@.raw
-
 
 clean:
 	rm -rf $(OBJDIR) bin $(TARGETS)

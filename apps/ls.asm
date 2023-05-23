@@ -8,21 +8,7 @@
 \   C version: 2051 bytes
 \ asm version: 1024 bytes (w/ flags)
 
-.bss pblock, 165
-cpm_fcb = pblock
-cpm_default_dma = pblock + 0x25
-
-BDOS = start-3
-
-BDOS_CONOUT            =  2
-BDOS_PRINTSTRING       =  9
-BDOS_SELECT_DRIVE      = 14
-BDOS_FINDFIRST         = 17
-BDOS_FINDNEXT          = 18
-BDOS_GET_CURRENT_DRIVE = 25
-BDOS_SET_DMA           = 26
-
-FCB_DR      = 0
+.include "cpm65.inc"
 
 MAXFILES = 255
 

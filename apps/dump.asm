@@ -6,52 +6,7 @@
 \
 \ ASM DUMP.ASM NEWDUMP.COM
 
-.bss pblock, 165
-cpm_fcb = pblock
-cpm_default_dma = pblock + 0x25
-
-BDOS_WARMBOOT          =  0
-BDOS_CONIN             =  1
-BDOS_CONOUT            =  2
-BDOS_AUXIN             =  3
-BDOS_AUXOUT            =  4
-BDOS_LSTOUT            =  5
-BDOS_CONIO             =  6
-BDOS_GET_IOBYTE        =  7
-BDOS_SET_IOBYTE        =  8
-BDOS_PRINTSTRING       =  9
-BDOS_READLINE          = 10
-BDOS_CONST             = 11
-BDOS_GET_VERSION       = 12
-BDOS_RESET_DISK_SYSTEM = 13
-BDOS_SELECT_DRIVE      = 14
-BDOS_OPEN_FILE         = 15
-BDOS_CLOSE_FILE        = 16
-BDOS_FINDFIRST         = 17
-BDOS_FINDNEXT          = 18
-BDOS_DELETE_FILE       = 19
-BDOS_READ_SEQUENTIAL   = 20
-BDOS_WRITE_SEQUENTIAL  = 21
-BDOS_MAKE_FILE         = 22
-BDOS_RENAME_FILE       = 23
-BDOS_GET_LOGIN_VECTOR  = 24
-BDOS_GET_CURRENT_DRIVE = 25
-BDOS_SET_DMA           = 26
-BDOS_GET_ALLOC_VECTOR  = 27
-BDOS_WRITE_PROT_DRIVE  = 28
-BDOS_GET_READONLY_VEC  = 29
-BDOS_SET_FILE_ATTRS    = 30
-BDOS_GET_DPB           = 31
-BDOS_GET_SET_USER      = 32
-BDOS_READ_RANDOM       = 33
-BDOS_WRITE_RANDOM      = 34
-BDOS_SEEK_TO_END       = 35
-BDOS_SEEK_TO_SEQ_POS   = 36
-BDOS_RESET_DRIVES      = 37
-BDOS_WRITE_RANDOM_FILL = 40
-
-BDOS = start - 3
-start:
+.include "cpm65.inc"
 
 .zp address, 3
 .zp index, 1
@@ -66,7 +21,7 @@ start:
 .expand 1
 .label printchar
 
-.zproc main
+.zproc start
 	\ Did we get a parameter?
 
 	lda cpm_fcb + 1

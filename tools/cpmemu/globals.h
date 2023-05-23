@@ -38,6 +38,8 @@ typedef struct
 }
 cpm_filename_t;
 
+extern bool parse_fcb(uint8_t fcb[16], const char* filename);
+
 extern void files_init(void);
 extern void file_set_drive(int drive, const char* path);
 extern struct file* file_open(cpm_filename_t* filename);
