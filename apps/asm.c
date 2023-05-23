@@ -76,9 +76,10 @@ typedef struct
 
 typedef struct
 {
-	uint8_t pos;
-	FCB fcb;
-	uint8_t buffer[128];
+    uint8_t pos;
+    uint16_t lineNumber;
+    FCB fcb;
+    uint8_t buffer[128];
 } InputStream;
 
 #define lengthof(a) (sizeof(a) / sizeof(*a))
@@ -92,8 +93,7 @@ static uint8_t* ramtop;
 
 static InputStream* firstFile;
 static InputStream* currentFile;
-
-static uint16_t lineNumber = 0;
+static uint8_t includes = 0;
 
 static char token = 0;
 static uint8_t tokenLength;
@@ -224,9 +224,9 @@ static void errormessage(const char* msg)
 {
     cpm_delete_file(&destFcb);
     cpm_printstring("Error: ");
-    if (lineNumber)
+    if (currentFile && currentFile->lineNumber)
     {
-        printi(lineNumber);
+        printi(currentFile->lineNumber);
         cpm_printstring(": ");
     }
     cpm_printstring(msg);
@@ -239,18 +239,77 @@ static void __attribute__((noreturn)) fatal(const char* msg)
     cpm_warmboot();
 }
 
-static void consumeByte()
+static void printFcb(FCB* fcb)
 {
-    if (currentFile->pos == 128)
+    if (fcb->dr)
     {
-        cpm_set_dma(currentFile->buffer);
-        int i = cpm_read_sequential(&currentFile->fcb);
-        if (i != 0)
-            currentByte = 26;
-        currentFile->pos = 0;
+		cpm_conout('@' + fcb->dr);
+		cpm_conout(':');
     }
 
-    currentByte = currentFile->buffer[currentFile->pos++];
+    const uint8_t* inp = &fcb->f[0];
+    while (inp != &fcb->f[11])
+    {
+        uint8_t c;
+        if (inp == &fcb->f[8])
+			cpm_conout('.');
+        c = *inp++;
+        if (c != ' ')
+            cpm_conout(c);
+    }
+}
+
+static void indent()
+{
+	for (uint8_t i=0; i<includes; i++)
+		cpm_printstring("  ");
+}
+
+static void openFile(const char* filename)
+{
+    currentFile--;
+    currentFile->pos = 128;
+    currentFile->lineNumber = 1;
+	currentFile->fcb.cr = 0;
+
+    cpm_set_dma(&currentFile->fcb);
+    if (!cpm_parse_filename(filename))
+        fatal("invalid filename");
+
+	indent();
+	cpm_printstring("> ");
+	printFcb(&currentFile->fcb);
+	cr();
+	includes++;
+
+    if (cpm_open_file(&currentFile->fcb))
+        fatal("cannot open source file");
+}
+
+static void consumeByte()
+{
+	if (currentFile->pos == 128)
+	{
+		cpm_set_dma(currentFile->buffer);
+		int i = cpm_read_sequential(&currentFile->fcb);
+		if (i != 0)
+			currentByte = 26;
+		currentFile->pos = 0;
+	}
+
+	currentByte = currentFile->buffer[currentFile->pos++];
+	if (currentByte == 0)
+		currentByte = 26;
+
+	if ((currentByte == 26) && (currentFile != firstFile))
+	{
+		includes--;
+		indent();
+		cpm_printstring("<\r\n");
+
+		currentFile++;
+		currentByte = '\n';
+	}
 }
 
 static void flushOutputBuffer()
@@ -311,7 +370,7 @@ static char consumeToken()
 
     if (currentByte == '\n')
     {
-        lineNumber++;
+        currentFile->lineNumber++;
         currentByte = ';';
     }
 
@@ -324,8 +383,8 @@ static char consumeToken()
         case ',':
         case '+':
         case '-':
-		case '*':
-		case '/':
+        case '*':
+        case '/':
         case '(':
         case ')':
         case '<':
@@ -379,11 +438,11 @@ static char consumeToken()
                     break;
             }
         }
-		else if (currentByte == '$')
-		{
-			consumeByte();
-			base = 16;
-		}
+        else if (currentByte == '$')
+        {
+            consumeByte();
+            base = 16;
+        }
 
         for (;;)
         {
@@ -432,7 +491,7 @@ static char consumeToken()
                     c = 13;
                 else if (c == 't')
                     c = 9;
-				else if (c != '\\')
+                else if (c != '\\')
                     badEscape();
             }
 
@@ -464,8 +523,8 @@ static char consumeToken()
                     currentByte = 9;
                     break;
 
-				case '\\':
-					break;
+                case '\\':
+                    break;
 
                 default:
                     badEscape();
@@ -508,11 +567,11 @@ static const Instruction simpleInsns[] = {
     {"CMP", 0xc1, AM_ALU},
     {"CPX", 0xe0, AM_IMMS | AM_ZP | AM_ABS},
     {"CPY", 0xc0, AM_IMMS | AM_ZP | AM_ABS},
-	{"DEC", 0xc2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
+    {"DEC", 0xc2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
     {"DEX", 0xca, AM_IMP},
     {"DEY", 0x88, AM_IMP},
     {"EOR", 0x41, AM_ALU},
-	{"INC", 0xe2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
+    {"INC", 0xe2, AM_ZP | AM_ABS | AM_XOFZ | AM_XOFF},
     {"INX", 0xe8, AM_IMP},
     {"INY", 0xc8, AM_IMP},
     {"JMP", 0x40, AM_ABS | AM_WIND},
@@ -663,10 +722,10 @@ static uint8_t getBProps(uint8_t b)
 
 static uint8_t getInsnProps(uint8_t opcode)
 {
-	/* JMP is special. */
+    /* JMP is special. */
 
-	if ((opcode == 0x4c) || (opcode == 0x6c))
-		return (3 << BPROP_SIZE_SHIFT) | BPROP_ABS;
+    if ((opcode == 0x4c) || (opcode == 0x6c))
+        return (3 << BPROP_SIZE_SHIFT) | BPROP_ABS;
 
     return getBProps(getB(opcode));
 }
@@ -770,11 +829,11 @@ static SymbolRecord* appendSymbol()
 
 static SymbolRecord* appendAnonymousSymbol()
 {
-	uint8_t oldLength = tokenLength;
+    uint8_t oldLength = tokenLength;
     tokenLength = 0;
     SymbolRecord* r = appendSymbol();
-	tokenLength = oldLength;
-	return r;
+    tokenLength = oldLength;
+    return r;
 }
 
 static SymbolRecord* addOrFindSymbol()
@@ -788,10 +847,10 @@ static SymbolRecord* addOrFindSymbol()
 
 static void symbolExists()
 {
-	errormessage("symbol exists: ");
-	cpm_printstring(parseBuffer);
-	cr();
-	cpm_warmboot();
+    errormessage("symbol exists: ");
+    cpm_printstring(parseBuffer);
+    cr();
+    cpm_warmboot();
 }
 
 static SymbolRecord* addSymbol()
@@ -866,7 +925,7 @@ static uint16_t postProcess(uint16_t value)
             break;
     }
     tokenPostProcessing = PP_NONE;
-	return value;
+    return value;
 }
 
 static void postProcessConstant()
@@ -874,20 +933,20 @@ static void postProcessConstant()
     if (tokenVariable)
         return;
 
-	tokenValue = postProcess(tokenValue);
+    tokenValue = postProcess(tokenValue);
 }
 
 /* Returns the current value, that is, the LHS */
 static uint16_t consumeRhs()
 {
-	if (tokenVariable)
-		fatal("bad operator");
-	uint16_t lhs = tokenValue;
-	consumeToken();
-	consumeExpression();
-	if (tokenVariable)
-		fatal("bad operator");
-	return lhs;
+    if (tokenVariable)
+        fatal("bad operator");
+    uint16_t lhs = tokenValue;
+    consumeToken();
+    consumeExpression();
+    if (tokenVariable)
+        fatal("bad operator");
+    return lhs;
 }
 
 static void consumeExpression()
@@ -913,21 +972,21 @@ static void consumeExpression()
             postProcessConstant();
             break;
 
-		case '*':
+        case '*':
         case TOKEN_ID:
         {
             SymbolRecord* r;
-			if (token == '*')
-			{
-				r = appendAnonymousSymbol();
-				createLabelDefinition(r);
-			}
-			else
-			{
-				r = addOrFindSymbol();
-				if (r->type == SYMBOL_UNINITIALISED)
-					r->type = SYMBOL_REFERENCE;
-			}
+            if (token == '*')
+            {
+                r = appendAnonymousSymbol();
+                createLabelDefinition(r);
+            }
+            else
+            {
+                r = addOrFindSymbol();
+                if (r->type == SYMBOL_UNINITIALISED)
+                    r->type = SYMBOL_REFERENCE;
+            }
 
             uint16_t offset;
             if (r->type == SYMBOL_COMPUTED)
@@ -935,8 +994,8 @@ static void consumeExpression()
                 tokenVariable = r->variable;
                 offset = r->offset;
 
-				if (!tokenVariable)
-					offset = postProcess(offset);
+                if (!tokenVariable)
+                    offset = postProcess(offset);
             }
             else
             {
@@ -963,29 +1022,29 @@ static void consumeExpression()
             syntaxError();
     }
 
-	switch (token)
-	{
-		case '/':
-		{
-			uint16_t lhs = consumeRhs();
-			tokenValue = lhs / tokenValue;
-			break;
-		}
+    switch (token)
+    {
+        case '/':
+        {
+            uint16_t lhs = consumeRhs();
+            tokenValue = lhs / tokenValue;
+            break;
+        }
 
-		case '+':
-		{
-			uint16_t lhs = consumeRhs();
-			tokenValue = lhs + tokenValue;
-			break;
-		}
+        case '+':
+        {
+            uint16_t lhs = consumeRhs();
+            tokenValue = lhs + tokenValue;
+            break;
+        }
 
-		case '-':
-		{
-			uint16_t lhs = consumeRhs();
-			tokenValue = lhs - tokenValue;
-			break;
-		}
-	}
+        case '-':
+        {
+            uint16_t lhs = consumeRhs();
+            tokenValue = lhs - tokenValue;
+            break;
+        }
+    }
 }
 
 static void consumeConstExpression()
@@ -1040,7 +1099,7 @@ static AddressingMode consumeArgument()
                 return AM_A;
             }
             /* fall through */
-		case '*':
+        case '*':
         case TOKEN_NUMBER:
             consumeExpression();
             if (token == ',')
@@ -1204,7 +1263,7 @@ static void consumeZloop()
     SymbolRecord* r = appendAnonymousSymbol();
     createLabelDefinition(r);
     startLabels[scopePointer] = r;
-	continueLabels[++continuePointer] = r;
+    continueLabels[++continuePointer] = r;
 
     r = appendAnonymousSymbol();
     endLabels[scopePointer] = r;
@@ -1218,7 +1277,7 @@ static void consumeZendloop()
     addExpressionRecord(0x4c); /* JMP */
 
     createLabelDefinition(endLabels[scopePointer]);
-	continuePointer--;
+    continuePointer--;
     breakPointer--;
 
     popScope();
@@ -1286,15 +1345,22 @@ static void consumeZif()
     SymbolRecord* r = appendAnonymousSymbol();
     endLabels[scopePointer] = r;
 
-	tokenVariable = r;
-	tokenValue = 0;
-	emitConditionalJump(0b00100000);
+    tokenVariable = r;
+    tokenValue = 0;
+    emitConditionalJump(0b00100000);
 }
 
 static void consumeZendif()
 {
     createLabelDefinition(endLabels[scopePointer]);
     popScope();
+}
+
+static void consumeInclude()
+{
+    expect(TOKEN_STRING);
+    openFile(parseBuffer);
+    token = currentByte = ';';
 }
 
 static void lookupAndCall(const SymbolCallbackEntry* entries)
@@ -1334,8 +1400,9 @@ static void parse()
         {"zcontinue", consumeZcontinue},
         {"zrepeat", consumeZloop},
         {"zuntil", consumeZuntil},
-		{"zif", consumeZif},
-		{"zendif", consumeZendif},
+        {"zif", consumeZif},
+        {"zendif", consumeZendif},
+        {"include", consumeInclude},
         {}
     };
 
@@ -1383,8 +1450,8 @@ static void parse()
                             am = AM_ABS;
                         if (!(insn->addressingModes & am))
                             fatal("invalid addressing mode");
-						if ((insn->opcode == 0xa2) && (am == AM_YOFF))
-							am = AM_XOFF; /* ldx abs,y is special */
+                        if ((insn->opcode == 0xa2) && (am == AM_YOFF))
+                            am = AM_XOFF; /* ldx abs,y is special */
 
                         uint8_t op = insn->opcode;
                         if (!(getInsnProps(op) & BPROP_RELATIVE))
@@ -1439,10 +1506,10 @@ exit:
 
 static void printSymbol(SymbolRecord* r)
 {
-	uint8_t namelen = (r->record.descr & 0x1f) - offsetof(SymbolRecord, name);
-	uint8_t i = 0;
-	while (namelen--)
-		cpm_conout(r->name[i++]);
+    uint8_t namelen = (r->record.descr & 0x1f) - offsetof(SymbolRecord, name);
+    uint8_t i = 0;
+    while (namelen--)
+        cpm_conout(r->name[i++]);
 }
 
 static bool placeCode(uint8_t pass)
@@ -1463,9 +1530,9 @@ static bool placeCode(uint8_t pass)
                 if (s->type == SYMBOL_REFERENCE)
                 {
                     errormessage("unresolved forward reference: ");
-					printSymbol(s);
-					cr();
-					badProgram = 1;
+                    printSymbol(s);
+                    cr();
+                    badProgram = 1;
                 }
                 break;
             }
@@ -1508,15 +1575,15 @@ static bool placeCode(uint8_t pass)
                 }
                 else if (bprops & BPROP_RELATIVE)
                 {
-					if (!s->variable)
+                    if (!s->variable)
                         fatal("relative branch to constant");
                     if (s->variable->type != SYMBOL_TEXT)
-					{
-						errormessage("branch to non-text label: ");
-						printSymbol(s->variable);
-						cr();
-						cpm_warmboot();
-					}
+                    {
+                        errormessage("branch to non-text label: ");
+                        printSymbol(s->variable);
+                        cr();
+                        cpm_warmboot();
+                    }
 
                     if (pass == 0)
                         len = defaultBranchSize;
@@ -1702,7 +1769,7 @@ static void writeTextRelocations()
     uint16_t pc = START_ADDRESS;
     uint16_t lastRelocation = 3;
     resetRelocationWriter();
-	writeRelocationFor(3);
+    writeRelocationFor(3);
 
     for (;;)
     {
@@ -1834,50 +1901,51 @@ static void writeSymbols()
             case RECORD_SYMBOL:
             {
                 SymbolRecord* s = (SymbolRecord*)r;
-				uint8_t namelen = (s->record.descr & 0x1f) - offsetof(SymbolRecord, name);
-				if (namelen == 0)
-					break;
+                uint8_t namelen =
+                    (s->record.descr & 0x1f) - offsetof(SymbolRecord, name);
+                if (namelen == 0)
+                    break;
 
-				uint8_t type = s->type;
-				if (s->variable)
-					type = s->variable->type;
-				writeByte(symbolTypeChars[type]);
-				writeByte(' ');
+                uint8_t type = s->type;
+                if (s->variable)
+                    type = s->variable->type;
+                writeByte(symbolTypeChars[type]);
+                writeByte(' ');
 
-				uint16_t address = s->offset;
-				if (s->variable)
-					address += s->variable->offset;
-				if (type == SYMBOL_BSS)
-					address += textUsage;
+                uint16_t address = s->offset;
+                if (s->variable)
+                    address += s->variable->offset;
+                if (type == SYMBOL_BSS)
+                    address += textUsage;
 
-				for (int i=0; i<4; i++)
-				{
-					uint8_t n = (address >> 12) & 0xf;
-					writeByte("0123456789abcdef"[n]);
-					address <<= 4;
-				}
+                for (int i = 0; i < 4; i++)
+                {
+                    uint8_t n = (address >> 12) & 0xf;
+                    writeByte("0123456789abcdef"[n]);
+                    address <<= 4;
+                }
 
-				writeByte(' ');
-				uint8_t i = 0;
-				while (namelen--)
-					writeByte(s->name[i++]);
+                writeByte(' ');
+                uint8_t i = 0;
+                while (namelen--)
+                    writeByte(s->name[i++]);
 
-				writeByte(13);
-				writeByte(10);
+                writeByte(13);
+                writeByte(10);
                 break;
             }
 
             case RECORD_EOF:
                 goto exit;
 
-			default:
-				break;
+            default:
+                break;
         }
 
         r += len;
     }
 exit:
-	writeByte(0x1a);
+    writeByte(0x1a);
 }
 
 /* --- Main program ------------------------------------------------------ */
@@ -1906,23 +1974,15 @@ int main()
 
     /* Open the first input file. */
 
-	firstFile = (InputStream*)(ramtop - sizeof(InputStream));
-	currentFile = firstFile;
-	currentFile->fcb = cpm_fcb;
-    currentFile->fcb.ex = 0;
-    currentFile->fcb.cr = 0;
-	currentFile->pos = 128;
-    if (cpm_open_file(&currentFile->fcb))
-    {
-        fatal("cannot open source file");
-    }
+    printnl("Parsing...");
+    firstFile = (InputStream*)(ramtop - sizeof(InputStream));
+    currentFile = firstFile + 1;
+    openFile(cpm_cmdline);
     consumeByte();
     consumeToken();
 
     /* Parse file into memory. */
 
-    printnl("Parsing...");
-    lineNumber++;
     parse();
     printi(top - cpm_ram);
     printnl(" bytes memory used");
@@ -1933,8 +1993,8 @@ int main()
     uint8_t i = 0;
     while (placeCode(i))
     {
-		if (badProgram)
-			cpm_warmboot();
+        if (badProgram)
+            cpm_warmboot();
 
         i++;
         cpm_conout('.');
@@ -1958,13 +2018,13 @@ int main()
     flushOutputBuffer();
     cpm_close_file(&destFcb);
 
-	/* Symbol table */
+    /* Symbol table */
 
-	printnl("Writing symbols...");
+    printnl("Writing symbols...");
 
-	destFcb.f[8] = 'S';
-	destFcb.f[9] = 'Y';
-	destFcb.f[10] = 'M';
+    destFcb.f[8] = 'S';
+    destFcb.f[9] = 'Y';
+    destFcb.f[10] = 'M';
     destFcb.ex = 0;
     destFcb.cr = 0;
     cpm_delete_file(&destFcb);
@@ -1976,10 +2036,10 @@ int main()
         fatal("cannot create symbol file");
     }
 
-	outputBufferPos = 0;
-	writeSymbols();
-	flushOutputBuffer();
-	cpm_close_file(&destFcb);
+    outputBufferPos = 0;
+    writeSymbols();
+    flushOutputBuffer();
+    cpm_close_file(&destFcb);
 
     printnl("Done.");
     cpm_warmboot();
