@@ -187,13 +187,7 @@ init:
 
     ; BIOS initialisation
 
-;    jsr initdrivers
-
-    lda #<DRVID_TTY
-    ldx #>DRVID_TTY
-    jsr entry_FINDDRV
-    sta TTY+1
-    stx TTY+2
+    jsr initdrivers
 
     ; Load the BDOS image to mem_base
 
