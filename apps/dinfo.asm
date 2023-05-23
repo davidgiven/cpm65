@@ -8,26 +8,7 @@
 \ C version: 727 bytes
 \ asm version: 512 bytes
 
-.bss pblock, 165
-cpm_fcb = pblock
-
-BDOS = start-3
-
-BDOS_CONOUT            =  2
-BDOS_PRINTSTRING       =  9
-BDOS_SELECT_DRIVE      = 14
-BDOS_GET_CURRENT_DRIVE = 25
-BDOS_GET_ALLOC_VECTOR  = 27
-BDOS_GET_DPB           = 31
-
-DPB_BSH     = 2
-DPB_EXM     = 4
-DPB_DSM     = 5
-DPB_DRM     = 7
-DPB_CKS     = 11
-DPB_OFF     = 13
-
-FCB_DR      = 0
+.include "cpm65.inc"
 
 .zp dpb, 2
 
