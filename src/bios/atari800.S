@@ -510,9 +510,16 @@ zproc tty_conin
     rts
 zendproc
 
+; Return 0 if no key is pending, $ff if there is
+
 zproc tty_const
-    lda #$00
-    clc
+    ldx CH
+    inx
+    zif_eq
+        lda #0
+        rts
+    zendif
+    lda #$ff
     rts
 zendproc
 
