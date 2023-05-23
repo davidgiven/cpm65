@@ -74,17 +74,24 @@ typedef struct
     void (*callback)();
 } SymbolCallbackEntry;
 
+typedef struct
+{
+	uint8_t pos;
+	FCB fcb;
+	uint8_t buffer[128];
+} InputStream;
+
 #define lengthof(a) (sizeof(a) / sizeof(*a))
 
-#define srcFcb cpm_fcb
-#define inputBuffer ((char*)cpm_default_dma)
 static char currentByte;
-static uint8_t inputBufferPos = 128;
 static FCB destFcb;
 static uint8_t outputBuffer[128];
 static uint8_t outputBufferPos = 0;
 static uint8_t* ramtop;
 #define parseBuffer ((char*)outputBuffer)
+
+static InputStream* firstFile;
+static InputStream* currentFile;
 
 static uint16_t lineNumber = 0;
 
@@ -234,16 +241,16 @@ static void __attribute__((noreturn)) fatal(const char* msg)
 
 static void consumeByte()
 {
-    if (inputBufferPos == 128)
+    if (currentFile->pos == 128)
     {
-        cpm_set_dma(inputBuffer);
-        int i = cpm_read_sequential(&srcFcb);
+        cpm_set_dma(currentFile->buffer);
+        int i = cpm_read_sequential(&currentFile->fcb);
         if (i != 0)
             currentByte = 26;
-        inputBufferPos = 0;
+        currentFile->pos = 0;
     }
 
-    currentByte = inputBuffer[inputBufferPos++];
+    currentByte = currentFile->buffer[currentFile->pos++];
 }
 
 static void flushOutputBuffer()
@@ -1897,11 +1904,15 @@ int main()
         fatal("cannot create destination file");
     }
 
-    /* Open input file */
+    /* Open the first input file. */
 
-    srcFcb.ex = 0;
-    srcFcb.cr = 0;
-    if (cpm_open_file(&srcFcb))
+	firstFile = (InputStream*)(ramtop - sizeof(InputStream));
+	currentFile = firstFile;
+	currentFile->fcb = cpm_fcb;
+    currentFile->fcb.ex = 0;
+    currentFile->fcb.cr = 0;
+	currentFile->pos = 128;
+    if (cpm_open_file(&currentFile->fcb))
     {
         fatal("cannot open source file");
     }
