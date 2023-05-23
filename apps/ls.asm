@@ -101,6 +101,9 @@ no_fill_wildcards:
 
 \ collect_files
 
+    lda #'?'
+    sta cpm_fcb+12          \ EX, find all extents, not just the first
+
     ldy #BDOS_FINDFIRST
     lda #<cpm_fcb
     ldx #>cpm_fcb
