@@ -3,15 +3,19 @@
 PTEMP  = $1f    ; P: handler temporary we can use freely, unless we print
 FMSZPG = $43    ; FMS zero page, but we don't use Atari DOS.SYS (7 bytes)
 
-MEMTOP = $02e5
+COLPF2 = $d018
 
 DMACTL = $d400
+DLISTL = $d402
+DLISTH = $d403
 
 CIOV = $e456
 
 SDMCTL = $022f
 SDLSTL = $0230
 SHFLOK = $02be
+CH     = $02fc
+MEMTOP = $02e5
 
 ICHID = $0340
 ICDNO = $0341

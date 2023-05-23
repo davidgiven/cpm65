@@ -301,11 +301,10 @@ atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.sys Makefile \
 	dd if=/dev/zero of=$@ bs=128 count=720
 	mkfs.cpm -f atari90 $@
 	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
-	cpmcp -f atari90 $@ $(OBJDIR)/ccp.sys $(MINIMAL_APPS) $(SCREEN_APPS) 0:
+	cpmcp -f atari90 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(MINIMAL_APPS) $(SCREEN_APPS) 0:
 	cpmcp -f atari90 $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/olivetti.fnt 1:
-	cpmchattr -f atari90 $@ sr 0:ccp.sys
+	cpmchattr -f atari90 $@ sr 0:ccp.sys o:bdos.sys
 	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc
-	dd if=$(OBJDIR)/bdos.sys of=$@ bs=128 seek=10 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
@@ -319,11 +318,10 @@ atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.sys Makefile \
 	dd if=/dev/zero of=$@ bs=128 count=8190
 	mkfs.cpm -f atarihd $@
 	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
-	cpmcp -f atarihd $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmcp -f atarihd $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
 	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/*.fnt 1:
-	cpmchattr -f atarihd $@ sr 0:ccp.sys
+	cpmchattr -f atarihd $@ sr 0:ccp.sys 0:bdos.sys
 	dd if=$(OBJDIR)/atari800hd.exe of=$@ bs=128 conv=notrunc
-	dd if=$(OBJDIR)/bdos.sys of=$@ bs=128 seek=10 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
