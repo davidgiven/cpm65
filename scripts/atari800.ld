@@ -1,6 +1,7 @@
 MEMORY {
     zp : ORIGIN = 0x80, LENGTH = 0x7f
     ram (rw) : ORIGIN = 0x500, LENGTH = 0x800
+    midram(rw) : ORIGIN = 0x3000, LENGTH = 0x800
 }
 
 SECTIONS {
@@ -13,19 +14,30 @@ SECTIONS {
         *(.loaderzp)
 	} >zp
 
+    .loader : {
+        *(loader)
+        *loader.o(.text .text.*)
+    } >midram
+
 	.text : {
+        bios_exec_addr = .;
+        bios_load_addr = LOADADDR(.text);
 		*(.text .text.*)
-	} >ram
-	.data : { *(.data .data.* .rodata .rodata.*) } > ram
+	} >ram AT>midram
+
+	.data : {
+        *(.data .data.* .rodata .rodata.*)
+        bios_end_addr = .;
+    } >ram AT>midram
+
 	.noinit (NOLOAD) : {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		__USERTPA_START__ = .;
-		__USERTPA_END__ = 0xbc00;
 	} >ram
 }
 
 OUTPUT_FORMAT {
-	TRIM(ram)
+	TRIM(midram)
 }
 

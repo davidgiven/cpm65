@@ -43,6 +43,9 @@ cursory = ROWCRS
 ; by the directory buffer/
 
 .global _start
+
+.section loader, "ax"
+
 _start:
 
     ; Boot sector
@@ -53,10 +56,37 @@ _start:
 #else
     .byte 12
 #endif
-    .word $0500
+    .word $3000
     .word init      ; just use init and never return
 
 init:
+
+    ; Copy BIOS to low RAM
+
+    zrepeat
+        load1 = .
+        lda bios_load_addr
+        store1 = .
+        sta bios_exec_addr
+
+        inc load1+1
+        zif_eq
+            inc load1+2
+        zendif
+
+        inc store1+1
+        zif_eq
+            inc store1+2
+            zbreakif_eq
+        zendif
+
+        lda store1+1
+        cmp #<bios_end_addr
+        zcontinueif_ne
+        lda store1+2
+        cmp #>bios_end_addr
+    zuntil_eq
+
     ldx MEMTOP+1
     stx mem_end
     stx ptr+1
@@ -157,7 +187,13 @@ init:
 
     ; BIOS initialisation
 
-    jsr initdrivers
+;    jsr initdrivers
+
+    lda #<DRVID_TTY
+    ldx #>DRVID_TTY
+    jsr entry_FINDDRV
+    sta TTY+1
+    stx TTY+2
 
     ; Load the BDOS image to mem_base
 
@@ -182,43 +218,20 @@ init:
     lda #<biosentry
     ldx #>biosentry
     rts                 ; indirect jump to BDOS
-zendproc
-
-; Everything above here is overwritten by the directory buffer, so make sure
-; it's bigger than 0x80 bytes (currently: 0xa3).
-
-.global directory_buffer
-directory_buffer = _start
-
-; Below are 34 bytes that become available for overwrite during init. We use
-; them for variables afterwards.
-
-overwrite_after_display_stretch:        ; 5 bytes
 
 dl_prologue:
     .byte $70, $30, $42, 0, 0
-
-overwrite_after_banner:                 ; 27 bytes
 
 banner: ; reversed!
     .byte 10,13
     .ascii "008 iratA eht rof 56-M/PC"
 banner_end:
 
-overwrite_after_keyboard_init:          ; 2 bytes
-
 kdevice: .ascii "K"
          .byte 155
 
 bdos_filename:
     .ascii "BDOS    SYS"
-
-charin       = overwrite_after_display_stretch
-charout      = overwrite_after_display_stretch
-drive_number = overwrite_after_display_stretch + 1
-sector_num   = overwrite_after_display_stretch + 2 ; (and +3, and +4, full)
-
-dma          = overwrite_after_banner   ; (and +1
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -771,11 +784,12 @@ zendproc
 ; ---------------------------------------------------------------------------
 
     .data
+
 zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
 
 mem_base: .byte __USERTPA_START__@mos16hi
-mem_end:  .byte __USERTPA_END__@mos16hi
+mem_end:  .byte 0
 
 ; DPH for drive 0 (our only drive)
 
@@ -791,7 +805,12 @@ define_drive dph, 720, 1024, 64, 18
 
 NOINIT
 
-; Nothing left for .bss
+.global directory_buffer
+directory_buffer:   .fill 128
+charin:
+charout:            .fill 1
+drive_number:       .fill 1
+sector_num:         .fill 3
+dma:                .fill 2
 
 ; vim: filetype=asm sw=4 ts=4 et
-
