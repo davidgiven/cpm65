@@ -1,7 +1,7 @@
 CP/M-65 Assembler
 =================
 
-An assembler comes with CP/M-65. It's very stupid but it does work. It's an
+An assembler comes with CP/M-65. It's pretty stupid but it does work. It's an
 in-memory assembler, so you need enough spare RAM to hold the program you're
 currently assembling --- you need 1/2 to 1/3 the amount of RAM as the source
 file is big. This makes it unsuitable for large programs, but does make it
@@ -13,15 +13,15 @@ Syntax
 
 It supports the normal 6502 opcodes (currently, no 65c02 opcodes) and the usual
 addressing modes. Labels are defined with `label:`. Equates can be made with
-`VALUE = label + 1`. Label forward references are supported; equate forward
+`VALUE = expression`. Label forward references are supported; equate forward
 references are not.
 
 Branch instructions will be automatically expanded to 5-byte long branches if
 out of range (see `.expand` below).
 
-Expressions are currently very limited. You can do `label +/- constant` or
-`constant` (or `constant +/- constant` in equates). This will be fixed
-eventually.
+Expression parsing works now, mostly. Operator precedence is undefined, so use
+parentheses. You can use these operators: `+` `-` `*` `/` `%` `&` `|` `^` `~`
+`<` `>`.
 
 The following pseudoops are available:
 
@@ -41,6 +41,9 @@ The following pseudoops are available:
 .bss symbol, number
     Defines an area of bss of length `number`, defining `symbol` to point to
     it. This must be done before use.
+
+.include "string"
+    Includes a file.
 
 .expand 0/1
     Turns off/on branch expansion.
