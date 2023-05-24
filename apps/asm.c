@@ -109,17 +109,21 @@ static uint8_t zpUsage = 0;
 static uint16_t bssUsage = 0;
 static uint16_t textUsage = 0;
 
-#define STACK_SIZE 8
+#define ZMACRO_STACK_SIZE 8
 static uint8_t scopePointer = 0;
-static SymbolRecord* scopePointers[STACK_SIZE];
-static SymbolRecord* startLabels[STACK_SIZE];
-static SymbolRecord* endLabels[STACK_SIZE];
+static SymbolRecord* scopePointers[ZMACRO_STACK_SIZE];
+static SymbolRecord* startLabels[ZMACRO_STACK_SIZE];
+static SymbolRecord* endLabels[ZMACRO_STACK_SIZE];
 
 static uint8_t breakPointer = 0xff;
-static SymbolRecord* breakLabels[STACK_SIZE];
+static SymbolRecord* breakLabels[ZMACRO_STACK_SIZE];
 
 static uint8_t continuePointer = 0xff;
-static SymbolRecord* continueLabels[STACK_SIZE];
+static SymbolRecord* continueLabels[ZMACRO_STACK_SIZE];
+
+#define EXPR_STACK_SIZE 8
+static uint16_t exprValue[EXPR_STACK_SIZE];
+static SymbolRecord* exprVariable[EXPR_STACK_SIZE];
 
 #define START_ADDRESS 7
 
@@ -203,6 +207,7 @@ enum
 #define ILLEGAL 0xff
 
 static void createLabelDefinition(SymbolRecord* r);
+static void consumeExpressionNode(uint8_t sp);
 static void consumeExpression();
 static void printSymbol(SymbolRecord* r);
 
@@ -243,8 +248,8 @@ static void printFcb(FCB* fcb)
 {
     if (fcb->dr)
     {
-		cpm_conout('@' + fcb->dr);
-		cpm_conout(':');
+        cpm_conout('@' + fcb->dr);
+        cpm_conout(':');
     }
 
     const uint8_t* inp = &fcb->f[0];
@@ -252,7 +257,7 @@ static void printFcb(FCB* fcb)
     {
         uint8_t c;
         if (inp == &fcb->f[8])
-			cpm_conout('.');
+            cpm_conout('.');
         c = *inp++;
         if (c != ' ')
             cpm_conout(c);
@@ -261,8 +266,8 @@ static void printFcb(FCB* fcb)
 
 static void indent()
 {
-	for (uint8_t i=0; i<includes; i++)
-		cpm_printstring("  ");
+    for (uint8_t i = 0; i < includes; i++)
+        cpm_printstring("  ");
 }
 
 static void openFile(const char* filename)
@@ -270,17 +275,17 @@ static void openFile(const char* filename)
     currentFile--;
     currentFile->pos = 128;
     currentFile->lineNumber = 1;
-	currentFile->fcb.cr = 0;
+    currentFile->fcb.cr = 0;
 
     cpm_set_dma(&currentFile->fcb);
     if (!cpm_parse_filename(filename))
         fatal("invalid filename");
 
-	indent();
-	cpm_printstring("> ");
-	printFcb(&currentFile->fcb);
-	cr();
-	includes++;
+    indent();
+    cpm_printstring("> ");
+    printFcb(&currentFile->fcb);
+    cr();
+    includes++;
 
     if (cpm_open_file(&currentFile->fcb))
         fatal("cannot open source file");
@@ -288,28 +293,28 @@ static void openFile(const char* filename)
 
 static void consumeByte()
 {
-	if (currentFile->pos == 128)
-	{
-		cpm_set_dma(currentFile->buffer);
-		int i = cpm_read_sequential(&currentFile->fcb);
-		if (i != 0)
-			currentByte = 26;
-		currentFile->pos = 0;
-	}
+    if (currentFile->pos == 128)
+    {
+        cpm_set_dma(currentFile->buffer);
+        int i = cpm_read_sequential(&currentFile->fcb);
+        if (i != 0)
+            currentByte = 26;
+        currentFile->pos = 0;
+    }
 
-	currentByte = currentFile->buffer[currentFile->pos++];
-	if (currentByte == 0)
-		currentByte = 26;
+    currentByte = currentFile->buffer[currentFile->pos++];
+    if (currentByte == 0)
+        currentByte = 26;
 
-	if ((currentByte == 26) && (currentFile != firstFile))
-	{
-		includes--;
-		indent();
-		cpm_printstring("<\r\n");
+    if ((currentByte == 26) && (currentFile != firstFile))
+    {
+        includes--;
+        indent();
+        cpm_printstring("<\r\n");
 
-		currentFile++;
-		currentByte = '\n';
-	}
+        currentFile++;
+        currentByte = '\n';
+    }
 }
 
 static void flushOutputBuffer()
@@ -377,20 +382,24 @@ static char consumeToken()
     switch (currentByte)
     {
         case 26:
+		case '&':
+		case '^':
+		case '|':
+		case '~':
         case '#':
-        case ':':
-        case ';':
-        case ',':
-        case '+':
-        case '-':
-        case '*':
-        case '/':
         case '(':
         case ')':
-        case '<':
-        case '>':
+        case '*':
+        case '+':
+        case ',':
+        case '-':
         case '.':
+        case '/':
+        case ':':
+        case ';':
+        case '<':
         case '=':
+        case '>':
         {
             token = currentByte;
             consumeByte();
@@ -870,7 +879,7 @@ static void syntaxError()
 
 static void pushScope()
 {
-    if (scopePointer == (STACK_SIZE - 1))
+    if (scopePointer == (ZMACRO_STACK_SIZE - 1))
         fatal("too many nested scopes");
 
     scopePointers[scopePointer] = lastSymbol;
@@ -928,48 +937,71 @@ static uint16_t postProcess(uint16_t value)
     return value;
 }
 
-static void postProcessConstant()
+static void checkNodeConstant(uint8_t sp)
 {
-    if (tokenVariable)
-        return;
-
-    tokenValue = postProcess(tokenValue);
+    if (exprVariable[sp])
+        fatal("operation requires non-constant value");
 }
 
-/* Returns the current value, that is, the LHS */
-static uint16_t consumeRhs()
+static void consumeTokenThenConstant(uint8_t sp)
 {
-    if (tokenVariable)
-        fatal("bad operator");
-    uint16_t lhs = tokenValue;
     consumeToken();
-    consumeExpression();
-    if (tokenVariable)
-        fatal("bad operator");
-    return lhs;
+    consumeExpressionNode(sp + 1);
+    checkNodeConstant(sp + 1);
 }
 
-static void consumeExpression()
+static void checkConstantThenConsumeTokenThenConstant(uint8_t sp)
 {
-    tokenVariable = NULL;
-    tokenPostProcessing = PP_NONE;
+    checkNodeConstant(sp);
+    consumeTokenThenConstant(sp);
+}
 
-    if (token == '<')
-    {
-        consumeToken();
-        tokenPostProcessing = PP_LSB;
-    }
-    else if (token == '>')
-    {
-        consumeToken();
-        tokenPostProcessing = PP_MSB;
-    }
+static void checkDivisionByZero(uint8_t sp)
+{
+    if (!exprValue[sp])
+        fatal("division by zero");
+}
+
+static void consumeExpressionNode(uint8_t sp)
+{
+    if (sp == EXPR_STACK_SIZE)
+        fatal("expression too complex");
+
+    exprVariable[sp] = NULL;
+
+    /* Prefix operators. */
 
     switch (token)
     {
+        case '<':
+            consumeTokenThenConstant(sp);
+            exprValue[sp] = exprValue[sp + 1] & 0xff;
+            break;
+
+        case '>':
+            consumeTokenThenConstant(sp);
+            exprValue[sp] = exprValue[sp + 1] >> 8;
+            break;
+
+        case '-':
+            consumeTokenThenConstant(sp);
+            exprValue[sp] *= -1;
+            break;
+
+        case '~':
+            consumeTokenThenConstant(sp);
+            exprValue[sp] ^= 0xff;
+            break;
+
+        case '(':
+            consumeToken();
+            consumeExpressionNode(sp);
+            expect(')');
+            break;
+
         case TOKEN_NUMBER:
             consumeToken();
-            postProcessConstant();
+            exprValue[sp] = tokenValue;
             break;
 
         case '*':
@@ -988,33 +1020,18 @@ static void consumeExpression()
                     r->type = SYMBOL_REFERENCE;
             }
 
-            uint16_t offset;
             if (r->type == SYMBOL_COMPUTED)
             {
-                tokenVariable = r->variable;
-                offset = r->offset;
-
-                if (!tokenVariable)
-                    offset = postProcess(offset);
+                exprVariable[sp] = r->variable;
+                exprValue[sp] = r->offset;
             }
             else
             {
-                tokenVariable = r;
-                offset = 0;
+                exprVariable[sp] = r;
+                exprValue[sp] = 0;
             }
 
-            char c = consumeToken();
-            if ((c == '+') || (c == '-'))
-            {
-                consumeToken();
-                expect(TOKEN_NUMBER);
-                if (c == '+')
-                    offset += tokenValue;
-                else
-                    offset -= tokenValue;
-                consumeToken();
-            }
-            tokenValue = offset;
+			consumeToken();
             break;
         }
 
@@ -1022,29 +1039,89 @@ static void consumeExpression()
             syntaxError();
     }
 
+    /* Infix operators, if any. */
+
     switch (token)
     {
-        case '/':
-        {
-            uint16_t lhs = consumeRhs();
-            tokenValue = lhs / tokenValue;
-            break;
-        }
+        case ')':
+        case ';':
+        case ',':
+            return;
 
         case '+':
-        {
-            uint16_t lhs = consumeRhs();
-            tokenValue = lhs + tokenValue;
+            consumeTokenThenConstant(sp);
+            exprValue[sp] += exprValue[sp + 1];
             break;
-        }
 
         case '-':
-        {
-            uint16_t lhs = consumeRhs();
-            tokenValue = lhs - tokenValue;
+            consumeTokenThenConstant(sp);
+            exprValue[sp] -= exprValue[sp + 1];
             break;
-        }
+
+        case '*':
+            checkConstantThenConsumeTokenThenConstant(sp);
+            exprValue[sp] *= exprValue[sp + 1];
+            break;
+
+        case '|':
+            checkConstantThenConsumeTokenThenConstant(sp);
+            exprValue[sp] |= exprValue[sp + 1];
+            break;
+
+        case '^':
+            checkConstantThenConsumeTokenThenConstant(sp);
+            exprValue[sp] ^= exprValue[sp + 1];
+            break;
+
+        case '&':
+            checkConstantThenConsumeTokenThenConstant(sp);
+            exprValue[sp] &= exprValue[sp + 1];
+            break;
+
+        case '/':
+            checkConstantThenConsumeTokenThenConstant(sp);
+            checkDivisionByZero(sp + 1);
+            exprValue[sp] /= exprValue[sp + 1];
+            break;
+
+        case '%':
+            checkConstantThenConsumeTokenThenConstant(sp);
+            checkDivisionByZero(sp + 1);
+            exprValue[sp] %= exprValue[sp + 1];
+            break;
+
+        default:
+            syntaxError();
     }
+}
+
+static void consumeExpression()
+{
+    tokenPostProcessing = PP_NONE;
+
+    if (token == '<')
+    {
+        consumeToken();
+        tokenPostProcessing = PP_LSB;
+    }
+    else if (token == '>')
+    {
+        consumeToken();
+        tokenPostProcessing = PP_MSB;
+    }
+
+    consumeExpressionNode(0);
+    tokenVariable = exprVariable[0];
+    tokenValue = exprValue[0];
+
+	if (!tokenVariable)
+	{
+		if (tokenPostProcessing == PP_LSB)
+			tokenValue &= 0xff;
+		else if (tokenPostProcessing == PP_MSB)
+			tokenValue >>= 8;
+		tokenPostProcessing = PP_NONE;
+	}
 }
 
 static void consumeConstExpression()

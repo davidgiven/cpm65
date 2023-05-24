@@ -2,7 +2,7 @@ CXX = g++
 CC = gcc
 
 CFLAGS = -Os -g -I.
-CFLAGS65 = -Os -g -fnonreentrant -I. \
+CFLAGS65 = -Os -g -I. \
 	-Wno-main-return-type \
 	-Wno-incompatible-library-redeclaration
 
