@@ -278,8 +278,8 @@ jumptable_lo:
     jmptablo entry_GETBIOS ; get_bios = 38
     jmptablo unimplemented ; 39
     jmptablo entry_WRITERANDOMFILLED ; write_random_filled = 40
-    jmptablo bios_GETTPA ; get_tpa = 41
-    jmptablo bios_GETZP ; get_zp = 42
+    jmptablo bios_GETZP ; get_zp = 41
+    jmptablo bios_GETTPA ; get_tpa = 42
     jmptablo entry_PARSEFCB ; 43
 jumptable_hi:
     jmptabhi entry_EXIT ;exit_program = 0
@@ -323,8 +323,8 @@ jumptable_hi:
     jmptabhi entry_GETBIOS ; 38
     jmptabhi unimplemented ; 39
     jmptabhi entry_WRITERANDOMFILLED ; write_random_filled = 40
-    jmptabhi bios_GETTPA ; get_tpa = 41
-    jmptabhi bios_GETZP ; get_zp = 42
+    jmptabhi bios_GETZP ; get_zp = 41
+    jmptabhi bios_GETTPA ; get_tpa = 42
     jmptabhi entry_PARSEFCB ; 43
 zendproc
 

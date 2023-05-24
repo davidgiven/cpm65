@@ -1,9 +1,9 @@
-; CP/M-65 Copyright © 2022 David Given
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
 #include "cpm65.inc"
 #include "zif.inc"
+#include "jumptables.inc"
 
 ZEROPAGE
 
@@ -35,9 +35,19 @@ MAINLOOP:
 
         lda #$ff
         jsr bdos_GETSETUSER
-        cmp #0
+        tax
         zif_ne
-            jsr print_dec_number
+            cmp #10
+            zif_cs
+                pha
+                jsr printi
+                .byte '1'|0x80
+                pla
+                ; carry left clear by printi
+                adc #(-10) & 0xff
+            zendif
+
+            jsr print_hex4_number
         zendif
 
         lda drive
@@ -112,21 +122,21 @@ execute_command:
 zendproc
 
 commands_lo:
-    .byte (entry_DIR - 1)@mos16lo
-    .byte (entry_ERA - 1)@mos16lo
-    .byte (entry_TYPE - 1)@mos16lo
-    .byte (entry_FREE - 1)@mos16lo
-    .byte (entry_REN - 1)@mos16lo
-    .byte (entry_USER - 1)@mos16lo
-    .byte (entry_TRANSIENT - 1)@mos16lo
+    jmptablo entry_DIR
+    jmptablo entry_ERA
+    jmptablo entry_TYPE
+    jmptablo entry_FREE
+    jmptablo entry_REN
+    jmptablo entry_USER
+    jmptablo entry_TRANSIENT
 commands_hi:
-    .byte (entry_DIR - 1)@mos16hi
-    .byte (entry_ERA - 1)@mos16hi
-    .byte (entry_TYPE - 1)@mos16hi
-    .byte (entry_FREE - 1)@mos16hi
-    .byte (entry_REN - 1)@mos16hi
-    .byte (entry_USER - 1)@mos16hi
-    .byte (entry_TRANSIENT - 1)@mos16hi
+    jmptabhi entry_DIR
+    jmptabhi entry_ERA
+    jmptabhi entry_TYPE
+    jmptabhi entry_FREE
+    jmptabhi entry_REN
+    jmptabhi entry_USER
+    jmptabhi entry_TRANSIENT
 
 zproc read_command_from_keyboard
     ; Read from keyboard.
@@ -221,41 +231,36 @@ zproc parse_valid_userfcb2
 zendproc
 
 zproc invalid_filename
-    lda #<1f
-    ldx #>1f
-    jmp error
-1:
-    .asciz "Invalid filename"
+    jsr printi
+    .ascii "Invalid filenam"
+    .byte 'e'|0x80
+    bcc error           ; always taken
 zendproc
 
 zproc cannot_open
-    lda #<1f
-    ldx #>1f
-    jmp error
-1:
-    .asciz "Cannot open file"
+    jsr printi
+    .ascii "Cannot open fil"
+    .byte 'e'|0x80
+    bcc error           ; always taken
 zendproc
 
 zproc bad_command
-    lda #<1f
-    ldx #>1f
-    jmp error
-1:
-    .asciz "Bad command"
+    jsr printi
+    .ascii "Bad comman"
+    .byte 'd'|0x80
+    bcc error           ; always taken
 zendproc
 
 zproc no_room
-    lda #<1f
-    ldx #>1f
-    jmp error
-1:
-    .asciz "No room"
+    jsr printi
+    .ascii "No roo"
+    .byte 'm'|0x80
+    bcc error           ; always taken
 zendproc
 
 ; Prints the message in XA and returns to the main loop.
 
 zproc error
-    jsr bdos_WRITESTRING
     jsr newline
     ldx stackptr
     txs
@@ -447,78 +452,79 @@ type_exit:
 zendproc
 
 zproc entry_FREE
-    lda #<msg_zp
-    ldx #>msg_zp
-    jsr bdos_WRITESTRING
+    jsr printi
+    .ascii "MAIN: \xa0"
+
+    lda #BANK_MAIN
+    jsr bios_SETBANK
+
+    jsr printsizes
+
+    jsr printi
+    .ascii "EXTRA:\xa0"
+
+    lda #BANK_EXTRA
+    jsr bios_SETBANK
+
+    jsr printsizes
+
+    jsr printi
+    .ascii "BIOS\xa0"
+
+    lda BIOS+1
+    ldx BIOS+2
+    jsr print_hex16_number
+
+    jsr printi
+    .ascii ", BDOS\xa0"
+
+    lda BDOS+1
+    ldx BDOS+2
+    jsr print_hex16_number
+
+    jsr printi
+    .ascii ", CCP\xa0"
+
+    lda #<main
+    ldx #>main
+    jsr print_hex16_number
+    
+    jsr printi
+    .ascii ".\r\x8a"
+    rts
+
+printsizes:
+    jsr printi
+    .ascii "ZP\xa0"
 
     jsr bios_GETZP
-    sta temp+0
-    stx temp+1
-    jsr print_hex_number
-    jsr print_to
-    lda temp+1
-    jsr print_hex_number
-    jsr print_free
-    lda temp+1
-    sec
-    sbc temp+0
-    jsr print_hex_number
-    jsr newline
+    jsr print_range
 
-    lda #<msg_tpa
-    ldx #>msg_tpa
-    jsr bdos_WRITESTRING
+    jsr printi
+    .ascii ". TPA\xa0"
 
     jsr bios_GETTPA
-    sta temp+0
-    stx temp+1
-    jsr print_hex_number
-    jsr print_zero
-    jsr print_to
-    lda temp+1
-    jsr print_hex_number
-    jsr print_zero
-    jsr print_free
+    jsr print_range
+
+    jsr printi
+    .ascii ". Free:\xa0"
+
     lda temp+1
     sec
     sbc temp+0
     jsr print_hex_number
-    jsr print_zero
-    jsr newline
-
-    lda #<msg_ccp
-    ldx #>msg_ccp
-    jsr bdos_WRITESTRING
-
-    lda #>BDOS
-    jsr print_hex_number
-    jsr print_zero
     jmp newline
 
-print_zero:
-    lda #0
+print_range:
+    sta temp+0
+    stx temp+1
+    jsr print_hex_number
+
+    jsr printi
+    .byte '-'|0x80
+
+    lda temp+1
     jmp print_hex_number
-
-print_free:
-    lda #<msg_free
-    ldx #>msg_free
-    jmp bdos_WRITESTRING
-
-print_to:
-    lda #<msg_to
-    ldx #>msg_to
-    jmp bdos_WRITESTRING
-
-msg_zp:
-    .asciz "ZP: "
-msg_tpa:
-    .asciz "TPA: "
-msg_to:
-    .asciz " to "
-msg_free:
-    .asciz ". Free: "
-msg_ccp:
-    .asciz "CCP at: "
 zendproc
 
 zproc entry_REN
@@ -537,12 +543,10 @@ zproc entry_REN
         zendif
     zendif
 
-    lda #<1f
-    ldx #>1f
-    jmp bdos_WRITESTRING
-1:
+    jsr printi
     .ascii "Bad filename"
-    .byte 13, 10, 0
+    .byte 13, 10|0x80
+    rts
 zendproc
 
 zproc entry_USER
@@ -554,12 +558,10 @@ zproc entry_USER
         zendif
     zendif
 
-    lda #<1f
-    ldx #>1f
-    jmp bdos_WRITESTRING
-1:
+    jsr printi
     .ascii "Bad number"
-    .byte 13, 10, 0
+    .byte 13, 10|0x80
+    rts
 zendproc
 
 zproc entry_TRANSIENT
@@ -778,7 +780,6 @@ read_command_sector:
 
 com:
     .ascii "COM"
-
 zendproc
 
 ; Decodes the cmdfcb, checking for one of the intrinsic commands.
@@ -932,42 +933,13 @@ zproc skip_whitespace
     rts
 zendproc
 
-; Prints an 8-bit decimal number in A.
-zproc print_dec_number
-    ldy #0
-    sty zflag
-    ldx #$ff
-    sec
-    zrepeat
-        inx
-        sbc #100
-    zuntil_cc
-    adc #100
-    jsr digit
-
-    ldx #$ff
-    sec
-    zrepeat
-        inx
-        sbc #10
-    zuntil_cc
-    adc #10
-    jsr digit
-    
-    tax
-digit:
+; Prints a 16-bit hex number in XA.
+zproc print_hex16_number
     pha
     txa
-    zflag = . + 1
-    ora #0
-    zif_ne
-        txa
-        ora #'0'
-        jsr bdos_CONOUT
-        inc zflag
-    zendif
+    jsr print_hex_number
     pla
-    rts
+    jmp print_hex_number
 zendproc
 
 ; Prints an 8-bit hex number in A.
@@ -977,9 +949,9 @@ zproc print_hex_number
     lsr a
     lsr a
     lsr a
-    jsr h4
+    jsr print_hex4_number
     pla
-h4:
+print_hex4_number:
     and #$0f
     ora #'0'
     cmp #'9'+1
@@ -989,6 +961,37 @@ h4:
     pha
     jsr bdos_CONOUT
     pla
+    rts
+zendproc
+
+; Prints an inline string terminated by a high bit.
+; Leaves C clear (for convenience when doing branches).
+zproc printi
+    pla
+    sta temp2+0
+    pla
+    sta temp2+1
+
+    zrepeat
+        ldy #1
+        lda (temp2), y
+        pha
+        and #0x7f
+        jsr bdos_CONOUT
+
+        inc temp2+0
+        zif_eq
+            inc temp2+1
+        zendif
+
+        pla
+    zuntil_mi
+
+    lda temp2+1
+    pha
+    lda temp2+0
+    pha
+    clc
     rts
 zendproc
 
