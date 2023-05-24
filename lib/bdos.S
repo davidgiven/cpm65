@@ -29,6 +29,7 @@ bdos bdos_GETBIOS,         BDOS_GET_BIOS
 bdos bdos_RENAME,          BDOS_RENAME_FILE
 bdos bdos_READSEQUENTIAL,  BDOS_READ_SEQUENTIAL
 
+bios bios_SETBANK,     BIOS_SETBANK
 bios bios_GETTPA,	   BIOS_GETTPA
 bios bios_GETZP,	   BIOS_GETZP
 bios bios_RELOCATE,    BIOS_RELOCATE

@@ -93,8 +93,8 @@
 
 /* These are custom extensions. */
 
-#define BDOS_GETTPA 41      /* forwards to BIOS */
-#define BDOS_GETZP 42       /* forwards to BIOS */
+#define BDOS_GETZP 41       /* forwards to BIOS */
+#define BDOS_GETTPA 42      /* forwards to BIOS */
 
 /* DMA points at an FCB structure; the filename pointed to by XA is parsed
  * into it. The updated XA pointing to the end of the filename is returned.
