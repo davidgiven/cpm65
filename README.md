@@ -198,9 +198,10 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Supported programs
 
-Commands include `DUMP`, `STAT`, `COPY`, `SUBMIT`, `ASM`, `QE` and `BEDIT`. I'd
-love more --- send me pull requests! The build system supports cc65 assembler
-and llvm-mos C programs.
+Commands include `DUMP`, `STAT`, `COPY`, `SUBMIT`, `ASM`, `QE` and `BEDIT` plus
+some smaller utilities. I'd love more --- send me pull requests! The build
+system supports cc65 assembler and llvm-mos C programs. The native assembler
+can be used (in emulation) to cross compile programs for CP/M-65.
 
 In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
 `SAVE` as on the relocatable CP/M-65 system assembling images in memory is of
