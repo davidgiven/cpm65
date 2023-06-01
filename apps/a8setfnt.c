@@ -1,7 +1,7 @@
 #include "cpm.h"
 #include <stdlib.h>
 
-static uint8_t *MEMTOP = (uint8_t *) 0x02e6;
+static uint8_t *RAMSIZ = (uint8_t *) 0x02e4;
 static uint8_t *CHBAS  = (uint8_t *) 0x02f4;
 
 static uint8_t memtop;
@@ -28,7 +28,7 @@ int main() {
         goto errout;
     }
 
-    memtop = *MEMTOP;
+    memtop = *RAMSIZ;
     tpa = cpm_bios_gettpa();
     mem_end = (tpa >> 8);
 
