@@ -491,6 +491,9 @@ zproc entry_FREE
     
     jsr printi
     .ascii ".\r\x8a"
+
+    lda #BANK_MAIN
+    jsr bios_SETBANK
     rts
 
 printsizes:
