@@ -33,7 +33,8 @@ SECTIONS {
 	.noinit (NOLOAD) : {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
-		__USERTPA_START__ = .;
+		__SCREENDATA_START__ = .;
+		__USERTPA_START__ = .+0x400;
 	} >ram
 }
 

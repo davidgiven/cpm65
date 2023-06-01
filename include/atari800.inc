@@ -15,6 +15,7 @@ SDMCTL = $022f
 SDLSTL = $0230
 SHFLOK = $02be
 CH     = $02fc
+RAMSIZ = $02e4
 MEMTOP = $02e5
 
 ICHID = $0340

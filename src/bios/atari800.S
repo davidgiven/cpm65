@@ -87,9 +87,8 @@ init:
         cmp #>bios_end_addr
     zuntil_eq
 
-    ldx MEMTOP+1
-    stx mem_end
-    stx ptr+1
+    lda RAMSIZ
+    sta mem_end
 
     lda #0
     sta ptr
@@ -116,13 +115,17 @@ init:
     sta DMACTL      ; hardware register
     sta SDLSTL      ; set DL pointer to MEMTOP+1
     sta DLISTL
+    ldx #>__SCREENDATA_START__
     stx SDLSTL+1
     stx DLISTH
+    stx ptr+1
     tay
 
     stx dl_prologue+4
+    stx SAVMSC+1
     lda #$40
     sta dl_prologue+3
+    sta SAVMSC
 
     zrepeat
         lda dl_prologue,y
@@ -148,7 +151,7 @@ init:
     iny
     sta (ptr),y
     iny
-    lda MEMTOP+1
+    lda #>__SCREENDATA_START__
     sta (ptr),y
 
     lda #$22
