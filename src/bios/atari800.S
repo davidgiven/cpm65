@@ -51,7 +51,7 @@ _start:
     ; Boot sector
 
     .byte 0
-    .byte 13
+    .byte 14
     .word $3000
     .word init      ; just use init and never return
 
@@ -930,8 +930,8 @@ clok_done:
 
     lda SDLSTL
     sta DLISTL
-    lda SDLSTH
-    sta DLISH
+    lda SDLSTL+1
+    sta DLISTH
 
     ; keyboard stuff
     lda SKSTAT
