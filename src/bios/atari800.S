@@ -51,11 +51,7 @@ _start:
     ; Boot sector
 
     .byte 0
-#ifdef ATARI_HD
-    .byte 12
-#else
-    .byte 12
-#endif
+    .byte 13
     .word $3000
     .word init      ; just use init and never return
 
@@ -86,6 +82,22 @@ init:
         lda store1+2
         cmp #>bios_end_addr
     zuntil_eq
+
+    ; ATARIXL PORT START
+
+; TEST with normal OS
+    sei
+    lda #<KIR
+    sta $0208
+    lda #>KIR
+    sta $0209
+    lda #<IVNM
+    sta $0222
+    lda #>IVNM
+    sta $0223
+    cli
+
+    ; ATARIXL PORT END
 
     lda RAMSIZ
     sta mem_end
@@ -816,5 +828,152 @@ charout:            .fill 1
 drive_number:       .fill 1
 sector_num:         .fill 3
 dma:                .fill 2
+
+; ---------------------------------------------------------------------------
+
+; Low memory wrappers for the Atari XL port where the original ROM OS
+; is turned off and only turned on for using SIO or PBI devices, and
+; reading the keyboard.
+;
+; We also need a minimal IRQ running while the OS is off so we can buffer
+; a keypress like the original OS and CONST will work correctly.
+; A minimal VBI is needed to copy just the shadow registers we need
+; and handle keyboard debounce.
+
+POKMSK  = $0010
+RTCLOK  = $0012
+SRTIMR  = $022b
+PCOLOR0 = $02c0
+CHBAS   = $02f4
+KRPDEL  = $02d9
+KEYREP  = $02da
+KEYDEL  = $02f1
+CH1     = $02f2
+
+COLPM0  = $d012
+KBCODE  = $d209
+IRQST   = $d20e
+IRQEN   = $d20e
+SKSTAT  = $d20f
+CHBASE  = $d409
+NMIEN   = $d40e
+NMIRES  = $d40f
+NMIST   = $d40f
+
+; During init, set POKMSK to 0b01000000 ($40 = keyboard interrupt)
+
+    .section .text, "ax"
+
+IRQ:                        ; vector $fffe here
+    pha
+
+            ; If we reach this code, it can only be a keyboard interrupt
+
+    lda #$bf                ; acknowledge ~$40
+    sta IRQEN
+    lda POKMSK
+    sta IRQEN
+
+KIR:                        ; vector here for normal OS
+    lda KBCODE
+    cmp CH1
+    bne not_the_same_key
+
+    lda KEYDEL
+    bne bounce
+
+not_the_same_key:
+    lda KBCODE
+    sta CH
+    sta CH1
+
+    lda #3
+    sta KEYDEL
+
+bounce:
+    lda KRPDEL
+    sta SRTIMR
+
+irq_out:
+    pla
+    rti
+
+; We only service VBIs, not DLIs
+
+NMI:                            ; vector $fffa here
+    pha
+    txa
+    pha
+    tya
+    pha
+
+    sta NMIRES
+
+IVNM:                           ; vector VVBLKI here
+    inc RTCLOK+2                ; might come in handy later
+    bne clok_done
+    inc RTCLOK+1
+    bne clok_done
+    inc RTCLOK
+
+clok_done:
+
+    ldx #8
+    zrepeat
+        lda PCOLOR0,x
+        sta COLPM0,x
+        dex
+    zuntil_mi
+
+    lda CHBAS
+    sta CHBASE
+
+    lda SDLSTL
+    sta DLISTL
+    lda SDLSTH
+    sta DLISH
+
+    ; keyboard stuff
+    lda SKSTAT
+    and #$04
+    beq key_down
+
+    ; key up
+    lda KEYDEL
+    beq counted_down
+
+    dec KEYDEL
+
+counted_down:
+key_down:
+    lda SRTIMR
+    beq continue
+
+    lda SKSTAT
+    and #$04
+    bne no_longer_down
+
+    dec SRTIMR
+    bne continue
+
+    lda KEYREP
+    sta SRTIMR
+    lda KBCODE
+    sta CH
+    jmp continue
+
+no_longer_down:
+    lda #0
+    sta SRTIMR
+
+continue:
+
+DVNM:
+    pla
+    tay
+    pla
+    tax
+    pla
+    rti
 
 ; vim: filetype=asm sw=4 ts=4 et
