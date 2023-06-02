@@ -179,8 +179,8 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Atari 800 XL/XE notes
 
-  - Standard 720 sectors single-sided single-density disk. The first three
-    tracks are reserved (54 sectors). The rest contains a standard CP/M 2.2
+  - Standard 720 sectors single-sided single-density disk. The first
+    track is reserved (18 sectors). The rest contains a standard CP/M 2.2
     filesystem. Boot with BASIC disabled.
 
   - Or a 1MB harddisk image for use with drive emulators like SIO2SD,
@@ -188,13 +188,13 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
     partition with an SIDE2/3 cartridge and boot from there. That's almost
     emulation speed on real hardware.
 
-  - Uses the Atari OS boot loader to load both BIOS and BDOS to avoid needing
-    Atari DOS 2.0 DOS.SYS which would consumes precious memory and is useless
-    afterwards. CCP.SYS is loaded from the CP/M filesystem.
+  - Console is standard 40x24. Runs on a 400, 800 or 600XL with 16kB,
+    but more memory makes it more comfortable and allows you to run
+    the assembler.
 
-  - Console is standard 40x24 and it uses the Atari OS routines to read the
-    keyboard and write to the screen. There are 41728 bytes of TPA memory on
-    a 48kB or 64kB machine. Runs on a 400, 800 or 600XL with 16kB, too.
+  - User area 1 contains loadable fonts and a utility to set a new
+    console font (setfnt.com). This consumes 1kB of TPA, but shows
+    proper glyphs like curly braces and tilde.
 
 ### Supported programs
 
