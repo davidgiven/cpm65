@@ -1117,15 +1117,15 @@ SIOV_wrapper:
     ora #1              ; enable ROM
     sta PORTB
 
-    lda DBUFHI
-    cmp #$bf            ; be safe, no 16-bit compare, below ROM
-    bcc load_direct
+    lda DBUFHI          ; we cannot load directly under the ROM if it's on
+    cmp #$bf            ; be safe, no 16-bit compare
+    bcc load_direct     ; definitely directly to RAM
 
-    sta ptr+1
+    sta ptr+1           ; save for later
     lda DBUFLO
     sta ptr
 
-    lda #<sector_buffer
+    lda #<sector_buffer ; temporary buffer
     sta DBUFLO
     lda #>sector_buffer
     sta DBUFHI
@@ -1136,7 +1136,7 @@ SIOV_wrapper:
     and #$fe            ; disable ROM
     sta PORTB
 
-    ldy #0
+    ldy #0              ; copy temporary buffer to destination
     zrepeat
         lda sector_buffer,y
         sta (ptr),y
