@@ -29,7 +29,10 @@ ptr1 = FMSZPG+2
 save_x = FMSZPG+4
 save_y = FMSZPG+5
 
-; 1 byte of FMSZPG left, and PTEMP
+; 1 byte of FMSZPG left
+
+charin = PTEMP      ; temporary on ZP that we don't use
+charout = PTEMP
 
 SCREEN_WIDTH = 40
 SCREEN_HEIGHT = 24
@@ -51,59 +54,126 @@ _start:
     ; Boot sector
 
     .byte 0
-.ifdef ATARI_XL
-    .byte 14
-.else
-    .byte 12
-.endif
+
+#ifdef ATARI_XL
+    .byte 16            ; (filesize(atari800xlhd.exe)+127)/128
+#else
+#   ifdef ATARI_HD
+        .byte 12        ; (filesize(atari800hd.exe)+127)/128
+#   else
+        .byte 12        ; (filesize(atari800.exe)+127)/128
+#   endif
+#endif
+
     .word $3000
     .word init      ; just use init and never return
 
 init:
+#ifdef ATARI_XL
 
-    ; Copy BIOS to low RAM
-
-    zrepeat
-        load1 = .
-        lda bios_load_addr
-        store1 = .
-        sta bios_exec_addr
-
-        inc load1+1
-        zif_eq
-            inc load1+2
-        zendif
-
-        inc store1+1
-        zif_eq
-            inc store1+2
-            zbreakif_eq
-        zendif
-
-        lda store1+1
-        cmp #<bios_end_addr
-        zcontinueif_ne
-        lda store1+2
-        cmp #>bios_end_addr
-    zuntil_eq
-
-    .ifdef ATARI_XL
-
-; TEST with normal OS
     sei
+    lda #0
+    sta NMIEN
+    sta IRQEN
+
     lda #<KIR
-    sta $0208
+    sta VKEYBD
     lda #>KIR
-    sta $0209
+    sta VKEYBD+1
+
     lda #<IVNM
-    sta $0222
+    sta VVBLKI
     lda #>IVNM
-    sta $0223
+    sta VVBLKI+1
+
+    lda #$fe        ; BASIC OFF, OS ROM OFF
+    sta PORTB
+
+    lda #<IRQ
+    sta $fffe
+    lda #>IRQ
+    sta $ffff
+
+    lda #<NMI
+    sta $fffa
+    lda #>NMI
+    sta $fffb
+
+#endif
+
+    ; Copy BIOS to bios RAM
+
+    jsr memcpy          ; default values copy BIOS, XL port reuses memcpy
+
+#ifdef ATARI_XL
+    ; Copy ROM font to temporary RAM
+
+    lda #$ff
+    sta PORTB
+
+    lda #<FONT
+    sta memload
+    lda #>FONT
+    sta memload+1
+    lda #<TMPFONT
+    sta memstore
+    lda #>TMPFONT
+    sta memstore+1
+    lda #<TMPFONTEND
+    sta memcmplsb
+    lda #>TMPFONTEND
+    sta memcmpmsb
+    jsr memcpy
+
+    ; and back "under" the ROM
+
+    lda #$fe
+    sta PORTB
+
+    lda #<TMPFONT
+    sta memload
+    lda #>TMPFONT
+    sta memload+1
+    lda #<FONT
+    sta memstore
+    lda #>FONT
+    sta memstore+1
+    lda #<FONTEND
+    sta memcmplsb
+    lda #>FONTEND
+    sta memcmpmsb
+    jsr memcpy
+
+    ; Copy wrappers and handlers to low RAM
+
+    lda #<wrappers_load_addr
+    sta memload
+    lda #>wrappers_load_addr
+    sta memload+1
+    lda #<wrappers_exec_addr
+    sta memstore
+    lda #>wrappers_exec_addr
+    sta memstore+1
+    lda #<wrappers_end_addr
+    sta memcmplsb
+    lda #>wrappers_end_addr
+    sta memcmpmsb
+    jsr memcpy
+
+    lda #$40
+    sta POKMSK      ; Keyboard only
+    sta IRQEN
+
+;    lda #$40
+    sta NMIEN       ; VBI only
     cli
+#endif
 
-    .endif
-
+#ifdef ATARI_XL
+    lda #$d0
+#else
     lda RAMSIZ
+#endif
     sta mem_end
 
     lda #0
@@ -114,7 +184,6 @@ init:
     sta SHFLOK      ; start lower case
     sta COLOR2      ; background (black)
     sta COLPF2      ; hardware register, too, VBI might not occur during SIO
-;    stx COLOR1      ; foreground a tad brighter (luma only)
 
     ; IOCB0 E: is already open
 
@@ -129,10 +198,11 @@ init:
 
     sta SDMCTL      ; turn off screen gracefully while we adjust the DL
     sta DMACTL      ; hardware register
-    sta SDLSTL      ; set DL pointer to MEMTOP+1
+    sta SDLSTL      ; set DL pointer LSB
     sta DLISTL
+
     ldx #>__SCREENDATA_START__
-    stx SDLSTL+1
+    stx SDLSTH
     stx DLISTH
     stx ptr+1
     tay
@@ -199,7 +269,11 @@ init:
     lda #>kdevice
     sta ICBAH,x
 
+#ifdef ATARI_XL
+    jsr CIOV_wrapper
+#else
     jsr CIOV
+#endif
 
     ; Figure out the start and end of the TPA.
     ; mem_base, mem_end are already set correctly for where BDOS loads
@@ -208,22 +282,36 @@ init:
 
     jsr initdrivers
 
-    ; Load the BDOS image to mem_base
+    ; Load the BDOS image
 
+#ifdef ATARI_XL
+    lda #1
+    sta mem_bank
+    ldy mem_base+1
+#else
+    ldy #>__USERTPA_START__
+#endif
     lda #<bdos_filename
     ldx #>bdos_filename
-    ldy #>__USERTPA_START__
     jsr loadfile
 
     ; Relocate it.
 
+#ifdef ATARI_XL
+    lda mem_base+1
+#else
     lda #>__USERTPA_START__
+#endif
     ldx #__USERZEROPAGE_START__
     jsr entry_RELOCATE
 
     ; Compute the entry address and jump.
 
+#ifdef ATARI_XL
+    lda mem_base+1
+#else
     lda mem_base
+#endif
     pha
     lda #COMHDR_ENTRY-1 ; rts addresses are one before the target
     pha
@@ -232,11 +320,42 @@ init:
     ldx #>biosentry
     rts                 ; indirect jump to BDOS
 
+memcpy:
+    zrepeat
+        memload = .+1
+        lda bios_load_addr
+        memstore = .+1
+        sta bios_exec_addr
+
+        inc memload
+        zif_eq
+            inc memload+1
+        zendif
+
+        inc memstore
+        zif_eq
+            inc memstore+1
+            zbreakif_eq
+        zendif
+
+        lda memstore
+        memcmplsb = .+1
+        cmp #<bios_end_addr
+        zcontinueif_ne
+        lda memstore+1
+        memcmpmsb = .+1
+        cmp #>bios_end_addr
+    zuntil_eq
+    rts
+
 dl_prologue:
     .byte $70, $30, $42, 0, 0
 
 banner: ; reversed!
     .byte 10,13
+#ifdef ATARI_XL
+    .ascii "LX"
+#endif
     .ascii "008 iratA eht rof 56-M/PC"
 banner_end:
 
@@ -504,7 +623,11 @@ zproc tty_conin
     lda #>charin
     sta ICBAH,x
 
+#ifdef ATARI_XL
+    jsr CIOV_wrapper
+#else
     jsr CIOV
+#endif
 
     lda charin
 
@@ -767,21 +890,37 @@ do_SIO:
     adc #0
     sta DAUX2
 
+#ifdef ATARI_XL
+    jsr SIOV_wrapper
+#else
     jsr SIOV
+#endif
 
     lda #0
     rts
 zendproc
 
 zproc entry_GETTPA
+#ifdef ATARI_XL
+    ldy mem_bank
+    lda mem_base,y
+    ldx mem_end,y
+#else
     lda mem_base
     ldx mem_end
+#endif
     rts
 zendproc
 
 zproc entry_SETTPA
+#ifdef ATARI_XL
+    ldy mem_bank
+    sta mem_base,y
+    stx mem_end,y
+#else
     sta mem_base
     stx mem_end
+#endif
     rts
 zendproc
 
@@ -798,6 +937,9 @@ zproc entry_SETZP
 zendproc
 
 zproc entry_SETBANK
+#ifdef ATARI_XL
+    sta mem_bank
+#endif
     rts
 zendproc
 
@@ -808,8 +950,14 @@ zendproc
 zp_base: .byte __USERZEROPAGE_START__
 zp_end:  .byte __USERZEROPAGE_END__
 
+#ifdef ATARI_XL
+mem_bank: .byte 0
+mem_base: .byte __USERTPA_START__@mos16hi, $e4
+mem_end:  .byte 0, $ff
+#else
 mem_base: .byte __USERTPA_START__@mos16hi
 mem_end:  .byte 0
+#endif
 
 ; DPH for drive 0 (our only drive)
 
@@ -823,19 +971,17 @@ define_drive dph, 8190, 2048, 128, 18
 define_drive dph, 720, 1024, 64, 18
 #endif
 
-NOINIT
+    .section .noinit, "ax", @nobits
 
-.global directory_buffer
-directory_buffer:   .fill 128
-charin:
-charout:            .fill 1
+    .global directory_buffer
+directory_buffer:   .fill 128           ; can be under RAM
 drive_number:       .fill 1
 sector_num:         .fill 3
 dma:                .fill 2
 
 ; ---------------------------------------------------------------------------
 
-.ifdef ATARI_XL
+#ifdef ATARI_XL
 
 ; Low memory wrappers for the Atari XL port where the original ROM OS
 ; is turned off and only turned on for using SIO or PBI devices, and
@@ -848,12 +994,14 @@ dma:                .fill 2
 
 ; During init, set POKMSK to 0b01000000 ($40 = keyboard interrupt only)
 
-    .section .text, "ax"
+    .section wrappers, "ax"
 
-IRQ:                        ; vector $fffe here
+IRQ:                        ; hardware vector here
     pha
 
-            ; If we reach this code, it can only be a keyboard interrupt
+    lda IRQST
+    and #$40
+    bne irq_out
 
     lda #$bf                ; acknowledge ~$40
     sta IRQEN
@@ -886,7 +1034,7 @@ irq_out:
 
 ; We only service VBIs, not DLIs
 
-NMI:                            ; vector $fffa here
+NMI:                            ; hardware vector here
     pha
     txa
     pha
@@ -962,6 +1110,66 @@ DVNM:
     pla
     rti
 
-.endif
+; Leave banking bits alone on a 130XE
+
+SIOV_wrapper:
+    lda PORTB
+    ora #1              ; enable ROM
+    sta PORTB
+
+    lda DBUFHI
+    cmp #$bf            ; be safe, no 16-bit compare, below ROM
+    bcc load_direct
+
+    sta ptr+1
+    lda DBUFLO
+    sta ptr
+
+    lda #<sector_buffer
+    sta DBUFLO
+    lda #>sector_buffer
+    sta DBUFHI
+
+    jsr SIOV
+
+    lda PORTB
+    and #$fe            ; disable ROM
+    sta PORTB
+
+    ldy #0
+    zrepeat
+        lda sector_buffer,y
+        sta (ptr),y
+        iny
+    zuntil_mi
+
+    rts
+
+load_direct:
+    jsr SIOV
+
+    lda PORTB
+    and #$fe            ; disable ROM
+    sta PORTB
+
+    rts
+
+CIOV_wrapper:
+    lda PORTB
+    ora #1              ; enable ROM
+    sta PORTB
+
+    jsr CIOV
+
+    lda PORTB
+    and #$fe            ; disable ROM
+    sta PORTB
+    rts
+
+    .section wrappersnoinit, "ax", @nobits
+
+sector_buffer: .ds 128
+
+#endif
 
 ; vim: filetype=asm sw=4 ts=4 et

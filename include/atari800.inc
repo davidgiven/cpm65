@@ -6,12 +6,18 @@ FMSZPG = $43    ; FMS zero page, but we don't use Atari DOS.SYS (7 bytes)
 POKMSK  = $10
 RTCLOK  = $12
 
+FONT    = $e000
+FONTEND = $e400
+TMPFONT = $8000             ; somewhere non-intruding
+TMPFONTEND = $8400
+
 COLPF2  = $d018
 COLPM0  = $d012
 KBCODE  = $d209
 IRQST   = $d20e
 IRQEN   = $d20e
 SKSTAT  = $d20f
+PORTB   = $d301
 DMACTL  = $d400
 DLISTL  = $d402
 DLISTH  = $d403
@@ -19,10 +25,16 @@ CHBASE  = $d409
 NMIEN   = $d40e
 NMIRES  = $d40f
 NMIST   = $d40f
+NMIVEC  = $fffa
+RESVEC  = $fffc
+IRQVEC  = $fffe
 
+VKEYBD  = $0208
+VVBLKI  = $0222
 SRTIMR  = $022b
 SDMCTL  = $022f
 SDLSTL  = $0230
+SDLSTH  = $0231
 SHFLOK  = $02be
 PCOLOR0 = $02c0
 CHBAS   = $02f4
