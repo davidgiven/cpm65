@@ -51,7 +51,11 @@ _start:
     ; Boot sector
 
     .byte 0
+.ifdef ATARI_XL
     .byte 14
+.else
+    .byte 12
+.endif
     .word $3000
     .word init      ; just use init and never return
 
@@ -83,7 +87,7 @@ init:
         cmp #>bios_end_addr
     zuntil_eq
 
-    ; ATARIXL PORT START
+    .ifdef ATARI_XL
 
 ; TEST with normal OS
     sei
@@ -97,7 +101,7 @@ init:
     sta $0223
     cli
 
-    ; ATARIXL PORT END
+    .endif
 
     lda RAMSIZ
     sta mem_end
@@ -831,6 +835,8 @@ dma:                .fill 2
 
 ; ---------------------------------------------------------------------------
 
+.ifdef ATARI_XL
+
 ; Low memory wrappers for the Atari XL port where the original ROM OS
 ; is turned off and only turned on for using SIO or PBI devices, and
 ; reading the keyboard.
@@ -840,27 +846,7 @@ dma:                .fill 2
 ; A minimal VBI is needed to copy just the shadow registers we need
 ; and handle keyboard debounce.
 
-POKMSK  = $0010
-RTCLOK  = $0012
-SRTIMR  = $022b
-PCOLOR0 = $02c0
-CHBAS   = $02f4
-KRPDEL  = $02d9
-KEYREP  = $02da
-KEYDEL  = $02f1
-CH1     = $02f2
-
-COLPM0  = $d012
-KBCODE  = $d209
-IRQST   = $d20e
-IRQEN   = $d20e
-SKSTAT  = $d20f
-CHBASE  = $d409
-NMIEN   = $d40e
-NMIRES  = $d40f
-NMIST   = $d40f
-
-; During init, set POKMSK to 0b01000000 ($40 = keyboard interrupt)
+; During init, set POKMSK to 0b01000000 ($40 = keyboard interrupt only)
 
     .section .text, "ax"
 
@@ -975,5 +961,7 @@ DVNM:
     tax
     pla
     rti
+
+.endif
 
 ; vim: filetype=asm sw=4 ts=4 et
