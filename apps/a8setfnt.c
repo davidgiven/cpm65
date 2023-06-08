@@ -1,10 +1,8 @@
 #include "cpm.h"
 #include <stdlib.h>
 
-static uint8_t *RAMSIZ = (uint8_t *) 0x02e4;
 static uint8_t *CHBAS  = (uint8_t *) 0x02f4;
 
-static uint8_t memtop;
 static uint8_t mem_end;
 static uint16_t tpa;
 static _Bool first_time;
@@ -28,11 +26,10 @@ int main() {
         goto errout;
     }
 
-    memtop = *RAMSIZ;
     tpa = cpm_bios_gettpa();
     mem_end = (tpa >> 8);
 
-    first_time = memtop == mem_end;
+    first_time = *CHBAS == 0xe0;    // not ROM font
     if (first_time)
         mem_end -= 4;
 
