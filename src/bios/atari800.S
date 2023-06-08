@@ -179,6 +179,7 @@ init:
     lda #0
     sta ptr
     sta LMARGN
+    sta FILDAT      ; no memory reserved for alternate font
     sta COLCRS      ; leftover cursor will be overwritten by banner
     sta COLCRS+1
     sta SHFLOK      ; start lower case

@@ -38,6 +38,7 @@ SDLSTH  = $0231
 SHFLOK  = $02be
 PCOLOR0 = $02c0
 CHBAS   = $02f4
+FILDAT  = $02fd
 KRPDEL  = $02d9
 KEYREP  = $02da
 KEYDEL  = $02f1

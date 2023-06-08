@@ -1,13 +1,46 @@
-#include "cpm.h"
+#include <cpm.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 static uint8_t *CHBAS  = (uint8_t *) 0x02f4;
 
+/* FILDAT is normally used by screen drawing routines in graphics modes.
+ * It is unused now, so we use it to signal whether memory for a font
+ * has been reserved.
+ */
+
+static uint8_t *FILDAT = (uint8_t *) 0x02fd;
+
+static uint8_t mem_base;
 static uint8_t mem_end;
 static uint16_t tpa;
-static _Bool first_time;
+static _Bool warmboot = false;
 
 int main() {
+    if (!*FILDAT) {                                     // first run
+        tpa = cpm_bios_gettpa();
+        mem_base = tpa & 0xff;
+        mem_end = tpa >> 8;
+
+        if (mem_end <= 0xc0) {                      // font in high memory
+            mem_end = (mem_end & ~3) - 4;           // 1kB aligned
+            cpm_bios_settpa(mem_base, mem_end);
+            *FILDAT = mem_end;
+            warmboot = true;
+        } else {                                    // font in low memory
+            if (mem_base & 3)
+                mem_base = (mem_base & ~3) + 8;     // 1kB aligned
+            else
+                mem_base += 4;
+            cpm_bios_settpa(mem_base, mem_end);
+            *FILDAT = mem_base-4;
+
+            cpm_printstring("first run, reserving low memory\r\n"
+                            "run again to change font\r\n");
+            return 0;
+        }
+    } 
+
     if (cpm_fcb.f[0] == ' ') {
         cpm_printstring("specify font file\r\n");
         goto errout;
@@ -26,28 +59,18 @@ int main() {
         goto errout;
     }
 
-    tpa = cpm_bios_gettpa();
-    mem_end = (tpa >> 8);
-
-    first_time = *CHBAS == 0xe0;    // not ROM font
-    if (first_time)
-        mem_end -= 4;
-
-    cpm_bios_settpa(tpa & 0xff, mem_end);   // reserve memory
-
     for (int i=0; i<8; i++) {
-        cpm_set_dma((uint8_t *)(mem_end<<8) + i*128);
+        cpm_set_dma((uint8_t *)(*FILDAT<<8) + i*128);
         cpm_read_sequential(&cpm_fcb);
     }
     cpm_close_file(&cpm_fcb);
 
-    *CHBAS = mem_end;       // set font
+    *CHBAS = *FILDAT;                       // set font
 
-    if (first_time) {
-        cpm_get_set_user(0);     // assure we can read CCP.SYS
+    if (warmboot) {
+        cpm_get_set_user(0);                // assure we can read CCP.SYS
         cpm_warmboot();
     }
-
     return 0;
 
 errout:
