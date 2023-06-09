@@ -216,7 +216,7 @@ void get_detailed_drive_status(void)
         printx(": 128 byte record capacity");
     }
 
-    printipadded(count_space());
+    printipadded(count_space()*(1<<(dpb->bsh-3)));
     printx(": kilobyte free drive capacity");
 
     printipadded(dpb->drm+1);
