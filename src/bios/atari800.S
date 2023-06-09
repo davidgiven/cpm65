@@ -1114,13 +1114,9 @@ DVNM:
 ; Leave banking bits alone on a 130XE
 
 SIOV_wrapper:
-    lda PORTB
-    ora #1              ; enable ROM
-    sta PORTB
-
     lda DBUFHI          ; we cannot load directly under the ROM if it's on
     cmp #$bf            ; be safe, no 16-bit compare
-    bcc load_direct     ; definitely directly to RAM
+    bcc actual_sio      ; definitely directly to RAM
 
     sta ptr+1           ; save for later
     lda DBUFLO
@@ -1131,22 +1127,39 @@ SIOV_wrapper:
     lda #>sector_buffer
     sta DBUFHI
 
-    jsr SIOV
+    lda DCOMND
+    cmp #SIO_WRITE_SECTOR
+    bne no_write
 
-    lda PORTB
-    and #$fe            ; disable ROM
-    sta PORTB
+    ldy #0              ; write: copy dma to temporary buffer
+    zrepeat
+        lda (ptr),y
+        sta sector_buffer,y
+        iny
+    zuntil_mi
 
-    ldy #0              ; copy temporary buffer to destination
+no_write:
+    jsr actual_sio
+
+    lda DCOMND
+    cmp #SIO_READ_SECTOR
+    bne siov_done
+
+    ldy #0              ; read: copy temporary buffer to dma
     zrepeat
         lda sector_buffer,y
         sta (ptr),y
         iny
     zuntil_mi
 
+siov_done:
     rts
 
-load_direct:
+actual_sio:
+    lda PORTB
+    ora #1              ; enable ROM
+    sta PORTB
+
     jsr SIOV
 
     lda PORTB
