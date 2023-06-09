@@ -189,8 +189,8 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
     partition with an SIDE2/3 cartridge and boot from there. That's almost
     emulation speed on real hardware. This one comes in two flavors.
     The hd version runs on any Atari with at least 16kB of RAM, the xlhd
-    is tailored for the XL/XE with at least 64kB of RAM. BIOS, BDOS and CCP
-    live "under" the Atari OS ROM, which leaves over 49kB of TPA.
+    version is tailored for the XL/XE with at least 64kB of RAM. BIOS, BDOS
+    and CCP live "under" the Atari OS ROM, which leaves over 49kB of TPA.
 
   - Console is standard 40x24. It has a SCREEN driver.
 
