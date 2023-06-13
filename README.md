@@ -21,8 +21,8 @@ to the 6502. So far it runs on:
 
   - Apple IIe; TPA is 46kB.
 
-  - Atari 400/800 XL/XE; 16kB minimum; TPA ranging from 8.5kB up to 42kB on a
-    48+kB machine.
+  - Atari 400/800 XL/XE; 16kB minimum; TPA ranging from 8.5kB up to over 49kB
+    on a 64kB XL/XE machine.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -181,20 +181,23 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
   - Standard 720 sectors single-sided single-density disk. The first
     track is reserved (18 sectors). The rest contains a standard CP/M 2.2
-    filesystem. Boot with BASIC disabled.
+    filesystem. Boot with BASIC disabled. This one runs on any Atari with
+    at least 16kB of RAM.
 
   - Or a 1MB harddisk image for use with drive emulators like SIO2SD,
     RespeQT, SDrive, AVG Cart etc... You can also mount it off a FAT
     partition with an SIDE2/3 cartridge and boot from there. That's almost
-    emulation speed on real hardware.
+    emulation speed on real hardware. This one comes in two flavors.
+    The hd version runs on any Atari with at least 16kB of RAM, the xlhd
+    version is tailored for the XL/XE with at least 64kB of RAM. BIOS, BDOS
+    and CCP live "under" the Atari OS ROM, which leaves over 49kB of TPA.
 
-  - Console is standard 40x24. Runs on a 400, 800 or 600XL with 16kB,
-    but more memory makes it more comfortable and allows you to run
-    the assembler.
+  - Console is standard 40x24. It has a SCREEN driver.
 
   - User area 1 contains loadable fonts and a utility to set a new
-    console font (setfnt.com). This consumes 1kB of TPA, but shows
-    proper glyphs like curly braces and tilde.
+    console font (setfnt.com). This consumes at least 1kB of TPA (depending
+    on the padding needed for alignment), but shows proper glyphs like curly
+    braces and tilde.
 
 ### Supported programs
 

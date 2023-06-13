@@ -19,6 +19,7 @@ TARGETS = \
 	vic20.d64 \
 	atari800.atr \
 	atari800hd.atr \
+	atari800xlhd.atr \
 
 APPS = \
 	$(OBJDIR)/apps/bedit.com \
@@ -324,6 +325,23 @@ atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.sys Makefile \
 	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/*.fnt 1:
 	cpmchattr -f atarihd $@ sr 0:ccp.sys 0:bdos.sys
 	dd if=$(OBJDIR)/atari800hd.exe of=$@ bs=128 conv=notrunc
+	mv $@ $@.raw
+	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
+	cat $@.raw >> $@
+	rm $@.raw
+
+$(OBJDIR)/src/bios/atari800xlhd.o: CFLAGS65 += -DATARI_HD -DATARI_XL
+$(OBJDIR)/atari800xlhd.exe:
+atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
+			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com \
+			$(SCREEN_APPS)
+	dd if=/dev/zero of=$@ bs=128 count=8190
+	mkfs.cpm -f atarihd $@
+	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
+	cpmcp -f atarihd $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/*.fnt 1:
+	cpmchattr -f atarihd $@ sr 0:ccp.sys 0:bdos.sys
+	dd if=$(OBJDIR)/atari800xlhd.exe of=$@ bs=128 conv=notrunc
 	mv $@ $@.raw
 	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
