@@ -53,5 +53,6 @@ jobs:
           cpm65/apple2e.po
           cpm65/atari800.atr
           cpm65/atari800hd.atr
+          cpm65/atari800xlhd.atr
           cpm65/diskdefs
 
