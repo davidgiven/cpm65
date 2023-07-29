@@ -10,16 +10,17 @@ OBJDIR = .obj
 
 TARGETS = \
 	apple2e.po \
-	c64.d64 \
+	atari800.atr \
+	atari800hd.atr \
+	atari800xlhd.atr \
 	bbcmicro.ssd \
-	x16.zip \
+	c64.d64 \
+	oricatmos.dsk \
 	pet4032.d64 \
 	pet8032.d64 \
 	pet8096.d64 \
 	vic20.d64 \
-	atari800.atr \
-	atari800hd.atr \
-	atari800xlhd.atr \
+	x16.zip \
 
 APPS = \
 	$(OBJDIR)/apps/bedit.com \
@@ -350,6 +351,11 @@ atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
 	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
 	rm $@.raw
+
+$(OBJDIR)/oricatmos.exe:
+oricatmos.dsk: $(OBJDIR)/oricatmos.exe $(OBJDIR)/bdos.sys Makefile \
+			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/mkoricdsk
+	$(OBJDIR)/mkoricdsk -i $(OBJDIR)/oricatmos.exe -o $@
 
 clean:
 	rm -rf $(OBJDIR) bin $(TARGETS)

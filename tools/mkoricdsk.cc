@@ -195,6 +195,10 @@ int main(int argc, char* argv[])
 
                 /* Sector data */
 
+                memset(buffer, 0, sizeof(buffer));
+                buffer[0] = 0xa1;
+                buffer[1] = 0xa1;
+                buffer[2] = 0xa1;
                 buffer[3] = 0xfb;
                 inf.read((char*)buffer + 4, 256);
                 putle16(&buffer[256 + 4], crc16(&buffer[0], 256 + 4));
