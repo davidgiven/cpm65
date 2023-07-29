@@ -96,6 +96,10 @@ $(OBJDIR)/mkdfs: $(OBJDIR)/tools/mkdfs.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $<
 
+$(OBJDIR)/mkoricdsk: $(OBJDIR)/tools/mkoricdsk.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -o $@ $< -lfmt
+
 bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
