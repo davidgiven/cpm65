@@ -430,8 +430,8 @@ zproc screen_putchar
 zendproc
 
 zproc screen_putstring
-    sta 1f+0
-    stx 1f+1
+    sta 1f+1
+    stx 1f+2
 
     IO_ON
     jsr calculate_cursor_address
