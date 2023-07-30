@@ -22,6 +22,22 @@
 
 #define MCMD_ReadSector          0x80
 
+/* Jasmin interface definitions */
+
+#define JFDC_command_register    0x03f4
+#define JFDC_status_register     0x03f4
+#define JFDC_track_register      0x03f5
+#define JFDC_sector_register     0x03f6
+#define JFDC_data                0x03f7
+#define JFDC_flags               0x03f8
+#define JFDC_drq                 0x03FC   
+
+#define JFDC_ovl_control         0x03FA
+#define JFDC_rom_control         0x03FB
+
+#define JCMD_ReadSector          0x8c
+#define JCMD_Seek                0x1F
+
 #define FLOPPY_DELAY            30
 
 /* Screen stuff */
@@ -51,7 +67,7 @@ cursory:          .fill 1
 
 ; Jasmin will load this at 0x0400.
 
-    jmp sector1
+    jmp jasmin_start
 
 ; Microdisk requires this literal data.
 
@@ -63,6 +79,58 @@ cursory:          .fill 1
     .byte 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20 ; :        :
     .byte 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20 ; :        :
     .byte 0x20, 0x20, 0x20, 0x20, 0x20                   ; :    ....:
+
+; Jasmin boot code starts here.
+
+jasmin_start:
+    /* Turn off the EPROM, exposing RAM. */
+
+    sei
+    lda #1
+    sta JFDC_ovl_control        ; enable overlay RAM
+    sta JFDC_rom_control        ; disable ROM
+
+    /* Set up for reading the BIOS. */
+
+    lda #<bios_exec_addr        ; set read pointer
+    sta ptr+0
+    lda #>bios_exec_addr
+    sta ptr+1
+
+    ldx #4                      ; sector to read
+    zrepeat
+        stx JFDC_sector_register    ; sector to read
+
+        /* Do the read. */
+
+        lda #JCMD_ReadSector
+        sta JFDC_command_register
+
+        ldy #FLOPPY_DELAY
+        zrepeat
+            nop
+            nop
+            dey
+        zuntil_eq
+
+        ldy #0
+        zrepeat
+            zrepeat
+                lda JFDC_drq
+            zuntil_pl
+            lda JFDC_data
+            sta (ptr), y
+            iny
+        zuntil_eq
+
+        /* Advance to next sector. */
+
+        inx
+        inc ptr+1
+        cpx #19
+    zuntil_eq
+
+    jmp _start
 
 .section "sector2", "ax"
 
