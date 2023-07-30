@@ -17,9 +17,11 @@
 #define MFDC_flags               0x0314
 #define MFDC_drq                 0x0318   
 
-#define MFDC_Flag_DiscSide       0b00010000
+#define MFDC_Flag_Side0          0b10000001
+#define MFDC_Flag_Side1          0b10010001
 
 #define MCMD_ReadSector          0x80
+#define MCMD_Seek                0x1f
 
 /* Jasmin interface definitions */
 
@@ -56,6 +58,7 @@ ptr:              .fill 2
 ptr1:             .fill 2
 cursorx:          .fill 1
 cursory:          .fill 1
+dma:              .fill 2     ; current DMA
 
 ; --- Bootloader code -------------------------------------------------------
 
@@ -172,7 +175,7 @@ return:
 sector2_start:
     /* Turn off the EPROM, exposing RAM. */
 
-    lda #0b10000001             ; EPROM off, FDC interrupts off
+    lda #MFDC_Flag_Side0        ; EPROM off, FDC interrupts off
     sta MFDC_flags
 
     /* Set up for reading the BIOS. */
@@ -257,14 +260,179 @@ zproc _start
         dey
     zuntil_eq
 
+    ; Initialise the disk system.
+
+    ldx #0xff
+    stx buffered_host_sector
+    stx buffered_track
+    inx
+    stx buffer_dirty
+
+    ; Read the BDOS.
+
+    lda #<bdos_filename
+    ldx #>bdos_filename
+    ldy #>__TPA1_START__
+    jsr loadfile
+
+    ; Relocate it.
+
+    lda #>__TPA1_START__
+    ldx #__ZEROPAGE_START__
+    jsr entry_RELOCATE
+	
+    ; Go!
+
+    lda #<biosentry
+    ldx #>biosentry
+    jmp __TPA1_START__ + COMHDR_ENTRY
+
     zloop
     zendloop
+
+bdos_filename:
+    .ascii "BDOS    SYS"
 
 banner: ; reversed!
     .byte 13, 10
     .ascii "cirO eht rof 56-M/PC"
 banner_end:
 
+zendproc
+
+; --- BIOS entrypoints ------------------------------------------------------
+
+zproc entry_GETTPA
+	ldy current_bank
+    lda mem_base, y
+    ldx mem_end, y
+    clc
+    rts
+zendproc
+
+zproc entry_SETTPA
+	ldy current_bank
+    sta mem_base, y
+    stx mem_end, y
+    clc
+    rts
+zendproc
+
+zproc entry_GETZP
+    lda zp_base
+    ldx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETZP
+    sta zp_base
+    stx zp_end
+    clc
+    rts
+zendproc
+
+zproc entry_SETBANK
+	sta current_bank
+    rts
+zendproc
+
+zproc fail
+    sec
+    rts
+zendproc
+
+; Sets the current DMA address.
+
+zproc entry_SETDMA
+    sta dma+0
+    stx dma+1
+    rts
+zendproc
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc entry_SELDSK
+    cmp #0
+    bne fail                ; invalid drive
+
+    lda #<dph
+    ldx #>dph
+    clc
+    rts
+zendproc
+
+; Set the current absolute sector number.
+; XA is a pointer to a three-byte number.
+
+zproc entry_SETSEC
+    sta ptr+0
+    stx ptr+1
+
+    ; Copy bottom 16 of sector number to temporary (the top byte must be 0).
+
+    ldy #0
+    lda (ptr), y
+    sta ptr1+0
+    iny
+    lda (ptr), y
+    sta ptr1+1
+
+    ; There are 36 CP/M sectors per host track. Do a 16-bit divide.
+
+    lda #0
+    sta requested_cpm_sector
+
+    ldx #16
+    lda #0
+    zrepeat
+        asl ptr1+0
+        rol ptr1+1
+        rol a
+        cmp #36
+        zif_cs
+            sbc #36
+            inc ptr1+0
+        zendif
+        dex
+    zuntil_eq
+break:
+    sta requested_cpm_sector
+    lda ptr1+0
+    sta requested_track
+
+    rts
+zendproc
+
+zproc entry_READ
+    jsr change_sector
+    zif_cc
+        lda requested_cpm_sector
+        ror a
+        lda #0
+        ror a               ; 0x00 or 0x80
+        tax
+
+        ldy #0
+        zrepeat
+            lda DISK_BUFFER, x
+            sta (dma), y
+            inx
+            iny
+            cpy #0x80
+        zuntil_eq
+        clc
+    zendif
+    rts
+zendproc
+
+zproc entry_WRITE
+    jsr change_sector
+    sec
+    rts
 zendproc
 
 ; --- TTY driver ------------------------------------------------------------
@@ -413,11 +581,6 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-zendproc
-
-zproc fail
-    sec
-    rts
 zendproc
 
 zproc screen_version
@@ -638,4 +801,162 @@ zproc screen_cleartoeol
     zuntil_eq
     rts
 zendproc
+
+; --- Disk access -----------------------------------------------------------
+
+zproc change_sector
+    lda requested_cpm_sector
+    lsr a
+    cmp buffered_host_sector
+    zif_eq
+        lda requested_track
+        cmp buffered_track
+        zif_eq
+            ; Buffered track/sector not changing, so do no work.
+
+            clc
+            rts
+        zendif
+    zendif
+
+    lda buffer_dirty
+    zif_ne
+        jsr flush_buffer
+        zif_cs
+            rts
+        zendif
+        lda #0
+        sta buffer_dirty
+    zendif
+
+    lda requested_cpm_sector
+    lsr a
+    sta buffered_host_sector
+
+    lda requested_track
+    sta buffered_track
+
+    jsr prepare_fdc
+
+    lda #MCMD_ReadSector
+    sta MFDC_command_register
+
+    ldy #4
+    zrepeat
+        nop
+        nop
+        dey
+    zuntil_eq
+
+    ldy #0
+    zrepeat
+        zrepeat
+            lda MFDC_drq
+        zuntil_pl
+        lda MFDC_data
+        sta DISK_BUFFER, y
+        iny
+    zuntil_eq
+
+    clc
+    rts
+zendproc
+
+zproc flush_buffer
+    sec
+    rts
+zendproc
+
+; Seek to the appropriate track and prepare for a read or write transfer.
+
+zproc prepare_fdc
+    ; Seek to track.
+
+    lda buffered_track
+    lsr a                           ; bottom bit is the side
+    cmp MFDC_track_register
+    zif_ne
+        pha
+        jsr wait_for_fdc_ready
+        pla
+
+        sta MFDC_data               ; computed track
+        lda #MCMD_Seek
+        sta MFDC_command_register
+
+        jsr wait_for_fdc_completion
+    zendif
+
+    ; Set sector.
+
+    ldx buffered_host_sector
+    inx                             ; FDC wants 1-based sectors
+    stx MFDC_sector_register
+
+    ; Set head.
+
+    ldx #MFDC_Flag_Side0
+    lda buffered_track
+    ror a
+    zif_cs
+        ldx #MFDC_Flag_Side1
+    zendif
+    stx MFDC_flags
+
+    rts
+zendproc
+
+zproc wait_for_fdc_ready
+    zrepeat
+        lda #MFDC_drq
+    zuntil_pl
+    rts
+zendproc
+
+zproc wait_for_fdc_completion
+    ; Short delay before checking the register.
+
+    ldy #4
+    zrepeat
+        dey
+    zuntil_eq
+
+    zloop
+        lda MFDC_status_register
+        lsr a
+    zuntil_cc
+    asl a
+    rts
+zendproc
+
+; --- Vectors ---------------------------------------------------------------
+
+.section "tail", "ax"
+
+    .word 0x5555
+
+; --- Data ------------------------------------------------------------------
+
+.data
+
+zp_base:    .byte __ZEROPAGE_START__
+zp_end:     .byte __ZEROPAGE_END__
+mem_base:   .byte __TPA0_START__@mos16hi, __TPA1_START__@mos16hi
+mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
+
+; DPH for drive 0 (our only drive)
+
+define_drive dph, 2844, 2048, 64, 36
+
+.bss
+
+current_bank:           .fill 1     ; which memory bank is selected
+requested_cpm_sector:   .fill 1     ; CP/M sector requested by user
+requested_track:        .fill 1     ; track requested by user
+buffered_host_sector:   .fill 1     ; host sector in buffer
+buffered_track:         .fill 1     ; track in buffer
+buffer_dirty:           .fill 1     ; has the buffer been modified?
+directory_buffer:       .fill 128   ; used by the BDOS
+
+.global directory_buffer
 

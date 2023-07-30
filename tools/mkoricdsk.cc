@@ -200,7 +200,10 @@ int main(int argc, char* argv[])
                 buffer[1] = 0xa1;
                 buffer[2] = 0xa1;
                 buffer[3] = 0xfb;
-                inf.read((char*)buffer + 4, 256);
+                inf.clear();
+                inf.seekg((s + h*sectors + t*heads*sectors)*256);
+                if (inf)
+                    inf.read((char*)buffer + 4, 256);
                 putle16(&buffer[256 + 4], crc16(&buffer[0], 256 + 4));
                 outf.write((char*)buffer, 256 + 4 + 2);
 
