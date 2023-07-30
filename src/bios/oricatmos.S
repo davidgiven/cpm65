@@ -3,7 +3,6 @@
 ; see the COPYING file in the root project directory for the full text.
 
 #include "zif.inc"
-#include "mos.inc"
 #include "cpm65.inc"
 #include "driver.inc"
 #include "jumptables.inc"
@@ -92,9 +91,9 @@ jasmin_start:
 
     /* Set up for reading the BIOS. */
 
-    lda #<bios_exec_addr        ; set read pointer
+    lda #<BIOS_LOAD_ADDR        ; set read pointer
     sta ptr+0
-    lda #>bios_exec_addr
+    lda #>BIOS_LOAD_ADDR
     sta ptr+1
 
     ldx #4                      ; sector to read
@@ -127,7 +126,7 @@ jasmin_start:
 
         inx
         inc ptr+1
-        cpx #19
+        cpx #4 + BIOS_SECTOR_COUNT
     zuntil_eq
 
     jmp _start
@@ -178,9 +177,9 @@ sector2_start:
 
     /* Set up for reading the BIOS. */
 
-    lda #<bios_exec_addr        ; set read pointer
+    lda #<BIOS_LOAD_ADDR        ; set read pointer
     sta ptr+0
-    lda #>bios_exec_addr
+    lda #>BIOS_LOAD_ADDR
     sta ptr+1
 
     ldx #4                      ; sector to read
@@ -213,7 +212,7 @@ sector2_start:
 
         inx
         inc ptr+1
-        cpx #19
+        cpx #4 + BIOS_SECTOR_COUNT
     zuntil_eq
 
     jmp _start
