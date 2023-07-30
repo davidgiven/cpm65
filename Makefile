@@ -360,7 +360,9 @@ atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
 $(OBJDIR)/oricatmos.exe:
 oricatmos.dsk: $(OBJDIR)/oricatmos.exe $(OBJDIR)/bdos.sys Makefile \
 			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/mkoricdsk
-	$(OBJDIR)/mkoricdsk -i $(OBJDIR)/oricatmos.exe -o $@
+	mkfs.cpm -f oric -b $(OBJDIR)/oricatmos.exe $(OBJDIR)/oricatmos.img
+	cpmcp -f oric $(OBJDIR)/oricatmos.img $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	$(OBJDIR)/mkoricdsk -i $(OBJDIR)/oricatmos.img -o $@
 
 clean:
 	rm -rf $(OBJDIR) bin $(TARGETS)

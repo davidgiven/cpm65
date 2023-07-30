@@ -77,3 +77,12 @@ diskdef atarihd
     os 2.2
 end
 
+diskdef oric
+    seclen 256
+    tracks 40
+    sectrk 18
+    blocksize 1024
+    maxdir 64
+    boottrk 1
+    os 2.2
+end
