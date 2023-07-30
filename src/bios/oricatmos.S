@@ -908,7 +908,7 @@ zendproc
 
 zproc wait_for_fdc_ready
     zrepeat
-        lda #MFDC_drq
+        lda MFDC_drq
     zuntil_pl
     rts
 zendproc
