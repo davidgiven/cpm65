@@ -260,13 +260,14 @@ zproc _start
         dey
     zuntil_eq
 
-    ; Initialise the disk system.
+    ; Miscellaneous initialisation.
 
     ldx #0xff
     stx buffered_host_sector
     stx buffered_track
     inx
     stx buffer_dirty
+    jsr initdrivers
 
     ; Read the BDOS.
 
@@ -399,7 +400,6 @@ zproc entry_SETSEC
         zendif
         dex
     zuntil_eq
-break:
     sta requested_cpm_sector
     lda ptr1+0
     sta requested_track
