@@ -41,6 +41,33 @@
 
 #define FLOPPY_DELAY            30
 
+/* Other system definitions */
+
+; 6522 VIA
+VIA      = 0x0300
+VIA_PB   = VIA + 0
+VIA_PA   = VIA + 1
+VIA_DDRB = VIA + 2
+VIA_DDRA = VIA + 3
+VIA_T1CL = VIA + 4
+VIA_T1CH = VIA + 5
+VIA_T1LL = VIA + 6
+VIA_T1LH = VIA + 7
+VIA_T2CL = VIA + 8
+VIA_T2CH = VIA + 9
+VIA_SR   = VIA + 10
+VIA_ACR  = VIA + 11
+VIA_PCR  = VIA + 12
+VIA_IFR  = VIA + 13
+VIA_IER  = VIA + 14
+VIA_ORA  = VIA + 15
+
+VIA_PB_NDAC_IN  = 1<<0
+VIA_PB_NRFD_OUT = 1<<1
+VIA_PB_ATN_OUT  = 1<<2
+VIA_PB_NRFD_IN  = 1<<6
+VIA_PB_DAV_IN   = 1<<7
+
 /* Screen stuff */
 
 #define SCREEN_WIDTH            40
@@ -561,8 +588,7 @@ screen_jmptable_lo:
     jmptablo screen_getcursor
     jmptablo screen_putchar
     jmptablo screen_putstring
-    jmptablo fail
-    jmptablo fail
+    jmptablo screen_getchar
     jmptablo fail
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
@@ -575,8 +601,7 @@ screen_jmptable_hi:
     jmptabhi screen_getcursor
     jmptabhi screen_putchar
     jmptabhi screen_putstring
-    jmptabhi fail
-    jmptabhi fail
+    jmptabhi screen_getchar
     jmptabhi fail
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
@@ -719,11 +744,6 @@ zproc calculate_line_address
     rts
 zendproc
 
-zproc screen_getchar
-    sec
-    rts
-zendproc
-
 zproc screen_scrollup
     ldx #0              ; current line
     zrepeat
@@ -802,6 +822,59 @@ zproc screen_cleartoeol
     rts
 zendproc
 
+; --- Keyboard --------------------------------------------------------------
+
+zproc screen_getchar
+    zloop
+        jsr scan_keyboard
+    zendloop
+zendproc
+
+; Does a single keyboard scan, processing any pressed keys. Last pressed key
+; wins.
+
+zproc scan_keyboard
+    ldy #7                      ; row counter
+    zrepeat
+        sty VIA_PB
+        
+        ldx #7                      ; column counter
+        zrepeat
+            lda #0x0e               ; AY column register
+            sta VIA_PA
+            lda #0xff               ; write to AY
+            sta VIA_PCR
+
+            lda #0xdd               ; clear CB2
+            sta VIA_PCR
+
+            lda column_values, x
+            sta VIA_PA
+            lda #0xfd
+            sta VIA_PCR
+            lda #0xdd
+            sta VIA_PCR
+
+            lda VIA_PB
+            and #0x08
+            zif_ne
+    break:
+                nop
+                ; key pressed!
+            zendif
+
+            dex
+        zuntil_mi
+
+        dey
+    zuntil_mi
+    rts
+
+column_values:
+    .byte 0xdf, 0x7f, 0xf7, 0xbf, 0xfe, 0xef, 0xfd, 0xfb
+zendproc
+
+
 ; --- Disk access -----------------------------------------------------------
 
 zproc change_sector
@@ -876,10 +949,6 @@ zproc prepare_fdc
     lsr a                           ; bottom bit is the side
     cmp MFDC_track_register
     zif_ne
-        pha
-        jsr wait_for_fdc_ready
-        pla
-
         sta MFDC_data               ; computed track
         lda #MCMD_Seek
         sta MFDC_command_register
