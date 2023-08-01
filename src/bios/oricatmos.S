@@ -302,6 +302,7 @@ zproc _start
 		sta keypress_bitfield, x
 		dex
 	zuntil_mi
+	sta const_counter
 
     ; Read the BDOS.
 
@@ -496,7 +497,12 @@ zendproc
 ; Returns 0xff if no key is pending, 0 if one is.
 
 zproc tty_const
-    jsr scan_keyboard
+	dec const_counter
+	zif_mi
+		lda #16
+		sta const_counter
+		jsr scan_keyboard
+	zendif
 
     lda pending_key
     zif_ne
@@ -665,10 +671,13 @@ zproc screen_getcursor
 zendproc
 
 zproc screen_putchar
-    pha
-    jsr calculate_cursor_address
-    pla
-    sta (ptr), y
+	cmp #32
+	zif_cs
+		pha
+		jsr calculate_cursor_address
+		pla
+		sta (ptr), y
+	zendif
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
@@ -1153,8 +1162,9 @@ buffer_dirty:           .fill 1     ; has the buffer been modified?
 directory_buffer:       .fill 128   ; used by the BDOS
 keypress_bitfield:		.fill 8		; stores which keys are pressed
 pending_key:			.fill 1		; ASCII code of pending keypress
-shift_pressed:			.fill 1
-ctrl_pressed:			.fill 1
+shift_pressed:			.fill 1		; top bit set if shift pressed
+ctrl_pressed:			.fill 1		; top bit set if ctrl pressed
+const_counter:			.fill 1		; number of consts until next key scan
 
 .global directory_buffer
 
