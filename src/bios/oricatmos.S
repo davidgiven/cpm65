@@ -21,6 +21,7 @@
 #define MFDC_Flag_Side1          0b10010001
 
 #define MCMD_ReadSector          0x80
+#define MCMD_WriteSector         0xa0
 #define MCMD_Seek                0x1f
 
 /* Jasmin interface definitions */
@@ -292,8 +293,9 @@ zproc _start
     ldx #0xff
     stx buffered_host_sector
     stx buffered_track
-    inx
+    inx				; x = 0
     stx buffer_dirty
+	stx const_counter
     jsr initdrivers
 
 	ldx #8			; includes pending_key
@@ -302,7 +304,6 @@ zproc _start
 		sta keypress_bitfield, x
 		dex
 	zuntil_mi
-	sta const_counter
 
     ; Read the BDOS.
 
@@ -465,8 +466,36 @@ zproc entry_READ
 zendproc
 
 zproc entry_WRITE
+	pha
     jsr change_sector
-    sec
+	pla
+	zif_cc
+		pha
+
+		lda requested_cpm_sector
+        ror a
+        lda #0
+        ror a               ; 0x00 or 0x80
+        tax
+
+		ldy #0
+		zrepeat
+			lda (dma), y
+			sta DISK_BUFFER, x
+			inx
+			iny
+			cpy #0x80
+		zuntil_eq
+
+		lda #0x80
+		sta buffer_dirty
+
+		clc
+		pla
+		zif_ne
+			jsr flush_buffer
+		zendif
+	zendif
     rts
 zendproc
 
@@ -1026,14 +1055,12 @@ zproc change_sector
         zendif
     zendif
 
-    lda buffer_dirty
-    zif_ne
+    bit buffer_dirty
+    zif_mi
         jsr flush_buffer
         zif_cs
             rts
         zendif
-        lda #0
-        sta buffer_dirty
     zendif
 
     lda requested_cpm_sector
@@ -1046,14 +1073,7 @@ zproc change_sector
     jsr prepare_fdc
 
     lda #MCMD_ReadSector
-    sta MFDC_command_register
-
-    ldy #4
-    zrepeat
-        nop
-        nop
-        dey
-    zuntil_eq
+	jsr write_fdc_command
 
     ldy #0
     zrepeat
@@ -1070,7 +1090,24 @@ zproc change_sector
 zendproc
 
 zproc flush_buffer
-    sec
+	jsr prepare_fdc
+
+	lda #MCMD_WriteSector
+	jsr write_fdc_command
+
+	ldy #0
+	zrepeat
+		zrepeat
+			lda MFDC_drq
+		zuntil_pl
+		lda DISK_BUFFER, y
+		sta MFDC_data
+		iny
+	zuntil_eq
+
+	lda #0
+	sta buffer_dirty
+    clc
     rts
 zendproc
 
@@ -1132,6 +1169,18 @@ zproc wait_for_fdc_completion
     rts
 zendproc
 
+zproc write_fdc_command
+    sta MFDC_command_register
+
+    ldy #4
+    zrepeat
+        nop
+        nop
+        dey
+    zuntil_eq
+	rts
+zendproc
+
 ; --- Vectors ---------------------------------------------------------------
 
 .section "tail", "ax"
@@ -1158,7 +1207,7 @@ requested_cpm_sector:   .fill 1     ; CP/M sector requested by user
 requested_track:        .fill 1     ; track requested by user
 buffered_host_sector:   .fill 1     ; host sector in buffer
 buffered_track:         .fill 1     ; track in buffer
-buffer_dirty:           .fill 1     ; has the buffer been modified?
+buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
 directory_buffer:       .fill 128   ; used by the BDOS
 keypress_bitfield:		.fill 8		; stores which keys are pressed
 pending_key:			.fill 1		; ASCII code of pending keypress
