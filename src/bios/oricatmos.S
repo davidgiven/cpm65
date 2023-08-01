@@ -290,20 +290,17 @@ zproc _start
 
     ; Miscellaneous initialisation.
 
+	ldx #bss_top - bss_bottom - 1
+	lda #0
+	zrepeat
+		sta bss_bottom, x
+		dex
+	zuntil_mi
+
     ldx #0xff
     stx buffered_host_sector
     stx buffered_track
-    inx				; x = 0
-    stx buffer_dirty
-	stx const_counter
     jsr initdrivers
-
-	ldx #8			; includes pending_key
-	lda #0
-	zrepeat
-		sta keypress_bitfield, x
-		dex
-	zuntil_mi
 
     ; Read the BDOS.
 
@@ -1202,6 +1199,7 @@ define_drive dph, 2844, 2048, 64, 36
 
 .bss
 
+bss_bottom:
 current_bank:           .fill 1     ; which memory bank is selected
 requested_cpm_sector:   .fill 1     ; CP/M sector requested by user
 requested_track:        .fill 1     ; track requested by user
@@ -1214,6 +1212,7 @@ pending_key:			.fill 1		; ASCII code of pending keypress
 shift_pressed:			.fill 1		; top bit set if shift pressed
 ctrl_pressed:			.fill 1		; top bit set if ctrl pressed
 const_counter:			.fill 1		; number of consts until next key scan
+bss_top:
 
 .global directory_buffer
 
