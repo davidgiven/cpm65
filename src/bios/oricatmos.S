@@ -749,6 +749,14 @@ zproc calculate_line_address
     rts
 zendproc
 
+zproc toggle_cursor
+	jsr calculate_cursor_address
+	lda (ptr), y
+	eor #0x80
+	sta (ptr), y
+	rts
+zendproc
+
 zproc screen_scrollup
     ldx #0              ; current line
     zrepeat
@@ -830,10 +838,14 @@ zendproc
 ; --- Keyboard --------------------------------------------------------------
 
 zproc screen_getchar
+	jsr toggle_cursor
     zrepeat
         jsr scan_keyboard
 		lda pending_key
     zuntil_ne
+	pha
+	jsr toggle_cursor
+	pla
 
 	ldx #0
 	stx pending_key
