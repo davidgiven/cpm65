@@ -958,7 +958,7 @@ shift_change:
 	rts
 
 ctrl_change:
-	lda keypress_bitfield+4
+	lda keypress_bitfield+2
 	asl a
 	asl a
 	asl a
