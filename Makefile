@@ -36,7 +36,6 @@ APPS = \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
 	apps/bedit.asm \
-	apps/cls.asm \
 	apps/dinfo.asm \
 	apps/dump.asm \
 	apps/ls.asm \
@@ -48,6 +47,7 @@ APPS = \
 	cpmfs/hello.asm \
 
 SCREEN_APPS = \
+	apps/cls.asm \
 	$(OBJDIR)/qe.com \
 
 MINIMAL_APPS = \
@@ -359,9 +359,10 @@ atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
 
 $(OBJDIR)/oricatmos.exe:
 oricatmos.dsk: $(OBJDIR)/oricatmos.exe $(OBJDIR)/bdos.sys Makefile \
-			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/mkoricdsk
+			$(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/mkoricdsk
 	mkfs.cpm -f oric -b $(OBJDIR)/oricatmos.exe $(OBJDIR)/oricatmos.img
-	cpmcp -f oric $(OBJDIR)/oricatmos.img $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) 0:
+	cpmcp -f oric $(OBJDIR)/oricatmos.img $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f oric $(OBJDIR)/oricatmos.img sr 0:ccp.sys 0:bdos.sys
 	$(OBJDIR)/mkoricdsk -i $(OBJDIR)/oricatmos.img -o $@
 
 clean:
