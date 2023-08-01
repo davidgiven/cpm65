@@ -296,6 +296,13 @@ zproc _start
     stx buffer_dirty
     jsr initdrivers
 
+	ldx #8			; includes pending_key
+	lda #0
+	zrepeat
+		sta keypress_bitfield, x
+		dex
+	zuntil_mi
+
     ; Read the BDOS.
 
     lda #<bdos_filename
@@ -489,16 +496,14 @@ zendproc
 ; Returns 0xff if no key is pending, 0 if one is.
 
 zproc tty_const
-    ;IO_ON
-    ;jsr scan_keyboard
-    ;IO_OFF
+    jsr scan_keyboard
 
-    ;lda pending_key
-    ;zif_ne
+    lda pending_key
+    zif_ne
         lda #0xff
-    ;zendif
+    zendif
 
-    ;clc
+    clc
     rts
 zendproc
 
@@ -825,9 +830,16 @@ zendproc
 ; --- Keyboard --------------------------------------------------------------
 
 zproc screen_getchar
-    zloop
+    zrepeat
         jsr scan_keyboard
-    zendloop
+		lda pending_key
+    zuntil_ne
+
+	ldx #0
+	stx pending_key
+
+	clc
+	rts
 zendproc
 
 ; Does a single keyboard scan, processing any pressed keys. Last pressed key
@@ -848,19 +860,43 @@ zproc scan_keyboard
             lda #0xdd               ; clear CB2
             sta VIA_PCR
 
-            lda column_values, x
+            lda column_pa_values, x
             sta VIA_PA
             lda #0xfd
             sta VIA_PCR
             lda #0xdd
             sta VIA_PCR
 
+			; Bit 3 of PB is now set if a key is pressed.
+
             lda VIA_PB
             and #0x08
-            zif_ne
-    break:
-                nop
-                ; key pressed!
+			lsr a
+			lsr a
+			lsr a
+			lsr a					; C is set if key is pressed
+			zif_cs
+				lda column_store_values, x
+			zendif
+			eor keypress_bitfield, y
+			and column_store_values, x ; has key changed state?
+			zif_ne
+				; Key has changed state.
+
+				eor keypress_bitfield, y
+				sta keypress_bitfield, y ; update bitfield
+
+				txa
+				pha
+				tya
+				pha
+
+				jsr key_state_changed
+
+				pla
+				tay
+				pla
+				tax
             zendif
 
             dex
@@ -870,8 +906,85 @@ zproc scan_keyboard
     zuntil_mi
     rts
 
-column_values:
-    .byte 0xdf, 0x7f, 0xf7, 0xbf, 0xfe, 0xef, 0xfd, 0xfb
+column_pa_values:
+	.byte 0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe
+column_store_values:
+	.byte 1, 2, 4, 8, 16, 32, 64, 128
+zendproc
+
+zproc key_state_changed
+	tya
+	asl a
+	asl a
+	asl a
+	sta ptr+0
+	txa
+	clc
+	adc ptr+0
+	tax
+
+break:
+	cpx #0x23
+	beq shift_change
+	cpx #0x3b
+	beq shift_change
+	cpx #0x13
+	beq ctrl_change
+
+	lda VIA_PB
+	and #0x08
+	zif_ne
+		lda keyboard_decode_tab, x
+		bit shift_pressed
+		zif_mi
+			lda keyboard_shift_decode_tab, x
+		zendif
+		bit ctrl_pressed
+		zif_mi
+			and #0x1f
+		zendif
+		sta pending_key
+	zendif
+	rts
+
+shift_change:
+	lda keypress_bitfield+4
+	ora keypress_bitfield+7
+	asl a
+	asl a
+	asl a
+	asl a
+	sta shift_pressed
+	rts
+
+ctrl_change:
+	lda keypress_bitfield+4
+	asl a
+	asl a
+	asl a
+	asl a
+	sta ctrl_pressed
+	rts
+
+keyboard_decode_tab:
+	.byte '3', 'x', '1', 0, 'v', '5', 'n', '7'
+	.byte 'd', 'q', 27,  0, 'f', 'r', 't', 'j'
+	.byte 'c', '2', 'z', 0, '4', 'b', '6', 'm'
+	.byte '\'', '\\', 0, 0, '-', ';', '9', 'k'
+	.byte 0,   0,   0,   0, 0,   '.', ',', ' '
+	.byte '[', ']', 127, 0, 'p', 'o', 'i', 'u'
+	.byte 'w', 's', 'a', 0, 'e', 'g', 'h', 'y'
+	.byte '=',  0,  13,  0, '/', '0', 'l', '8'
+
+keyboard_shift_decode_tab:
+	.byte '#', 'X', '!', 0, 'V', '%', 'N', '&'
+	.byte 'D', 'Q', 27,  0, 'F', 'R', 'T', 'J'
+	.byte 'C', '"', 'Z', 0, '$', 'B', '^', 'M'
+	.byte '\'', '\\', 0, 0, '_', ':', '(', 'K'
+	.byte 0,   0,   0,   0, 0,   '<', '>', ' '
+	.byte '{', '}', 127, 0, 'P', 'O', 'I', 'U'
+	.byte 'W', 'S', 'A', 0, 'E', 'G', 'H', 'Y'
+	.byte '+',  0,  13,  0, '|', '0', 'L', '*'
 zendproc
 
 
@@ -1026,6 +1139,10 @@ buffered_host_sector:   .fill 1     ; host sector in buffer
 buffered_track:         .fill 1     ; track in buffer
 buffer_dirty:           .fill 1     ; has the buffer been modified?
 directory_buffer:       .fill 128   ; used by the BDOS
+keypress_bitfield:		.fill 8		; stores which keys are pressed
+pending_key:			.fill 1		; ASCII code of pending keypress
+shift_pressed:			.fill 1
+ctrl_pressed:			.fill 1
 
 .global directory_buffer
 
