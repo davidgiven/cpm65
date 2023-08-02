@@ -10,16 +10,17 @@ OBJDIR = .obj
 
 TARGETS = \
 	apple2e.po \
-	c64.d64 \
+	atari800.atr \
+	atari800hd.atr \
+	atari800xlhd.atr \
 	bbcmicro.ssd \
-	x16.zip \
+	c64.d64 \
+	oric.dsk \
 	pet4032.d64 \
 	pet8032.d64 \
 	pet8096.d64 \
 	vic20.d64 \
-	atari800.atr \
-	atari800hd.atr \
-	atari800xlhd.atr \
+	x16.zip \
 
 APPS = \
 	$(OBJDIR)/apps/bedit.com \
@@ -35,7 +36,6 @@ APPS = \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
 	apps/bedit.asm \
-	apps/cls.asm \
 	apps/dinfo.asm \
 	apps/dump.asm \
 	apps/ls.asm \
@@ -47,6 +47,7 @@ APPS = \
 	cpmfs/hello.asm \
 
 SCREEN_APPS = \
+	apps/cls.asm \
 	$(OBJDIR)/qe.com \
 
 MINIMAL_APPS = \
@@ -95,6 +96,10 @@ $(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
 $(OBJDIR)/mkdfs: $(OBJDIR)/tools/mkdfs.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $<
+
+$(OBJDIR)/mkoricdsk: $(OBJDIR)/tools/mkoricdsk.o
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) -o $@ $< -lfmt
 
 bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
@@ -170,6 +175,11 @@ $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts
 	@mkdir -p $(dir $@)
 	ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
 	ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
+	
+$(OBJDIR)/oric.exe: $(OBJDIR)/src/bios/oric.o $(OBJDIR)/libbios.a scripts/oric.ld scripts/oric-prelink.ld scripts/oric-common.ld Makefile
+	@mkdir -p $(dir $@)
+	ld.lld -Map -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
+	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oric-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 	
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
@@ -346,6 +356,14 @@ atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
 	/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $@
 	cat $@.raw >> $@
 	rm $@.raw
+
+$(OBJDIR)/oric.exe:
+oric.dsk: $(OBJDIR)/oric.exe $(OBJDIR)/bdos.sys Makefile \
+			$(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/mkoricdsk
+	mkfs.cpm -f oric -b $(OBJDIR)/oric.exe $(OBJDIR)/oric.img
+	cpmcp -f oric $(OBJDIR)/oric.img $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f oric $(OBJDIR)/oric.img sr 0:ccp.sys 0:bdos.sys
+	$(OBJDIR)/mkoricdsk -i $(OBJDIR)/oric.img -o $@
 
 clean:
 	rm -rf $(OBJDIR) bin $(TARGETS)
