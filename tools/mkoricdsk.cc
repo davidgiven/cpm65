@@ -122,6 +122,12 @@ static void parseArgs(int argc, char* argv[])
     }
 }
 
+static void putbe16(uint8_t* p, uint16_t value)
+{
+    *p++ = value >> 8;
+    *p++ = value & 0xff;
+}
+
 static void putle16(uint8_t* p, uint16_t value)
 {
     *p++ = value & 0xff;
@@ -155,7 +161,7 @@ int main(int argc, char* argv[])
     uint8_t buffer[256 + 4 + 2] = "MFM_DISK";
     putle16(buffer + 0x08, heads);
     putle16(buffer + 0x0c, tracks);
-    putle16(buffer + 0x10, sectors);
+    putle16(buffer + 0x10, geometry);
     outf.write((char*)buffer, 256);
 
     for (int h = 0; h < heads; h++)
@@ -183,7 +189,7 @@ int main(int argc, char* argv[])
                 buffer[5] = h;
                 buffer[6] = s + 1;
                 buffer[7] = 1;
-                putle16(&buffer[8], crc16(&buffer[0], 8));
+                putbe16(&buffer[8], crc16(&buffer[0], 8));
                 outf.write((char*)buffer, 10);
 
                 /* Gap after sector header */
@@ -204,7 +210,7 @@ int main(int argc, char* argv[])
                 inf.seekg((s + h*sectors + t*heads*sectors)*256);
                 if (inf)
                     inf.read((char*)buffer + 4, 256);
-                putle16(&buffer[256 + 4], crc16(&buffer[0], 256 + 4));
+                putbe16(&buffer[256 + 4], crc16(&buffer[0], 256 + 4));
                 outf.write((char*)buffer, 256 + 4 + 2);
 
                 /* Gap after sector */
