@@ -88,7 +88,7 @@ jobs:
           cpm65/atari800xlhd.atr
           cpm65/bbcmicro.ssd
           cpm65/c64.d64
-          cpm65/oricatmos.dsk
+          cpm65/oric.dsk
           cpm65/pet4032.d64
           cpm65/pet8032.d64
           cpm65/pet8096.d64

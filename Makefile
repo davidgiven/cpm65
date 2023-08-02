@@ -15,7 +15,7 @@ TARGETS = \
 	atari800xlhd.atr \
 	bbcmicro.ssd \
 	c64.d64 \
-	oricatmos.dsk \
+	oric.dsk \
 	pet4032.d64 \
 	pet8032.d64 \
 	pet8096.d64 \
@@ -176,10 +176,10 @@ $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts
 	ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
 	ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 	
-$(OBJDIR)/oricatmos.exe: $(OBJDIR)/src/bios/oricatmos.o $(OBJDIR)/libbios.a scripts/oricatmos.ld scripts/oricatmos-prelink.ld scripts/oricatmos-common.ld Makefile
+$(OBJDIR)/oric.exe: $(OBJDIR)/src/bios/oric.o $(OBJDIR)/libbios.a scripts/oric.ld scripts/oric-prelink.ld scripts/oric-common.ld Makefile
 	@mkdir -p $(dir $@)
-	ld.lld -Map -T scripts/oricatmos-prelink.ld -o $(OBJDIR)/oricatmos-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oricatmos.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oricatmos-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
+	ld.lld -Map -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
+	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oric-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 	
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
@@ -357,13 +357,13 @@ atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
 	cat $@.raw >> $@
 	rm $@.raw
 
-$(OBJDIR)/oricatmos.exe:
-oricatmos.dsk: $(OBJDIR)/oricatmos.exe $(OBJDIR)/bdos.sys Makefile \
+$(OBJDIR)/oric.exe:
+oric.dsk: $(OBJDIR)/oric.exe $(OBJDIR)/bdos.sys Makefile \
 			$(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/mkoricdsk
-	mkfs.cpm -f oric -b $(OBJDIR)/oricatmos.exe $(OBJDIR)/oricatmos.img
-	cpmcp -f oric $(OBJDIR)/oricatmos.img $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmchattr -f oric $(OBJDIR)/oricatmos.img sr 0:ccp.sys 0:bdos.sys
-	$(OBJDIR)/mkoricdsk -i $(OBJDIR)/oricatmos.img -o $@
+	mkfs.cpm -f oric -b $(OBJDIR)/oric.exe $(OBJDIR)/oric.img
+	cpmcp -f oric $(OBJDIR)/oric.img $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
+	cpmchattr -f oric $(OBJDIR)/oric.img sr 0:ccp.sys 0:bdos.sys
+	$(OBJDIR)/mkoricdsk -i $(OBJDIR)/oric.img -o $@
 
 clean:
 	rm -rf $(OBJDIR) bin $(TARGETS)

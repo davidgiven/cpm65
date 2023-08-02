@@ -205,9 +205,10 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
 ### Oric notes
 
-  - This disk image is a MFM_DISK format disk as used by Oricutron. You get
-    about 350kB on a disk. The CCP, BIOS and BDOS all live in overlay RAM,
-    leaving the entire user memory available for programs.
+  - This disk image is a MFM_DISK format disk as used by Oricutron. (If you need
+    a simple sector image, look at `.obj/oric.img`.) You get about 350kB on a
+    disk. The CCP, BIOS and BDOS all live in overlay RAM, leaving the entire user
+    memory available for programs.
 
   - If you're trying to run this on an Oric 1, you need the full upgrade to
     64kB (including overlay RAM).

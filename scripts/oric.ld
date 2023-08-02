@@ -1,7 +1,3 @@
-/* This performs a fake link, so that we can see how big the BIOS is going to
- * be, so it can get placed properly at the end of memory in the real link.
- * Sigh, ld. */
-
 MEMORY {
     zp : ORIGIN = 0, LENGTH = 0xff
     loram (rw) : ORIGIN = 0x400, LENGTH = 0xb100
@@ -14,11 +10,22 @@ MEMORY {
 }
 
 SECTIONS {
-	/DISCARD/ : {
-		*(sector1)
-		*(sector2)
-		*(sector3)
-	}
+	.head : {
+		*(sector1) 
+		. = ALIGN(256);
+	} >jasminboot AT>initram
 
-	INCLUDE "scripts/oricatmos-common.ld"
+	.head : {
+		*(sector2) 
+		. = ALIGN(256);
+		*(sector3)
+		. = ALIGN(256);
+	} >microdiscboot AT>initram
+
+	INCLUDE "scripts/oric-common.ld"
 }
+
+OUTPUT_FORMAT {
+	TRIM(initram)
+}
+
