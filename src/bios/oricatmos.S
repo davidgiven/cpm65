@@ -290,12 +290,12 @@ zproc _start
 
     ; Miscellaneous initialisation.
 
-	ldx #bss_top - bss_bottom - 1
+	ldx #bss_top - bss_bottom
 	lda #0
 	zrepeat
-		sta bss_bottom, x
+		sta bss_bottom-1, x
 		dex
-	zuntil_mi
+	zuntil_eq
 
     ldx #0xff
     stx buffered_host_sector
@@ -320,9 +320,6 @@ zproc _start
     lda #<biosentry
     ldx #>biosentry
     jmp __TPA1_START__ + COMHDR_ENTRY
-
-    zloop
-    zendloop
 
 bdos_filename:
     .ascii "BDOS    SYS"
@@ -630,6 +627,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
+	jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -643,6 +641,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
+	jmptabhi screen_setstyle
 zendproc
 
 zproc screen_version
@@ -702,6 +701,7 @@ zproc screen_putchar
 		pha
 		jsr calculate_cursor_address
 		pla
+		ora screen_style
 		sta (ptr), y
 	zendif
 
@@ -818,6 +818,7 @@ zproc screen_scrollup
 
     ldy #SCREEN_WIDTH-1
     lda #' '
+	ora screen_style
     zrepeat
         sta (ptr), y
         dey
@@ -851,6 +852,7 @@ zproc screen_scrolldown
 
     ldy #SCREEN_WIDTH-1
     lda #' '
+	ora screen_style
     zrepeat
         sta (ptr), y
         dey
@@ -862,12 +864,23 @@ zproc screen_cleartoeol
     jsr calculate_cursor_address
 
     lda #' '
+	ora screen_style
     zrepeat
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
     zuntil_eq
     rts
+zendproc
+
+zproc screen_setstyle
+	ldx #0
+	and #STYLE_REVERSE
+	zif_ne
+		ldx #0x80
+	zendif
+	stx screen_style
+	rts
 zendproc
 
 ; --- Keyboard --------------------------------------------------------------
@@ -1180,9 +1193,77 @@ zendproc
 
 ; --- Vectors ---------------------------------------------------------------
 
+zproc brk_handler
+	pla				; discard flags
+
+    ldy #message_end - message
+    zrepeat
+        tya
+        pha
+        lda message-1, y
+        jsr tty_conout
+        pla
+        tay
+        dey
+    zuntil_eq
+
+	pla
+	tay				; low byte of fault address
+	pla
+	tax				; high byte of fault address
+	tya
+	jsr print_hex16_number
+
+	lda #10
+	jsr tty_conout
+	lda #13
+	jsr tty_conout
+
+    lda #<biosentry
+    ldx #>biosentry
+    jmp __TPA1_START__ + COMHDR_ENTRY
+
+message: ; reversed!
+	.ascii " KRB"
+	.byte 13, 10, 13, 10
+message_end:
+zendproc
+
+; Prints a 16-bit hex number in XA.
+zproc print_hex16_number
+    pha
+    txa
+    jsr print_hex_number
+    pla
+    jmp print_hex_number
+zendproc
+
+; Prints an 8-bit hex number in A.
+zproc print_hex_number
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr print_hex4_number
+    pla
+print_hex4_number:
+    and #$0f
+    ora #'0'
+    cmp #'9'+1
+    zif_cs
+        adc #6
+    zendif
+    pha
+    jsr tty_conout
+    pla
+    rts
+zendproc
+
+
 .section "tail", "ax"
 
-    .word 0x5555
+    .word brk_handler
 
 ; --- Data ------------------------------------------------------------------
 
@@ -1212,6 +1293,7 @@ pending_key:			.fill 1		; ASCII code of pending keypress
 shift_pressed:			.fill 1		; top bit set if shift pressed
 ctrl_pressed:			.fill 1		; top bit set if ctrl pressed
 const_counter:			.fill 1		; number of consts until next key scan
+screen_style:			.fill 1		; top bit set if inverse video
 bss_top:
 
 .global directory_buffer
