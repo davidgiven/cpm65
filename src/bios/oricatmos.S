@@ -34,10 +34,14 @@
 #define JFDC_flags               0x03f8
 #define JFDC_drq                 0x03FC   
 
+#define JFDC_Flag_Side0          0b00000000
+#define JFDC_Flag_Side1          0b00000001
+
 #define JFDC_ovl_control         0x03FA
 #define JFDC_rom_control         0x03FB
 
 #define JCMD_ReadSector          0x8c
+#define JCMD_WriteSector         0xac
 #define JCMD_Seek                0x1F
 
 #define FLOPPY_DELAY            30
@@ -159,6 +163,35 @@ jasmin_start:
         inc ptr+1
         cpx #4 + BIOS_SECTOR_COUNT
     zuntil_eq
+
+    /* Patch the BIOS floppy routines to use the Jasmin registers. */
+
+    lda #JFDC_Flag_Side0
+    sta __fdc_side0_flag
+    lda #JFDC_Flag_Side1
+    sta __fdc_side1_flag
+    lda #JCMD_ReadSector
+    sta __fdc_readsector_cmd
+    lda #JCMD_WriteSector
+    sta __fdc_writesector_cmd
+    lda #JCMD_Seek
+    sta __fdc_seek_cmd
+    lda #<JFDC_command_register
+    sta __fdc_command_reg
+    lda #<JFDC_drq
+    sta __fdc_drq_reg
+    lda #<JFDC_status_register
+    sta __fdc_status_reg
+    lda #<JFDC_flags
+    sta __fdc_flags_reg
+    lda #<JFDC_data
+    sta __fdc_data_reg_0
+    sta __fdc_data_reg_1
+    sta __fdc_data_reg_2
+    lda #<JFDC_track_register
+    sta __fdc_track_reg
+    lda #<JFDC_sector_register
+    sta __fdc_sector_reg
 
     jmp _start
 
@@ -916,7 +949,6 @@ zproc scan_keyboard
             sta VIA_PA
             lda #0xff               ; write to AY
             sta VIA_PCR
-
             lda #0xdd               ; clear CB2
             sta VIA_PCR
 
@@ -1080,16 +1112,12 @@ zproc change_sector
     lda requested_track
     sta buffered_track
 
-    jsr prepare_fdc
-
-    lda #MCMD_ReadSector
-	jsr write_fdc_command
+    jsr prepare_read_fdc_command
 
     ldy #0
     zrepeat
-        zrepeat
-            lda MFDC_drq
-        zuntil_pl
+        jsr wait_for_fdc_ready
+__fdc_data_reg_0 = . + 1
         lda MFDC_data
         sta DISK_BUFFER, y
         iny
@@ -1100,17 +1128,13 @@ zproc change_sector
 zendproc
 
 zproc flush_buffer
-	jsr prepare_fdc
-
-	lda #MCMD_WriteSector
-	jsr write_fdc_command
+	jsr prepare_write_fdc_command
 
 	ldy #0
 	zrepeat
-		zrepeat
-			lda MFDC_drq
-		zuntil_pl
+        jsr wait_for_fdc_ready
 		lda DISK_BUFFER, y
+__fdc_data_reg_1 = . + 1
 		sta MFDC_data
 		iny
 	zuntil_eq
@@ -1128,11 +1152,14 @@ zproc prepare_fdc
 
     lda buffered_track
     lsr a                           ; bottom bit is the side
+__fdc_track_reg = . + 1
     cmp MFDC_track_register
     zif_ne
+__fdc_data_reg_2 = . + 1
         sta MFDC_data               ; computed track
+__fdc_seek_cmd = . + 1
         lda #MCMD_Seek
-        sta MFDC_command_register
+        jsr write_fdc_command
 
         jsr wait_for_fdc_completion
     zendif
@@ -1141,16 +1168,20 @@ zproc prepare_fdc
 
     ldx buffered_host_sector
     inx                             ; FDC wants 1-based sectors
+__fdc_sector_reg = . + 1
     stx MFDC_sector_register
 
     ; Set head.
 
+__fdc_side0_flag = . + 1
     ldx #MFDC_Flag_Side0
     lda buffered_track
     ror a
     zif_cs
+__fdc_side1_flag = . + 1
         ldx #MFDC_Flag_Side1
     zendif
+__fdc_flags_reg = . + 1
     stx MFDC_flags
 
     rts
@@ -1158,6 +1189,7 @@ zendproc
 
 zproc wait_for_fdc_ready
     zrepeat
+__fdc_drq_reg = . + 1
         lda MFDC_drq
     zuntil_pl
     rts
@@ -1172,6 +1204,7 @@ zproc wait_for_fdc_completion
     zuntil_eq
 
     zloop
+__fdc_status_reg = . + 1
         lda MFDC_status_register
         lsr a
     zuntil_cc
@@ -1179,7 +1212,14 @@ zproc wait_for_fdc_completion
     rts
 zendproc
 
+zproc prepare_read_fdc_command
+    jsr prepare_fdc
+__fdc_readsector_cmd = . + 1
+    lda #MCMD_ReadSector
+zendproc
+    ; fall through
 zproc write_fdc_command
+__fdc_command_reg = . + 1
     sta MFDC_command_register
 
     ldy #4
@@ -1189,6 +1229,13 @@ zproc write_fdc_command
         dey
     zuntil_eq
 	rts
+zendproc
+
+zproc prepare_write_fdc_command
+    jsr prepare_fdc
+__fdc_writesector_cmd = . + 1
+    lda #MCMD_WriteSector
+    jmp write_fdc_command
 zendproc
 
 ; --- Vectors ---------------------------------------------------------------
