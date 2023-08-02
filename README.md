@@ -24,6 +24,9 @@ to the 6502. So far it runs on:
   - Atari 400/800 XL/XE; 16kB minimum; TPA ranging from 8.5kB up to over 49kB
     on a 64kB XL/XE machine.
 
+  - Oric 1 and Oric Atmos (but not, currently, the Telestrat) with Microdisc
+    interface; TPA 44kB.
+
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
 much less standardised than 8080 and Z80 systems. (The systems above all load
@@ -46,6 +49,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/pet8096.png"><img src="doc/pet8096.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 8096"></a>
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
+<a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
 </div>
 
 
@@ -198,6 +202,24 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
     console font (setfnt.com). This consumes at least 1kB of TPA (depending
     on the padding needed for alignment), but shows proper glyphs like curly
     braces and tilde.
+
+### Oric notes
+
+  - This disk image is a MFM_DISK format disk as used by Oricutron. You get
+    about 350kB on a disk. The CCP, BIOS and BDOS all live in overlay RAM,
+    leaving the entire user memory available for programs.
+
+  - If you're trying to run this on an Oric 1, you need the full upgrade to
+    64kB (including overlay RAM).
+
+  - Only the Microdisc interface currently works. (It's supposed to work with
+    Jasmin too, but with Oricutron it boots but the keyboard is unresponsive, and
+    I don't know why.) Only the first drive is supported. This would be easy to
+    extend if anyone's interested.
+
+  - The console is 40x28. It has a SCREEN driver.
+
+  - The port runs completely bare-metal and does not use any ROM routines.
 
 ### Supported programs
 
