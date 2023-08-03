@@ -179,7 +179,8 @@ jasmin_start:
     lda #<JFDC_command_register
     sta __fdc_command_reg
     lda #<JFDC_drq
-    sta __fdc_drq_reg
+    sta __fdc_drq_reg_0
+    sta __fdc_drq_reg_1
     lda #<JFDC_status_register
     sta __fdc_status_reg
     lda #<JFDC_flags
@@ -445,7 +446,7 @@ zproc entry_SETSEC
     lda (ptr), y
     sta ptr1+1
 
-    ; There are 36 CP/M sectors per host track. Do a 16-bit divide.
+    ; There are 34 CP/M sectors per host track. Do a 16-bit divide.
 
     lda #0
     sta requested_cpm_sector
@@ -456,9 +457,9 @@ zproc entry_SETSEC
         asl ptr1+0
         rol ptr1+1
         rol a
-        cmp #36
+        cmp #34
         zif_cs
-            sbc #36
+            sbc #34
             inc ptr1+0
         zendif
         dex
@@ -1015,7 +1016,6 @@ zproc key_state_changed
 	adc ptr+0
 	tax
 
-break:
 	cpx #0x23
 	beq shift_change
 	cpx #0x3b
@@ -1116,14 +1116,27 @@ zproc change_sector
 
     ldy #0
     zrepeat
-        jsr wait_for_fdc_ready
+        zrepeat
+__fdc_drq_reg_0 = . + 1
+            lda MFDC_drq
+        zuntil_pl
 __fdc_data_reg_0 = . + 1
         lda MFDC_data
         sta DISK_BUFFER, y
         iny
     zuntil_eq
 
+    jsr wait_for_fdc_completion
     clc
+    and #0x1c
+    zif_ne
+        ; Some kind of read error. The data in the buffer is corrupt.
+
+        lda #0xff
+        sta buffered_track
+        
+        sec
+    zendif
     rts
 zendproc
 
@@ -1132,16 +1145,26 @@ zproc flush_buffer
 
 	ldy #0
 	zrepeat
-        jsr wait_for_fdc_ready
+        zrepeat
+__fdc_drq_reg_1 = . + 1
+            lda MFDC_drq
+        zuntil_pl
 		lda DISK_BUFFER, y
 __fdc_data_reg_1 = . + 1
 		sta MFDC_data
 		iny
 	zuntil_eq
 
-	lda #0
-	sta buffer_dirty
-    clc
+    jsr wait_for_fdc_completion
+    sec
+    and #0x1c
+    zif_eq
+        ; A successful write, so mark the buffer as clean.
+
+        lda #0
+        sta buffer_dirty
+        clc
+    zendif
     rts
 zendproc
 
@@ -1184,14 +1207,6 @@ __fdc_side1_flag = . + 1
 __fdc_flags_reg = . + 1
     stx MFDC_flags
 
-    rts
-zendproc
-
-zproc wait_for_fdc_ready
-    zrepeat
-__fdc_drq_reg = . + 1
-        lda MFDC_drq
-    zuntil_pl
     rts
 zendproc
 
@@ -1243,11 +1258,11 @@ zendproc
 zproc brk_handler
 	pla				; discard flags
 
-    ldy #message_end - message
+    ldy #brk_message_end - brk_message
     zrepeat
         tya
         pha
-        lda message-1, y
+        lda brk_message-1, y
         jsr tty_conout
         pla
         tay
@@ -1270,10 +1285,33 @@ zproc brk_handler
     ldx #>biosentry
     jmp __TPA1_START__ + COMHDR_ENTRY
 
-message: ; reversed!
+brk_message: ; reversed!
 	.ascii " KRB"
 	.byte 13, 10, 13, 10
-message_end:
+brk_message_end:
+zendproc
+
+zproc nmi_handler
+    ldy #nmi_message_end - nmi_message
+    zrepeat
+        tya
+        pha
+        lda nmi_message-1, y
+        jsr tty_conout
+        pla
+        tay
+        dey
+    zuntil_eq
+
+    lda #<biosentry
+    ldx #>biosentry
+    jmp __TPA1_START__ + COMHDR_ENTRY
+
+nmi_message: ; reversed!
+    .byte 13, 10
+	.ascii "IMN"
+	.byte 13, 10, 13, 10
+nmi_message_end:
 zendproc
 
 ; Prints a 16-bit hex number in XA.
@@ -1307,9 +1345,10 @@ print_hex4_number:
     rts
 zendproc
 
-
 .section "tail", "ax"
 
+    .word nmi_handler
+    .word 0
     .word brk_handler
 
 ; --- Data ------------------------------------------------------------------
@@ -1323,7 +1362,7 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 2844, 2048, 64, 36
+define_drive dph, 2844, 2048, 64, 34
 
 .bss
 

@@ -52,7 +52,7 @@ static std::string infilename;
 static std::string outfilename;
 static int heads = 2;
 static int tracks = 40;
-static int sectors = 18;
+static int sectors = 17;
 static int geometry = 1;
 static int gap1 = 12;
 static int gap2 = 34;
