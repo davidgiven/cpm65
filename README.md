@@ -215,8 +215,8 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
   - Only the Microdisc interface currently works. (It's supposed to work with
     Jasmin too, but with Oricutron it boots but the keyboard is unresponsive, and
-    I don't know why.) Only the first drive is supported. This would be easy to
-    extend if anyone's interested.
+    on MAME it boots into BASIC, and I don't know why.) Only the first drive is
+    supported. This would be easy to extend if anyone's interested.
 
   - The console is 40x28. It has a SCREEN driver.
 
