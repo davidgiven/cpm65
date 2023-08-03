@@ -76,7 +76,9 @@ zproc loadfile
     ; Scan the directory for the filename.
 
     zloop
-        jsr readsector
+        zloop
+            jsr readsector
+        zuntil_cc
 
         lda #0x01
         zrepeat
@@ -171,7 +173,9 @@ found:
             lda destination_addr+0
             ldx destination_addr+1
             jsr entry_SETDMA
-            jsr readsector
+            zrepeat
+                jsr readsector
+            zuntil_cc
 
             ; Advance to the next sector.
 
