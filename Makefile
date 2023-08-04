@@ -175,12 +175,12 @@ $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts
 	@mkdir -p $(dir $@)
 	ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
 	ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
-	
+
 $(OBJDIR)/oric.exe: $(OBJDIR)/src/bios/oric.o $(OBJDIR)/libbios.a scripts/oric.ld scripts/oric-prelink.ld scripts/oric-common.ld Makefile
 	@mkdir -p $(dir $@)
-	ld.lld -Map -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
+	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oric-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
-	
+
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
 	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(filter %.a,$^) $(LINKFLAGS)
@@ -188,7 +188,7 @@ $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 $(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
 	@mkdir -p $(dir $@)
 	bin/fontconvert third_party/tomsfonts/atari-small.bdf > $@
-	
+
 $(OBJDIR)/bbcmicrofs.img: $(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys
 	mkfs.cpm -f bbc192 $@
 	cpmcp -f bbc192 $@ $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
@@ -357,7 +357,6 @@ atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
 	cat $@.raw >> $@
 	rm $@.raw
 
-$(OBJDIR)/oric.exe:
 oric.dsk: $(OBJDIR)/oric.exe $(OBJDIR)/bdos.sys Makefile \
 			$(APPS) $(SCREEN_APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/mkoricdsk
 	mkfs.cpm -f oric -b $(OBJDIR)/oric.exe $(OBJDIR)/oric.img

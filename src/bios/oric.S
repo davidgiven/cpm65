@@ -15,10 +15,12 @@
 #define MFDC_sector_register     0x0312
 #define MFDC_data                0x0313
 #define MFDC_flags               0x0314
-#define MFDC_drq                 0x0318   
+#define MFDC_drq                 0x0318
 
 #define MFDC_Flag_Side0          0b10000001
 #define MFDC_Flag_Side1          0b10010001
+
+#define MFDC_ID                  0
 
 #define MCMD_ReadSector          0x80
 #define MCMD_WriteSector         0xa0
@@ -32,13 +34,15 @@
 #define JFDC_sector_register     0x03f6
 #define JFDC_data                0x03f7
 #define JFDC_flags               0x03f8
-#define JFDC_drq                 0x03FC   
+#define JFDC_drq                 0x03FC
 
 #define JFDC_Flag_Side0          0b00000000
 #define JFDC_Flag_Side1          0b00000001
 
 #define JFDC_ovl_control         0x03FA
 #define JFDC_rom_control         0x03FB
+
+#define JFDC_ID                  1
 
 #define JCMD_ReadSector          0x8c
 #define JCMD_WriteSector         0xac
@@ -194,6 +198,7 @@ jasmin_start:
     lda #<JFDC_sector_register
     sta __fdc_sector_reg
 
+    lda #JFDC_ID
     jmp _start
 
 .section "sector2", "ax"
@@ -280,6 +285,7 @@ sector2_start:
         cpx #4 + BIOS_SECTOR_COUNT
     zuntil_eq
 
+    lda #MFDC_ID
     jmp _start
 
 .section "sector3", "ax"
@@ -309,8 +315,10 @@ sector2_start:
 /* This is run once on startup and then discarded. */
 
 zproc _start
+    pha                     ; store xFDC_ID
+    jsr init_hardware
     jsr screen_clear
-    
+
     ldy #banner_end - banner
     zrepeat
         tya
@@ -322,14 +330,46 @@ zproc _start
         dey
     zuntil_eq
 
+    pla                     ; get xFDC_ID back
+    zif_ne
+      ldy #msg_jasmin_end - msg_jasmin
+      zrepeat
+          tya
+          pha
+          lda msg_jasmin-1, y
+          jsr tty_conout
+          pla
+          tay
+          dey
+      zuntil_eq
+      beq msg_crlf
+    zendif
+
+    ldy #msg_microdisc_end - msg_microdisc
+    zrepeat
+        tya
+        pha
+        lda msg_microdisc-1, y
+        jsr tty_conout
+        pla
+        tay
+        dey
+    zuntil_eq
+
+msg_crlf:
+    lda #10
+    jsr tty_conout
+    lda #13
+    jsr tty_conout
+
     ; Miscellaneous initialisation.
 
-	ldx #bss_top - bss_bottom
-	lda #0
-	zrepeat
-		sta bss_bottom-1, x
-		dex
-	zuntil_eq
+    ldx #bss_top - bss_bottom
+    lda #0
+    zrepeat
+        sta bss_bottom-1, x
+        dex
+    zuntil_eq
 
     ldx #0xff
     stx buffered_host_sector
@@ -348,7 +388,7 @@ zproc _start
     lda #>__TPA1_START__
     ldx #__ZEROPAGE_START__
     jsr entry_RELOCATE
-	
+
     ; Go!
 
     lda #<biosentry
@@ -358,17 +398,103 @@ zproc _start
 bdos_filename:
     .ascii "BDOS    SYS"
 
+msg_jasmin:
+    .ascii "nimsaJ"
+msg_jasmin_end:
+
+msg_microdisc:
+    .ascii "csidorciM"
+msg_microdisc_end:
+
 banner: ; reversed!
-    .byte 13, 10
-    .ascii "cirO eht rof 56-M/PC"
+    .ascii "/cirO eht rof 56-M/PC"
 banner_end:
 
+zendproc
+
+; Initializes VIA and AY-3-8912 defaults (iss)
+zproc init_hardware
+
+    lda   #0xff
+    sta   VIA_PA
+    sta   VIA_ORA
+    sta   VIA_DDRA
+    lda   #0xb7
+    sta   VIA_PB
+    lda   #0xf7
+    sta   VIA_DDRB
+    lda   #0xdd
+    sta   VIA_PCR
+    lda   #0x7f
+    sta   VIA_IER
+    lda   #0x40
+    sta   VIA_ACR
+
+    lda   #<50000           ; 50 msec
+    ldx   #>50000
+    sta   VIA_T1LL
+    sta   VIA_T1CL
+    stx   VIA_T1LH
+    stx   VIA_T1CH
+
+    lda   #0xc0             ; enable T1 interrupt
+    sta   VIA_IER
+
+    lda   #0x07             ; set i/o port on 8912 to output
+    ldx   #0x3f             ; and disable mixer
+    jsr   psg_x2a
+
+    lda   #0x08             ; mute all channels
+    ldx   #0x00
+    jsr   psg_x2a
+    lda   #0x09
+    ldx   #0x00
+    jsr   psg_x2a
+    lda   #0x0a
+    ldx   #0x00
+    jsr   psg_x2a
+
+    lda   #0x00
+    ldx   #0x7f
+    jsr   psg_x2a
+
+    lda   #0x01
+    ldx   #0x00
+;   jmp   psg_x2a           ; fall trough
+zendproc
+
+; Writes X to port A
+zproc psg_x2a
+    sta   VIA_PA
+    tay
+    txa
+    cpy   #0x07
+    zif_eq
+      ora   #0x40
+    zendif
+    pha
+    lda   VIA_PCR
+    ora   #0xee
+    sta   VIA_PCR
+    and   #0x11
+    ora   #0xcc
+    sta   VIA_PCR
+    tax
+    pla
+    sta   VIA_PA
+    txa
+    ora   #0xec
+    sta   VIA_PCR
+    and   #0x11
+    ora   #0xcc
+    sta   VIA_PCR
+    rts
 zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
 zproc entry_GETTPA
-	ldy current_bank
+    ldy current_bank
     lda mem_base, y
     ldx mem_end, y
     clc
@@ -376,7 +502,7 @@ zproc entry_GETTPA
 zendproc
 
 zproc entry_SETTPA
-	ldy current_bank
+    ldy current_bank
     sta mem_base, y
     stx mem_end, y
     clc
@@ -398,7 +524,7 @@ zproc entry_SETZP
 zendproc
 
 zproc entry_SETBANK
-	sta current_bank
+    sta current_bank
     rts
 zendproc
 
@@ -494,36 +620,36 @@ zproc entry_READ
 zendproc
 
 zproc entry_WRITE
-	pha
+    pha
     jsr change_sector
-	pla
-	zif_cc
-		pha
+    pla
+    zif_cc
+        pha
 
-		lda requested_cpm_sector
+        lda requested_cpm_sector
         ror a
         lda #0
         ror a               ; 0x00 or 0x80
         tax
 
-		ldy #0
-		zrepeat
-			lda (dma), y
-			sta DISK_BUFFER, x
-			inx
-			iny
-			cpy #0x80
-		zuntil_eq
+        ldy #0
+        zrepeat
+            lda (dma), y
+            sta DISK_BUFFER, x
+            inx
+            iny
+            cpy #0x80
+        zuntil_eq
 
-		lda #0x80
-		sta buffer_dirty
+        lda #0x80
+        sta buffer_dirty
 
-		clc
-		pla
-		zif_ne
-			jsr flush_buffer
-		zendif
-	zendif
+        clc
+        pla
+        zif_ne
+            jsr flush_buffer
+        zendif
+    zendif
     rts
 zendproc
 
@@ -554,12 +680,12 @@ zendproc
 ; Returns 0xff if no key is pending, 0 if one is.
 
 zproc tty_const
-	dec const_counter
-	zif_mi
-		lda #16
-		sta const_counter
-		jsr scan_keyboard
-	zendif
+    dec const_counter
+    zif_mi
+        lda #16
+        sta const_counter
+        jsr scan_keyboard
+    zendif
 
     lda pending_key
     zif_ne
@@ -661,7 +787,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
-	jmptablo screen_setstyle
+    jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -675,7 +801,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-	jmptabhi screen_setstyle
+    jmptabhi screen_setstyle
 zendproc
 
 zproc screen_version
@@ -730,14 +856,14 @@ zproc screen_getcursor
 zendproc
 
 zproc screen_putchar
-	cmp #32
-	zif_cs
-		pha
-		jsr calculate_cursor_address
-		pla
-		ora screen_style
-		sta (ptr), y
-	zendif
+    cmp #32
+    zif_cs
+        pha
+        jsr calculate_cursor_address
+        pla
+        ora screen_style
+        sta (ptr), y
+    zendif
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
@@ -777,7 +903,7 @@ zendproc
 zproc calculate_line_address
     clc
     rol ptr+1           ; shift a zero bit into the bottom of ptr+1
-    
+
     ; x*40 = x*8 + x*32.
 
     ; We have 28 lines. As 28*8 will fit in a byte, we can do this easily.
@@ -819,11 +945,11 @@ zproc calculate_line_address
 zendproc
 
 zproc toggle_cursor
-	jsr calculate_cursor_address
-	lda (ptr), y
-	eor #0x80
-	sta (ptr), y
-	rts
+    jsr calculate_cursor_address
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
+    rts
 zendproc
 
 zproc screen_scrollup
@@ -852,7 +978,7 @@ zproc screen_scrollup
 
     ldy #SCREEN_WIDTH-1
     lda #' '
-	ora screen_style
+    ora screen_style
     zrepeat
         sta (ptr), y
         dey
@@ -886,7 +1012,7 @@ zproc screen_scrolldown
 
     ldy #SCREEN_WIDTH-1
     lda #' '
-	ora screen_style
+    ora screen_style
     zrepeat
         sta (ptr), y
         dey
@@ -898,7 +1024,7 @@ zproc screen_cleartoeol
     jsr calculate_cursor_address
 
     lda #' '
-	ora screen_style
+    ora screen_style
     zrepeat
         sta (ptr), y
         iny
@@ -908,32 +1034,32 @@ zproc screen_cleartoeol
 zendproc
 
 zproc screen_setstyle
-	ldx #0
-	and #STYLE_REVERSE
-	zif_ne
-		ldx #0x80
-	zendif
-	stx screen_style
-	rts
+    ldx #0
+    and #STYLE_REVERSE
+    zif_ne
+        ldx #0x80
+    zendif
+    stx screen_style
+    rts
 zendproc
 
 ; --- Keyboard --------------------------------------------------------------
 
 zproc screen_getchar
-	jsr toggle_cursor
+    jsr toggle_cursor
     zrepeat
         jsr scan_keyboard
-		lda pending_key
+        lda pending_key
     zuntil_ne
-	pha
-	jsr toggle_cursor
-	pla
+    pha
+    jsr toggle_cursor
+    pla
 
-	ldx #0
-	stx pending_key
+    ldx #0
+    stx pending_key
 
-	clc
-	rts
+    clc
+    rts
 zendproc
 
 ; Does a single keyboard scan, processing any pressed keys. Last pressed key
@@ -943,7 +1069,7 @@ zproc scan_keyboard
     ldy #7                      ; row counter
     zrepeat
         sty VIA_PB
-        
+
         ldx #7                      ; column counter
         zrepeat
             lda #0x0e               ; AY column register
@@ -960,36 +1086,36 @@ zproc scan_keyboard
             lda #0xdd
             sta VIA_PCR
 
-			; Bit 3 of PB is now set if a key is pressed.
+            ; Bit 3 of PB is now set if a key is pressed.
 
             lda VIA_PB
             and #0x08
-			lsr a
-			lsr a
-			lsr a
-			lsr a					; C is set if key is pressed
-			zif_cs
-				lda column_store_values, x
-			zendif
-			eor keypress_bitfield, y
-			and column_store_values, x ; has key changed state?
-			zif_ne
-				; Key has changed state.
+            lsr a
+            lsr a
+            lsr a
+            lsr a                   ; C is set if key is pressed
+            zif_cs
+                lda column_store_values, x
+            zendif
+            eor keypress_bitfield, y
+            and column_store_values, x ; has key changed state?
+            zif_ne
+                ; Key has changed state.
 
-				eor keypress_bitfield, y
-				sta keypress_bitfield, y ; update bitfield
+                eor keypress_bitfield, y
+                sta keypress_bitfield, y ; update bitfield
 
-				txa
-				pha
-				tya
-				pha
+                txa
+                pha
+                tya
+                pha
 
-				jsr key_state_changed
+                jsr key_state_changed
 
-				pla
-				tay
-				pla
-				tax
+                pla
+                tay
+                pla
+                tax
             zendif
 
             dex
@@ -1000,83 +1126,83 @@ zproc scan_keyboard
     rts
 
 column_pa_values:
-	.byte 0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe
+    .byte 0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe
 column_store_values:
-	.byte 1, 2, 4, 8, 16, 32, 64, 128
+    .byte 1, 2, 4, 8, 16, 32, 64, 128
 zendproc
 
 zproc key_state_changed
-	tya
-	asl a
-	asl a
-	asl a
-	sta ptr+0
-	txa
-	clc
-	adc ptr+0
-	tax
+    tya
+    asl a
+    asl a
+    asl a
+    sta ptr+0
+    txa
+    clc
+    adc ptr+0
+    tax
 
-	cpx #0x23
-	beq shift_change
-	cpx #0x3b
-	beq shift_change
-	cpx #0x13
-	beq ctrl_change
+    cpx #0x23
+    beq shift_change
+    cpx #0x3b
+    beq shift_change
+    cpx #0x13
+    beq ctrl_change
 
-	lda VIA_PB
-	and #0x08
-	zif_ne
-		lda keyboard_decode_tab, x
-		bit shift_pressed
-		zif_mi
-			lda keyboard_shift_decode_tab, x
-		zendif
-		bit ctrl_pressed
-		zif_mi
-			and #0x1f
-		zendif
-		sta pending_key
-	zendif
-	rts
+    lda VIA_PB
+    and #0x08
+    zif_ne
+        lda keyboard_decode_tab, x
+        bit shift_pressed
+        zif_mi
+            lda keyboard_shift_decode_tab, x
+        zendif
+        bit ctrl_pressed
+        zif_mi
+            and #0x1f
+        zendif
+        sta pending_key
+    zendif
+    rts
 
 shift_change:
-	lda keypress_bitfield+4
-	ora keypress_bitfield+7
-	asl a
-	asl a
-	asl a
-	asl a
-	sta shift_pressed
-	rts
+    lda keypress_bitfield+4
+    ora keypress_bitfield+7
+    asl a
+    asl a
+    asl a
+    asl a
+    sta shift_pressed
+    rts
 
 ctrl_change:
-	lda keypress_bitfield+2
-	asl a
-	asl a
-	asl a
-	asl a
-	sta ctrl_pressed
-	rts
+    lda keypress_bitfield+2
+    asl a
+    asl a
+    asl a
+    asl a
+    sta ctrl_pressed
+    rts
 
 keyboard_decode_tab:
-	.byte '3', 'x', '1', 0, 'v', '5', 'n', '7'
-	.byte 'd', 'q', 27,  0, 'f', 'r', 't', 'j'
-	.byte 'c', '2', 'z', 0, '4', 'b', '6', 'm'
-	.byte '\'', '\\', 0, 0, '-', ';', '9', 'k'
-	.byte 0,   0,   0,   0, 0,   '.', ',', ' '
-	.byte '[', ']', 127, 0, 'p', 'o', 'i', 'u'
-	.byte 'w', 's', 'a', 0, 'e', 'g', 'h', 'y'
-	.byte '=',  0,  13,  0, '/', '0', 'l', '8'
+    .byte '3', 'x', '1', 0, 'v', '5', 'n', '7'
+    .byte 'd', 'q', 27,  0, 'f', 'r', 't', 'j'
+    .byte 'c', '2', 'z', 0, '4', 'b', '6', 'm'
+    .byte '\'', '\\', 0, 0, '-', ';', '9', 'k'
+    .byte 0,   0,   0,   0, 0,   '.', ',', ' '
+    .byte '[', ']', 127, 0, 'p', 'o', 'i', 'u'
+    .byte 'w', 's', 'a', 0, 'e', 'g', 'h', 'y'
+    .byte '=',  0,  13,  0, '/', '0', 'l', '8'
 
 keyboard_shift_decode_tab:
-	.byte '#', 'X', '!', 0, 'V', '%', 'N', '&'
-	.byte 'D', 'Q', 27,  0, 'F', 'R', 'T', 'J'
-	.byte 'C', '"', 'Z', 0, '$', 'B', '^', 'M'
-	.byte '\'', '\\', 0, 0, '_', ':', '(', 'K'
-	.byte 0,   0,   0,   0, 0,   '<', '>', ' '
-	.byte '{', '}', 127, 0, 'P', 'O', 'I', 'U'
-	.byte 'W', 'S', 'A', 0, 'E', 'G', 'H', 'Y'
-	.byte '+',  0,  13,  0, '|', '0', 'L', '*'
+    .byte '#', 'X', '!', 0, 'V', '%', 'N', '&'
+    .byte 'D', 'Q', 27,  0, 'F', 'R', 'T', 'J'
+    .byte 'C', '"', 'Z', 0, '$', 'B', '^', 'M'
+    .byte '\'', '\\', 0, 0, '_', ':', '(', 'K'
+    .byte 0,   0,   0,   0, 0,   '<', '>', ' '
+    .byte '{', '}', 127, 0, 'P', 'O', 'I', 'U'
+    .byte 'W', 'S', 'A', 0, 'E', 'G', 'H', 'Y'
+    .byte '+',  0,  13,  0, '|', '0', 'L', '*'
 zendproc
 
 
@@ -1134,26 +1260,26 @@ __fdc_data_reg_0 = . + 1
 
         lda #0xff
         sta buffered_track
-        
+
         sec
     zendif
     rts
 zendproc
 
 zproc flush_buffer
-	jsr prepare_write_fdc_command
+    jsr prepare_write_fdc_command
 
-	ldy #0
-	zrepeat
+    ldy #0
+    zrepeat
         zrepeat
 __fdc_drq_reg_1 = . + 1
             lda MFDC_drq
         zuntil_pl
-		lda DISK_BUFFER, y
+        lda DISK_BUFFER, y
 __fdc_data_reg_1 = . + 1
-		sta MFDC_data
-		iny
-	zuntil_eq
+        sta MFDC_data
+        iny
+    zuntil_eq
 
     jsr wait_for_fdc_completion
     sec
@@ -1243,7 +1369,7 @@ __fdc_command_reg = . + 1
         nop
         dey
     zuntil_eq
-	rts
+    rts
 zendproc
 
 zproc prepare_write_fdc_command
@@ -1256,7 +1382,7 @@ zendproc
 ; --- Vectors ---------------------------------------------------------------
 
 zproc brk_handler
-	pla				; discard flags
+    pla             ; discard flags
 
     ldy #brk_message_end - brk_message
     zrepeat
@@ -1269,25 +1395,25 @@ zproc brk_handler
         dey
     zuntil_eq
 
-	pla
-	tay				; low byte of fault address
-	pla
-	tax				; high byte of fault address
-	tya
-	jsr print_hex16_number
+    pla
+    tay             ; low byte of fault address
+    pla
+    tax             ; high byte of fault address
+    tya
+    jsr print_hex16_number
 
-	lda #10
-	jsr tty_conout
-	lda #13
-	jsr tty_conout
+    lda #10
+    jsr tty_conout
+    lda #13
+    jsr tty_conout
 
     lda #<biosentry
     ldx #>biosentry
     jmp __TPA1_START__ + COMHDR_ENTRY
 
 brk_message: ; reversed!
-	.ascii " KRB"
-	.byte 13, 10, 13, 10
+    .ascii " KRB"
+    .byte 13, 10, 13, 10
 brk_message_end:
 zendproc
 
@@ -1309,8 +1435,8 @@ zproc nmi_handler
 
 nmi_message: ; reversed!
     .byte 13, 10
-	.ascii "IMN"
-	.byte 13, 10, 13, 10
+    .ascii "IMN"
+    .byte 13, 10, 13, 10
 nmi_message_end:
 zendproc
 
@@ -1374,12 +1500,12 @@ buffered_host_sector:   .fill 1     ; host sector in buffer
 buffered_track:         .fill 1     ; track in buffer
 buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
 directory_buffer:       .fill 128   ; used by the BDOS
-keypress_bitfield:		.fill 8		; stores which keys are pressed
-pending_key:			.fill 1		; ASCII code of pending keypress
-shift_pressed:			.fill 1		; top bit set if shift pressed
-ctrl_pressed:			.fill 1		; top bit set if ctrl pressed
-const_counter:			.fill 1		; number of consts until next key scan
-screen_style:			.fill 1		; top bit set if inverse video
+keypress_bitfield:      .fill 8     ; stores which keys are pressed
+pending_key:            .fill 1     ; ASCII code of pending keypress
+shift_pressed:          .fill 1     ; top bit set if shift pressed
+ctrl_pressed:           .fill 1     ; top bit set if ctrl pressed
+const_counter:          .fill 1     ; number of consts until next key scan
+screen_style:           .fill 1     ; top bit set if inverse video
 bss_top:
 
 .global directory_buffer
