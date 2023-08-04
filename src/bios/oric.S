@@ -15,10 +15,12 @@
 #define MFDC_sector_register     0x0312
 #define MFDC_data                0x0313
 #define MFDC_flags               0x0314
-#define MFDC_drq                 0x0318   
+#define MFDC_drq                 0x0318
 
 #define MFDC_Flag_Side0          0b10000001
 #define MFDC_Flag_Side1          0b10010001
+
+#define MFDC_ID                  0
 
 #define MCMD_ReadSector          0x80
 #define MCMD_WriteSector         0xa0
@@ -32,13 +34,15 @@
 #define JFDC_sector_register     0x03f6
 #define JFDC_data                0x03f7
 #define JFDC_flags               0x03f8
-#define JFDC_drq                 0x03FC   
+#define JFDC_drq                 0x03FC
 
 #define JFDC_Flag_Side0          0b00000000
 #define JFDC_Flag_Side1          0b00000001
 
 #define JFDC_ovl_control         0x03FA
 #define JFDC_rom_control         0x03FB
+
+#define JFDC_ID                  1
 
 #define JCMD_ReadSector          0x8c
 #define JCMD_WriteSector         0xac
@@ -194,6 +198,7 @@ jasmin_start:
     lda #<JFDC_sector_register
     sta __fdc_sector_reg
 
+    lda #JFDC_ID
     jmp _start
 
 .section "sector2", "ax"
@@ -280,6 +285,7 @@ sector2_start:
         cpx #4 + BIOS_SECTOR_COUNT
     zuntil_eq
 
+    lda #MFDC_ID
     jmp _start
 
 .section "sector3", "ax"
@@ -309,8 +315,10 @@ sector2_start:
 /* This is run once on startup and then discarded. */
 
 zproc _start
+    pha                     ; store xFDC_ID
+    jsr init_hardware
     jsr screen_clear
-    
+
     ldy #banner_end - banner
     zrepeat
         tya
@@ -321,6 +329,38 @@ zproc _start
         tay
         dey
     zuntil_eq
+
+    pla                     ; get xFDC_ID back
+    zif_ne
+      ldy #msg_jasmin_end - msg_jasmin
+      zrepeat
+          tya
+          pha
+          lda msg_jasmin-1, y
+          jsr tty_conout
+          pla
+          tay
+          dey
+      zuntil_eq
+      beq msg_crlf
+    zendif
+
+    ldy #msg_microdisc_end - msg_microdisc
+    zrepeat
+        tya
+        pha
+        lda msg_microdisc-1, y
+        jsr tty_conout
+        pla
+        tay
+        dey
+    zuntil_eq
+
+msg_crlf:
+    lda #10
+    jsr tty_conout
+    lda #13
+    jsr tty_conout
 
     ; Miscellaneous initialisation.
 
@@ -348,7 +388,7 @@ zproc _start
     lda #>__TPA1_START__
     ldx #__ZEROPAGE_START__
     jsr entry_RELOCATE
-    
+
     ; Go!
 
     lda #<biosentry
@@ -358,11 +398,97 @@ zproc _start
 bdos_filename:
     .ascii "BDOS    SYS"
 
+msg_jasmin:
+    .ascii "nimsaJ"
+msg_jasmin_end:
+
+msg_microdisc:
+    .ascii "csidorciM"
+msg_microdisc_end:
+
 banner: ; reversed!
-    .byte 13, 10
-    .ascii "cirO eht rof 56-M/PC"
+    .ascii "/cirO eht rof 56-M/PC"
 banner_end:
 
+zendproc
+
+; Initializes VIA and AY-3-8912 defaults (iss)
+zproc init_hardware
+
+    lda   #0xff
+    sta   VIA_PA
+    sta   VIA_ORA
+    sta   VIA_DDRA
+    lda   #0xb7
+    sta   VIA_PB
+    lda   #0xf7
+    sta   VIA_DDRB
+    lda   #0xdd
+    sta   VIA_PCR
+    lda   #0x7f
+    sta   VIA_IER
+    lda   #0x40
+    sta   VIA_ACR
+
+    lda   #<50000           ; 50 msec
+    ldx   #>50000
+    sta   VIA_T1LL
+    sta   VIA_T1CL
+    stx   VIA_T1LH
+    stx   VIA_T1CH
+
+    lda   #0xc0             ; enable T1 interrupt
+    sta   VIA_IER
+
+    lda   #0x07             ; set i/o port on 8912 to output
+    ldx   #0x3f             ; and disable mixer
+    jsr   psg_x2a
+
+    lda   #0x08             ; mute all channels
+    ldx   #0x00
+    jsr   psg_x2a
+    lda   #0x09
+    ldx   #0x00
+    jsr   psg_x2a
+    lda   #0x0a
+    ldx   #0x00
+    jsr   psg_x2a
+
+    lda   #0x00
+    ldx   #0x7f
+    jsr   psg_x2a
+
+    lda   #0x01
+    ldx   #0x00
+;   jmp   psg_x2a           ; fall trough
+zendproc
+
+; Writes X to port A
+zproc psg_x2a
+    sta   VIA_PA
+    tay
+    txa
+    cpy   #0x07
+    zif_eq
+      ora   #0x40
+    zendif
+    pha
+    lda   VIA_PCR
+    ora   #0xee
+    sta   VIA_PCR
+    and   #0x11
+    ora   #0xcc
+    sta   VIA_PCR
+    tax
+    pla
+    sta   VIA_PA
+    txa
+    ora   #0xec
+    sta   VIA_PCR
+    and   #0x11
+    ora   #0xcc
+    sta   VIA_PCR
+    rts
 zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
@@ -777,7 +903,7 @@ zendproc
 zproc calculate_line_address
     clc
     rol ptr+1           ; shift a zero bit into the bottom of ptr+1
-    
+
     ; x*40 = x*8 + x*32.
 
     ; We have 28 lines. As 28*8 will fit in a byte, we can do this easily.
@@ -943,7 +1069,7 @@ zproc scan_keyboard
     ldy #7                      ; row counter
     zrepeat
         sty VIA_PB
-        
+
         ldx #7                      ; column counter
         zrepeat
             lda #0x0e               ; AY column register
@@ -1134,7 +1260,7 @@ __fdc_data_reg_0 = . + 1
 
         lda #0xff
         sta buffered_track
-        
+
         sec
     zendif
     rts
