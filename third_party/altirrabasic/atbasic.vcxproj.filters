@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+    <Filter Include="Documentation">
+      <UniqueIdentifier>{c792783f-2614-48b5-ae52-0c9655c4ee4f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="source\atbasic.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\data.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\error.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\evaluator.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\exec.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\functions.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\io.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\list.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="makefile">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\math.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\memory.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\parser.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\parserbytecode.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\statements.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\system.inc">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\tokens.inc">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\util.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="source\variables.s">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="doc\internals.html">
+      <Filter>Documentation</Filter>
+    </None>
+    <None Include="doc\styles.css">
+      <Filter>Documentation</Filter>
+    </None>
+  </ItemGroup>
+</Project>

@@ -301,3 +301,7 @@ directory, you must conform to the terms of the GPL.
 `third_party/tomsfonts` contains a copy of the atari-small font, which is ©
 1999 Thomas A. Fine and is available under the terms of a minimal free license.
 See `third_party/tomsfonts/LICENSE` for the full text.
+
+`third_party/altirrabasic` contains a hacked copy of Altirra Basic, which is ©
+2014 Avery Lee and is available under the terms of a minimal free license.  See
+`third_party/altirrabasic/LICENSE.md` for the full text.
