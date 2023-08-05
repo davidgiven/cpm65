@@ -95,34 +95,13 @@ unsigned roundup(unsigned value)
 
 int main(int argc, char* const* argv)
 {
-    if ((argc < 4) || (std::string(argv[1]) != "-o"))
-        error("syntax: multilink -o <outfile> <infiles...>");
+    if ((argc != 6) || (std::string(argv[1]) != "-o"))
+        error("syntax: multilink -o <outfile> <corefile> <zpfile> <memfile>");
 
     auto outfile = std::string(argv[2]);
-    std::stringstream ss;
-    for (int i = 3; i < argc; i++)
-    {
-        ss << argv[i];
-        ss << ' ';
-    }
-    auto infiles = ss.str();
-
-    auto corefile = outfile + ".core";
-    auto zpfile = outfile + ".zp";
-    auto memfile = outfile + ".mem";
-
-    if (system(
-            fmt::format("ld65 -C scripts/link.cfg {} -o {}", infiles, corefile)
-                .c_str()) != 0)
-        error("error: assembly failed");
-    if (system(
-            fmt::format("ld65 -C scripts/linkz.cfg {} -o {}", infiles, zpfile)
-                .c_str()) != 0)
-        error("error: assembly failed (pass 2)");
-    if (system(
-            fmt::format("ld65 -C scripts/linkm.cfg {} -o {}", infiles, memfile)
-                .c_str()) != 0)
-        error("error: assembly failed (pass 3)");
+    auto corefile = std::string(argv[3]);
+    auto zpfile = std::string(argv[4]);
+    auto memfile = std::string(argv[5]);
 
     auto coreSize = std::filesystem::file_size(corefile);
 
