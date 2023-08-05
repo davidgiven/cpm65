@@ -6,10 +6,8 @@
 ; notice and this notice are preserved.  This file is offered as-is,
 ; without any warranty.
 
-		opt		m-
-
-		icl		'system.inc'
-		icl		'tokens.inc'
+		include		'system.inc'
+		include		'tokens.inc'
 
 ;===========================================================================
 .macro _MSG_BANNER

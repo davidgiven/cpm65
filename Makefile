@@ -62,6 +62,7 @@ MINIMAL_APPS = \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
+	$(OBJDIR)/altirrabasic/source/atbasic.com \
 	apps/dump.asm \
 	apps/ls.asm \
 
@@ -152,6 +153,10 @@ $(OBJDIR)/libcpm.a: $(LIBCPM_OBJS)
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
+
+$(OBJDIR)/%.com: $(OBJDIR)/third_party/%.o $(OBJDIR)/libcpm.a
+	@mkdir -p $(dir $@)
+	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
