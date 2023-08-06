@@ -305,3 +305,7 @@ See `third_party/tomsfonts/LICENSE` for the full text.
 `third_party/altirrabasic` contains a hacked copy of Altirra Basic, which is ©
 2014 Avery Lee and is available under the terms of a minimal free license.  See
 `third_party/altirrabasic/LICENSE.md` for the full text.
+
+`third_party/mad` contains a copy of Mad Assembler, which is © 2018-2023 Tomasz
+Biela and is available under the terms of the MIT license.  See
+`third_party/mad/LICENSE` for the full text.
