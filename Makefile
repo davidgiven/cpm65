@@ -115,7 +115,7 @@ bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $^
 
-bin/mads: third_party/mad/mads.pas
+bin/mads: third_party/mads/mads.pas
 	@mkdir -p $(dir $@)
 	$(FPC) -Mdelphi -vh -Os third_party/mad/mads.pas -o$@
 
