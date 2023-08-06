@@ -1,5 +1,6 @@
 CXX = g++
 CC = gcc
+FPC = fpc
 
 CFLAGS = -Os -g -I.
 CFLAGS65 = -Os -g -I. \
@@ -113,6 +114,10 @@ bin/shuffle: $(OBJDIR)/tools/shuffle.o
 bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $^
+
+bin/mads: third_party/mad/mads.pas
+	@mkdir -p $(dir $@)
+	$(FPC) -Mdelphi -vh -Os third_party/mad/mads.pas -o$@
 
 $(OBJDIR)/mkcombifs: $(OBJDIR)/tools/mkcombifs.o
 	@mkdir -p $(dir $@)
