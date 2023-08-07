@@ -965,11 +965,7 @@ stCp = stDos
 
 		;We may end up returning if DOS fails to load (MEM.SAV error, user
 		;backs out!).
-		.if CART==0
 		jmp		ReturnToDOS
-		.else
-		jmp		(dosvec)
-		.endif
 .endp
 
 

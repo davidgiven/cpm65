@@ -291,6 +291,8 @@ is_state_jump:
 		;jump to new state
 		lda		parse_state_table-$40,x
 		ldy		#>pa_state_start
+		add		#<pa_state_start
+		scc:iny
 load_and_jmp:
 		sta		parptr
 		sty		parptr+1
@@ -696,6 +698,8 @@ accept:
 		;init for statements
 		lda		parse_state_table_statements,x
 		ldy		#>pa_statements_begin
+		add		#<pa_statements_begin
+		scc:iny
 
 		;check if we're doing functions
 		lsr		_functionMode
@@ -719,6 +723,8 @@ accept:
 		ldx		stScratch
 		lda		parse_state_table_functions-$3d,x
 		ldy		#>pa_functions_begin
+		add		#<pa_functions_begin
+		scc:iny
 
 do_branch:
 		clc

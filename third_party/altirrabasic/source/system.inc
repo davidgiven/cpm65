@@ -168,8 +168,6 @@ ramtop	= $006a			;ram size
 bufcnt	= $006b
 holdch	= $007c			;temporary key hold area prior to shift/control lock logic
 
-fr0		= $00d4			;floating point register 0
-fr1		= $00e0			;floating point register 1
 cix		= $00f2
 inbuff	= $00f3
 
@@ -312,37 +310,7 @@ casbuf	= $03fd			;Cassette buffer (03FD-047F)
 plyarg	= $05e0			;FP: Polynomial evaluation temp register
 fpscr	= $05e6			;FP: Temp evaluation register (used by LOG/LOG10)
 
-afp		= $d800
-fasc	= $d8e6
-ifp		= $d9aa
-fpi		= $d9d2
-zfr0	= $da44
-zf1		= $da46
-zfl		= $da48
-ldbufa	= $da51
-fsub	= $da60
-fadd	= $da66
-fmul	= $dadb
-fdiv	= $db28
-skpspc	= $dba1
-isdigt	= $dbaf
-normalize = $dc00
-plyevl	= $dd40
-fld0r	= $dd89
-fld0p	= $dd8d
-fld1r	= $dd98
-fld1p	= $dd9c
-fst0r	= $dda7
-fst0p	= $ddab
-fmove	= $ddb6
-exp		= $ddc0
-exp10	= $ddcc
-redrng	= $de95
-log		= $decd
-log10	= $ded1
-half	= $df6c
 
-fpconst_half    = $df6c
 fpconst_atncoef	= $dfae
 fpconst_pi4		= $dff0
 

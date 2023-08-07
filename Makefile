@@ -91,15 +91,7 @@ CPMEMU_OBJS = \
 
 all: $(TARGETS)
 
-$(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
-	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -o $@ $< -lfmt
-
-$(OBJDIR)/mkdfs: $(OBJDIR)/tools/mkdfs.o
-	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -o $@ $<
-
-$(OBJDIR)/mkoricdsk: $(OBJDIR)/tools/mkoricdsk.o
+$(OBJDIR)/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $< -lfmt
 
@@ -107,7 +99,7 @@ bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
 
-bin/shuffle: $(OBJDIR)/tools/shuffle.o
+bin/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $<
 
@@ -117,7 +109,7 @@ bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
 
 bin/mads: third_party/mads/mads.pas
 	@mkdir -p $(dir $@)
-	$(FPC) -Mdelphi -vh -Os third_party/mad/mads.pas -o$@
+	$(FPC) -Mdelphi -vh -Os $< -o$@
 
 $(OBJDIR)/mkcombifs: $(OBJDIR)/tools/mkcombifs.o
 	@mkdir -p $(dir $@)
@@ -143,16 +135,39 @@ $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc include/dri
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 
-$(OBJDIR)/third_party/altirrabasic/atbasic.com: \
+$(OBJDIR)/third_party/altirrabasic/%.bin: \
 		$(wildcard third_party/altirrabasic/source/*.s) \
-		$(wildcard third_party/altirrabasic/kernel/*.s)
+		$(wildcard third_party/altirrabasic/kernel/*.s) \
+		bin/mads \
+		$(OBJDIR)/xextobin
+	@mkdir -p $(dir $@)
 	bin/mads third_party/altirrabasic/source/atbasic.s \
 		-c \
-		-o:$@ \
+		-o:$(patsubst %.bin,%.xex,$@) \
 		-s \
-		-d:CART=0 \
-		-l:$(patsubst %.o,%.lst,%@) \
-		-t:$(patsubst %.o,%.map,$@)
+		-l:$(patsubst %.bin,%.lst,$@) \
+		-t:$(patsubst %.bin,%.map,$@) \
+		-d:ZPBASE=$(ZPBASE) \
+		-d:TEXTBASE='$$$(TEXTBASE)'
+	$(OBJDIR)/xextobin -i $(patsubst %.bin,%.xex,$@) -o $@ -b 0x$(TEXTBASE)
+
+$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin: ZPBASE=0
+$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin: TEXTBASE=0100
+$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin: ZPBASE=1
+$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin: TEXTBASE=0100
+$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin: ZPBASE=0
+$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin: TEXTBASE=0200
+
+$(OBJDIR)/third_party/altirrabasic/atbasic.com: \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin \
+	$(OBJDIR)/multilink
+	@mkdir -p $(dir $@)
+	$(OBJDIR)/multilink -o $@ \
+		$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin \
+		$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin \
+		$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin
 
 $(OBJDIR)/libcommodore.a: $(LIBCOMMODORE_OBJS)
 	@mkdir -p $(dir $@)

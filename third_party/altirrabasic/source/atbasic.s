@@ -24,7 +24,7 @@
 ;	QUADRATO.BAS
 ;	- Uses $B0-B3 from USR() routine
 
-		org		$0080
+		org ZPBASE
 		opt		o-
 argstk	equ		*
 lomem	dta		a(0)		;$0080 (compat) from lomem; argument/operator stack
@@ -66,28 +66,24 @@ dataLnEnd	dta		0		;current DATA statement line end
 pmgbase		dta		0
 pmgmode		dta		0
 ioTermFlag	dta		0
+fr0         dta     f(0)
+fr1			dta		f(0)
+fr2			dta		f(0)
+_fr3		dta		f(0)
+flptr		dta		a(0)
+fptr2		dta		a(0)
+ztemp4		dta		a(0)
 
-		.if grColor!=$c8
-		.error "Graphics color is at ",grColor," but must be at $C8 for PEEK(200) to work (see Space Station Multiplication.bas)"
-		.endif
-
-		.if *>$b7
-		.error "Zero page overflow: ",*
-		.endif
-
-			org		$b7
 dataln		dta		a(0)	;(compat - Mapping the Atari / ANALOG verifier) current DATA statement line
 
 
-stopln	= $ba				;(compat - Atari BASIC manual): line number of error
-		; $bb
+stopln		dta		0		;(compat - Atari BASIC manual): line number of error
 		
 ;--------------------------------------------------------------------------
 ; $BC-BF are reserved as scratch space for use by the currently executing
 ; statement or by the parser. They must not be used by functions or library
 ; code.
 ;
-			org		$bc
 stScratch	dta		0
 stScratch2	dta		0
 stScratch3	dta		0
@@ -101,31 +97,18 @@ parStBegin	= stScratch2	;parsing offset of statement begin (0 if none)
 ; $C0-C1 are reserved as scratch space for use by the currently executing
 ; function.
 ;
-funScratch1	= $c0
-funScratch2	= $c1
+funScratch1	dta 0
+funScratch2	dta 0
 ;--------------------------------------------------------------------------
-errno	= $c2
-errsave	= $c3				;(compat - Atari BASIC manual): error number
+errno	dta 0
+errsave	dta 0				;(compat - Atari BASIC manual): error number
 
-			org		$c4
 dataptr		dta		a(0)	;current DATA statement pointer
 dataoff		dta		0		;current DATA statement offset
 			dta		0		;(unused)
 grColor		dta		0		;graphics color (must be at $C8 for Space Station Multiplication)
 ptabw		dta		0		;(compat - Atari BASIC manual): tab width
 
-.if ptabw != $C9
-			.error	"PTABW is wrong"
-.endif
-
-.if * > $CB
-.error "$CB-D1 are reserved"
-.endif
-
-;--------------------------------------------------------------------------
-; $CB-D1 are reserved for use by annoying people that read Mapping The
-; Atari.
-;--------------------------------------------------------------------------
 ; Floating-point library vars
 ;
 ; $D2-D3 is used as an extension prefix to FR0; $D4-FF are used by the FP
@@ -139,9 +122,7 @@ a3		= fr0+6				;temporary pointer 3
 a4		= fr0+8				;temporary pointer 4
 a5		= fr0+10			;temporary pointer 5
 
-degflg	= $fb				;(compat) degree/radian flag: 0 for radians, 6 for degrees
-
-lbuff	equ		$0580
+degflg	dta 0				;(compat) degree/radian flag: 0 for radians, 6 for degrees
 
 .macro _STATIC_ASSERT
 		.if :1
@@ -156,376 +137,294 @@ lbuff	equ		$0580
 		.endif
 .endm
 
+	org TEXTBASE
+	opt		o+
+_text_start:
+	
 ;==========================================================================
-; EXE loader start
+; CP/M-65 entry point
 ;
-		.if CART==0
-
-		org		$3000
-		opt		o+
-		
-;==========================================================================
-; Preloader
+.proc _entry
 ;
-; The preloader executes before the main load.
-
-.proc __preloader
-		;check if BASIC is on
-		jsr		__testROM
-		beq		basic_ok
-		
-		;try to turn basic off
-		lda		#0
-		sta		basicf
-		lda		portb
-		ora		#2
-		sta		portb
-
-		;check again if BASIC is on
-		jsr		__testROM
-		beq		basic_ok
-
-		;print failure
-		mwa		#msg_romconflict_begin icbal
-		mwa		#msg_romconflict_end-msg_romconflict_begin icbll
-		mva		#CIOCmdPutChars iccmd
-		ldx		#0
-		jsr		ciov
-
-		lda		#$ff
-		cmp:req	ch
-		sta		ch
-
-		;exit
-		jmp		(dosvec)
-		
-basic_ok:
-		;print loading banner and continue disk load
-		mwa		#msg_loading_begin icbal
-		mwa		#msg_loading_end-msg_loading_begin icbll
-		mva		#CIOCmdPutChars iccmd
-		ldx		#0
-		jmp		ciov
-
-msg_loading_begin:
-		dta		'Loading Altirra BASIC...'
-msg_loading_end:
-
-msg_romconflict_begin:
-		dta		$9B
-		dta		'Cannot load Altirra BASIC: another',$9B
-		dta		'ROM is already present at $A000.',$9B
-		dta		$9B
-		dta		'If you are running under SpartaDOS X,',$9B
-		dta		'use the X command to run ATBasic.',$9B
-		dta		$9B
-		dta		'Press a key',$9B
-msg_romconflict_end:
-.endp
-
-;--------------------------------------------------------------------------
-; Exit:
-;	Z=0: Not writable
-;	Z=1: Writable
+;		;reset RAMTOP if it is above $A000
+;		lda		#$a0
+;		cmp		ramtop
+;		bcs		ramtop_ok
 ;
-.proc __testROM
-		lda		$a000
-		tax
-		eor		#$ff
-		sta		$a000
-		cmp		$a000
-		stx		$a000
-		rts		
-.endp
-
-;--------------------------------------------------------------------------
-
-		ini		__preloader
-
-;--------------------------------------------------------------------------
-.proc __loader
-		;reset RAMTOP if it is above $A000
-		lda		#$a0
-		cmp		ramtop
-		bcs		ramtop_ok
-
-adjust_ramtop:
-		sta		ramtop
-		
-		;reinitialize GR.0 screen if needed (XEP80 doesn't)
-		lda		sdmctl
-		and		#$20
-		beq		dma_off
-		
-		jsr		wait_vbl
-
-		ldx		#0
-		stx		dmactl
-		stx		sdmctl
-		lda		#4
-		cmp:rcc	vcount
-		mva		#CIOCmdClose iccmd
-		jsr		ciov
-
-		mva		#CIOCmdOpen iccmd
-		mwa		#editor icbal
-		mva		#$0c icax1
-		mva		#$00 icax2
-		ldx		#0
-		jsr		ciov
-
-		;Wait for a VBLANK to ensure that the screen has taken place;
-		;we don't just use RTCLOK because we need to ensure that stage
-		;2 VBLANK has been run, not just stage 1.
-		jsr		wait_vbl
-dma_off:
-ramtop_ok:
-
-		;Check if we might have the OS-A or OS-B screen editor. The OS-A/B
-		;screen editor has a nasty bug of clearing up to one page more than
-		;it should on a screen clear, which will trash the beginning of our
-		;soft-loaded BASIC interpreter. In that case, we need to drop RAMTOP
-		;by another 4K to compensate. 4K is a lot, but is necessary since
-		;the screen editor does not align playfields properly otherwise.
-		
-		;The first check we do is to see if the memory limit is already $9F00
-		;or lower; if so, we don't have a problem.
-		lda		ramtop
-		cmp		#$A0
-		bcc		editor_ok
-
-		;The first check we do is to see if the put char routine for E: is
-		;that of OS-A/B. If it isn't, then either we aren't running on OS-A/B,
-		;or E: has been replaced. Either way, we're fine.
-		lda		icptl
-		cmp		#$A3
-		bne		editor_ok
-		lda		#$F6
-		cmp		icptl+1
-		bne		editor_ok
-
-		;Okay, we might have OS-A/B. However, there's a chance that someone
-		;preserved that entry point but fixed the editor (hah). So, let's do
-		;a test: put a test byte at $A000 and clear the screen. If it gets
-		;wiped, we have a problem.
-		sta		$A000
-
-		ldx		#0
-		stx		icbll
-		stx		icblh
-		mva		#CIOCmdPutChars iccmd
-		lda		#$7d
-		jsr		ciov
-
-		lda		$A000
-		cmp		#$FC
-		beq		editor_ok
-
-		;Whoops... the test byte was overwritten. Lower RAMTOP from $A0 to
-		;$90 and reinitialize E:.
-		lda		#$90
-		bne		adjust_ramtop
-
-editor_ok:
-		;reset RUNAD to $A000 so we can be re-invoked
-		mwa		#$a000 runad
-
-		;move $3800-57FF to $A000-BFFF
-		mva		#$38 fr0+1
-		mva		#$a0 fr1+1
-		ldy		#0
-		sty		fr0
-		sty		fr1
-		ldx		#$20
-copy_loop:
-		mva:rne	(fr0),y (fr1),y+
-		inc		fr0+1
-		inc		fr1+1
-		dex
-		bne		copy_loop
-
-		;check if there is a command line to process
-		ldy		#0
-		sty		iocbidx				;!! - needed since we will be skipping it
-		lda		(dosvec),y
-		cmp		#$4c
-		bne		no_cmdline
-		ldy		#3
-		lda		(dosvec),y
-		cmp		#$4c
-		beq		have_cmdline
-no_cmdline:
-		lda		#0
-		jmp		no_filename
-
-have_cmdline:
-		;skip spaces
-		ldy		#10
-		lda		(dosvec),y
-		clc
-		adc		#63
-		tay
-space_loop:
-		lda		(dosvec),y
-		cmp		#$9b
-		beq		no_filename
-		iny
-		cmp		#' '
-		beq		space_loop
-
-		;stash filename base offset
-		dey
-		sty		fr0+3
-
-		;check if the first character is other than D and there is a colon
-		;afterward -- if so, we should skip DOS's parser and use it straight
-		;as it may be a CIO filename that DOS would munge
-		cmp		#'D'
-		beq		possibly_dos_file
-cio_file:
-		;copy filename to LBUFF
-		ldx		#0
-cio_copy_loop:
-		lda		(dosvec),y
-		sta		lbuff,x
-		inx
-		iny
-		cmp		#$9b
-		bne		cio_copy_loop
-
-		;stash length
-		stx		fr0+2
-
-		tya
-		jmp		have_filename_nz
-
-possibly_dos_file:
-		;scan for colon
-colon_loop:
-		lda		(dosvec),y
-		iny
-		cmp		#':'
-		beq		cio_file
-		cmp		#$9b
-		bne		colon_loop
-
-		;okay, assume it's a DOS file - clear the CIO filename flag
-		lda		#0
-		sta		fr0+2
-		
-		;try to parse out a filename
-		ldy		fr0+3
-		sec
-		sbc		#63
-		ldy		#10
-		sta		(dosvec),y
-
-		ldy		#4
-		mva		(dosvec),y fr0
-		iny
-		mva		(dosvec),y fr0+1
-		jsr		jump_fr0
-		
-no_filename:
-have_filename_nz:
-		;save off filename flag
-		php
+;adjust_ramtop:
+;		sta		ramtop
+;		
+;		;reinitialize GR.0 screen if needed (XEP80 doesn't)
+;		lda		sdmctl
+;		and		#$20
+;		beq		dma_off
+;		
+;		jsr		wait_vbl
+;
+;		ldx		#0
+;		stx		dmactl
+;		stx		sdmctl
+;		lda		#4
+;		cmp:rcc	vcount
+;		mva		#CIOCmdClose iccmd
+;		jsr		ciov
+;
+;		mva		#CIOCmdOpen iccmd
+;		mwa		#editor icbal
+;		mva		#$0c icax1
+;		mva		#$00 icax2
+;		ldx		#0
+;		jsr		ciov
+;
+;		;Wait for a VBLANK to ensure that the screen has taken place;
+;		;we don't just use RTCLOK because we need to ensure that stage
+;		;2 VBLANK has been run, not just stage 1.
+;		jsr		wait_vbl
+;dma_off:
+;ramtop_ok:
+;
+;		;Check if we might have the OS-A or OS-B screen editor. The OS-A/B
+;		;screen editor has a nasty bug of clearing up to one page more than
+;		;it should on a screen clear, which will trash the beginning of our
+;		;soft-loaded BASIC interpreter. In that case, we need to drop RAMTOP
+;		;by another 4K to compensate. 4K is a lot, but is necessary since
+;		;the screen editor does not align playfields properly otherwise.
+;		
+;		;The first check we do is to see if the memory limit is already $9F00
+;		;or lower; if so, we don't have a problem.
+;		lda		ramtop
+;		cmp		#$A0
+;		bcc		editor_ok
+;
+;		;The first check we do is to see if the put char routine for E: is
+;		;that of OS-A/B. If it isn't, then either we aren't running on OS-A/B,
+;		;or E: has been replaced. Either way, we're fine.
+;		lda		icptl
+;		cmp		#$A3
+;		bne		editor_ok
+;		lda		#$F6
+;		cmp		icptl+1
+;		bne		editor_ok
+;
+;		;Okay, we might have OS-A/B. However, there's a chance that someone
+;		;preserved that entry point but fixed the editor (hah). So, let's do
+;		;a test: put a test byte at $A000 and clear the screen. If it gets
+;		;wiped, we have a problem.
+;		sta		$A000
+;
+;		ldx		#0
+;		stx		icbll
+;		stx		icblh
+;		mva		#CIOCmdPutChars iccmd
+;		lda		#$7d
+;		jsr		ciov
+;
+;		lda		$A000
+;		cmp		#$FC
+;		beq		editor_ok
+;
+;		;Whoops... the test byte was overwritten. Lower RAMTOP from $A0 to
+;		;$90 and reinitialize E:.
+;		lda		#$90
+;		bne		adjust_ramtop
+;
+;editor_ok:
+;		;reset RUNAD to $A000 so we can be re-invoked
+;		mwa		#$a000 runad
+;
+;		;move $3800-57FF to $A000-BFFF
+;		mva		#$38 fr0+1
+;		mva		#$a0 fr1+1
+;		ldy		#0
+;		sty		fr0
+;		sty		fr1
+;		ldx		#$20
+;copy_loop:
+;		mva:rne	(fr0),y (fr1),y+
+;		inc		fr0+1
+;		inc		fr1+1
+;		dex
+;		bne		copy_loop
+;
+;		;check if there is a command line to process
+;		ldy		#0
+;		sty		iocbidx				;!! - needed since we will be skipping it
+;		lda		(dosvec),y
+;		cmp		#$4c
+;		bne		no_cmdline
+;		ldy		#3
+;		lda		(dosvec),y
+;		cmp		#$4c
+;		beq		have_cmdline
+;no_cmdline:
+;		lda		#0
+;		jmp		no_filename
+;
+;have_cmdline:
+;		;skip spaces
+;		ldy		#10
+;		lda		(dosvec),y
+;		clc
+;		adc		#63
+;		tay
+;space_loop:
+;		lda		(dosvec),y
+;		cmp		#$9b
+;		beq		no_filename
+;		iny
+;		cmp		#' '
+;		beq		space_loop
+;
+;		;stash filename base offset
+;		dey
+;		sty		fr0+3
+;
+;		;check if the first character is other than D and there is a colon
+;		;afterward -- if so, we should skip DOS's parser and use it straight
+;		;as it may be a CIO filename that DOS would munge
+;		cmp		#'D'
+;		beq		possibly_dos_file
+;cio_file:
+;		;copy filename to LBUFF
+;		ldx		#0
+;cio_copy_loop:
+;		lda		(dosvec),y
+;		sta		lbuff,x
+;		inx
+;		iny
+;		cmp		#$9b
+;		bne		cio_copy_loop
+;
+;		;stash length
+;		stx		fr0+2
+;
+;		tya
+;		jmp		have_filename_nz
+;
+;possibly_dos_file:
+;		;scan for colon
+;colon_loop:
+;		lda		(dosvec),y
+;		iny
+;		cmp		#':'
+;		beq		cio_file
+;		cmp		#$9b
+;		bne		colon_loop
+;
+;		;okay, assume it's a DOS file - clear the CIO filename flag
+;		lda		#0
+;		sta		fr0+2
+;		
+;		;try to parse out a filename
+;		ldy		fr0+3
+;		sec
+;		sbc		#63
+;		ldy		#10
+;		sta		(dosvec),y
+;
+;		ldy		#4
+;		mva		(dosvec),y fr0
+;		iny
+;		mva		(dosvec),y fr0+1
+;		jsr		jump_fr0
+;		
+;no_filename:
+;have_filename_nz:
+;		;save off filename flag
+;		php
 
 		;cold boot ATBasic
-		ldx		#0
-		stx		iocbidx
-		stx		iocbexec
-		inx
+		ldx		#1
 		stx		errno
 
 		;print startup banner
-		mwa		#msg_banner_begin icbal
-		mwa		#msg_banner_end-msg_banner_begin icbll
-		mva		#CIOCmdPutChars iccmd
-		ldx		#0
-		jsr		ciov
-
-		jsr		_stNew.reset_entry
-		jsr		ExecReset
-
-		;read filename flag
-		plp
-		bne		explicit_fn
-
-		;no filename... try loading implicit file
-		ldx		#$70
-		stx		iocbidx
-		mwa		#default_fn_start icbal+$70
-		mwa		#default_fn_end-default_fn_start icbll+$70
-		mva		#CIOCmdOpen iccmd+$70
-		mva		#$04 icax1+$70
-		jsr		ciov
-		bmi		load_failed
-
-		;load and run
-		lsr		stLoadRun._loadflg
-		jmp		stLoadRun.with_open_iocb
-
-load_failed:
-		;failed... undo the EOL with an up arrow so the prompt is in the right place
-		mva		#0 iocbidx
-		lda		#$1c
-		jsr		putchar
-
-		;close IOCB and jump to prompt
-		ldx		#$70
-		mva		#CIOCmdClose iccmd+$70
-		jsr		ciov
+;		mwa		#msg_banner_begin icbal
+;		mwa		#msg_banner_end-msg_banner_begin icbll
+;		mva		#CIOCmdPutChars iccmd
+;		ldx		#0
+;		jsr		ciov
+;
+;		jsr		_stNew.reset_entry
+;		jsr		ExecReset
+;
+;		;read filename flag
+;		plp
+;		bne		explicit_fn
+;
+;		;no filename... try loading implicit file
+;		ldx		#$70
+;		stx		iocbidx
+;		mwa		#default_fn_start icbal+$70
+;		mwa		#default_fn_end-default_fn_start icbll+$70
+;		mva		#CIOCmdOpen iccmd+$70
+;		mva		#$04 icax1+$70
+;		jsr		ciov
+;		bmi		load_failed
+;
+;		;load and run
+;		lsr		stLoadRun._loadflg
+;		jmp		stLoadRun.with_open_iocb
+;
+;load_failed:
+;		;failed... undo the EOL with an up arrow so the prompt is in the right place
+;		mva		#0 iocbidx
+;		lda		#$1c
+;		jsr		putchar
+;
+;		;close IOCB and jump to prompt
+;		ldx		#$70
+;		mva		#CIOCmdClose iccmd+$70
+;		jsr		ciov
 		jmp		immediateModeReset
 
-explicit_fn:
-		;move filename to line buffer
-		ldy		#33
-		ldx		#0
-		stx		fr0+3
-
-		;check if filename is already there
-		lda		fr0+2
-		bne		fncopy_skip
-fncopy_loop:
-		lda		(dosvec),y
-		sta		lbuff,x
-		cmp		#$9b
-		beq		fncopy_exit
-		iny
-		inx
-		bne		fncopy_loop
-fncopy_exit:
-		;finish length
-		stx		fr0+2
-
-fncopy_skip:
-		;set string pointer
-		mwa		#lbuff fr0
-
-		;set up for RUN statement
-		jsr		IoPutNewline
-		lsr		stLoadRun._loadflg
-		ldx		#$70
-		stx		iocbidx
-		jmp		stLoadRun.loader_entry
-
-wait_vbl:
-		sei
-		mwa		#1 cdtmv3
-		cli
-		lda:rne	cdtmv4
-		rts
-
-jump_fr0:
-		jmp		(fr0)
-
-editor:
-		dta		c'E',$9B
-
-default_fn_start:
-		dta		'D:AUTORUN.BAS',$9B
-default_fn_end:
+;explicit_fn:
+;		;move filename to line buffer
+;		ldy		#33
+;		ldx		#0
+;		stx		fr0+3
+;
+;		;check if filename is already there
+;		lda		fr0+2
+;		bne		fncopy_skip
+;fncopy_loop:
+;		lda		(dosvec),y
+;		sta		lbuff,x
+;		cmp		#$9b
+;		beq		fncopy_exit
+;		iny
+;		inx
+;		bne		fncopy_loop
+;fncopy_exit:
+;		;finish length
+;		stx		fr0+2
+;
+;fncopy_skip:
+;		;set string pointer
+;		mwa		#lbuff fr0
+;
+;		;set up for RUN statement
+;		jsr		IoPutNewline
+;		lsr		stLoadRun._loadflg
+;		ldx		#$70
+;		stx		iocbidx
+;		jmp		stLoadRun.loader_entry
+;
+;wait_vbl:
+;		sei
+;		mwa		#1 cdtmv3
+;		cli
+;		lda:rne	cdtmv4
+;		rts
+;
+;jump_fr0:
+;		jmp		(fr0)
+;
+;editor:
+;		dta		c'E',$9B
+;
+;default_fn_start:
+;		dta		'D:AUTORUN.BAS',$9B
+;default_fn_end:
 
 msg_banner_begin:
 		dta		$9c				;delete loading line
@@ -534,17 +433,6 @@ msg_banner_begin:
 msg_banner_end:
 .endp
 
-		opt		h-
-		dta		a($ffff),a($3800),a($57ff)
-
-		.endif
-		
-;==========================================================================
-; Cartridge start
-;
-		opt		h-
-		org		$a000
-		opt		o+f+
 
 ;==========================================================================
 ; Entry point
@@ -552,8 +440,6 @@ msg_banner_end:
 ; This is totally skipped in the EXE version, where we reuse the space for
 ; a reload-E: stub when returning to DOS.
 ;
-		.if CART==0
-msg_base = *+13
 ReturnToDOS:
 		ldx		#0
 		jsr		IoCloseX
@@ -564,20 +450,6 @@ ReturnToDOS:
 		jsr		IoOpenStockDeviceX			;!! this overwrites $BC20+
 		jmp		(dosvec)
 
-		:13 dta 0
-
-		.else
-main:
-		;check if this is a warm start
-		ldx		warmst
-		bmi		immediateModeReset
-				
-		;print banner
-		sec
-		rol		ioTermFlag
-		jsr		IoPrintMessageIOCB0		;!! - X=0
-		jmp		stNew
-
 ;==========================================================================
 ; Message base
 ;
@@ -585,16 +457,6 @@ msg_base:
 msg_banner:
 		_MSG_BANNER
 		dta		0
-		.endif
-
-		.if		msg_base != $A00D
-		.error	"msg_base misaligned: ",*
-		.endif
-
-		.if		* != $A023
-		.error	"msg_ready misaligned: ",*
-		.endif
-		org		$A023
 
 msg_ready:
 		dta		$9B,c'Ready',$9B,0
@@ -677,6 +539,7 @@ eof:
 		icl		'list.s'
 		icl		'error.s'
 		icl		'util.s'
+		icl		'../kernel/mathpack.s'
 
 
 ;==========================================================================
@@ -691,14 +554,9 @@ pmgmode_tab:					;2 bytes ($00 80)
 
 ;==========================================================================
 
-const_table = $bffa - 4 - 6*9 - 6 - 7
-
-		.echo	"Main program ends at ",*," (",[((((*-$a000)*100/8192)/10)*16+(((*-$a000)*100)/8192)%10)],"% full) (", const_table-*," bytes free)"
-
-		org		const_table
-		.echo	"Constant table begins at ",*
 		.pages 1
 
+const_table:
 devname_c:
 		dta		'C'
 devname_s:
@@ -742,24 +600,14 @@ const_one:
 		dta		$40,$01
 pmg_move_mask_tab:
 		dta		$00,$00,$00,$00,$fc,$f3,$cf,$3f
+_text_end:
+	
+	opt o-
+_data_start:
+lbuff:
+	* = * + $80
+_data_end:
+
 
 		.endpg
-
-		_STATIC_ASSERT *=$bffa
-		
-;==========================================================================
-		
-		.echo	"Program ends at ",*," (",[((((*-$a000)*100/8192)/10)*16+(((*-$a000)*100)/8192)%10)],"% full)"
-
-		org		$bffa
-		dta		a($a000)		;boot vector
-		dta		$00				;do not init
-		dta		$05				;boot disk/tape, boot cart
-		dta		a(ExNop)		;init vector (no-op)
-
-		.if CART==0
-		opt		f-h+
-		run		__loader
-		.endif
-		
 		end

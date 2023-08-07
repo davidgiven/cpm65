@@ -9,7 +9,7 @@
 ?parser_program_start = *
 
 .macro _PA_STATE_OFFSET
-.def ?state_offset = :1-[pa_state_start&$ff00]-1
+.def ?state_offset = :1-pa_state_start-1
 .if ?state_offset < 0 || ?state_offset > 255
 .error "Offset out of bounds: ",?state_offset," (state address: ",:1,", base address: ", pa_state_start, ")"
 .endif
@@ -33,7 +33,7 @@ parse_state_table:
 		_PA_STATE_OFFSET		pa_aexpr_next
 
 .macro _PA_STATEMENT_OFFSET
-.def ?statement_offset = :1-[pa_statements_begin&$ff00]-1
+.def ?statement_offset = :1-pa_statements_begin-1
 .if ?statement_offset < 0 || ?statement_offset > 255
 .error "Offset out of bounds: ",?statement_offset," (statement address: ",:1,", base address: ", pa_statements_begin, ")"
 .endif
@@ -130,7 +130,7 @@ parse_state_table_statements:
 		_PA_STATEMENT_OFFSET		pa_state_pmmove
 
 .macro _PA_FUNCTION_OFFSET
-.def ?function_offset = :1-[pa_functions_begin&$ff00]-1
+.def ?function_offset = :1-pa_functions_begin-1
 .if ?function_offset < 0 || ?function_offset > 255
 .error "Offset out of bounds: ",?function_offset," (function address: ",:1,", base address: ", pa_statements_begin, ")"
 .endif
@@ -406,6 +406,7 @@ var:
 		PAI_FAIL
 
 .def :pa_state_start
+	dta 0 ; required to prevent offsets being 0
 .def :pa_array
 		PAI_BSTR	sarrayvar		
 		PAI_EMIT	TOK_EXP_OPEN_ARY
@@ -631,6 +632,7 @@ op_str_g:
 
 ;==========================================================================
 pa_functions_begin:
+	dta 0 ; required to prevent offsets being 0
 
 ;aexpr fun(aexpr)
 pa_state_abs:
@@ -690,8 +692,6 @@ pa_state_str:
 pa_state_hex:
 		PAI_JSR		PST_OPENFUN
 		
-		_PAGE_CHECK pa_functions_begin
-
 		PAM_AEXPR
 		PAI_STR
 pa_close_function:
@@ -704,6 +704,7 @@ pa_functions_end:
 ;==========================================================================
 
 pa_statements_begin:
+	dta 0 ; required to prevent offsets being 0
 
 pa_state_sound:			;STATEMENT aexpr,aexpr,aexpr,aexpr
 		PAM_AEXPR_COMMA
@@ -980,8 +981,6 @@ pa_state_print:
 pa_state_lprint:
 pa_state_print_item:
 		PAI_BEOS	pa_state_print_simple
-
-		_PAGE_CHECK pa_statements_begin
 
 		PAI_BEQEMIT	',', TOK_EXP_COMMA, pa_state_print_item
 		PAI_BEQEMIT	';', TOK_EXP_SEMI, pa_state_print_item
