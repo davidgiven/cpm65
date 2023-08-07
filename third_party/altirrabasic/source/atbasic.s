@@ -26,6 +26,7 @@
 
 		org ZPBASE
 		opt		o-
+_zp_start:
 argstk	equ		*
 lomem	dta		a(0)		;$0080 (compat) from lomem; argument/operator stack
 vntp	dta		a(0)		;$0082 (compat - loaded) variable name table pointer
@@ -137,14 +138,20 @@ degflg	dta 0				;(compat) degree/radian flag: 0 for radians, 6 for degrees
 		.endif
 .endm
 
+_zp_end:
 	org TEXTBASE
 	opt		o+
 _text_start:
 	
 ;==========================================================================
-; CP/M-65 entry point
+; CP/M-65 header and entrypoint
+	dta _zp_end - _zp_start
+	dta >(_text_end - _text_start + 255)
+	dta a(_text_end - _text_start)
+	jmp 0xffff
 ;
 .proc _entry
+	rts
 ;
 ;		;reset RAMTOP if it is above $A000
 ;		lda		#$a0
@@ -601,6 +608,7 @@ const_one:
 pmg_move_mask_tab:
 		dta		$00,$00,$00,$00,$fc,$f3,$cf,$3f
 _text_end:
+		.endpg
 	
 	opt o-
 _data_start:
@@ -608,6 +616,4 @@ lbuff:
 	* = * + $80
 _data_end:
 
-
-		.endpg
 		end
