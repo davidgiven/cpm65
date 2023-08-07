@@ -164,7 +164,6 @@ palnts	= $0062			;[XL/XE] PAL/NTSC flag; 0=NTSC
 logcol	= $0063			;logical line column
 adress	= $0064			;temporary storage (display code)
 		; $0065
-ramtop	= $006a			;ram size
 bufcnt	= $006b
 holdch	= $007c			;temporary key hold area prior to shift/control lock logic
 

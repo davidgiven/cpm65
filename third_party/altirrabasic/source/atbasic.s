@@ -8,6 +8,7 @@
 
 		icl		'system.inc'
 		icl		'tokens.inc'
+		icl		'cpm65.inc'
 
 ;===========================================================================
 .macro _MSG_BANNER
@@ -124,6 +125,7 @@ a4		= fr0+8				;temporary pointer 4
 a5		= fr0+10			;temporary pointer 5
 
 degflg	dta 0				;(compat) degree/radian flag: 0 for radians, 6 for degrees
+ramtop	dta 0				;page number of top of memory
 
 .macro _STATIC_ASSERT
 		.if :1
@@ -148,110 +150,14 @@ _text_start:
 	dta _zp_end - _zp_start
 	dta >(_text_end - _text_start + 255)
 	dta a(_text_end - _text_start)
-	jmp 0xffff
+BDOS:
+	jmp 0x0000
 ;
 .proc _entry
+	ldy #BDOS_GETTPA
+	jsr BDOS
+	stx ramtop
 	rts
-;
-;		;reset RAMTOP if it is above $A000
-;		lda		#$a0
-;		cmp		ramtop
-;		bcs		ramtop_ok
-;
-;adjust_ramtop:
-;		sta		ramtop
-;		
-;		;reinitialize GR.0 screen if needed (XEP80 doesn't)
-;		lda		sdmctl
-;		and		#$20
-;		beq		dma_off
-;		
-;		jsr		wait_vbl
-;
-;		ldx		#0
-;		stx		dmactl
-;		stx		sdmctl
-;		lda		#4
-;		cmp:rcc	vcount
-;		mva		#CIOCmdClose iccmd
-;		jsr		ciov
-;
-;		mva		#CIOCmdOpen iccmd
-;		mwa		#editor icbal
-;		mva		#$0c icax1
-;		mva		#$00 icax2
-;		ldx		#0
-;		jsr		ciov
-;
-;		;Wait for a VBLANK to ensure that the screen has taken place;
-;		;we don't just use RTCLOK because we need to ensure that stage
-;		;2 VBLANK has been run, not just stage 1.
-;		jsr		wait_vbl
-;dma_off:
-;ramtop_ok:
-;
-;		;Check if we might have the OS-A or OS-B screen editor. The OS-A/B
-;		;screen editor has a nasty bug of clearing up to one page more than
-;		;it should on a screen clear, which will trash the beginning of our
-;		;soft-loaded BASIC interpreter. In that case, we need to drop RAMTOP
-;		;by another 4K to compensate. 4K is a lot, but is necessary since
-;		;the screen editor does not align playfields properly otherwise.
-;		
-;		;The first check we do is to see if the memory limit is already $9F00
-;		;or lower; if so, we don't have a problem.
-;		lda		ramtop
-;		cmp		#$A0
-;		bcc		editor_ok
-;
-;		;The first check we do is to see if the put char routine for E: is
-;		;that of OS-A/B. If it isn't, then either we aren't running on OS-A/B,
-;		;or E: has been replaced. Either way, we're fine.
-;		lda		icptl
-;		cmp		#$A3
-;		bne		editor_ok
-;		lda		#$F6
-;		cmp		icptl+1
-;		bne		editor_ok
-;
-;		;Okay, we might have OS-A/B. However, there's a chance that someone
-;		;preserved that entry point but fixed the editor (hah). So, let's do
-;		;a test: put a test byte at $A000 and clear the screen. If it gets
-;		;wiped, we have a problem.
-;		sta		$A000
-;
-;		ldx		#0
-;		stx		icbll
-;		stx		icblh
-;		mva		#CIOCmdPutChars iccmd
-;		lda		#$7d
-;		jsr		ciov
-;
-;		lda		$A000
-;		cmp		#$FC
-;		beq		editor_ok
-;
-;		;Whoops... the test byte was overwritten. Lower RAMTOP from $A0 to
-;		;$90 and reinitialize E:.
-;		lda		#$90
-;		bne		adjust_ramtop
-;
-;editor_ok:
-;		;reset RUNAD to $A000 so we can be re-invoked
-;		mwa		#$a000 runad
-;
-;		;move $3800-57FF to $A000-BFFF
-;		mva		#$38 fr0+1
-;		mva		#$a0 fr1+1
-;		ldy		#0
-;		sty		fr0
-;		sty		fr1
-;		ldx		#$20
-;copy_loop:
-;		mva:rne	(fr0),y (fr1),y+
-;		inc		fr0+1
-;		inc		fr1+1
-;		dex
-;		bne		copy_loop
 ;
 ;		;check if there is a command line to process
 ;		ldy		#0

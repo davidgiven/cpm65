@@ -141,6 +141,7 @@ $(OBJDIR)/third_party/altirrabasic/%.bin: \
 		bin/mads \
 		$(OBJDIR)/xextobin
 	@mkdir -p $(dir $@)
+	rm -f $(patsubst %.bin,%.xex,$@)
 	bin/mads third_party/altirrabasic/source/atbasic.s \
 		-c \
 		-o:$(patsubst %.bin,%.xex,$@) \
@@ -152,11 +153,11 @@ $(OBJDIR)/third_party/altirrabasic/%.bin: \
 	$(OBJDIR)/xextobin -i $(patsubst %.bin,%.xex,$@) -o $@ -b 0x$(TEXTBASE)
 
 $(OBJDIR)/third_party/altirrabasic/atbasic.core.bin: ZPBASE=0
-$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin: TEXTBASE=0100
+$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin: TEXTBASE=0200
 $(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin: ZPBASE=1
-$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin: TEXTBASE=0100
+$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin: TEXTBASE=0200
 $(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin: ZPBASE=0
-$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin: TEXTBASE=0200
+$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin: TEXTBASE=0300
 
 $(OBJDIR)/third_party/altirrabasic/atbasic.com: \
 	$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin \
