@@ -57,12 +57,6 @@ offset_loop:
 		cpx		#memtop2+2
 		bne		offset_loop
 
-.def :MemAdjustAPPMHI = *			;NOTE: Must not modify X or CLR/NEW will break.
-		;update OS APPMHI from our memory top
-		sta		appmhi+1
-		lda		memtop2
-		sta		appmhi
-
 nothing_to_do:
 xit:
 		rts

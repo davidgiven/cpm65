@@ -39,7 +39,6 @@ errorNoMemory		inc		errno		;2
 				
 		;set stop line
 		ldy		#0
-		sty		dspflg			;force off list flag while we have a zero
 		sty		fr0+1
 		lda		(stmcur),y
 		sta		stopln

@@ -144,8 +144,7 @@ reset_loop:
 		inx
 		bne		reset_loop
 
-		;reset APPMHI
-		jmp		MemAdjustAPPMHI
+		rts
 .endp
 
 
@@ -207,17 +206,16 @@ stEnd = immediateModeReset
 .proc _stNew
 .def :stLomem
 		jsr		evaluateInt
-		stx		memlo
-		sta		memlo+1
+		sta		memlo
 .def :stNew
 		jsr		reset_entry
 		jsr		execRestore
 		jmp		immediateModeReset
 
 reset_entry:
-		ldy		memlo+1
-		lda		memlo
+		lda		#0
 		sta		lomem
+		ldy		memlo
 
 		;set up second argument stack pointer
 		clc
@@ -501,28 +499,7 @@ relocloop:
 ;===========================================================================
 ; NOTE #iocb, avar, avar
 ;
-.proc stNote
-		;consume #iocb,
-		jsr		evaluateHashIOCB
-		
-		;issue XIO 38 to get current position
-		lda		#38
-		jsr		IoDoCmd
-		
-		;copy ICAX3/4 into first variable
-		jsr		ExprSkipCommaAndEvalVar
-		ldy		iocbidx
-		lda		icax3,y
-		ldx		icax4,y
-		jsr		MathWordToFP
-		jsr		VarStoreFR0
-		
-		;copy ICAX5 into second variable
-		jsr		ExprSkipCommaAndEvalVar
-		ldx		iocbidx
-		lda		icax5,x
-		jmp		stGet.store_byte_to_var
-.endp
+stNote = errorWTF
 
 
 ;===========================================================================
@@ -534,26 +511,7 @@ relocloop:
 ; For some reason, this command only takes avars instead of aexps, even
 ; though they're incoming parameters.
 ;
-.proc stPoint
-		;consume #iocb,
-		jsr		evaluateHashIOCB
-		
-		;consume comma and then first var, which holds sector number
-		lda		#icax3-icbal
-		jsr		stGetIoWord
-		
-		;consume comma and then second var, which holds sector offset
-		jsr		ExprSkipCommaAndEvalPopInt
-		
-		;move to ICAX5
-		txa
-		ldx		iocbidx
-		sta		icax5,x
-		
-		;issue XIO 37 and exit
-		lda		#37
-		jmp		IoDoCmd
-.endp
+stPoint = errorWTF
 
 
 ;===========================================================================
@@ -598,12 +556,8 @@ relocloop:
 ;	If an error occurs during evaluation of any of the parameters, none of
 ;	them are written to the IOCB.
 ;
-.proc stXio
-		jsr		evaluateInt
-		inc		exLineOffset
-		txa
-		dta		{bit $0100}
-.def :stOpen = *
+stXio = errorWTF
+.proc stOpen
 		lda		#CIOCmdOpen
 		pha
 		jsr		ExprEvalIOCBCommaInt
@@ -618,9 +572,9 @@ relocloop:
 		
 		ldx		iocbidx
 		pla
-		sta		icax2,x
+		;sta		icax2,x
 		pla
-		sta		icax1,x
+		;sta		icax1,x
 				
 		;issue command
 		pla
@@ -926,21 +880,7 @@ loop:
 ; Station Multiplication due to overwriting graphics data already placed
 ; at $BFxx.
 ;
-.proc stGraphics
-		jsr		evaluateInt
-
-		jsr		pmTryDisable
-
-		;close and reopen IOCB 6 with S:
-		lda		fr0
-		sta		icax2+$60
-		and		#$30
-		eor		#$1c 
-		ldy		#<devname_s
-		ldx		#$60
-		jmp		IoOpenStockDeviceX
-.endp
-
+stGraphics = errorWTF
 
 ;===========================================================================
 ; PLOT aexp1, aexp2
@@ -952,10 +892,7 @@ loop:
 ;	Error 3 if Y in [256, 32767]
 ;	Error 7 if Y in [32768, 65535]
 ;
-.proc stPlot
-		jsr		stSetupCommandXY
-		jmp		IoPutCharDirect
-.endp
+stPlot = errorWTF
 
 
 ;===========================================================================
@@ -981,16 +918,7 @@ stCp = stDos
 ;	  Defense.bas for LOCATE to work after an XIO #6,0,0. None of the other
 ;	  drawing commands seem to do this (COLOR, PLOT, LOCATE, SETCOLOR).
 ;
-.proc stDrawto
-		lda		#$0C
-		sta		icax1+$60
-
-		jsr		stSetupCommandXY
-		sta		atachr
-
-		lda		#$11
-		jmp		IoDoCmd
-.endp
+stDrawto = errorWTF
 
 ;===========================================================================
 .proc stTrap
@@ -1375,7 +1303,7 @@ not_found:
 stGoto2 = stGoto
 
 ;===========================================================================
-stBye = blkbdv
+stBye = ReturnToDOS
 
 ;===========================================================================
 ; CONT
@@ -1427,16 +1355,12 @@ stSetupCommandXY = stPosition
 		bne		stErrorValueError
 		
 		;position at (X,Y)
-		stx		rowcrs
+		;stx		rowcrs
 		pla
-		sta		colcrs
+		;sta		colcrs
 		pla
-		sta		colcrs+1
+		;sta		colcrs+1
 
-		;preload IOCB #6 and current color for PLOT/DRAWTO
-		lda		grColor
-		ldx		#$60			;!! - exit NZ for unconditional branch in LOCATE
-		stx		iocbidx
 xit:
 		rts
 .endp
@@ -1468,38 +1392,7 @@ stErrorValueError:
 ; function. However, a quirk in Atari BASIC is that the shadow SSKCTL is
 ; *not* updated.
 ;
-.proc stSound
-_channel = stScratch
-
-		;get voice
-		jsr		ExprEvalPopIntPos
-		bne		stErrorValueError
-		txa
-		cmp		#4
-		bcs		stErrorValueError
-		asl
-		sta		_channel
-		
-		;get pitch
-		jsr		ExprSkipCommaAndEvalPopInt
-		txa
-		pha
-
-		;get distortion and volume
-		jsr		stSetcolor.decode_dual
-
-		ldx		_channel
-		sta		audc1,x
-		pla
-		sta		audf1,x
-		
-		;force all audio channels to 64K clock and unlinked
-		mva		#0 audctl
-
-		;force off asynchronous mode so that channels 3 and 4 work
-		mva		#3 skctl
-		rts
-.endp
+stSound = errorWTF
 
 ;===========================================================================
 ; SETCOLOR aexpr1, aexpr2, aexpr3
@@ -1510,50 +1403,8 @@ _channel = stScratch
 ;	Error 7 if aexpr1 in [32768, 65535].
 ;	Error 3 if aexpr1, aexpr2, or aexpr3 not in [0, 65535].
 ;
-.proc stPmcolor
-		;get color index
-		jsr		ExprEvalPopIntPos
-		cpx		#4
-		bcs		stErrorValueError
-		txa
-		bpl		stSetcolor.pmcolor_entry
-.endp
-
-.proc stSetcolor
-_channel = stScratch
-
-		;get color index
-		jsr		ExprEvalPopIntPos
-		cpx		#5
-		bcs		stErrorValueError
-		txa
-		adc		#4
-pmcolor_entry:
-		sta		_channel
-
-		;get hue and luma
-		jsr		decode_dual
-		
-		;store new color
-		ldx		_channel
-		sta		pcolr0,x
-		rts
-		
-decode_dual:
-		;get hue/distortion
-		jsr		decode_single
-decode_single:
-		asl
-		asl
-		asl
-		asl
-		pha
-		;get luma/volume
-		jsr		ExprSkipCommaAndEvalPopInt
-		pla
-		adc		fr0				;X*16+Y		
-		rts
-.endp
+stPmcolor = errorWTF
+stSetcolor = errorWTF
 
 ;===========================================================================
 .proc stLprint
@@ -1686,27 +1537,10 @@ copy_down:
 ; All players and missiles are reset to position 0 and 1x size. P/M graphics
 ; memory is not cleared.
 ;
-.proc stPmgraphics
-		jsr		ExprEvalPopIntPos
-		dex
-		bmi		pmDisable
-		beq		single_line
-		ldx		#1
-single_line:
+stPmgraphics = errorWTF
 
-		ldy		pmgmode_tab,x
-		lda		mask_tab,x
-		and		memtop+1
-		clc
-		adc		mask_tab,x
-		cmp		memtop2+1
-		bcs		mem_ok
-		
-		jmp		errorNoMemory
-
-.def :ExecReset
+.proc ExecReset
 		jsr		IoCheckBusy
-
 
 		;close IOCBs 1-7
 		ldx		#$70
@@ -1717,66 +1551,15 @@ close_loop:
 		sbc		#$10
 		tax
 		bne		close_loop
-
-		;silence all sound channels
-		ldx		#7
-		sta:rpl	$d200,x-		;!! - A=0 from above
-		
-.def :pmTryDisable
-		lda		pmgbase
-		beq		no_pmg
-
-.def :pmDisable
-		ldx		#2
-		lda		#0
-		tay
-		sta		gractl
-		clc
-mem_ok:
-		sta		pmgbase
-		sta		pmbase
-		sty		pmgmode
-
-		bcc		skip_pmenable
-		lda		#3
-		sta		gractl
-		ora		gprior
-		and		#$c1
-		sta		gprior
-skip_pmenable:
-
-		lda		sdmctl
-		and		#$e3
-		ora		pmg_dmactl_tab,x
-		sta		sdmctl
-
-		;reset sprite positions, sizes, and graphics latches
-		ldy		#17
-		lda		#0
-		sta:rpl	hposp0,y-
-
-no_pmg:
 		rts
 
-mask_tab:
-		dta		$f8,$fc
+pmTryDisable = errorWTF
+pmDisable = errorWTF
+		rts
 .endp
 
 ;===========================================================================
-.proc stPmclr
-		jsr		ExprEvalPopIntPos
-.def :pmClear
-		jsr		pmGetAddrX
-clear2:
-		ldy		pmgmode
-		lda		#0
-clloop:
-		dey
-		sta		(parptr),y
-		bne		clloop
-done:
-		rts
-.endp
+stPmclr = errorWTF
 
 ;==========================================================================
 ; PMMOVE aexp[,hpos][;vdel]
@@ -1785,126 +1568,8 @@ done:
 ;
 ; Only bits 0-6 or bits 0-7 of |vdel| are used.
 ;
-.proc stPmmove
-		jsr		ExprEvalPopIntPos
-		cpx		#8
-		bcs		stPmclr.done
-		stx		stScratch2
-		lda		pmg_move_mask_tab,x
-		sta		stScratch4
-		jsr		pmGetAddrX
-		sta		iterPtr+1
-op_loop:
-		jsr		ExecGetComma
-		bne		not_hmove
-
-		;read absolute horizontal pos
-		jsr		ExprEvalPopIntPos
-		txa
-		ldx		stScratch2
-		sta		hposp0,x
-		bpl		op_loop				;!! - unconditional
-
-not_hmove:
-		cmp		#TOK_EXP_SEMI
-		bne		stPmclr.done
-
-		;read relative vertical pos
-		jsr		evaluate
-		jsr		MathSplitSign
-		jsr		ExprConvFR0Int
-		txa
-		ora		pmgmode
-		eor		pmgmode
-		beq		stPmclr.done
-		sta		stScratch3
-		ora		parptr
-		sta		iterPtr
-
-		;test vsign -- + is up (ascending copy), - is down (descending copy)
-		lda		pmgmode
-		sec
-		sbc		stScratch3
-
-		bit		funScratch1
-		bpl		move_up
-
-move_down:
-		tay
-down_loop:
-		dey
-		lda		(parptr),y
-		eor		(iterPtr),y
-		and		stScratch4
-		eor		(parptr),y
-		sta		(iterPtr),y
-		tya
-		bne		down_loop
-down_loop_exit:
-clear:
-		ldy		stScratch3
-down_clear_loop:
-		dey
-		lda		(parptr),y
-		and		stScratch4
-		sta		(parptr),y
-		tya
-		bne		down_clear_loop
-		rts
-
-move_up:
-		ldy		#0
-		tax
-up_loop:
-		lda		(iterPtr),y
-		eor		(parptr),y
-		and		stScratch4
-		eor		(iterPtr),y
-		sta		(parptr),y
-		iny
-		dex
-		bne		up_loop
-up_loop_exit:
-up_clear_loop:
-		lda		(parptr),y
-		and		stScratch4
-		sta		(parptr),y
-		iny
-		cpy		pmgmode
-		bne		up_clear_loop
-		rts
-.endp
-
-;==========================================================================
-.proc stMissile
-		jsr		ExprEvalPopIntPos
-		txa
-		and		#3
-		tax
-		lda		pmg_move_mask_tab+4,x
-		eor		#$ff
-		sta		stScratch
-		jsr		ExprSkipCommaAndEvalPopIntPos
-		stx		stScratch2
-
-		ldx		#4
-		jsr		pmGetAddrX
-
-		jsr		ExprSkipCommaAndEvalPopIntPos
-		txa
-		beq		done
-
-		ldy		stScratch2
-xor_loop:
-		lda		(parptr),y
-		eor		stScratch
-		sta		(parptr),y
-		iny
-		dex
-		bne		xor_loop
-done:
-		rts
-.endp
+stPmmove = errorWTF
+stMissile = errorWTF
 
 ;==========================================================================
 .proc pmGetAddrX

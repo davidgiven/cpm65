@@ -134,9 +134,10 @@ done:
 .proc IoReadLineX
 		jsr		IoSetupReadLineLDBUFA_SetIOCBX
 		jsr		ciov
-		bpl		putchar.done
+		bpl		done
 		cpy		#$88
 		bne		IoCloseIOCB7AndThrowError
+done:
 		rts
 .endp
 

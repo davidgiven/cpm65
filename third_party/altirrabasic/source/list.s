@@ -100,10 +100,6 @@ no_lineno:
 		sta		parptr
 		sty		parptr+1
 		
-		;turn on LIST mode display
-		sec
-		ror		dspflg
-		
 lineloop:
 		;check that we haven't hit the end line; we'll always eventually
 		;hit the immediate mode line
@@ -117,9 +113,6 @@ lineloop:
 		sta		fr0+1
 		sbc		_endline+1
 		bcc		not_done
-		
-		;turn off LIST mode display
-		asl		dspflg
 		
 		;we're done
 		rts

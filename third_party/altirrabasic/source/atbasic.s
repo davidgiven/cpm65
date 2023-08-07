@@ -75,6 +75,8 @@ _fr3		dta		f(0)
 flptr		dta		a(0)
 fptr2		dta		a(0)
 ztemp4		dta		a(0)
+plyarg		dta		f(0)
+fpscr		dta		f(0)
 
 dataln		dta		a(0)	;(compat - Mapping the Atari / ANALOG verifier) current DATA statement line
 
@@ -125,7 +127,21 @@ a4		= fr0+8				;temporary pointer 4
 a5		= fr0+10			;temporary pointer 5
 
 degflg	dta 0				;(compat) degree/radian flag: 0 for radians, 6 for degrees
-ramtop	dta 0				;page number of top of memory
+memtop  dta 0				;page number of top of memory
+memlo	dta 0    			;page number of base of memory
+brkkey	dta 0				;set on BREAK
+cix		dta 0				;character input buffer offset (into inbuff)
+inbuff	dta a(0)			;input buffer pointer
+
+icbalz	dta 0			;Zero page IOCB: address of device/filename spec lo
+icbahz	dta 0			;Zero page IOCB: address of device/filename spec hi
+icptlz	dta 0			;Zero page IOCB: put byte address lo (-1)
+icpthz	dta 0			;Zero page IOCB: put byte address hi (-1)
+icbllz	dta 0			;Zero page IOCB: buffer length/byte count lo (-1)
+icblhz	dta 0			;Zero page IOCB: buffer length/byte count hi (-1)
+icax1z	dta 0			;Zero page IOCB: device-specific information 1
+icax2z	dta 0			;Zero page IOCB: device-specific information 2
+
 
 .macro _STATIC_ASSERT
 		.if :1
@@ -156,8 +172,11 @@ BDOS:
 .proc _entry
 	ldy #BDOS_GETTPA
 	jsr BDOS
-	stx ramtop
-	rts
+	stx memtop
+	lda #>(_data_end + 256)
+	sta memlo
+
+	jsr initcio
 ;
 ;		;check if there is a command line to process
 ;		ldy		#0
@@ -251,13 +270,13 @@ BDOS:
 		stx		errno
 
 		;print startup banner
-;		mwa		#msg_banner_begin icbal
-;		mwa		#msg_banner_end-msg_banner_begin icbll
-;		mva		#CIOCmdPutChars iccmd
-;		ldx		#0
-;		jsr		ciov
-;
-;		jsr		_stNew.reset_entry
+		mwa		#msg_banner_begin icbal
+		mwa		#msg_banner_end-msg_banner_begin icbll
+		mva		#CIOCmdPutChars iccmd
+		ldx		#0
+		jsr		ciov
+
+		jsr		_stNew.reset_entry
 ;		jsr		ExecReset
 ;
 ;		;read filename flag
@@ -356,20 +375,13 @@ msg_banner_end:
 ReturnToDOS:
 		ldx		#0
 		jsr		IoCloseX
-		mva		#$c0 ramtop
-		sta		icax2
-		lda		#$0c
-		ldy		#<devname_e
-		jsr		IoOpenStockDeviceX			;!! this overwrites $BC20+
-		jmp		(dosvec)
+		ldy		#BDOS_EXIT_PROGRAM
+		jmp		BDOS
 
 ;==========================================================================
 ; Message base
 ;
 msg_base:
-msg_banner:
-		_MSG_BANNER
-		dta		0
 
 msg_ready:
 		dta		$9B,c'Ready',$9B,0
@@ -453,6 +465,7 @@ eof:
 		icl		'error.s'
 		icl		'util.s'
 		icl		'../kernel/mathpack.s'
+		icl		'cioemu.s'
 
 
 ;==========================================================================
@@ -518,8 +531,25 @@ _text_end:
 	
 	opt o-
 _data_start:
+ichid	dta 0		;IOCB #0 handler ID
+iccmd	dta 0		;IOCB #0 command byte
+icsta	dta 0		;IOCB #0 status
+icbal	dta 0		;IOCB #0 buffer address lo
+icbah	dta 0		;IOCB #0 buffer address hi
+icptl	dta 0		;IOCB #0 PUT address lo
+icpth	dta 0		;IOCB #0 PUT address hi
+icbll	dta 0		;IOCB #0 buffer length/byte count lo
+icblh	dta 0		;IOCB #0 buffer length/byte count hi
+icax1	dta 0		;IOCB #0 auxiliary information lo
+icax2	dta 0		;IOCB #0 auxiliary information hi
+icax3	dta 0		;
+icax4	dta 0		;
+icax5	dta 0		;
+icax6	dta 0		;
+ciochr	dta a(0)    ; CIO: call A register save/restore
+
 lbuff:
-	* = * + $80
+	.ds 256
 _data_end:
 
 		end

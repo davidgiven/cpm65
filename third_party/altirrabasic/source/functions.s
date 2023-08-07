@@ -1044,22 +1044,7 @@ arg_loop_start:
 ;	Invalid paddle numbers 8-255 aren't trapped and return data from
 ;	other parts of the OS database.
 ;
-.proc funPaddleStick
-		lda		offset_table-$51,x
-		pha
-		jsr		ExprConvFR0IntPos
-		lda		#2
-		sta		fr0+1
-		pla
-		tay
-		bcc		funPeek.push_fr0_y		;!! - unconditional
-
-offset_table:
-		dta		<paddl0
-		dta		<stick0
-		dta		<ptrig0
-		dta		<strig0
-.endp
+funPaddleStick = errorWTF
 
 ;===========================================================================
 ; PEEK(aexp)
@@ -1335,7 +1320,8 @@ _temp2 = fr0+7
 loop:
 		;keep looping until we get a valid BCD number
 loop2:
-		lda		random		;4
+		lda		#0
+		;lda		random		;4
 		cmp		#$a0		;2
 		bcs		loop2		;2
 		sta		fr0,x		;4
@@ -1516,28 +1502,10 @@ approx_compare_tab:
 ;
 ; Returns the sign of a number, as -1/0/+1.
 ;
-.nowarn .proc _funHVStick
-.def :funHstick
-.def :funVstick
-		cpx		#TOK_EXP_VSTICK
-		php
-		jsr		ExprConvFR0IntPos
-		lda		stick0,x
-		pha
-		jsr		zfr0
-		pla
-		plp
-		beq		vstick
-		lsr
-		lsr
-		eor		#$03
-vstick:
-		and		#$03
-		tax
-		lda		hvstick_table,x
-		sta		fr0
-.endp
-		;!! - fall through
+_funHVStick = errorWTF
+funHstick = errorWTF
+funVstick = errorWTF
+
 .proc funSgn
 		;check if the number is zero
 		asl		fr0
@@ -1625,24 +1593,7 @@ get_errno:
 ;===========================================================================
 ; BUMP(aexp, aexp)
 ;
-.proc funBump
-		;fetch bit index and player/playfield flag
-		jsr		funBitwiseSetup
-		lda		fr1
-		and		#8
-
-		;fetch player/missile index
-		eor		#12
-		eor		fr0
-		tay
-		lda		fr1
-		and		#3
-		tax
-		lda		funCompare.compare_mode_tab,x
-		and		m0pf,y
-		jsr		funCompare.push_nz_as_bool
-		jmp		funOpenParens
-.endp
+funBump = errorWTF
 
 ;===========================================================================
 .echo "- Function module length: ",*-?statements_start

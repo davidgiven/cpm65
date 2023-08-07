@@ -1857,7 +1857,7 @@ fpconst_log10coeff:		;Maclaurin series expansion for log10((z-1)/(z+1))
 ; use a custom minimax polynomial for f(y)=atn(sqrt(y))/sqrt(y) where y=x^2.
 ;
 	fixadr	$dfae
-atncoef:
+fpconst_atncoef:
 	dta		$3E,$11,$12,$07,$58,$81		;x^10* 1.11207588057982e-3
 	dta		$BE,$73,$04,$08,$75,$20		;x^ 9*-7.30408751951452e-3
 	dta		$3F,$02,$24,$96,$55,$73		;x^ 8* 2.24965572957342e-2
@@ -1872,7 +1872,7 @@ atncoef:
 fp_one:
 	dta		$40,$01,$00,$00,$00,$00		;1.0 (also an arctan coeff)
 	fixadr	$dff0
-fp_pi4:	;pi/4 - needed by Atari Basic ATN()
+fpconst_pi4:	;pi/4 - needed by Atari Basic ATN()
 	dta		$3F,$78,$53,$98,$16,$34		;0.7853981633[9744830961566084581988]
 	
 fp_dectobin_tab:
