@@ -63,7 +63,7 @@ MINIMAL_APPS = \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
-	$(OBJDIR)/altirrabasic/source/atbasic.com \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.com \
 	apps/dump.asm \
 	apps/ls.asm \
 
@@ -142,6 +142,17 @@ $(OBJDIR)/tools/%.o: tools/%.cc
 $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc include/driver.inc
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
+
+$(OBJDIR)/third_party/altirrabasic/atbasic.com: \
+		$(wildcard third_party/altirrabasic/source/*.s) \
+		$(wildcard third_party/altirrabasic/kernel/*.s)
+	bin/mads third_party/altirrabasic/source/atbasic.s \
+		-c \
+		-o:$@ \
+		-s \
+		-d:CART=0 \
+		-l:$(patsubst %.o,%.lst,%@) \
+		-t:$(patsubst %.o,%.map,$@)
 
 $(OBJDIR)/libcommodore.a: $(LIBCOMMODORE_OBJS)
 	@mkdir -p $(dir $@)
