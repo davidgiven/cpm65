@@ -7,8 +7,9 @@
 ; without any warranty.
 
 .proc initcio
-    ldy #0
+    ldy #0xff
     sty brkkey
+    iny
     sty ichid
     lda #<(console_putchar-1)
     sta icptl
