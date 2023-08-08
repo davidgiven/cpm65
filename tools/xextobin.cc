@@ -46,6 +46,11 @@ static void read_file(std::string filename)
             break;
         switch (header)
         {
+            default:
+                if ((header & 0xff00) == 0xff00)
+                    error("unsupported header 0x{:04x}\n", header);
+                ifs.seekg(ifs.tellg()-2L);
+                /* fall through */
             case 0xffff:
             {
                 uint16_t start = readle16(ifs);
@@ -58,9 +63,6 @@ static void read_file(std::string filename)
                 himem = std::max((int)himem, (int)end+1);
                 break;
             }
-
-            default:
-                error("unsupported header 0x{:04x}\n", header);
         }
     }
 }
