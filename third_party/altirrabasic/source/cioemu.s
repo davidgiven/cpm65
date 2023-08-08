@@ -70,11 +70,7 @@
         rts
     #end
     #if .byte @ == #CIOCmdGetRecord
-        brk
-        mwa icbal,x temp0
-        mwa icbll,x temp1
-        ldy #0
-        rts
+        jmp console_getrecord
     #end
     brk
     rts
@@ -91,4 +87,50 @@
     #end
     ldy #BDOS_CONSOLE_OUTPUT
     jmp BDOS
+.endp
+
+.proc console_getrecord
+    mwa icbal,x temp0
+    ldy #0
+    lda #0xff
+    sta (temp0), y
+    
+    txa
+    pha
+
+    lda temp0+0
+    ldx temp0+1
+    ldy #BDOS_READ_LINE
+    jsr BDOS
+
+    ldy #1
+    lda (temp0), y          ; get line length
+    sta temp1+0
+    ldy #0
+?loop:
+    iny
+    iny
+    lda (temp0), y
+    dey
+    dey
+    sta (temp0), y
+    iny
+    cpy temp1+0
+    bne ?loop
+    
+    ldy temp1+0
+    lda #0x9b
+    sta (temp0), y
+
+    pla
+    tax
+    ldy temp1+0
+    iny
+    tya
+    sta icbll, x
+    lda #0
+    sta icblh, x
+
+    ldy #1
+    rts
 .endp

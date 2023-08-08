@@ -128,7 +128,7 @@ a4		= fr0+8				;temporary pointer 4
 a5		= fr0+10			;temporary pointer 5
 
 degflg	dta 0				;(compat) degree/radian flag: 0 for radians, 6 for degrees
-memtop  dta 0				;page number of top of memory
+memtop  dta a(0)	        ;address of top of memory
 memlo	dta 0    			;page number of base of memory
 brkkey	dta 0				;set on BREAK
 cix		dta 0				;character input buffer offset (into inbuff)
@@ -173,7 +173,9 @@ BDOS:
 .proc _entry
 	ldy #BDOS_GETTPA
 	jsr BDOS
-	stx memtop
+	lda #0
+	sta memtop+0
+	stx memtop+1
 	lda #>(_data_end + 256)
 	sta memlo
 
@@ -481,6 +483,7 @@ pmgmode_tab:					;2 bytes ($00 80)
 
 ;==========================================================================
 
+  .align 256
 		.pages 1
 
 const_table:
@@ -527,8 +530,8 @@ const_one:
 		dta		$40,$01
 pmg_move_mask_tab:
 		dta		$00,$00,$00,$00,$fc,$f3,$cf,$3f
-_text_end:
 		.endpg
+_text_end:
 	
 	opt o-
 _data_start:

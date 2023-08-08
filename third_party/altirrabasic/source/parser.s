@@ -291,8 +291,6 @@ is_state_jump:
 		;jump to new state
 		lda		parse_state_table-$40,x
 		ldy		#>pa_state_start
-		add		#<pa_state_start
-		scc:iny
 load_and_jmp:
 		sta		parptr
 		sty		parptr+1
@@ -444,12 +442,13 @@ print_loop:
 		pha
 		dec		cix
 		bne		no_invert
-		eor		#$80
-		cmp		#$1b
-		bne		not_eol
-		lda		#$a0
+		;eor		#$80
+		;cmp		#$1b
+		;bne		not_eol
+		pha
+		lda		#'^' ;$a0
 		jsr		putchar
-		lda		#$9b
+		pla
 no_invert:
 not_eol:
 		jsr		putchar
@@ -698,8 +697,6 @@ accept:
 		;init for statements
 		lda		parse_state_table_statements,x
 		ldy		#>pa_statements_begin
-		add		#<pa_statements_begin
-		scc:iny
 
 		;check if we're doing functions
 		lsr		_functionMode
@@ -723,8 +720,6 @@ accept:
 		ldx		stScratch
 		lda		parse_state_table_functions-$3d,x
 		ldy		#>pa_functions_begin
-		add		#<pa_functions_begin
-		scc:iny
 
 do_branch:
 		clc
