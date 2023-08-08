@@ -12,7 +12,7 @@
 
 ;===========================================================================
 .macro _MSG_BANNER
-		dta		c'Altirra 8K BASIC 1.58'
+		dta		c'Altirra 8K BASIC 1.58 CP/M-65 version'
 .endm
 
 ;===========================================================================
@@ -72,9 +72,10 @@ fr0         dta     f(0)
 fr1			dta		f(0)
 fr2			dta		f(0)
 _fr3		dta		f(0)
-flptr		dta		a(0)
-fptr2		dta		a(0)
-ztemp4		dta		a(0)
+temp0		dta		a(0)	;used by mathpack; otherwise, temporary
+temp1		dta		a(0)	;used by mathpack; otherwise, temporary
+temp2		dta		a(0)	;used by mathpack; otherwise, temporary
+temp3		dta		a(0)	;used by mathpack; otherwise, temporary
 plyarg		dta		f(0)
 fpscr		dta		f(0)
 
@@ -531,21 +532,26 @@ _text_end:
 	
 	opt o-
 _data_start:
-ichid	dta 0		;IOCB #0 handler ID
-iccmd	dta 0		;IOCB #0 command byte
-icsta	dta 0		;IOCB #0 status
-icbal	dta 0		;IOCB #0 buffer address lo
-icbah	dta 0		;IOCB #0 buffer address hi
-icptl	dta 0		;IOCB #0 PUT address lo
-icpth	dta 0		;IOCB #0 PUT address hi
-icbll	dta 0		;IOCB #0 buffer length/byte count lo
-icblh	dta 0		;IOCB #0 buffer length/byte count hi
-icax1	dta 0		;IOCB #0 auxiliary information lo
-icax2	dta 0		;IOCB #0 auxiliary information hi
-icax3	dta 0		;
-icax4	dta 0		;
-icax5	dta 0		;
-icax6	dta 0		;
+iocb_table:
+	.ds	8 * $10
+
+ichid	= iocb_table + $0		;IOCB #0 handler ID
+iccmd	= iocb_table + $1		;IOCB #0 command byte
+icsta	= iocb_table + $2		;IOCB #0 status
+icbal	= iocb_table + $3		;IOCB #0 buffer address lo
+icbah	= iocb_table + $4		;IOCB #0 buffer address hi
+icptl	= iocb_table + $5		;IOCB #0 PUT address lo
+icpth	= iocb_table + $6		;IOCB #0 PUT address hi
+icbll	= iocb_table + $7		;IOCB #0 buffer length/byte count lo
+icblh	= iocb_table + $8		;IOCB #0 buffer length/byte count hi
+icax1	= iocb_table + $9		;IOCB #0 auxiliary information lo
+icax2	= iocb_table + $a		;IOCB #0 auxiliary information hi
+icax3	= iocb_table + $b		;
+icax4	= iocb_table + $c		;
+icax5	= iocb_table + $d		;
+icax6	= iocb_table + $e		;
+icax7	= iocb_table + $f		;
+
 ciochr	dta a(0)    ; CIO: call A register save/restore
 
 lbuff:

@@ -312,12 +312,10 @@ IoSetupReadLineLDBUFA_SetIOCBX:
 IoSetupReadLineLDBUFA_X:
 		jsr		ldbufa
 .proc IoSetupReadLine
-		;we are using some pretty bad hacks here:
-		;- GET RECORD and >LBUFF are $05
-		;- <LBUFF is $80
-		ldy		#$05
-		lda		#$80
+		ldy		#>lbuff
+		lda		#<lbuff
 		jsr		IoSetupBufferAddress
+		lda		#CIOCmdGetRecord
 		sta		iccmd,x
 		ldy		#$ff
 .def :IoSetupBufferLengthY
