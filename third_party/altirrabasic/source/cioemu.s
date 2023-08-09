@@ -84,9 +84,9 @@
 
 .proc console_putchar
     #if .byte @ == #0x9b
-        lda #10
-        jsr console_putchar
         lda #13
+        jsr console_putchar
+        lda #10
     #end
     #if .byte @ >= #0x80
         rts
@@ -110,7 +110,7 @@
     jsr BDOS
 
     ; Rewrite the buffer into the format which atbasic expects.
-    
+
     ldy #1
     lda (temp0), y          ; get line length
     sta temp1+0
@@ -138,6 +138,11 @@
     sta icbll, x
     lda #0
     sta icblh, x
+
+    ; Print a newline (CP/M doesn't).
+    
+    lda #0x9b
+    jsr console_putchar
 
     ldy #1
     rts
