@@ -23,34 +23,6 @@ TARGETS = \
 	vic20.d64 \
 	x16.zip \
 
-APPS = \
-	$(OBJDIR)/apps/bedit.com \
-	$(OBJDIR)/apps/capsdrv.com \
-	$(OBJDIR)/apps/cls.com \
-	$(OBJDIR)/apps/devices.com \
-	$(OBJDIR)/apps/dinfo.com \
-	$(OBJDIR)/apps/dump.com \
-	$(OBJDIR)/apps/ls.com \
-	$(OBJDIR)/asm.com \
-	$(OBJDIR)/copy.com \
-	$(OBJDIR)/objdump.com \
-	$(OBJDIR)/stat.com \
-	$(OBJDIR)/submit.com \
-	apps/bedit.asm \
-	apps/dinfo.asm \
-	apps/dump.asm \
-	apps/ls.asm \
-	apps/cpm65.inc \
-	apps/drivers.inc \
-	cpmfs/asm.txt \
-	cpmfs/bedit.txt \
-	cpmfs/demo.sub \
-	cpmfs/hello.asm \
-
-SCREEN_APPS = \
-	apps/cls.asm \
-	$(OBJDIR)/qe.com \
-
 MINIMAL_APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
@@ -66,6 +38,22 @@ MINIMAL_APPS = \
 	$(OBJDIR)/third_party/altirrabasic/atbasic.com \
 	apps/dump.asm \
 	apps/ls.asm \
+
+APPS = \
+	$(MINIMAL_APPS) \
+	$(OBJDIR)/objdump.com \
+	apps/bedit.asm \
+	apps/dinfo.asm \
+	apps/cpm65.inc \
+	apps/drivers.inc \
+	cpmfs/asm.txt \
+	cpmfs/bedit.txt \
+	cpmfs/demo.sub \
+	cpmfs/hello.asm \
+
+SCREEN_APPS = \
+	apps/cls.asm \
+	$(OBJDIR)/qe.com \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \

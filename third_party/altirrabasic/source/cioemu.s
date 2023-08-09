@@ -73,6 +73,11 @@
     #if .byte @ == #CIOCmdGetRecord
         jmp console_getrecord
     #end
+    #if .byte @ == #CIOCmdClose
+        ; Ignore attempts to close the console.
+        ldy #0
+        rts
+    #end
     brk
     rts
 .endp
@@ -104,6 +109,8 @@
     ldy #BDOS_READ_LINE
     jsr BDOS
 
+    ; Rewrite the buffer into the format which atbasic expects.
+    
     ldy #1
     lda (temp0), y          ; get line length
     sta temp1+0

@@ -52,8 +52,8 @@
 flptr    = temp0
 fptr2    = temp1
 ztemp4   = temp2
-_fpcocnt = temp3+0          ;FP: temporary storage - polynomial coefficient counter
-_fptemp0 = ztemp4+1			;FP: temporary storage - transcendental temporary
+_fpcocnt = frx              ;FP: temporary storage - polynomial coefficient counter
+_fptemp0 = temp3+0 			;FP: temporary storage - transcendental temporary
 _fptemp1 = temp3+1			;FP: temporary storage - transcendental temporary
 
 .macro  ckaddr
