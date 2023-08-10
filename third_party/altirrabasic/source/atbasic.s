@@ -68,26 +68,10 @@ dataLnEnd   dta     0       ;current DATA statement line end
 pmgbase     dta     0
 pmgmode     dta     0
 ioTermFlag  dta     0
-fr0         .fl     0
-fre         .fl     0
-fr1         .fl     0
-fr2         .fl     0
-frx         dta     0
-eexp        dta     0
-nsign       dta     0
-esign       dta     0
-fchrflg		dta		0
-digrt		dta		0
-cix			dta		0
 _fr3        .fl     0
-temp0       dta     a(0)    ;used by mathpack; otherwise, temporary
-temp1       dta     a(0)    ;used by mathpack; otherwise, temporary
-temp2       dta     a(0)    ;used by mathpack; otherwise, temporary
-temp3       dta     a(0)    ;used by mathpack; otherwise, temporary
+mathpack_data .ds mathpack_data_len
 
 dataln      dta     a(0)    ;(compat - Mapping the Atari / ANALOG verifier) current DATA statement line
-
-
 stopln      dta     0       ;(compat - Atari BASIC manual): line number of error
         
 ;--------------------------------------------------------------------------
@@ -133,11 +117,9 @@ a3      = fr0+6             ;temporary pointer 3
 a4      = fr0+8             ;temporary pointer 4
 a5      = fr0+10            ;temporary pointer 5
 
-degflg  dta 0               ;(compat) degree/radian flag: 0 for radians, 6 for degrees
 memtop  dta a(0)            ;address of top of memory
 memlo   dta 0               ;page number of base of memory
 brkkey  dta 0               ;set on BREAK
-inbuff  dta a(0)            ;input buffer pointer
 
 icbalz  dta 0           ;Zero page IOCB: address of device/filename spec lo
 icbahz  dta 0           ;Zero page IOCB: address of device/filename spec hi

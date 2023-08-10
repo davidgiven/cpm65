@@ -46,24 +46,24 @@
 .proc ciov_console
     lda iccmd, x
     #if .byte @ == #CIOCmdPutChars
-        mwa icbal,x temp0
-        mwa icbll,x temp1
+        mwa icbal,x ztemp3
+        mwa icbll,x ztemp1
         ?loop:
-            lda temp1+0
-            ora temp1+1
+            lda ztemp1+0
+            ora ztemp1+1
             beq ?endloop
             
             ldy #0
-            lda (temp0), y
+            lda (ztemp3), y
             jsr console_putchar
 
-            inc temp0+0
-            sne:inc temp0+1
+            inc ztemp3+0
+            sne:inc ztemp3+1
 
-            lda temp1+0
+            lda ztemp1+0
             sub #1
-            sta temp1+0
-            scs:dec temp1+1
+            sta ztemp1+0
+            scs:dec ztemp1+1
         
             jmp ?loop
         ?endloop:
@@ -96,43 +96,43 @@
 .endp
 
 .proc console_getrecord
-    mwa icbal,x temp0
+    mwa icbal,x ztemp3
     ldy #0
     lda #0xff
-    sta (temp0), y
+    sta (ztemp3), y
     
     txa
     pha
 
-    lda temp0+0
-    ldx temp0+1
+    lda ztemp3+0
+    ldx ztemp3+1
     ldy #BDOS_READ_LINE
     jsr BDOS
 
     ; Rewrite the buffer into the format which atbasic expects.
 
     ldy #1
-    lda (temp0), y          ; get line length
-    sta temp1+0
+    lda (ztemp3), y          ; get line length
+    sta ztemp1+0
     ldy #0
 ?loop:
     iny
     iny
-    lda (temp0), y
+    lda (ztemp3), y
     dey
     dey
-    sta (temp0), y
+    sta (ztemp3), y
     iny
-    cpy temp1+0
+    cpy ztemp1+0
     bne ?loop
     
-    ldy temp1+0
+    ldy ztemp1+0
     lda #0x9b
-    sta (temp0), y
+    sta (ztemp3), y
 
     pla
     tax
-    ldy temp1+0
+    ldy ztemp1+0
     iny
     tya
     sta icbll, x

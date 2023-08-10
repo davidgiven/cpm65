@@ -49,12 +49,29 @@
 ; [6] Atari BASIC SIN() uses FCHRFLG ($F0).
 ;
 
-flptr    = temp0
-fptr2    = temp1
-ztemp4   = temp2
+mathpack_data_len = $100 - $d4
+fr0         = mathpack_data + 0
+fre         = mathpack_data + 6
+fr1         = mathpack_data + 12
+fr2         = mathpack_data + 18
+frx         = mathpack_data + 24
+eexp        = mathpack_data + 25
+nsign       = mathpack_data + 26
+esign       = mathpack_data + 27
+fchrflg     = mathpack_data + 28
+digrt       = mathpack_data + 29
+cix         = mathpack_data + 30
+inbuff      = mathpack_data + 31
+ztemp1      = mathpack_data + 33
+ztemp4      = mathpack_data + 35
+ztemp3      = mathpack_data + 37
+degflg      = mathpack_data + 40
+flptr       = mathpack_data + 41
+fptr2       = mathpack_data + 43
+
 _fpcocnt = frx              ;FP: temporary storage - polynomial coefficient counter
-_fptemp0 = temp3+0 			;FP: temporary storage - transcendental temporary
-_fptemp1 = temp3+1			;FP: temporary storage - transcendental temporary
+_fptemp0 = ztemp4+1			;FP: temporary storage - transcendental temporary
+_fptemp1 = ztemp3+0	    	;FP: temporary storage - transcendental temporary
 
 .macro  ckaddr
 ;.if * <> %%1
