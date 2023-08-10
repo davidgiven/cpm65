@@ -68,7 +68,6 @@ dataLnEnd   dta     0       ;current DATA statement line end
 pmgbase     dta     0
 pmgmode     dta     0
 ioTermFlag  dta     0
-_fr3        .fl     0
 mathpack_data .ds mathpack_data_len
 
 dataln      dta     a(0)    ;(compat - Mapping the Atari / ANALOG verifier) current DATA statement line
@@ -456,6 +455,7 @@ eof:
         icl     'util.s'
         icl     '../kernel/mathpack.s'
         icl     'cioemu.s'
+        icl     'printerror.s'
 
 
 ;==========================================================================
@@ -542,9 +542,10 @@ icax5   = iocb_table + $d       ;
 icax6   = iocb_table + $e       ;
 icax7   = iocb_table + $f       ;
 
-ciochr      dta a(0)    ; CIO: call A register save/restore
+ciochr      dta 0       ; CIO: call A register save/restore
 plyarg      .fl 0       ; mathpack polynomial arguments
 fpscr       .fl 0       ; mathpack scratchpad
+_fr3        .fl 0       ; mathpack temporary
 
 lbuff:
     .ds 256

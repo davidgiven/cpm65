@@ -83,7 +83,7 @@ no_trap:
 		;ERROR-   11
 		ldx		#msg_error-msg_base
 		jsr		IoPrintMessageIOCB0
-		jsr		IoPrintInt
+		jsr		print_error
 
 print_lineno:
 		lda		stopln+1
