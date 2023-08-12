@@ -35,12 +35,12 @@ MINIMAL_APPS = \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
-	$(OBJDIR)/third_party/altirrabasic/atbasic.com \
 	apps/dump.asm \
 	apps/ls.asm \
 
 APPS = \
 	$(MINIMAL_APPS) \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.com \
 	$(OBJDIR)/objdump.com \
 	apps/bedit.asm \
 	apps/dinfo.asm \

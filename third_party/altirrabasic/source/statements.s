@@ -36,8 +36,6 @@
 ; if the evaluation fails with an error.
 ;
 .proc stEnter
-_vectmp = $0500
-
 		;Use IOCB #7 for compatibility with Atari BASIC
 		;get filename
 		jsr		IoSetupIOCB7AndEval

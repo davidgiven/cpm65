@@ -28,6 +28,7 @@
         org ZPBASE
         opt     o-
 _zp_start:
+; These must be contiguous as they're loaded and saved with programs.
 argstk  equ     *
 lomem   dta     a(0)        ;$0080 (compat) from lomem; argument/operator stack
 vntp    dta     a(0)        ;$0082 (compat - loaded) variable name table pointer
