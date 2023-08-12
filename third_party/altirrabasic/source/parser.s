@@ -901,6 +901,9 @@ _nameEnd = a3
 		;first non-space character must be a letter
 		jsr		skpspc
 		lda		(inbuff),y
+		#if .byte @ >= #96 .and .byte @ <= #172
+			eor #32
+		#end
 		sub		#'A'
 		cmp		#26
 		bcs		reject
