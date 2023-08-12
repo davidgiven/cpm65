@@ -211,8 +211,14 @@ parse_loop:
 		jmp		parse_loop
 		
 not_space:
+		sta 	?cmd_char
 		ldy		cix
-		cmp		(inbuff),y
+		lda		(inbuff),y
+		#if .byte @ >= #96 .and .byte @ <= #172
+			eor #32
+		#end
+?cmd_char = * + 1
+		cmp		#0
 		bne		parseFail
 		inc		cix
 		bne		parse_loop			;!! - unconditional
@@ -634,6 +640,11 @@ not_period:
 		;Check if we have a question mark or a letter. This will let @ through
 		;too, but that's fine as it won't match anything, and it's not valid
 		;in any other context either.
+		
+		;Enable case sensitive comparisons.
+		#if .byte @ >= #96
+			eor #32
+		#end
 		sub		#'?'
 		cmp		#26+2
 		bcs		fail_try
@@ -645,11 +656,16 @@ table_loop:
 		ldy		#0
 		ldx		cix
 statement_loop:
-		lda		(iterPtr),y
+		lda 	(iterPtr), y
 		beq		fail_try				;exit if we hit the end of the table
-		and		#$7f
+
 		inx
-		cmp		lbuff-1,x
+		lda		lbuff-1,x
+		#if .byte @ >= #96
+			eor #32
+		#end
+		eor		(iterPtr),y
+		and		#$7f
 		bne		fail_stcheck
 
 		;check if this was the last char
