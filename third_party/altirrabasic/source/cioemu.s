@@ -15,6 +15,11 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 ; icax5:   byte offset into record
 ; icax6/7: ptr to FCB/buffer
 
+; ichid values:
+; 0xff      not open
+; 0         console
+; 1         file
+
 .proc initcio
     ldy #0xff
     sty brkkey
@@ -42,120 +47,18 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
 .proc ciov
     lda ichid, x
-    beq ciov_console
+    jeq ciov_console
 
     lda iccmd, x
-    cmp #CIOCmdOpen
-    jeq file_open
     cmp #CIOCmdPutChars
     jeq file_putchars
+    cmp #CIOCmdGetChars
+    jeq file_getchars
+    cmp #CIOCmdOpen
+    jeq file_open
     cmp #CIOCmdClose
     jeq file_close
-    rts
-.endp
-
-.proc ciov_console
-    lda iccmd, x
-    #if .byte @ == #CIOCmdPutChars
-        mwa icbal,x ztemp3
-        mwa icbll,x ztemp1
-        ?loop:
-            lda ztemp1+0
-            ora ztemp1+1
-            beq ?endloop
-            
-            ldy #0
-            lda (ztemp3), y
-            jsr console_putchar
-
-            inc ztemp3+0
-            sne:inc ztemp3+1
-
-            lda ztemp1+0
-            sub #1
-            sta ztemp1+0
-            scs:dec ztemp1+1
-        
-            jmp ?loop
-        ?endloop:
-        ldy #0
-        rts
-    #end
-    #if .byte @ == #CIOCmdGetRecord
-        jmp console_getrecord
-    #end
-    #if .byte @ == #CIOCmdClose
-        ; Ignore attempts to close the console.
-        ldy #0
-        rts
-    #end
     brk
-    rts
-.endp
-
-.proc console_putchar
-    #if .byte @ == #0x9b
-        lda #13
-        jsr console_putchar
-        lda #10
-    #end
-    #if .byte @ >= #0x80
-        rts
-    #end
-    ldy #BDOS_CONSOLE_OUTPUT
-    jmp BDOS
-.endp
-
-.proc console_getrecord
-    mwa icbal,x ztemp3
-    ldy #0
-    lda #0xff
-    sta (ztemp3), y
-    
-    txa
-    pha
-
-    lda ztemp3+0
-    ldx ztemp3+1
-    ldy #BDOS_READ_LINE
-    jsr BDOS
-
-    ; Rewrite the buffer into the format which atbasic expects.
-
-    ldy #1
-    lda (ztemp3), y          ; get line length
-    sta ztemp1+0
-    ldy #0
-?loop:
-    iny
-    iny
-    lda (ztemp3), y
-    dey
-    dey
-    sta (ztemp3), y
-    iny
-    cpy ztemp1+0
-    bne ?loop
-    
-    ldy ztemp1+0
-    lda #0x9b
-    sta (ztemp3), y
-
-    pla
-    tax
-    ldy ztemp1+0
-    iny
-    tya
-    sta icbll, x
-    lda #0
-    sta icblh, x
-
-    ; Print a newline (CP/M doesn't).
-    
-    lda #0x9b
-    jsr console_putchar
-
-    ldy #1
     rts
 .endp
 
@@ -273,20 +176,15 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
         ; Then try to create a new one.
 
-        lda a0+0
-        ldx a0+1
         ldy #BDOS_CREATE_FILE
-        jsr BDOS
-        
-        jmp ?done_open
+    #else
+        ; Otherwise, just open it.
+
+        ldy #BDOS_OPEN_FILE
     #end
-
-    ; Otherwise, just open it.
-
     lda a0+0
     ldx a0+1
-    ldy #BDOS_OPEN_FILE
-?done_open:
+    jsr BDOS
     
     ; A is the error code. We can return this directly.
 
@@ -312,7 +210,29 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
         dew icbll,x
         jmp ?loop
     ?endloop:
-    ldy #0
+    ldy #1
+    rts
+.endp
+
+.proc file_getchars
+    jsr claim_fcb
+        
+    mwa icbal,x a1
+    ?loop:
+        lda icbll,x
+        ora icblh, x
+        beq ?endloop
+        
+        jsr file_getchar
+        ldy #0
+        sta (a1), y
+
+        inw a1
+
+        dew icbll,x
+        jmp ?loop
+    ?endloop:
+    ldy #1
     rts
 .endp
 
@@ -320,7 +240,6 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 .proc file_putchar
     pha
     jsr claim_fcb
-
     jsr change_buffers
 
     ; Do the write.
@@ -337,12 +256,14 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     lda #0x80
     ldy #FCB_DIRTY
     sta (a0), y
-
+.endp
+; fall through
+.proc inc_cio_pointers
     ; Increment pointers.
 
     inc icax5, x
     lda icax5, x
-    #if .byte @ == 0x80
+    #if .byte @ == #0x80
         ; We've reached the end of this record; change the seek position to the next one.
 
         lda #0
@@ -352,6 +273,25 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     #end
 
     ldy #1
+    rts
+.endp
+
+; Don't use a1 here.
+.proc file_getchar
+    jsr claim_fcb
+    jsr change_buffers
+
+    ; Do the read.
+    
+    lda #FCB_BUFFER
+    clc
+    adc icax5, x
+    tay
+    lda (a0), y
+    pha
+
+    jsr inc_cio_pointers
+    pla
     rts
 .endp
 
@@ -464,10 +404,116 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     ; Mark the IOCB as closed.
 
-    ldy #0xff
+    lda #0xff
     sta ichid, x
 
     pla
     tay
+    rts
+.endp
+
+.proc ciov_console
+    lda iccmd, x
+    cmp #CIOCmdPutChars
+    jeq console_putchars
+    cmp #CIOCmdGetRecord
+    jeq console_getrecord
+    cmp #CIOCmdClose
+    jeq console_nop
+    cmp #CIOCmdOpen
+    jeq console_nop
+    brk
+    rts
+.endp
+
+.proc console_putchars
+    mwa icbal,x a1
+    ?loop:
+        lda icbll,x
+        ora icblh, x
+        beq ?endloop
+        
+        ldy #0
+        lda (a1), y
+        jsr console_putchar
+
+        inw a1
+
+        dew icbll,x
+        jmp ?loop
+    ?endloop:
+    ldy #1
+    rts
+.endp
+
+.proc console_nop
+    ; Do nothing.
+    ldy #1
+    rts
+.endp
+
+.proc console_putchar
+    #if .byte @ == #0x9b
+        lda #13
+        jsr console_putchar
+        lda #10
+    #end
+    #if .byte @ >= #0x80
+        rts
+    #end
+    ldy #BDOS_CONSOLE_OUTPUT
+    jmp BDOS
+.endp
+
+.proc console_getrecord
+    mwa icbal,x ztemp3
+    ldy #0
+    lda #0xff
+    sta (ztemp3), y
+    
+    txa
+    pha
+
+    lda ztemp3+0
+    ldx ztemp3+1
+    ldy #BDOS_READ_LINE
+    jsr BDOS
+
+    ; Rewrite the buffer into the format which atbasic expects.
+
+    ldy #1
+    lda (ztemp3), y          ; get line length
+    sta ztemp1+0
+    ldy #0
+?loop:
+    iny
+    iny
+    lda (ztemp3), y
+    dey
+    dey
+    sta (ztemp3), y
+    iny
+    cpy ztemp1+0
+    bne ?loop
+    
+    ldy ztemp1+0
+    lda #0x9b
+    sta (ztemp3), y
+
+    pla
+    tax
+    ldy ztemp1+0
+    iny
+    tya
+    sta icbll, x
+    lda #0
+    sta icblh, x
+
+    ; Print a newline (CP/M doesn't).
+    
+    lda #0x9b
+    jsr console_putchar
+
+    ldy #1
     rts
 .endp

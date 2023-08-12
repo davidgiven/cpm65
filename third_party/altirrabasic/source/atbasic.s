@@ -69,6 +69,7 @@ dataLnEnd   dta     0       ;current DATA statement line end
 pmgbase     dta     0
 pmgmode     dta     0
 ioTermFlag  dta     0
+            dta     a(0)    ; mathpack_data-2 is used by the parser code...
 mathpack_data .ds mathpack_data_len
 
 dataln      dta     a(0)    ;(compat - Mapping the Atari / ANALOG verifier) current DATA statement line
@@ -101,7 +102,6 @@ errsave dta 0               ;(compat - Atari BASIC manual): error number
 dataptr     dta     a(0)    ;current DATA statement pointer
 dataoff     dta     0       ;current DATA statement offset
             dta     0       ;(unused)
-grColor     dta     0       ;graphics color (must be at $C8 for Space Station Multiplication)
 ptabw       dta     0       ;(compat - Atari BASIC manual): tab width
 
 ; Floating-point library vars
@@ -120,16 +120,6 @@ a5      = fr0+10            ;temporary pointer 5
 memtop  dta a(0)            ;address of top of memory
 memlo   dta 0               ;page number of base of memory
 brkkey  dta 0               ;set on BREAK
-
-icbalz  dta 0           ;Zero page IOCB: address of device/filename spec lo
-icbahz  dta 0           ;Zero page IOCB: address of device/filename spec hi
-icptlz  dta 0           ;Zero page IOCB: put byte address lo (-1)
-icpthz  dta 0           ;Zero page IOCB: put byte address hi (-1)
-icbllz  dta 0           ;Zero page IOCB: buffer length/byte count lo (-1)
-icblhz  dta 0           ;Zero page IOCB: buffer length/byte count hi (-1)
-icax1z  dta 0           ;Zero page IOCB: device-specific information 1
-icax2z  dta 0           ;Zero page IOCB: device-specific information 2
-
 
 .macro _STATIC_ASSERT
         .if :1
@@ -544,6 +534,8 @@ icax6   = iocb_table + $e       ;
 icax7   = iocb_table + $f       ;
 
 ciochr      dta 0       ; CIO: call A register save/restore
+; These must be consecutive as they're shared with the vector buffer.
+_vectmp:
 plyarg      .fl 0       ; mathpack polynomial arguments
 fpscr       .fl 0       ; mathpack scratchpad
 _fr3        .fl 0       ; mathpack temporary

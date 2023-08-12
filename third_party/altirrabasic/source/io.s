@@ -120,7 +120,6 @@ not_iocb7:
 dispatch:
 		sta		ciochr
 		lda		icax1,x
-		sta		icax1z
 		lda		icpth,x
 		pha
 		lda		icptl,x

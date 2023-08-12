@@ -9,11 +9,7 @@
 ?statements_start = *
 
 ;===========================================================================
-.proc stColor
-		jsr		evaluateInt
-		stx		grColor
-		rts
-.endp
+stColor = errorWTF
 
 ;===========================================================================
 ; ENTER filespec
@@ -291,7 +287,6 @@ reset_entry:
 ; and only if the open succeeds and load fails.
 ;
 .proc stLoadRun
-_vectmp = fr0
 _loadflg = stScratch		;N=0 for run, N=1 for load
 
 .def :stRun
@@ -372,7 +367,7 @@ setup_vector_io:
 		pha
 		ldx		iocbidx
 		
-		ldy		#0
+		ldy		#>_vectmp
 		lda		#<_vectmp
 		jsr		IoSetupBufferAddress
 
@@ -415,8 +410,6 @@ setup_main_io:
 ; reason, we must close IOCB #7 before reopening it.
 ;
 .proc stSave
-_vectmp = fr0
-
 		;Use IOCB #7 for compatibility with Atari BASIC
 		;close it in case ENTER is active
 		;get filename
@@ -444,7 +437,9 @@ with_open_iocb:
 
 		;clear LOMEM offset; note that VNTP offset will already be $0100
 		;since we're subtracting (VNTP-$0100) from it
-		jsr		zfr0
+		lda		#0
+		sta		_vectmp+0
+		sta		_vectmp+1
 
 		ldx		#12
 relocloop:
