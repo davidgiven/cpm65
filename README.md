@@ -73,6 +73,15 @@ is available out of the box. Once installed, you should just be able to run the
 Makefile and you'll get bootable disk images for the Commodore 64 (with 1541
 drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 
+Building CP/M-65 is a bit of a performance because it's aggregating lots of
+other software, all of which need building in turn. You'll need: a C and C++
+compiler, cc1541 (for creating 1541 disk images), cpmtools (for creating CP/M
+disk images), libfmt (all the C++ tools use this), ninja-build (for the build
+system), and FreePascal (because the MADS assembler is written in Pascal). Use
+these Debian packages:
+
+    cc1541 cpmtools libfmt-dev ninja-build fp-compiler
+
 ### BBC Micro notes
 
   - To run, do SHIFT+BREAK.
@@ -100,11 +109,11 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
     unfortunately not enough to run the assembler.
 
   - The CP/M file system is stored in a big file (called cpmfs). This will
-	expand up to the size defined in diskdefs: currently, 192kB (the largest
-	that will fit on a SSSD disk). All disk access is done through MOS so you
-	should be able to use a ramdisk, hard disk, Econet, ADFS, VDFS, etc. If so,
-	you'll want to define your own disk format and adjust the drive definition
-	in the BIOS to get more space.
+	  expand up to the size defined in diskdefs: currently, 192kB (the largest
+	  that will fit on a SSSD disk). All disk access is done through MOS so you
+	  should be able to use a ramdisk, hard disk, Econet, ADFS, VDFS, etc. If so,
+	  you'll want to define your own disk format and adjust the drive definition
+	  in the BIOS to get more space.
 
   - The BBC Micro port has a SCREEN driver.
 
@@ -113,15 +122,15 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
   - Load and run the `CPM` program to start.
 
   - It's excruciatingly slow as it uses normal 1541 disk accesses at 300 bytes
-	per second. Everything works, but you won't enjoy it. At some point I want
-	to add a fastloader.
+	  per second. Everything works, but you won't enjoy it. At some point I want
+	  to add a fastloader.
 
   - The disk image produced is a hybrid of a CP/M file system and a CBMDOS file
-	system, which can be accessed as either. The disk structures used by the
-	other file system are hidden. You get about 170kB on a normal disk.
+	  system, which can be accessed as either. The disk structures used by the
+	  other file system are hidden. You get about 170kB on a normal disk.
 
   - Disk accesses are done using direct block access, so it _won't_ work on
-	anything other than a 1541. Sorry.
+	  anything other than a 1541. Sorry.
 
 ### VIC-20 notes
 
@@ -161,15 +170,15 @@ drive) and BBC Micro (producing a 200kB SSSD DFS disk).
 ### Commander X16 notes
 
   - To use, place the contents of the `x16.zip` file on the X16's SD card. Load
-	and run the `CPM` program to start.
+	  and run the `CPM` program to start.
 
   - The CP/M filesystem is stored in a big file called CPMFS. It needs support
-	for the Position command in order to seek within the file. `x16emu`
-	currently doesn't support this in its host filesystem, so you'll need to
-	use an actual SD card image. (I have a [pull request
-	outstanding](https://github.com/commanderx16/x16-emulator/pull/435) to add
-	support. An SD2IEC should work too, as these support the same commands.
-	However a real Commodore disk drive _will not work_.
+	  for the Position command in order to seek within the file. `x16emu`
+	  currently doesn't support this in its host filesystem, so you'll need to
+	  use an actual SD card image. (I have a [pull request
+	  outstanding](https://github.com/commanderx16/x16-emulator/pull/435) to add
+	  support. An SD2IEC should work too, as these support the same commands.
+	  However a real Commodore disk drive _will not work_.
 
 ### Apple IIe notes
 
@@ -234,6 +243,9 @@ In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
 questionable utility, but there's a new `FREE` command which shows memory
 usage.
 
+You also get a port of Altirra BASIC, an open source Atari BASIC clone. This is
+called `ATBASIC`. See below for more details.
+
 Pokey the Penguin loves to read your [pull
 requests](https://github.com/davidgiven/cpm65/compare)!
 
@@ -246,6 +258,25 @@ and is likely to have lots of bugs. There is, at least, a port of the DUMP
 program to it which assembles, works, and is ready to play with.
 
 Go read [cpmfs/asm.txt](cpmfs/asm.txt) for the documentation. 
+
+### The BASIC
+
+Altirra BASIC is an open source recreation of the BASIC used on the Atari 8-bit
+machines (on which CP/M-65 runs, coincidentally). It has been heavily modified
+by me to work on CP/M-65. Anything Atari-related has been removed, including
+graphics, sound, etc. In addition, I have extended the error reporting, added
+support for case-insensitive keywords (simply because Atari BASIC traditionally
+requires upper case but most CP/M-65 platforms don't have caps lock keys!), and
+fairly crudely added file I/O support. There is no screen editor.
+
+It is currently rather fragile with a number of known (and, probably, unknown)
+bugs. Please [file bug reports](https://github.com/davidgiven/cpm65/issues/new)!
+
+Atari BASIC is rather different from Microsoft BASIC. Please consult [the user
+manual](https://www.virtualdub.org/downloads/Altirra%20BASIC%20Reference%20Manual.pdf).
+
+**Important!** Do not contact the author of Altirra BASIC for anything related
+*to the CP/M-65 port! Any bugs are strictly my fault.
 
 ### The editors
 
