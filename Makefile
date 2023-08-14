@@ -2,7 +2,7 @@ CXX = g++
 CC = gcc
 FPC = fpc
 
-CFLAGS = -Os -g -I.
+CFLAGS = -O0 -g -I.
 CFLAGS65 = -Os -g -I. \
 	-Wno-main-return-type \
 	-Wno-incompatible-library-redeclaration
@@ -192,6 +192,7 @@ $(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu $(wildcard apps/*.inc)
 $(OBJDIR)/bdos.sys: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	llvm-objdump -S $@.elf > $@.lst
 
 $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
