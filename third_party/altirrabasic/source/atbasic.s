@@ -119,7 +119,6 @@ a5      = fr0+10            ;temporary pointer 5
 
 memtop  dta a(0)            ;address of top of memory
 memlo   dta 0               ;page number of base of memory
-brkkey  dta 0               ;set on BREAK
 
 .macro _STATIC_ASSERT
         .if :1
@@ -533,6 +532,7 @@ icax5   = iocb_table + $d       ;
 icax6   = iocb_table + $e       ;
 icax7   = iocb_table + $f       ;
 
+brkkey      dta 0       ; set on BREAK
 ciochr      dta 0       ; CIO: call A register save/restore
 ; These must be consecutive as they're shared with the vector buffer.
 _vectmp:

@@ -505,7 +505,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     ldx #0xff
     ldy #BDOS_DIRECT_IO
     jsr BDOS
-    ldx #0x80
+    ldx #0
     cmp #3
     sne:sta brkkey
 
@@ -586,7 +586,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
         ; Ctrl+C?
         cmp #3
         bne ?not_ctrlc
-            lda #0x80
+            lda #0
             sta brkkey
             lda #0
             sta _count
