@@ -23,6 +23,7 @@ static struct watchpoint watchpoints[16];
 static bool tracing = false;
 static bool singlestepping = true;
 static bool bdosbreak = false;
+static bool bdoslog = false;
 
 void showregs(void)
 {
@@ -240,9 +241,13 @@ static void cmd_bdos(void)
 {
     char* w1 = strtok(NULL, " ");
     if (w1)
+    {
         bdosbreak = !!strtoul(w1, NULL, 16);
-    else
-        printf("break on bdos entry: %s\n", bdosbreak ? "on" : "off");
+        bdoslog = bdosbreak || (toupper(*w1) == 'L');
+    }
+
+    printf("break on bdos entry: %s\n", bdosbreak ? "on" : "off");
+    printf("log on bdos entry: %s\n", bdoslog ? "on" : "off");
 }
 
 static void cmd_tracing(void)
@@ -269,7 +274,7 @@ static void cmd_help(void)
         "  u <addr> <len>  unassemble memory\n"
         "  s               single step\n"
         "  g               continue\n"
-        "  bdos 0|1        enable break on bdos entry\n"
+        "  bdos 0|1|L      enable break/log on bdos entry\n"
         "  trace 0|1       enable tracing\n");
 }
 
@@ -380,11 +385,15 @@ void emulator_run(void)
         switch (pc)
         {
             case BDOS_ADDRESS:
-                bdos_entry(cpu->registers->y);
+                if (bdosbreak)
+                    singlestepping = true;
+                bdos_entry(cpu->registers->y, bdoslog);
                 rts();
                 continue;
 
             case BIOS_ADDRESS:
+                if (bdosbreak)
+                    singlestepping = true;
                 bios_entry(cpu->registers->y);
                 rts();
                 continue;

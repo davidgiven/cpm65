@@ -17,6 +17,53 @@ static uint8_t current_disk;
 static int exitcode = 0;
 uint16_t himem = BDOS_ADDRESS;
 
+static const char* bdos_names[] = {
+    "BDOS_EXIT_PROGRAM",
+    "BDOS_CONSOLE_INPUT",
+    "BDOS_CONSOLE_OUTPUT",
+    "BDOS_AUX_INPUT",
+    "BDOS_AUX_OUTPUT",
+    "BDOS_PRINTER_OUTPUT",
+    "BDOS_DIRECT_IO",
+    "BDOS_GET_IO_BYTE",
+    "BDOS_SET_IO_BYTE",
+    "BDOS_WRITE_STRING",
+    "BDOS_READ_LINE",
+    "BDOS_CONSOLE_STATUS",
+    "BDOS_GET_VERSION",
+    "BDOS_RESET_DISKS",
+    "BDOS_SELECT_DISK",
+    "BDOS_OPEN_FILE",
+    "BDOS_CLOSE_FILE",
+    "BDOS_FIND_FIRST",
+    "BDOS_FIND_NEXT",
+    "BDOS_DELETE_FILE",
+    "BDOS_READ_SEQUENTIAL",
+    "BDOS_WRITE_SEQUENTIAL",
+    "BDOS_CREATE_FILE",
+    "BDOS_RENAME_FILE",
+    "BDOS_GET_LOGIN_BITMAP",
+    "BDOS_GET_CURRENT_DRIVE",
+    "BDOS_SET_DMA_ADDRESS",
+    "BDOS_GET_ALLOCATION_BITMAP",
+    "BDOS_SET_DRIVE_READONLY",
+    "BDOS_GET_READONLY_BITMAP",
+    "BDOS_SET_FILE_ATTRIBUTES",
+    "BDOS_GET_DPB",
+    "BDOS_GET_SET_USER_NUMBER",
+    "BDOS_READ_RANDOM",
+    "BDOS_WRITE_RANDOM",
+    "BDOS_COMPUTE_FILE_SIZE",
+    "BDOS_COMPUTE_RANDOM_POINTER",
+    "BDOS_RESET_DISK",
+    "BDOS_GET_BIOS",
+    "BDOS_39",
+    "BDOS_WRITE_RANDOM_FILLED",
+    "BDOS_GETZP",
+    "BDOS_GETTPA",
+    "BDOS_PARSEFILENAME",
+};
+
 struct fcb
 {
     cpm_filename_t filename; /* includes drive */
@@ -249,7 +296,7 @@ static void bdos_putchar(void)
 
 static void bdos_consoleio(void)
 {
-    uint8_t c = cpu->registers->x;
+    uint8_t c = cpu->registers->a;
     if (c == 0xff)
     {
         bios_const();
@@ -505,6 +552,7 @@ void parse_filename(uint8_t fcb[16], const char* filename)
         fill(fcb+9, filename+1, 3);
 
 	set_result(get_xa(), filename);
+    cpu->registers->p &= ~0x01;
 }
 
 static void bdos_parsefilename(void)
@@ -515,47 +563,65 @@ static void bdos_parsefilename(void)
 	parse_filename(fcb, filename);
 }
 
-void bdos_entry(uint8_t bdos_call)
+void bdos_entry(uint8_t bdos_call, bool log)
 {
+    if (log)
+    {
+        if (bdos_call < sizeof(bdos_names)/sizeof(*bdos_names))
+            fprintf(stderr, "%s", bdos_names[bdos_call]);
+        else
+            fprintf(stderr, "BDOS_%d", bdos_call);
+        fprintf(stderr, "(%04x) -> ", get_xa());
+    }
+
+    cpu->registers->p &= ~0x01;
     switch (bdos_call)
     {
             // clang-format off
-		case 0: exit(0); return;
-        case 1: bdos_getchar(); return;
-        case 2: bdos_putchar(); return;
-        case 6: bdos_consoleio(); return;
-        case 9: bdos_printstring(); return;
-        case 10: bdos_readline(); return;
-        case 11: bdos_consolestatus(); return;
-        case 12: set_result(0x0022, true); return; // get CP/M version
-        case 13: bdos_resetdisk(); return; // reset disk system
-        case 14: bdos_selectdisk(); return; // select disk
-        case 15: bdos_openfile(); return;
-        case 16: bdos_closefile(); return;
-        case 17: bdos_findfirst(); return;
-        case 18: bdos_findnext(); return;
-        case 19: bdos_deletefile(); return;
-        case 20: bdos_readwritesequential(file_read); return;
-        case 21: bdos_readwritesequential(file_write); return;
-        case 22: bdos_makefile(); return;
-        case 23: bdos_renamefile(); return;
-        case 24: set_result(0xffff, false); return; // get login vector
-        case 25: bdos_getdisk(); return; // get current disk
-        case 26: dma = get_xa(); return; // set DMA
-        case 27: set_result(0, false); return; // get allocation vector
-        case 29: set_result(0x0000, false); return; // get read-only vector
-        case 31: set_result(0, false); return; // get disk parameter block
-        case 32: bdos_getsetuser(); return;
-        case 33: bdos_readwriterandom(file_read); return;
-        case 34: bdos_readwriterandom(file_write); return;
-        case 35: bdos_filelength(); return;
-		case 38: set_result(BIOS_ADDRESS, true); return;
-        case 40: bdos_readwriterandom(file_write); return;
-		case 42: set_result((TPA_BASE>>8) | (himem&0xff00), true); return;
-		case 43: bdos_parsefilename(); return;
+		case 0: exit(0); break;
+        case 1: bdos_getchar(); break;
+        case 2: bdos_putchar(); break;
+        case 6: bdos_consoleio(); break;
+        case 9: bdos_printstring(); break;
+        case 10: bdos_readline(); break;
+        case 11: bdos_consolestatus(); break;
+        case 12: set_result(0x0022, true); break; // get CP/M version
+        case 13: bdos_resetdisk(); break; // reset disk system
+        case 14: bdos_selectdisk(); break; // select disk
+        case 15: bdos_openfile(); break;
+        case 16: bdos_closefile(); break;
+        case 17: bdos_findfirst(); break;
+        case 18: bdos_findnext(); break;
+        case 19: bdos_deletefile(); break;
+        case 20: bdos_readwritesequential(file_read); break;
+        case 21: bdos_readwritesequential(file_write); break;
+        case 22: bdos_makefile(); break;
+        case 23: bdos_renamefile(); break;
+        case 24: set_result(0xffff, false); break; // get login vector
+        case 25: bdos_getdisk(); break; // get current disk
+        case 26: dma = get_xa(); break; // set DMA
+        case 27: set_result(0, false); break; // get allocation vector
+        case 29: set_result(0x0000, false); break; // get read-only vector
+        case 31: set_result(0, false); break; // get disk parameter block
+        case 32: bdos_getsetuser(); break;
+        case 33: bdos_readwriterandom(file_read); break;
+        case 34: bdos_readwriterandom(file_write); break;
+        case 35: bdos_filelength(); break;
+		case 38: set_result(BIOS_ADDRESS, true); break;
+        case 40: bdos_readwriterandom(file_write); break;
+		case 42: set_result((TPA_BASE>>8) | (himem&0xff00), true); break;
+		case 43: bdos_parsefilename(); break;
             // clang-format on
+    
+        default:
+            showregs();
+            fatal("unimplemented bdos entry %d", bdos_call);
     }
 
-    showregs();
-    fatal("unimplemented bdos entry %d", bdos_call);
+    if (log)
+    {
+        if (cpu->registers->p & 0x01)
+            fprintf(stderr, "FAILED ");
+        fprintf(stderr, "%04x\n", get_xa());
+    }
 }
