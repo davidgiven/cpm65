@@ -54,12 +54,13 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     jeq file_putchars
     cmp #CIOCmdGetChars
     jeq file_getchars
+    cmp #CIOCmdGetRecord
+    jeq file_getrecord
     cmp #CIOCmdOpen
     jeq file_open
     cmp #CIOCmdClose
     jeq file_close
-    brk
-    rts
+    jmp errorIO
 .endp
 
 ; Ensures that an FCB structure is in icax6 and icax7. Copy it to a0. Also
@@ -311,6 +312,77 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     rts
 .endp
 
+; Reads ASCII characters until an EOL is met.
+
+.proc file_getrecord
+    _buffer = a3
+    _maxlength = a1+0
+    _count = a1+1
+    _tempb = a2+1
+    _x = a2+0
+
+    jsr claim_fcb
+    mwa icbal,x _buffer
+    
+    ldy #0
+    sty _count
+    dey
+    lda icblh, x
+    sne:ldy icbll, x
+    sty _maxlength
+    
+    ?loop:
+        ldx _x
+        jsr file_getchar
+        
+        ; Finished?
+
+        cmp #13
+        beq ?loop
+        cmp #10
+        beq ?eol
+        cmp #0
+        beq ?eof
+        cmp #27
+        beq ?eof
+
+        ldy _count
+        sta (_buffer), y
+        jsr direct_print
+        inc _count
+        
+        ldy _count
+        cpy _maxlength
+    bne ?loop
+    jmp errorLineTooLong
+
+?eof:
+    ldy #0
+    beq ?exit           ; always taken
+
+?eol:
+    ldy #1              ; not eof
+?exit:
+    tya
+    pha
+
+    jsr direct_nl
+    ldy _count
+    lda #0x9b
+    sta (_buffer), y
+
+    ldx _x
+    lda _count
+    sta icbll, x
+    lda #0
+    sta icblh, x
+    
+    pla
+    tay
+    rts
+
+.endp
+
 ; Seeks to the position in the IOCB, flushing and loading the buffer as
 ; required.
 
@@ -458,8 +530,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     jeq console_nop
     cmp #CIOCmdOpen
     jeq console_nop
-    brk
-    rts
+    jmp errorIO
 .endp
 
 .proc console_putchars
