@@ -47,6 +47,7 @@ APPS = \
 	apps/cpm65.inc \
 	apps/drivers.inc \
 	cpmfs/asm.txt \
+	cpmfs/basic.txt \
 	cpmfs/bedit.txt \
 	cpmfs/demo.sub \
 	cpmfs/hello.asm \
@@ -316,7 +317,7 @@ pet8032.d64: $(OBJDIR)/pet8032.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(SCREEN_
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/vic20.exe: $(OBJDIR)/libcommodore.a
-$(OBJDIR)/src/bios/vic20.o: $(OBJDIR)/4x8font.inc
+src/bios/vic20.S: $(OBJDIR)/4x8font.inc
 vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.sys Makefile $(APPS) \
 		$(OBJDIR)/ccp.sys $(OBJDIR)/mkcombifs
 	@rm -f $@
