@@ -10,6 +10,13 @@ FCB_DIRTY = FCB__SIZE + 0
 FCB_BUFFER = FCB__SIZE + 1
 FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
+_t0 = ztemp1
+_t1 = ztemp4
+_t2 = ztemp3
+_t3 = flptr
+
+_fcb = _t0
+
 ; icax1:   direction
 ; icax3/4: record number
 ; icax5:   byte offset into record
@@ -63,26 +70,26 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     jmp errorIO
 .endp
 
-; Ensures that an FCB structure is in icax6 and icax7. Copy it to a0. Also
+; Ensures that an FCB structure is in icax6 and icax7. Copy it to _fcb. Also
 ; copies X to a2+0.
 
 .proc claim_fcb
     stx a2+0
     lda icax6, x
-    sta a0+0
+    sta _fcb+0
     lda icax7, x
-    sta a0+1
-    ora a0+0
+    sta _fcb+1
+    ora _fcb+0
     bne ?exit
 
     ; We need to allocate some memory.
 
     sbw memtop #FCB_EXTRA__SIZE
     lda memtop+0
-    sta a0+0
+    sta _fcb+0
     sta icax6, x
     lda memtop+1
-    sta a0+1
+    sta _fcb+1
     sta icax7, x
 
 ?exit:
@@ -93,29 +100,30 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 ;   icba points at the filename, terminated with 0x9b
 
 .proc file_open
+_filename = _t1
     jsr claim_fcb
 
     ; Zero-terminate the string.
 
-    mwa icbal,x a1
+    mwa icbal,x _filename
     ldy #0xff
 ?terminate_loop:
     iny
-    lda (a1), y
+    lda (_filename), y
     cmp #0x9b
     bne ?terminate_loop
     lda #0
-    sta (a1), y
+    sta (_filename), y
 
     ; Populate and initialise the FCB.
 
-    lda a0+0
-    ldx a0+1
+    lda _fcb+0
+    ldx _fcb+1
     ldy #BDOS_SET_DMA_ADDRESS
     jsr BDOS
 
-    lda a1+0
-    ldx a1+1
+    lda _filename+0
+    ldx _filename+1
     ldy #BDOS_PARSEFILENAME
     jsr bdose
 
@@ -124,17 +132,17 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     ldy #0xff
 ?unterminate_loop:
     iny
-    lda (a1), y
+    lda (_filename), y
     bne ?unterminate_loop
     lda #0x9b
-    sta (a1), y
+    sta (_filename), y
 
     ; Clear the flags.
 
     lda #0
     ldy #FCB_DIRTY
 ?fcb_clear_loop
-    sta (a0), y
+    sta (_fcb), y
     iny
     cpy #FCB_EXTRA__SIZE
     bne ?fcb_clear_loop
@@ -156,9 +164,9 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     lda #0xff
     ldy #FCB_R0+0
-    sta (a0), y
+    sta (_fcb), y
     iny
-    sta (a0), y
+    sta (_fcb), y
 
     ; icax1 contains the direction: 0x04 for read, 0x08 for write, 0x0c for
     ; bidirectional. The only option we care about is writing, which creates a
@@ -169,8 +177,8 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     #if .byte @ == #0x08
         ; Open for output. First, delete the old file.
 
-        lda a0+0
-        ldx a0+1
+        lda _fcb+0
+        ldx _fcb+1
         ldy #BDOS_DELETE_FILE
         jsr BDOS
 
@@ -182,8 +190,8 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
         ldy #BDOS_OPEN_FILE
     #end
-    lda a0+0
-    ldx a0+1
+    lda _fcb+0
+    ldx _fcb+1
     jsr bdose
     
     ldy #1
@@ -193,17 +201,17 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 .proc file_putchars
     jsr claim_fcb
         
-    mwa icbal,x a1
+    mwa icbal,x _t1
     ?loop:
-        lda icbll,x
+        lda icbll, x
         ora icblh, x
         beq ?endloop
         
         ldy #0
-        lda (a1), y
+        lda (_t1), y
         jsr file_putchar
 
-        inw a1
+        inw _t1
 
         dew icbll,x
         jmp ?loop
@@ -215,7 +223,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 .proc file_getchars
     jsr claim_fcb
         
-    mwa icbal,x a1
+    mwa icbal,x _t1
     ?loop:
         lda icbll,x
         ora icblh, x
@@ -224,9 +232,9 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
         jsr file_getchar
         bcs ?exit
         ldy #0
-        sta (a1), y
+        sta (_t1), y
 
-        inw a1
+        inw _t1
 
         dew icbll,x
         jmp ?loop
@@ -236,7 +244,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     rts
 .endp
 
-; Don't use a1 here.
+; Don't use _t1 here.
 .proc file_putchar
     pha
     jsr claim_fcb
@@ -249,13 +257,13 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     adc icax5, x
     tay
     pla
-    sta (a0), y
+    sta (_fcb), y
 
     ; The buffer is now dirty.
 
     lda #0x80
     ldy #FCB_DIRTY
-    sta (a0), y
+    sta (_fcb), y
 .endp
 ; fall through
 .proc inc_cio_pointers
@@ -277,7 +285,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     rts
 .endp
 
-; Don't use a1 here.
+; Don't use _t1 here.
 .proc file_getchar
     jsr claim_fcb
     jsr change_buffers
@@ -289,7 +297,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     clc
     adc icax5, x
     tay
-    lda (a0), y
+    lda (_fcb), y
     pha
 
     jsr inc_cio_pointers
@@ -303,9 +311,9 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     lda #0xff
     ldy #FCB_R0
-    sta (a0), y
+    sta (_fcb), y
     iny
-    sta (a0), y
+    sta (_fcb), y
 
     pla
     tay
@@ -315,10 +323,10 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 ; Reads ASCII characters until an EOL is met.
 
 .proc file_getrecord
-    _buffer = a3
-    _maxlength = a1+0
-    _count = a1+1
-    _tempb = a2+1
+    _buffer = _t3
+    _maxlength = _t1+0
+    _count = _t1+1
+    _tempb = _t2+1
     _x = a2+0
 
     jsr claim_fcb
@@ -388,11 +396,11 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
 .proc change_buffers
     ldy #FCB_R0+0
-    lda (a0), y
+    lda (_fcb), y
     cmp icax3, x
     bne ?seek_required
     iny
-    lda (a0), y
+    lda (_fcb), y
     cmp icax4, x
     bne ?seek_required
     clc
@@ -405,10 +413,10 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     ldy #FCB_R0
     lda icax3, x
-    sta (a0), y
+    sta (_fcb), y
     iny
     lda icax4, x
-    sta (a0), y
+    sta (_fcb), y
 
     ; Do it.
 
@@ -420,7 +428,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
         ldy #FCB_BUFFER
         lda #0
     ?clear_loop:
-        sta (a0), y
+        sta (_fcb), y
         iny
         cpy #FCB_BUFFER + 0x80
         bne ?clear_loop
@@ -432,15 +440,15 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     ; For all other modes, we need to read the next record.
 
-    lda a0+0
+    lda _fcb+0
     add #FCB_BUFFER
-    ldx a0+1
+    ldx _fcb+1
     scc:inx
     ldy #BDOS_SET_DMA_ADDRESS
     jsr BDOS
 
-    lda a0+0
-    ldx a0+1
+    lda _fcb+0
+    ldx _fcb+1
     ldy #BDOS_READ_RANDOM
     jsr BDOS
     ldx a2+0
@@ -469,27 +477,27 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     ; If the buffer isn't dirty, it doesn't need flushing.
 
     ldy #FCB_DIRTY
-    lda (a0), y
+    lda (_fcb), y
     smi:rts
     
     ; Do the write.
 
-    lda a0+0
+    lda _fcb+0
     add #FCB_BUFFER
-    ldx a0+1
+    ldx _fcb+1
     scc:inx
     ldy #BDOS_SET_DMA_ADDRESS
     jsr BDOS
 
-    lda a0+0
-    ldx a0+1
+    lda _fcb+0
+    ldx _fcb+1
     ldy #BDOS_WRITE_RANDOM
     jsr bdose
     ldx a2+0
 
     ldy #FCB_DIRTY
     lda #0
-    sta (a0), y
+    sta (_fcb), y
     rts
 .endp
 
@@ -511,8 +519,8 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     ; Close it.
 
-    lda a0+0
-    ldx a0+1
+    lda _fcb+0
+    ldx _fcb+1
     ldy #BDOS_CLOSE_FILE
     jsr bdose
 
@@ -534,17 +542,17 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 .endp
 
 .proc console_putchars
-    mwa icbal,x a1
+    mwa icbal,x _t1
     ?loop:
         lda icbll,x
         ora icblh, x
         beq ?endloop
         
         ldy #0
-        lda (a1), y
+        lda (_t1), y
         jsr console_putchar
 
-        inw a1
+        inw _t1
 
         dew icbll,x
         jmp ?loop
@@ -587,10 +595,10 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
 ; Reads a line from the console. It is written to icbal/h, and can be of length icbll/h.
 .proc console_getrecord
-    _buffer = a0
-    _maxlength = a1+0
-    _count = a1+1
-    _tempb = a2+0
+    _buffer = _t0
+    _maxlength = _t1+0
+    _count = _t1+1
+    _tempb = _t2+0
 
     mwa icbal,x _buffer
     
