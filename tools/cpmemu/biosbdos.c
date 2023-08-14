@@ -571,7 +571,34 @@ void bdos_entry(uint8_t bdos_call, bool log)
             fprintf(stderr, "%s", bdos_names[bdos_call]);
         else
             fprintf(stderr, "BDOS_%d", bdos_call);
-        fprintf(stderr, "(%04x) -> ", get_xa());
+        fprintf(stderr, "(%04x", get_xa());
+        switch (bdos_call)
+        {
+            case 15:
+            case 16:
+            case 17:
+            case 18:
+            case 19:
+            case 20:
+            case 21:
+            case 22:
+            case 23:
+            case 33:
+            case 34:
+            case 35:
+            case 40:
+            {
+                struct fcb* fcb = find_fcb();
+                fprintf(stderr, " `FCB={'%c:%.11s' CR=%02x R=%02x%02x}",
+                    fcb->filename.drive + '@',
+                    fcb->filename.bytes,
+                    fcb->currentrecord,
+                    fcb->r[1], fcb->r[0]);
+                break;
+            }
+        }
+
+        fprintf(stderr, ") -> ");
     }
 
     cpu->registers->p &= ~0x01;
