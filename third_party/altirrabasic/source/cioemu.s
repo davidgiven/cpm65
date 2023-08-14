@@ -66,11 +66,10 @@ _fcb = _t0
     jmp errorIO
 .endp
 
-; Ensures that an FCB structure is in icax6 and icax7. Copy it to _fcb. Also
-; copies X to a2+0.
+; Ensures that an FCB structure is in icax6 and icax7. Copy it to _fcb.
 
 .proc claim_fcb
-    stx a2+0
+    ldx iocbidx
     lda icax6, x
     sta _fcb+0
     lda icax7, x
@@ -164,7 +163,7 @@ _filename = _t1
     ; bidirectional. The only option we care about is writing, which creates a
     ; new file.
 
-    ldx a2+0
+    ldx iocbidx
     lda icax1, x
     #if .byte @ == #0x08
         ; Open for output. First, delete the old file.
@@ -319,7 +318,6 @@ _filename = _t1
     _maxlength = _t1+0
     _count = _t1+1
     _tempb = _t2+1
-    _x = a2+0
 
     jsr claim_fcb
     mwa icbal,x _buffer
@@ -332,7 +330,7 @@ _filename = _t1
     sty _maxlength
     
     ?loop:
-        ldx _x
+        ldx iocbidx
         jsr file_getchar
         
         ; Finished?
@@ -371,7 +369,7 @@ _filename = _t1
     lda #0x9b
     sta (_buffer), y
 
-    ldx _x
+    ldx iocbidx
     lda _count
     sta icbll, x
     lda #0
@@ -443,7 +441,7 @@ _filename = _t1
     ldx _fcb+1
     ldy #BDOS_READ_RANDOM
     jsr BDOS
-    ldx a2+0
+    ldx iocbidx
 
     ldy #1              ; normal success
     scs:rts
@@ -485,7 +483,7 @@ _filename = _t1
     ldx _fcb+1
     ldy #BDOS_WRITE_RANDOM
     jsr bdose
-    ldx a2+0
+    ldx iocbidx
 
     ldy #FCB_DIRTY
     lda #0
@@ -561,8 +559,6 @@ _filename = _t1
 .endp
 
 .proc console_putchar
-    stx a2+0
-    
     #if .byte @ == #0x9b
         lda #0x0d
         jsr direct_print
@@ -580,7 +576,7 @@ _filename = _t1
     cmp #3
     sne:sta brkkey
 
-    ldx a2+0
+    ldx iocbidx
     ldy #1
     rts
 .endp
@@ -715,7 +711,7 @@ direct_nl:
 
 .proc bdose
     jsr BDOS
-    ldx a2+0                ; restore X
+    ldx iocbidx
     scs:rts
     jmp errorIO
 .endp

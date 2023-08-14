@@ -251,9 +251,9 @@ BDOS:
         ;print startup banner
         mwa     #msg_banner_begin icbal
         mwa     #msg_banner_end-msg_banner_begin icbll
-        mva     #CIOCmdPutChars iccmd
         ldx     #0
-        jsr     ciov
+        stx     iocbidx
+        jsr     console_putchars
 
         jsr     _stNew.reset_entry
 ;       jsr     ExecReset

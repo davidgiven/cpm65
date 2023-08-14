@@ -182,9 +182,9 @@ IoSetupIOCB7AndEval:
 ;==========================================================================
 IoSetupIOCB7:
 		ldx		#$70
-		stx		iocbidx
 IoCloseX = IoClose.with_IOCB_X
 .proc IoClose
+		stx		iocbidx
 		ldx		iocbidx
 with_IOCB_X:
 		lda		#CIOCmdClose
