@@ -32,10 +32,6 @@ _fcb = _t0
     sty brkkey
     iny
     sty ichid
-    lda #<(console_putchar-1)
-    sta icptl
-    lda #>(console_putchar-1)
-    sta icpth
     
     lda #0x10
 ?loop:
@@ -151,10 +147,6 @@ _filename = _t1
 
     lda #1
     sta ichid, x
-    lda #<(file_putchar-1)
-    sta icptl, x
-    lda #>(file_putchar-1)
-    sta icpth, x
     lda #0
     sta icax3, x
     sta icax4, x

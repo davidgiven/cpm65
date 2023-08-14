@@ -533,7 +533,6 @@ icax6   = iocb_table + $e       ;
 icax7   = iocb_table + $f       ;
 
 brkkey      dta 0       ; set on BREAK
-ciochr      dta 0       ; CIO: call A register save/restore
 ; These must be consecutive as they're shared with the vector buffer.
 _vectmp:
 plyarg      .fl 0       ; mathpack polynomial arguments

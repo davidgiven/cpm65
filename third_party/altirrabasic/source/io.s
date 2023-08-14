@@ -118,13 +118,9 @@ not_iocb7:
 		jmp		errorDispatch
 		
 dispatch:
-		sta		ciochr
-		lda		icax1,x
-		lda		icpth,x
-		pha
-		lda		icptl,x
-		pha
-		lda		ciochr
+		cpx		#0
+		jeq		console_putchar
+		jmp		file_putchar
 done:
 		rts
 .endp
