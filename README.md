@@ -267,7 +267,9 @@ by me to work on CP/M-65. Anything Atari-related has been removed, including
 graphics, sound, etc. In addition, I have extended the error reporting, added
 support for case-insensitive keywords (simply because Atari BASIC traditionally
 requires upper case but most CP/M-65 platforms don't have caps lock keys!), and
-fairly crudely added file I/O support. There is no screen editor.
+fairly crudely added file I/O support. There is no screen editor. It is (should
+be) binary compatible with Atari BASIC, although programs using Atari features
+which aren't supported will of course not run.
 
 It is currently rather fragile with a number of known (and, probably, unknown)
 bugs. Please [file bug reports](https://github.com/davidgiven/cpm65/issues/new)!
