@@ -478,6 +478,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
         dew icbll,x
         jmp ?loop
     ?endloop:
+
     ldy #1
     rts
 .endp
@@ -489,73 +490,154 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 .endp
 
 .proc console_putchar
-    #if .byte @ == #0x9b
-        lda #13
-        jsr console_putchar
-        lda #10
-    #end
-    #if .byte @ >= #0x80
-        rts
-    #end
     stx a2+0
-    ldy #BDOS_CONSOLE_OUTPUT
+    
+    #if .byte @ == #0x9b
+        lda #0x0d
+        jsr direct_print
+        lda #0x0a
+    #end
+
+    jsr direct_print
+    
+    ; This is a good opportunity to check for ^C.
+
+    ldx #0xff
+    ldy #BDOS_DIRECT_IO
     jsr BDOS
+    ldx #0x80
+    cmp #3
+    sne:sta brkkey
+
     ldx a2+0
     ldy #1
     rts
 .endp
 
+; Reads a line from the console. It is written to icbal/h, and can be of length icbll/h.
 .proc console_getrecord
-    mwa icbal,x ztemp3
+    _buffer = a0
+    _maxlength = a1+0
+    _count = a1+1
+    _tempb = a2+0
+
+    mwa icbal,x _buffer
+    
     ldy #0
-    lda #0xff
-    sta (ztemp3), y
-    
-    txa
-    pha
-
-    lda ztemp3+0
-    ldx ztemp3+1
-    ldy #BDOS_READ_LINE
-    jsr BDOS
-
-    ; Rewrite the buffer into the format which atbasic expects.
-
-    ldy #1
-    lda (ztemp3), y          ; get line length
-    sta ztemp1+0
-    ldy #0
-?loop:
-    iny
-    iny
-    lda (ztemp3), y
+    sty _count
     dey
-    dey
-    sta (ztemp3), y
-    iny
-    cpy ztemp1+0
-    bne ?loop
+    lda icblh, x
+    sne:ldy icbll, x
+    sty _maxlength
     
-    ldy ztemp1+0
+    ?loop:
+        ; Read a key without echo.
+
+        ldx #0xfd
+        ldy #BDOS_DIRECT_IO
+        jsr BDOS
+        
+        ; Delete?
+
+        cmp #8
+        sne:lda #127
+        cmp #127
+        bne ?not_deletechar
+            ldx _count
+            beq ?loop
+
+            dec _count
+            jsr direct_print
+            jmp ?loop
+        ?not_deletechar:
+        
+        ; Retype line?
+
+        cmp #18
+        bne ?not_retype
+            jsr direct_nl
+
+            lda #0
+            sta _tempb
+            ?printloop:
+                ldy _tempb
+                cpy _count
+                beq ?loop
+
+                lda (_buffer), y
+                jsr direct_print
+                inc _tempb
+            jmp ?printloop
+        ?not_retype:
+
+        ; Delete line?
+
+        cmp #21
+        bne ?not_delete
+            lda #'#'
+            jsr direct_print
+            jsr direct_nl
+
+            lda #0
+            sta _count
+            beq ?loop       ; always taken
+        ?not_delete:
+
+        ; Ctrl+C?
+        cmp #3
+        bne ?not_ctrlc
+            lda #0x80
+            sta brkkey
+            lda #0
+            sta _count
+            beq ?exit       ; always taken
+        ?not_ctrlc:
+        
+        ; Finished?
+
+        cmp #13
+        beq ?exit
+        cmp #10
+        beq ?exit
+
+        ; Graphic character?
+
+        cmp #32
+        bcc ?loop
+
+        ldy _count
+        cpy _maxlength
+        beq ?loop
+
+        sta (_buffer), y
+        jsr direct_print
+        inc _count
+        bne ?loop           ; always taken
+
+?exit:
+    jsr direct_nl
+    ldy _count
     lda #0x9b
-    sta (ztemp3), y
-
-    pla
-    tax
-    ldy ztemp1+0
-    iny
-    tya
-    sta icbll, x
-    lda #0
-    sta icblh, x
-
-    ; Print a newline (CP/M doesn't).
+    sta (_buffer), y
     
-    lda #0x9b
-    jsr console_putchar
-
+    ldx #0                  ; IOCB pointer for console
     ldy #1
     rts
+.endp
+
+; Use direct I/O to print A.
+
+direct_nl:
+    lda #0x0d
+    jsr direct_print
+    lda #0x0a
+.proc direct_print
+    #if .byte @ > #127
+        rts
+    #end
+    ldy #BDOS_DIRECT_IO
+    ldx #0
+    jmp BDOS
 .endp
 
 ; Calls the BDOS, returning an error code in Y.
