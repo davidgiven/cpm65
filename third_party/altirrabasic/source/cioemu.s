@@ -63,7 +63,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 .endp
 
 ; Ensures that an FCB structure is in icax6 and icax7. Copy it to a0. Also
-; copies C to a2+0.
+; copies X to a2+0.
 
 .proc claim_fcb
     stx a2+0
@@ -116,8 +116,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     lda a1+0
     ldx a1+1
     ldy #BDOS_PARSEFILENAME
-    jsr BDOS
-    ldx a2+0                ; restore X
+    jsr bdose
 
     ; Restore the 9b terminator.
 
@@ -184,11 +183,9 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     #end
     lda a0+0
     ldx a0+1
-    jsr BDOS
+    jsr bdose
     
-    ; A is the error code. We can return this directly.
-
-    tay
+    ldy #1
     rts
 .endp
 
@@ -224,6 +221,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
         beq ?endloop
         
         jsr file_getchar
+        bcs ?exit
         ldy #0
         sta (a1), y
 
@@ -231,8 +229,9 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
         dew icbll,x
         jmp ?loop
-    ?endloop:
+?endloop:
     ldy #1
+?exit:
     rts
 .endp
 
@@ -273,6 +272,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     #end
 
     ldy #1
+    clc
     rts
 .endp
 
@@ -280,6 +280,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 .proc file_getchar
     jsr claim_fcb
     jsr change_buffers
+    bcs ?error
 
     ; Do the read.
     
@@ -292,6 +293,21 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     jsr inc_cio_pointers
     pla
+    ldy #1
+    rts
+
+?error:
+    tya
+    pha
+
+    lda #0xff
+    ldy #FCB_R0
+    sta (a0), y
+    iny
+    sta (a0), y
+
+    pla
+    tay
     rts
 .endp
 
@@ -307,6 +323,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     lda (a0), y
     cmp icax4, x
     bne ?seek_required
+    clc
     rts
 
 ?seek_required:
@@ -335,23 +352,45 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
         iny
         cpy #FCB_BUFFER + 0x80
         bne ?clear_loop
-    #else
-        ; For all other modes, we need to read the next record.
-
-        lda a0+0
-        add #FCB_BUFFER
-        ldx a0+1
-        scc:inx
-        ldy #BDOS_SET_DMA_ADDRESS
-        jsr BDOS
-
-        lda a0+0
-        ldx a0+1
-        ldy #BDOS_READ_RANDOM
-        jsr BDOS
-    
-        ldx a2+0
+        
+        ldy #1
+        clc
+        rts
     #end
+
+    ; For all other modes, we need to read the next record.
+
+    lda a0+0
+    add #FCB_BUFFER
+    ldx a0+1
+    scc:inx
+    ldy #BDOS_SET_DMA_ADDRESS
+    jsr BDOS
+
+    lda a0+0
+    ldx a0+1
+    ldy #BDOS_READ_RANDOM
+    jsr BDOS
+    ldx a2+0
+
+    ldy #1              ; normal success
+    scs:rts
+
+    ; Error handling. Results of NODATA or NOEXTENT mean eof.
+
+    cmp #CPME_NODATA
+    beq ?eof
+    cmp #CPME_NOEXTENT
+    beq ?eof
+
+    ; Otherwise it's an I/O error.
+
+    jmp errorIO
+
+?eof:
+    ldy #0
+    sec
+    rts
 .endp
 
 .proc flush_buffer
@@ -373,7 +412,7 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     lda a0+0
     ldx a0+1
     ldy #BDOS_WRITE_RANDOM
-    jsr BDOS
+    jsr bdose
     ldx a2+0
 
     ldy #FCB_DIRTY
@@ -384,8 +423,8 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
 .proc file_close
     lda ichid, x
-    ldy #1
-    cmp #0xff
+    ldy #0
+    cmp #0xff           ; is this IOCB already closed?
     sne:rts
 
     ; Flush the file.
@@ -393,22 +432,19 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     jsr claim_fcb
     jsr flush_buffer
 
-    ; Close it.
-
-    lda a0+0
-    ldx a0+1
-    ldy #BDOS_CLOSE_FILE
-    jsr BDOS
-    ldx a2+0
-    pha
-
     ; Mark the IOCB as closed.
 
     lda #0xff
     sta ichid, x
 
-    pla
-    tay
+    ; Close it.
+
+    lda a0+0
+    ldx a0+1
+    ldy #BDOS_CLOSE_FILE
+    jsr bdose
+
+    ldy #1
     rts
 .endp
 
@@ -461,8 +497,12 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
     #if .byte @ >= #0x80
         rts
     #end
+    stx a2+0
     ldy #BDOS_CONSOLE_OUTPUT
-    jmp BDOS
+    jsr BDOS
+    ldx a2+0
+    ldy #1
+    rts
 .endp
 
 .proc console_getrecord
@@ -516,4 +556,13 @@ FCB_EXTRA__SIZE = FCB_BUFFER + 0x80
 
     ldy #1
     rts
+.endp
+
+; Calls the BDOS, returning an error code in Y.
+
+.proc bdose
+    jsr BDOS
+    ldx a2+0                ; restore X
+    scs:rts
+    jmp errorIO
 .endp

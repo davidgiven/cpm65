@@ -143,7 +143,7 @@ _text_start:
 ; CP/M-65 header and entrypoint
     dta _zp_end - _zp_start
     dta >(_text_end - _text_start + 255)
-    dta a(_text_end - _text_start)
+    dta a(_text_end)
 BDOS:
     jmp 0x0000
 ;

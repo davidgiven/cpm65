@@ -51,6 +51,7 @@ error_17:   dta c"syntax", 1
 error_18:   dta c"invalid string", 0
 error_19:   dta c"load", 1
 error_20:   dta c"bad device number", 0
+error_21:   dta c"I/O", 1
 error_28:   dta c"invalid structure", 0
 
 .macro error_entry
@@ -79,7 +80,7 @@ error_table:
     error_entry error_18
     error_entry error_19
     error_entry error_20
-    dta 0xff
+    error_entry error_21
     dta 0xff
     dta 0xff
     dta 0xff

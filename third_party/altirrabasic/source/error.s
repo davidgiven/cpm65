@@ -6,6 +6,7 @@
 ; notice and this notice are preserved.  This file is offered as-is,
 ; without any warranty.
 
+errorIO				inc 	errno		;21
 errorBadDeviceNo	inc		errno
 errorLoadError		inc		errno
 errorInvalidString	inc		errno
