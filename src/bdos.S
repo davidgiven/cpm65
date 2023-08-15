@@ -445,28 +445,35 @@ zproc entry_GETCONSOLESTATUS
     rts
 zendproc
 
-; If param+0 == $ff, returns a character without waiting and without echo.
-; If param+0 != $ff, prints it.
+; If param+1 == $ff, returns a character without waiting and without echo.
+; If param+1 == $fd, returns a character while waiting and without echo.
+; If otherwise, prints param+0.
 
 zproc entry_DIRECTIO
-    lda param+0
-    cmp #$ff
-    zif_ne
-        jsr bios_CONOUT
+    ldx param+1
+    cpx #$ff    
+    zif_eq
+        lda buffered_key
+        ; A is either a character, or zero
+        zif_eq
+            jsr bios_CONST
+            cmp #$ff
+            zif_eq
+                jsr bios_CONIN
+            zendif
+            ; A is either a character, or zero
+        zendif
         clc
         rts
     zendif
 
-    lda buffered_key
-    ; A is either a character, or zero
+    cpx #$fd
     zif_eq
-        jsr bios_CONST
-        cmp #$ff
-        zif_eq
-            jsr bios_CONIN
-        zendif
-        ; A is either a character, or zero
+        jmp bios_CONIN
     zendif
+
+    lda param+0
+    jsr bios_CONOUT
     clc
     rts
 zendproc

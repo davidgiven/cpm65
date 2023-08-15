@@ -1,0 +1,77 @@
+<html>
+<head>
+<title>Mads Assembler - String Utility</title>
+<!-- Converts ASCII string to sequence of char for usage in FPC --> 
+</head>
+<script>
+
+function convertToCode(){
+  var inTextArea = document.getElementById("in");
+  var outTextArea = document.getElementById("out");
+  var inValue = inTextArea.value;
+  var code = "";
+  var firstInCode = true;
+  var line = "";
+  var firstInLine = true;
+  for(var i=0;i<inValue.length;i++) {
+      var c=inValue.charAt(i);
+
+      var newLine = false;
+      if (c == '\n') {
+        newLine = true;
+      }
+      var textEnd = false;
+      if (i==inValue.length-1){
+        textEnd = true;
+      }
+
+      if (firstInLine && !firstInCode){
+         line = "      ";
+      }
+
+      var cString = "'"+c+"'";
+      if (firstInCode) {
+         cString = "chr(ord("+cString+") + $80)";
+         firstInCode = false;
+      }
+      if (newLine) {
+        cString = "#13,#10";
+      } else  if (c == '\t') {
+        cString = "#9";
+      }
+
+      line += cString+",";
+      firstInLine=false;
+ 
+      if (newLine==true || textEnd==true){
+        code += line+"\n";
+        line = "";
+        firstInLine = true;
+      }
+  }
+  outTextArea.value = code;
+  logMessage("Text converted to code.");
+};
+
+function convertToText(){
+};
+
+function logMessage(message){
+  var logTextArea = document.getElementById("log");
+  logTextArea.value = new Date().toString()+": "+message
+};
+</script>
+
+<body>
+    <textarea id="in" cols="132" rows="20" placeholder="Your text">Example&#9;Tab&#13;Text&#13;
+</textarea>
+    <br>
+    <button id="convterToCodeButton" onclick="convertToCode();">Convert to Code</button>
+    <br><br>
+    <textarea id="out" cols="160" rows="20" placeholder="Your code"></textarea>
+    <br>
+    <!-- <button id="convterToTextButton" onclick="convertToText();">Convert to Text</button> -->
+    <br><br>
+    <textarea id="log" cols="132" placeholder="Log"></textarea>
+</body>
+</html>

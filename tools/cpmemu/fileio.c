@@ -13,7 +13,7 @@
 #include "globals.h"
 
 #define logf(args...) while (0)
-// #define logf(args...) printf(args)
+//#define logf(args...) printf(args)
 
 struct file
 {
@@ -271,8 +271,6 @@ struct file* file_open(cpm_filename_t* filename)
 {
     struct file* f = find_file(filename);
     reopen(f, O_RDONLY);
-    if (f->fd == -1)
-        return NULL;
     return f;
 }
 

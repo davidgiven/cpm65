@@ -1,7 +1,9 @@
 CXX = g++
 CC = gcc
+FPC = fpc
+LLVM = /opt/bin/
 
-CFLAGS = -Os -g -I.
+CFLAGS = -O0 -g -I.
 CFLAGS65 = -Os -g -I. \
 	-Wno-main-return-type \
 	-Wno-incompatible-library-redeclaration
@@ -22,34 +24,6 @@ TARGETS = \
 	vic20.d64 \
 	x16.zip \
 
-APPS = \
-	$(OBJDIR)/apps/bedit.com \
-	$(OBJDIR)/apps/capsdrv.com \
-	$(OBJDIR)/apps/cls.com \
-	$(OBJDIR)/apps/devices.com \
-	$(OBJDIR)/apps/dinfo.com \
-	$(OBJDIR)/apps/dump.com \
-	$(OBJDIR)/apps/ls.com \
-	$(OBJDIR)/asm.com \
-	$(OBJDIR)/copy.com \
-	$(OBJDIR)/objdump.com \
-	$(OBJDIR)/stat.com \
-	$(OBJDIR)/submit.com \
-	apps/bedit.asm \
-	apps/dinfo.asm \
-	apps/dump.asm \
-	apps/ls.asm \
-	apps/cpm65.inc \
-	apps/drivers.inc \
-	cpmfs/asm.txt \
-	cpmfs/bedit.txt \
-	cpmfs/demo.sub \
-	cpmfs/hello.asm \
-
-SCREEN_APPS = \
-	apps/cls.asm \
-	$(OBJDIR)/qe.com \
-
 MINIMAL_APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
@@ -64,6 +38,24 @@ MINIMAL_APPS = \
 	$(OBJDIR)/submit.com \
 	apps/dump.asm \
 	apps/ls.asm \
+
+APPS = \
+	$(MINIMAL_APPS) \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.com \
+	$(OBJDIR)/objdump.com \
+	apps/bedit.asm \
+	apps/dinfo.asm \
+	apps/cpm65.inc \
+	apps/drivers.inc \
+	cpmfs/asm.txt \
+	cpmfs/basic.txt \
+	cpmfs/bedit.txt \
+	cpmfs/demo.sub \
+	cpmfs/hello.asm \
+
+SCREEN_APPS = \
+	apps/cls.asm \
+	$(OBJDIR)/qe.com \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
@@ -89,15 +81,7 @@ CPMEMU_OBJS = \
 
 all: $(TARGETS)
 
-$(OBJDIR)/multilink: $(OBJDIR)/tools/multilink.o
-	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -o $@ $< -lfmt
-
-$(OBJDIR)/mkdfs: $(OBJDIR)/tools/mkdfs.o
-	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -o $@ $<
-
-$(OBJDIR)/mkoricdsk: $(OBJDIR)/tools/mkoricdsk.o
+$(OBJDIR)/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $< -lfmt
 
@@ -105,13 +89,17 @@ bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
 
-bin/shuffle: $(OBJDIR)/tools/shuffle.o
+bin/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)
 	$(CXX) $(CFLAGS) -o $@ $<
 
 bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $^
+
+bin/mads: third_party/mads/mads.pas
+	@mkdir -p $(dir $@)
+	$(FPC) -Mdelphi -vh -Os $< -o$@
 
 $(OBJDIR)/mkcombifs: $(OBJDIR)/tools/mkcombifs.o
 	@mkdir -p $(dir $@)
@@ -137,25 +125,65 @@ $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc include/dri
 	@mkdir -p $(dir $@)
 	mos-cpm65-clang $(CFLAGS65) -c -o $@ $< -I include
 
+$(OBJDIR)/third_party/altirrabasic/%.bin: \
+		$(wildcard third_party/altirrabasic/source/*.s) \
+		$(wildcard third_party/altirrabasic/source/*.inc) \
+		$(wildcard third_party/altirrabasic/kernel/*.s) \
+		bin/mads \
+		$(OBJDIR)/xextobin
+	@mkdir -p $(dir $@)
+	rm -f $(patsubst %.bin,%.xex,$@)
+	bin/mads third_party/altirrabasic/source/atbasic.s \
+		-c \
+		-o:$(patsubst %.bin,%.xex,$@) \
+		-s \
+		-l:$(patsubst %.bin,%.lst,$@) \
+		-t:$(patsubst %.bin,%.map,$@) \
+		-d:ZPBASE=$(ZPBASE) \
+		-d:TEXTBASE='$$$(TEXTBASE)'
+	$(OBJDIR)/xextobin -i $(patsubst %.bin,%.xex,$@) -o $@ -b 0x$(TEXTBASE)
+
+$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin: ZPBASE=0
+$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin: TEXTBASE=0200
+$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin: ZPBASE=1
+$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin: TEXTBASE=0200
+$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin: ZPBASE=0
+$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin: TEXTBASE=0300
+
+$(OBJDIR)/third_party/altirrabasic/atbasic.com: \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin \
+	$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin \
+	$(OBJDIR)/multilink
+	@mkdir -p $(dir $@)
+	$(OBJDIR)/multilink -o $@ \
+		$(OBJDIR)/third_party/altirrabasic/atbasic.core.bin \
+		$(OBJDIR)/third_party/altirrabasic/atbasic.zp.bin \
+		$(OBJDIR)/third_party/altirrabasic/atbasic.tpa.bin
+
 $(OBJDIR)/libcommodore.a: $(LIBCOMMODORE_OBJS)
 	@mkdir -p $(dir $@)
-	llvm-ar rs $@ $^
+	$(LLVM)llvm-ar rs $@ $^
 
 $(OBJDIR)/libbios.a: $(LIBBIOS_OBJS)
 	@mkdir -p $(dir $@)
-	llvm-ar rs $@ $^
+	$(LLVM)llvm-ar rs $@ $^
 
 $(OBJDIR)/libcpm.a: $(LIBCPM_OBJS)
 	@mkdir -p $(dir $@)
-	llvm-ar rs $@ $^
+	$(LLVM)llvm-ar rs $@ $^
 
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
+	$(LLVM)mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
+
+$(OBJDIR)/%.com: $(OBJDIR)/third_party/%.o $(OBJDIR)/libcpm.a
+	@mkdir -p $(dir $@)
+	$(LLVM)mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu $(wildcard apps/*.inc)
 	@mkdir -p $(dir $@)
@@ -165,25 +193,26 @@ $(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu $(wildcard apps/*.inc)
 
 $(OBJDIR)/bdos.sys: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)llvm-objdump -S $@.elf > $@.lst
 
 $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts/apple2e.ld scripts/apple2e-prelink.ld Makefile
 	@mkdir -p $(dir $@)
-	ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
-	ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
+	$(LLVM)ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
+	$(LLVM)ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 
 $(OBJDIR)/oric.exe: $(OBJDIR)/src/bios/oric.o $(OBJDIR)/libbios.a scripts/oric.ld scripts/oric-prelink.ld scripts/oric-common.ld Makefile
 	@mkdir -p $(dir $@)
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oric-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
+	$(LLVM)ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
+	$(LLVM)ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oric-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(filter %.a,$^) $(LINKFLAGS)
+	$(LLVM)ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(filter %.a,$^) $(LINKFLAGS)
 
 $(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
 	@mkdir -p $(dir $@)

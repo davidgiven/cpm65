@@ -1,0 +1,86 @@
+2023-06-07
+- SDX: Weak Symbol, SMB^
+
+2023-06-04
+- poprawione generowanie kodu dla .CB, .BY, .WO, .HE, .SB, .DBYTE gdy jest aktywny przełącznik -X (exclude unreferenced procedures)
+
+2023-06-03
+- dodany znak modyfikacji ciągu znakowego '^', ostatni bajt ulega inwersowi, np:
+
+   dta 'text'^
+   dta "text"^
+
+2023-05-02
+- naprawione generowanie kodu dla rozkazu LAX (Z,X)
+
+2023-04-20
+- dodana dyrektywa .BI generująca dane z zapisu binarnego
+
+2022-12-26
+- poprawnie zapisuje wartość '.FL 0', https://github.com/tebe6502/Mad-Assembler/issues/8
+- dodany komunikat ostrzeżenia w przypadku przekroczenia adresu $FFFF 'Memory range has been exceeded'
+
+2022-12-18
+- JNE, JEQ itd. przyjmuja dluga wersje jesli page boundary
+
+2022-11-12
+- dodane etykiety automodyfikacji zasięgu globalnego '::', np.
+ 
+.local
+ lda temp:: #$00
+.endl
+
+2022-09-10
+- zastepstwo dla 'org r:address' który nie generuje nowego bloku w pliku
+
+.local ,address
+
+.endl
+
+
+2022-02-21
+- etykiety automodyfikacji 'lda temp:  #$40'
+ 
+2022-01-22
+- dodano kolorowanie komunikatów konsoli
+- dodana funkcja Tab2Space
+
+2021-12-04
+- poprawiony zapis pliku RAW (opt h-f+)
+
+2021-11-08
+- poprawiona procedura 'get_maeData', dodany komunikat błędu w przypadku braku parametru +xx
+
+2021-11-01
+- poprawione działanie .UNDEF, dodatkowy test czy usuwamy makro
+- poprawione wykonywanie zagnieżdzonych pętli .REPT (dodany licznik RPT w funkcji dirENDR)
+
+2021-10-22
+- dla .IFDEF dodany test 'exclude procedure', odpowiednio reaguje na etykiety które należały do wykluczonych procedur
+
+2021-06-04
+- dodana możliwość łączenia obszarów lokalnych poprzez znak '+' poprzedzający etykietę, np.:
+ .local +label
+
+2021-04-19
+- nowy przełącznik -bc 'Branch condition test', powoduje wygenerowanie  komunikatów ostrzeżenia w przypadku kiedy skok jest poza zakres lub przekracza stronę pamięci
+
+2021-03-14
+- poprawiony skok dla '@ branch @+', który powodował pętlę bez końca
+
+2021-03-07
+- zmieniony test przeciwdziałający powstaniu 'infinite loop'
+- dodany komunikat ostrzeżenia 'Register A is changed' dla pseudo rozkazów DEW, DEL, DED
+
+2020-11-17
+- poprawione parsowanie ciągów znakowych dla argumentu rozkazu, np. lda #'''', lda #""""
+
+2020-10-28
+- dodatkowy test przeciwdzialajacy powstaniu 'infinite loop', 't_lab[].lop = true' jeśli ta etykieta powoduje wymuszania kolejnego przebiegu asemblacji
+- dodany komunikat ostrzeżenia gdy zostaje wybrane długie odgałęzienie 'bxx *+3 jmp'
+
+2020-07-01 (Daniel Serpell/DMSC) https://atariage.com/forums/topic/308611-mad-assembler-and-floating-point-constants/
+
+- floating-point parsing code rewritten
+- new function BCD
+- new procedure save_fl

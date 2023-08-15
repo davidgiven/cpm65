@@ -1,0 +1,16 @@
+REM This is an ASCII dump of a BASIC
+REM program. To load it, do:
+REM   ENTER "basic.txt"
+REM Then you can save it with:
+REM   SAVE "basic.bas"
+REM ...in the normal way.
+
+10 PRINT "I can do it!"
+20 FOR i=1 TO 9
+30 PRINT "I can do it ";i;" time";
+40 IF i<>1 THEN PRINT "s";
+50 PRINT "!"
+60 NEXT i
+
+REM vim: set ft=basic fileformat=dos:
+

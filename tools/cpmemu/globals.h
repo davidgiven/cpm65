@@ -28,7 +28,7 @@ extern const int biosbdosdata_len;
 extern void bios_coldboot(void);
 extern void bios_warmboot(void);
 
-extern void bdos_entry(uint8_t bdos_call);
+extern void bdos_entry(uint8_t bdos_call, bool log);
 extern void bios_entry(uint8_t bios_call);
 
 typedef struct
