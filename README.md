@@ -33,9 +33,9 @@ much less standardised than 8080 and Z80 systems. (The systems above all load
 programs at different base addresses.)
 
 Currently you can cross-assemble programs from a PC, as well as a working C
-toolchain with llvm-mos. For native development, there's a basic assembler and
-an even more basic editor. You need about 20kB to run the assembler at all, and
-of course more memory the bigger the program.
+toolchain with llvm-mos. For native development, there's a basic assembler, a
+couple of editors, and a BASIC.  You need about 20kB to run the assembler at
+all, and of course more memory the bigger the program.
 
 No, it won't let you run 8080 programs on the 6502!
 
@@ -71,7 +71,9 @@ How?
 You will need the [llvm-mos](https://llvm-mos.org) toolchain. CP/M-65 support
 is available out of the box. Once installed, you should just be able to run the
 Makefile and you'll get bootable disk images for the Commodore 64 (with 1541
-drive) and BBC Micro (producing a 200kB SSSD DFS disk).
+drive) and BBC Micro (producing a 200kB SSSD DFS disk):
+
+    make LLVM=<your llvm-mos bin directory here>
 
 Building CP/M-65 is a bit of a performance because it's aggregating lots of
 other software, all of which need building in turn. You'll need: a C and C++

@@ -37,7 +37,7 @@ jobs:
         (cd llvm-mos-sdk/build && ninja install)
 
     - name: make
-      run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65
+      run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65 LLVM=
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v2
