@@ -68,6 +68,8 @@ _eos = stScratch4
 		jsr		do_list
 		
 		;close IOCB and exit
+		lda		#27
+		jsr		putchar
 		jmp		IoClose
 		
 do_list:

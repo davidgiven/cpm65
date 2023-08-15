@@ -559,12 +559,6 @@ _filename = _t1
 .endp
 
 .proc console_putchar
-    #if .byte @ == #0x9b
-        lda #0x0d
-        jsr direct_print
-        lda #0x0a
-    #end
-
     jsr direct_print
     
     ; This is a good opportunity to check for ^C.

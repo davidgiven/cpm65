@@ -76,17 +76,17 @@ print_digit:
 .endp
 
 ;==========================================================================
-.proc IoPutCharAndInc
-		inc		inbuff
-		sne:inc	inbuff+1
-		bne		putchar			;! - unconditional
-.endp
-
-;==========================================================================
 IoPutCharDirect = putchar.direct
 
+IoPutCharAndInc:
+		inc		inbuff
+		sne:inc	inbuff+1
+		cmp		#0x9b
+		bne		putchar
 IoPutNewline:
-		lda		#$9b
+		lda		#13
+		jsr		putchar
+		lda		#10
 		dta		{bit $0100}
 IoPutSpace:
 		lda		#' '

@@ -338,9 +338,8 @@ BDOS:
 ;default_fn_end:
 
 msg_banner_begin:
-        dta     $9c             ;delete loading line
         _MSG_BANNER
-        dta     $9b
+        dta     13, 10
 msg_banner_end:
 .endp
 
@@ -363,13 +362,13 @@ ReturnToDOS:
 msg_base:
 
 msg_ready:
-        dta     $9B,c'Ready',$9B,0
+        dta     13, 10, c'Ready', 13, 10, 0
 
 msg_stopped:
-        dta     $9B,c"Stopped",0
+        dta     13, 10, c"Stopped", 0
 
 msg_error:
-        dta     $9B
+        dta     13, 10
 msg_error2:
         dta     c"Error-   ",0
 
