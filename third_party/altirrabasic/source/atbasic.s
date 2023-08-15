@@ -12,7 +12,9 @@
 
 ;===========================================================================
 .macro _MSG_BANNER
-        dta     c'Altirra 8K BASIC 1.58 CP/M-65 version'
+        dta     c'Altirra 8K BASIC 1.58 CP/M-65 version', 13, 10
+        dta     c'This port not supported by the Altirra project.', 13, 10
+        dta     c'Do not contact them about bugs.', 13, 10
 .endm
 
 ;===========================================================================
@@ -339,7 +341,6 @@ BDOS:
 
 msg_banner_begin:
         _MSG_BANNER
-        dta     13, 10
 msg_banner_end:
 .endp
 
@@ -457,21 +458,9 @@ pmgmode_tab:                    ;2 bytes ($00 80)
 
 ;==========================================================================
 
-  .align 256
         .pages 1
 
 const_table:
-devname_c:
-        dta     'C'
-devname_s:
-        dta     'S'
-devname_e:
-        dta     'E'
-devname_p:
-        dta     'P'
-devpath_d1all:
-        dta     'D:*.*',$9B
-
         ;The Maclaurin expansion for sin(x) is as follows:
         ;
         ; sin(x) = x - x^3/3! + x^5/5! - x^7/7! + x^9/9! - x^11/11!...

@@ -87,3 +87,15 @@ overflow:
 		sta		fr0+1
 		rts
 .endp
+
+; Return C=1 if A is a lower case letter. Does not modify A.
+
+.proc islower
+	cmp #'a'
+	bcc ?done
+	sbc #0x7b
+	sec
+	sbc #0x85
+?done:
+	rts
+.endp

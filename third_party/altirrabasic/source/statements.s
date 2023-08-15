@@ -238,16 +238,7 @@ reset_entry:
 .endp
 
 ;===========================================================================
-.proc stCload
-		;open IOCB #7 to C: device for read
-		lda		#$04
-		jsr		IoOpenCassette
-		
-		;do load
-		sec
-		ror		stLoadRun._loadflg
-		bmi		stLoadRun.with_open_iocb
-.endp
+stCload = errorWTF
 
 ;===========================================================================
 ; RUN [sexp]
@@ -374,14 +365,7 @@ setup_main_io:
 .endp
 
 ;===========================================================================
-.proc stCsave
-		;open IOCB #7 to C: device for write
-		lda		#$08
-		jsr		IoOpenCassette
-		
-		;do load
-		bpl		stSave.with_open_iocb		;!! - unconditional
-.endp
+stCsave = errorWTF
 
 
 ;===========================================================================
@@ -1381,18 +1365,7 @@ stPmcolor = errorWTF
 stSetcolor = errorWTF
 
 ;===========================================================================
-.proc stLprint
-		;open IOCB #7 to P: device for write
-		ldy		#<devname_p
-		lda		#8
-		jsr		IoOpenStockDeviceIOCB7
-		
-		;do PRINT
-		jsr		stPrint.have_iocb_entry
-		
-		;close IOCB #7
-		jmp		IoClose
-.endp
+stLprint = errorWTF
 
 
 ;===========================================================================

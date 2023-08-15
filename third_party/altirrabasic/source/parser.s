@@ -214,9 +214,8 @@ not_space:
 		sta 	?cmd_char
 		ldy		cix
 		lda		(inbuff),y
-		#if .byte @ >= #96 .and .byte @ <= #172
-			eor #32
-		#end
+		jsr 	islower
+		scc:eor #32
 ?cmd_char = * + 1
 		cmp		#0
 		bne		parseFail
@@ -295,17 +294,21 @@ is_state:
 		
 is_state_jump:
 		;jump to new state
+		php
 		lda		parse_state_table-$40,x
+		add		#<pa_state_start
 		ldy		#>pa_state_start
+		scc:iny
+		plp
 load_and_jmp:
 		sta		parptr
 		sty		parptr+1
-		bcs		parse_loop
+		jcs		parse_loop
 
 		;clear any backtracking entries from the stack
 btc_loop:
 		pla
-		beq		push_then_restart_parse_loop
+		jeq		push_then_restart_parse_loop
 		pla
 		pla
 		pla
@@ -709,7 +712,9 @@ accept:
 
 		;init for statements
 		lda		parse_state_table_statements,x
+		add		#<pa_statements_begin
 		ldy		#>pa_statements_begin
+		scc:iny
 
 		;check if we're doing functions
 		lsr		_functionMode
@@ -732,7 +737,9 @@ accept:
 		
 		ldx		stScratch
 		lda		parse_state_table_functions-$3d,x
+		add		#<pa_functions_begin
 		ldy		#>pa_functions_begin
+		scc:iny
 
 do_branch:
 		clc
@@ -898,9 +905,8 @@ _nameEnd = a3
 		;first non-space character must be a letter
 		jsr		skpspc
 		lda		(inbuff),y
-		#if .byte @ >= #96 .and .byte @ <= #172
-			eor #32
-		#end
+		jsr		islower
+		scc:eor	#32
 		sub		#'A'
 		cmp		#26
 		bcs		reject

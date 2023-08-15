@@ -194,38 +194,6 @@ with_IOCB_X:
 		jmp		ciov
 .endp
 
-;==========================================================================
-; Open the cassette (C:) device or any other stock device.
-;
-; Entry (IoOpenCassette):
-;	None
-;
-; Entry (IoOpenStockDeviceIOCB7):
-;	A = AUX1 mode
-;	Y = Low byte of device name address in constant page
-;
-; Entry (IoOpenStockDeviceX):
-;	A = AUX1 mode
-;	X = IOCB #
-;	Y = Low byte of device name address in constant page
-;
-IoOpenCassette:
-		sec
-		ror		icax2+$70		
-		ldy		#<devname_c
-IoOpenStockDeviceIOCB7:
-		ldx		#$70
-IoOpenStockDeviceX:
-		stx		iocbidx
-		sty		stScratch4
-		pha
-		jsr		IoCloseX
-		pla
-		sta		icax1,x
-		lda		stScratch4
-		ldy		#>devname_c
-		jsr		IoSetupBufferAddress
-		lda		#CIOCmdOpen
 IoDoCmd:
 		ldx		iocbidx
 		sta		iccmd,x
