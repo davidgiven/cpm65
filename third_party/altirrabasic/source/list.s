@@ -197,7 +197,7 @@ line_done:
 		bpl		lineloop			;!! - unconditional
 
 syntax_error:
-		ldx		#msg_error2-msg_base
+		ldx		#msg_error-msg_base
 		jsr		IoPrintMessage
 print_raw:
 		jsr		ListGetByte

@@ -81,6 +81,7 @@ IoPutCharDirect = putchar.direct
 IoPutCharAndInc:
 		inc		inbuff
 		sne:inc	inbuff+1
+IoPutChar:
 		cmp		#0x9b
 		bne		putchar
 IoPutNewline:

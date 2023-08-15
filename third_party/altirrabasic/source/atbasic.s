@@ -368,9 +368,7 @@ msg_stopped:
         dta     13, 10, c"Stopped", 0
 
 msg_error:
-        dta     13, 10
-msg_error2:
-        dta     c"Error-   ",0
+        dta     13, 10, c"Error-   ",0
 
 msg_atline:
         dta     c" at line ",0

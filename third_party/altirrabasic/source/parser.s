@@ -437,7 +437,7 @@ copyloop:
 		;##TRACE "Parser: No backtrack -- failing."
 		lda		#0
 		sta		parout
-		ldx		#msg_error2-msg_base
+		ldx		#msg_error-msg_base
 		jsr		IoPrintMessageIOCB0		;!! - overwrites INBUFF
 		
 		inc		cix
@@ -448,16 +448,13 @@ print_loop:
 		pha
 		dec		cix
 		bne		no_invert
-		;eor		#$80
-		;cmp		#$1b
-		;bne		not_eol
 		pha
-		lda		#'^' ;$a0
-		jsr		putchar
+		lda		#'^'
+		jsr		IoPutChar
 		pla
 no_invert:
 not_eol:
-		jsr		putchar
+		jsr		IoPutChar
 		pla
 		cmp		#$9b
 		bne		print_loop
