@@ -13,8 +13,9 @@
 ;===========================================================================
 .macro _MSG_BANNER
         dta     c'Altirra 8K BASIC 1.58 CP/M-65 version', 13, 10
-        dta     c'This port not supported by the Altirra project.', 13, 10
-        dta     c'Do not contact them about bugs.', 13, 10
+        dta     c'This port is not supported by the', 13, 10
+        dta     c'Altirra project. Do not contact them', 13, 10
+        dta     c'about bugs.', 13, 10
 .endm
 
 ;===========================================================================
