@@ -1,6 +1,7 @@
 CXX = g++
 CC = gcc
 FPC = fpc
+LLVM = /opt/pkg/llvm-mos/bin
 
 CFLAGS = -O0 -g -I.
 CFLAGS65 = -Os -g -I. \
@@ -162,27 +163,27 @@ $(OBJDIR)/third_party/altirrabasic/atbasic.com: \
 
 $(OBJDIR)/libcommodore.a: $(LIBCOMMODORE_OBJS)
 	@mkdir -p $(dir $@)
-	llvm-ar rs $@ $^
+	$(LLVM)/llvm-ar rs $@ $^
 
 $(OBJDIR)/libbios.a: $(LIBBIOS_OBJS)
 	@mkdir -p $(dir $@)
-	llvm-ar rs $@ $^
+	$(LLVM)/llvm-ar rs $@ $^
 
 $(OBJDIR)/libcpm.a: $(LIBCPM_OBJS)
 	@mkdir -p $(dir $@)
-	llvm-ar rs $@ $^
+	$(LLVM)/llvm-ar rs $@ $^
 
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
+	$(LLVM)/mos-cpm65-clang $(CFLAGS65) -c -I. -o $@ $^
 
 $(OBJDIR)/%.com: $(OBJDIR)/third_party/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)/mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)/mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu $(wildcard apps/*.inc)
 	@mkdir -p $(dir $@)
@@ -192,26 +193,26 @@ $(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu $(wildcard apps/*.inc)
 
 $(OBJDIR)/bdos.sys: $(OBJDIR)/src/bdos.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
-	llvm-objdump -S $@.elf > $@.lst
+	$(LLVM)/mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)/llvm-objdump -S $@.elf > $@.lst
 
 $(OBJDIR)/ccp.sys: $(OBJDIR)/src/ccp.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)/mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
 
 $(OBJDIR)/apple2e.bios: $(OBJDIR)/src/bios/apple2e.o $(OBJDIR)/libbios.a scripts/apple2e.ld scripts/apple2e-prelink.ld Makefile
 	@mkdir -p $(dir $@)
-	ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
-	ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
+	$(LLVM)/ld.lld -T scripts/apple2e-prelink.ld -o $(OBJDIR)/apple2e.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x8000
+	$(LLVM)/ld.lld -Map $(patsubst %.bios,%.map,$@) -T scripts/apple2e.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/apple2e.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 
 $(OBJDIR)/oric.exe: $(OBJDIR)/src/bios/oric.o $(OBJDIR)/libbios.a scripts/oric.ld scripts/oric-prelink.ld scripts/oric-common.ld Makefile
 	@mkdir -p $(dir $@)
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oric-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
+	$(LLVM)/ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric-prelink.ld -o $(OBJDIR)/oric-prelink.o $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=0x4000
+	$(LLVM)/ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/oric.ld -o $@ $< $(OBJDIR)/libbios.a --defsym=BIOS_SIZE=$$(llvm-objdump --section-headers $(OBJDIR)/oric-prelink.o | gawk --non-decimal-data '/ [0-9]+/ { size[$$2] = ("0x"$$3)+0 } END { print(size[".text"] + size[".data"] + size[".bss"]) }')
 
 $(OBJDIR)/%.exe: $(OBJDIR)/src/bios/%.o $(OBJDIR)/libbios.a scripts/%.ld
 	@mkdir -p $(dir $@)
-	ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(filter %.a,$^) $(LINKFLAGS)
+	$(LLVM)/ld.lld -Map $(patsubst %.exe,%.map,$@) -T scripts/$*.ld -o $@ $< $(filter %.a,$^) $(LINKFLAGS)
 
 $(OBJDIR)/4x8font.inc: bin/fontconvert third_party/tomsfonts/atari-small.bdf
 	@mkdir -p $(dir $@)
@@ -317,7 +318,7 @@ pet8032.d64: $(OBJDIR)/pet8032.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(SCREEN_
 
 $(OBJDIR)/vic20.exe: LINKFLAGS += --no-check-sections
 $(OBJDIR)/vic20.exe: $(OBJDIR)/libcommodore.a
-src/bios/vic20.S: $(OBJDIR)/4x8font.inc
+$(OBJDIR)/src/bios/vic20.o: $(OBJDIR)/4x8font.inc
 vic20.d64: $(OBJDIR)/vic20.exe $(OBJDIR)/bdos.sys Makefile $(APPS) \
 		$(OBJDIR)/ccp.sys $(OBJDIR)/mkcombifs
 	@rm -f $@
