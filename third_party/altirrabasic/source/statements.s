@@ -74,26 +74,7 @@ close_iocb:
 .endp
 
 ;===========================================================================
-.proc stDir
-		jsr		IoSetupIOCB7AndEval
-		lda		#6
-		ldy		argsp
-		bne		open_fn
-		ldy		#<devpath_d1all
-		jsr		IoOpenStockDeviceIOCB7
-		bpl		read_loop
-open_fn:
-		jsr		IoDoOpenWithFilename
-read_loop:
-		ldx		#$70
-		jsr		IoReadLineX
-		beq		stClose.close_iocb
-		ldx		#0
-		jsr		IoSetupReadLineLDBUFA_SetIOCBX
-		lda		#CIOCmdPutRecord
-		jsr		IoDoCmd
-		bpl		read_loop			;!! N=0 - error would be trapped
-.endp
+stDir = errorWTF
 
 ;===========================================================================
 ; CLR
