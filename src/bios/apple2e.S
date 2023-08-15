@@ -65,8 +65,8 @@ track_buffer = 0xd000
     .byte BIOS_SECTOR_COUNT ; boot loader loads this many sectors
 _start:
     cli
-    sta MEM_BANKING+0xb     ; R/W 0xe000 RAM; bank 1 in 0xd000
-    sta MEM_BANKING+0xb     ; yes, I'm sure
+    lda MEM_BANKING+0xb     ; R/W 0xe000 RAM; bank 1 in 0xd000
+    lda MEM_BANKING+0xb     ; yes, I'm sure
     sta SCREEN_80COLON
     sta SCREEN_80STOREON
     sta SCREEN_PAGE2OFF
