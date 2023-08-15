@@ -73,7 +73,7 @@ is available out of the box. Once installed, you should just be able to run the
 Makefile and you'll get bootable disk images for the Commodore 64 (with 1541
 drive) and BBC Micro (producing a 200kB SSSD DFS disk):
 
-    make LLVM=<your llvm-mos bin directory here>
+    make LLVM=<your llvm-mos bin directory here>/
 
 Building CP/M-65 is a bit of a performance because it's aggregating lots of
 other software, all of which need building in turn. You'll need: a C and C++
