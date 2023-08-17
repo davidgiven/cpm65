@@ -897,7 +897,7 @@ do_SIO:
     jsr SIOV
 #endif
 
-    lda #0
+    clc
     rts
 zendproc
 
