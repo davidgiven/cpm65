@@ -890,6 +890,14 @@ do_SIO:
     jsr SIOV
 #endif
 
+    lda DSTATS
+    cmp #1
+    beq status_ok
+
+    sec
+    rts
+
+status_ok:
     clc
     rts
 zendproc
