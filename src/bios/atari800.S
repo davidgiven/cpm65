@@ -8,9 +8,7 @@
 ; or
 ; 455 tracks x 18 sectors = 8190 sectors (CP/M FS uses 8176)
 
-; First three tracks are reserved for BIOS and BDOS so there is room to grow.
-; Use Atari OS bootloader to load BDOS instead of requiring DOS.SYS, which
-; is pretty big and useless afterwards as it has no ftell()/fseek()
+; The first track is reserved for the boot code.
 
 #include "zif.inc"
 #include "cpm65.inc"
@@ -188,12 +186,7 @@ init:
 
     ; IOCB0 E: is already open
 
-    ; ptr points to the last kilobyte of RAM before ROM (48+kB machines) or
-    ; a gap (<48kB machines). This is _always_ true for all models.
-    ; This block contains 32 empty bytes, 32 bytes of display list (DL),
-    ; after which the screen memory starts.
-
-    ; Adjust display list to have a scanline of space between text lines to
+    ; Create display list with a scanline of blank space between text lines to
     ; avoid ascenders and descenders touching eachother when we load a
     ; proper 7x8 font from user space.
 
