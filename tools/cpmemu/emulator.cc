@@ -11,6 +11,8 @@
 M6502* cpu;
 uint8_t ram[0x10000];
 bool breakpoints[0x10000];
+std::map<std::string, uint16_t> symbolsByName;
+std::map<uint16_t, std::string> symbolsByAddress;
 
 struct watchpoint
 {
@@ -25,14 +27,40 @@ static bool singlestepping = true;
 static bool bdosbreak = false;
 static bool bdoslog = false;
 
+bool print_addr(uint16_t addr)
+{
+    auto i = symbolsByAddress.upper_bound(addr);
+    if (i != symbolsByAddress.end())
+    {
+        i--;
+        printf("% 20s+%04x", i->second.c_str(), addr - i->first);
+        return true;
+    }
+    else
+    {
+        printf("% 25s", "");
+        return false;
+    }
+}
+
+uint16_t parse_addr(std::string name)
+{
+    auto i = symbolsByName.find(name);
+    if (i != symbolsByName.end())
+        return i->second;
+
+    return strtoul(name.c_str(), nullptr, 16);
+}
+
 void showregs(void)
 {
     char buffer[64];
     M6502_dump(cpu, buffer);
     printf("%s\n", buffer);
 
+    print_addr(cpu->registers->pc);
     int bytes = M6502_disassemble(cpu, cpu->registers->pc, buffer);
-    printf("%04x : ", cpu->registers->pc);
+    printf(" : %04x : ", cpu->registers->pc);
 	for (int i=0; i<3; i++)
 	{
 		if (i < bytes)
@@ -50,7 +78,7 @@ static void cmd_register(void)
 
     if (w1 && w2)
     {
-        uint16_t value = strtoul(w2, NULL, 16);
+        uint16_t value = parse_addr(w2);
 
         if (strcmp(w1, "sp") == 0)
             cpu->registers->s = value;
@@ -85,7 +113,7 @@ static void cmd_break(void)
     char* w1 = strtok(NULL, " ");
     if (w1)
     {
-        uint16_t breakpc = strtoul(w1, NULL, 16);
+        uint16_t breakpc = parse_addr(w1);
         breakpoints[breakpc] = true;
     }
     else
@@ -103,7 +131,7 @@ static void cmd_delete_breakpoint(void)
     char* w1 = strtok(NULL, " ");
     if (w1)
     {
-        uint16_t breakpc = strtoul(w1, NULL, 16);
+        uint16_t breakpc = parse_addr(w1);
         breakpoints[breakpc] = false;
     }
 }
@@ -113,7 +141,7 @@ static void cmd_watch(void)
     char* w1 = strtok(NULL, " ");
     if (w1)
     {
-        uint16_t watchaddr = strtoul(w1, NULL, 16);
+        uint16_t watchaddr = parse_addr(w1);
         for (int i = 0; i < sizeof(watchpoints) / sizeof(*watchpoints); i++)
         {
             struct watchpoint* w = &watchpoints[i];
@@ -143,7 +171,7 @@ static void cmd_delete_watchpoint(void)
     char* w1 = strtok(NULL, " ");
     if (w1)
     {
-        uint16_t address = strtoul(w1, NULL, 16);
+        uint16_t address = parse_addr(w1);
         for (int i = 0; i < sizeof(breakpoints) / sizeof(*breakpoints); i++)
         {
             struct watchpoint* w = &watchpoints[i];
@@ -167,8 +195,8 @@ static void cmd_memory(void)
 
     if (w1 && w2)
     {
-        uint16_t startaddr = strtoul(w1, NULL, 16);
-        uint16_t endaddr = startaddr + strtoul(w2, NULL, 16);
+        uint16_t startaddr = parse_addr(w1);
+        uint16_t endaddr = startaddr + parse_addr(w2);
         uint16_t startrounded = startaddr & ~0xf;
         uint16_t endrounded = (endaddr + 0xf) & ~0xf;
 
@@ -215,14 +243,15 @@ static void cmd_unassemble(void)
 
     if (w1 && w2)
     {
-        uint16_t addr = strtoul(w1, NULL, 16);
-        uint16_t endaddr = addr + strtoul(w2, NULL, 16);
+        uint16_t addr = parse_addr(w1);
+        uint16_t endaddr = addr + parse_addr(w2);
 
         while (addr < endaddr)
         {
+            print_addr(addr);
             char buffer[64];
             int len = M6502_disassemble(cpu, addr, buffer);
-            printf("%04x : ", addr);
+            printf(" : %04x : ", addr);
 			for (int i=0; i<3; i++)
 			{
 				if (i < len)

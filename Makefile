@@ -88,7 +88,7 @@ $(OBJDIR)/%: $(OBJDIR)/tools/%.o
 
 bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline
+	$(CXX) $(CFLAGS) -o $@ $(CPMEMU_OBJS) -lreadline -lelf
 
 bin/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)

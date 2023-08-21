@@ -2,6 +2,8 @@
 #define GLOBALS_H
 
 #include <stdbool.h>
+#include <string>
+#include <map>
 extern "C" {
 #include "third_party/lib6502/lib6502.h"
 }
@@ -16,6 +18,8 @@ extern "C" {
 extern M6502* cpu;
 extern uint8_t ram[0x10000];
 extern uint16_t himem;
+extern std::map<std::string, uint16_t> symbolsByName;
+extern std::map<uint16_t, std::string> symbolsByAddress;
 
 extern void emulator_init(void);
 extern void emulator_run(void);

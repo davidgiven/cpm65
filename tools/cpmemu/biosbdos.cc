@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <poll.h>
 #include <errno.h>
+#include <libelf.h>
+#include <gelf.h>
 #include "globals.h"
 
 static uint16_t dma;
@@ -135,43 +137,117 @@ static void relocate(uint16_t relotable)
 
 static void makefcb(uint16_t address, const char* word)
 {
-		if (!word)
-			word = "";
+    if (!word)
+        word = "";
 
-        struct fcb* fcb = fcb_at(address);
-        memset(fcb, 0, sizeof(struct fcb));
-        memset(fcb->filename.bytes, ' ', 11);
+    struct fcb* fcb = fcb_at(address);
+    memset(fcb, 0, sizeof(struct fcb));
+    memset(fcb->filename.bytes, ' ', 11);
 
-        if (word[0] && (word[1] == ':'))
-        {
-            fcb->filename.drive = toupper(word[0]) - '@';
-            word += 2;
-        }
+    if (word[0] && (word[1] == ':'))
+    {
+        fcb->filename.drive = toupper(word[0]) - '@';
+        word += 2;
+    }
 
-        int offset = 0;
-        while (offset < 8)
+    int offset = 0;
+    while (offset < 8)
+    {
+        uint8_t c = toupper(*word++);
+        if (!c)
+            break;
+        if (c == '.')
+            break;
+        fcb->filename.bytes[offset++] = c;
+    }
+
+    if (*word == '.')
+        word++;
+    if (offset && (word[-1] == '.'))
+    {
+        offset = 8;
+        while (offset < 11)
         {
             uint8_t c = toupper(*word++);
             if (!c)
                 break;
-            if (c == '.')
-                break;
             fcb->filename.bytes[offset++] = c;
         }
+    }
+}
 
-        if (*word == '.')
-            word++;
-        if (offset && (word[-1] == '.'))
+static void load_binary(std::string filename)
+{
+    /* Load the binary. */
+
+    int fd = open(filename.c_str(), O_RDONLY);
+    if (fd == -1)
+        fatal("couldn't open program: %s", strerror(errno));
+    read(fd, &ram[TPA_BASE], himem - TPA_BASE);
+    close(fd);
+
+    /* If an ELF file exists, fetch symbol information from it. */
+
+    std::string elffilename = filename + ".elf";
+    if (access(elffilename.c_str(), R_OK) == 0)
+    {
+        /* ELF file exists; load from this. */
+
+        elf_version(EV_NONE);
+        if (elf_version(EV_CURRENT) == EV_NONE)
+            fatal("bad libelf versrion");
+
+        int fd = open(elffilename.c_str(), O_RDONLY);
+        if (fd == -1)
+            fatal("couldn't open program: %s", strerror(errno));
+        Elf* elf = elf_begin(fd, ELF_C_READ, nullptr);
+        if ((elf_kind(elf) != ELF_K_ELF))
+            fatal("not an ELF file");
+
+        GElf_Phdr phdr;
+        if ((gelf_getphdr(elf, 0, &phdr) != &phdr) || (phdr.p_type != PT_LOAD))
+            fatal("could not fetch main data block from ELF file: %s",
+                elf_errmsg(-1));
+
+        uint16_t loadAddress = phdr.p_vaddr;
+
+        Elf_Scn* scn = nullptr;
+        GElf_Shdr shdr;
+        for (;;)
         {
-            offset = 8;
-            while (offset < 11)
+            scn = elf_nextscn(elf, scn);
+            if (!scn)
+                break;
+
+            gelf_getshdr(scn, &shdr);
+            if (shdr.sh_type == SHT_SYMTAB)
             {
-                uint8_t c = toupper(*word++);
-                if (!c)
-                    break;
-                fcb->filename.bytes[offset++] = c;
+                Elf_Data* data = elf_getdata(scn, NULL);
+                int count = shdr.sh_size / shdr.sh_entsize;
+
+                /* print the symbol names */
+                for (int i = 0; i < count; ++i)
+                {
+                    GElf_Sym sym;
+                    gelf_getsym(data, i, &sym);
+
+                    std::string name = elf_strptr(elf, shdr.sh_link, sym.st_name);
+                    uint16_t address = sym.st_value;
+                    if (address >= loadAddress)
+                    {
+                        address -= loadAddress;
+                        address += TPA_BASE;
+                    }
+
+                    symbolsByName[name] = address;
+                    symbolsByAddress[address] = name;
+                }
             }
         }
+
+        elf_end(elf);
+        close(fd);
+    }
 }
 
 void bios_warmboot(void)
@@ -186,27 +262,23 @@ void bios_warmboot(void)
         terminate_next_time = true;
 
         /* Push the return address onto the stack. */
-        ram[0x01fe] = (EXIT_ADDRESS-1) & 0xff;
-        ram[0x01ff] = (EXIT_ADDRESS-1) >> 8;
+        ram[0x01fe] = (EXIT_ADDRESS - 1) & 0xff;
+        ram[0x01ff] = (EXIT_ADDRESS - 1) >> 8;
         cpu->registers->s = 0xfd;
 
-        int fd = open(user_command_line[0], O_RDONLY);
-        if (fd == -1)
-            fatal("couldn't open program: %s", strerror(errno));
-        read(fd, &ram[TPA_BASE], himem - TPA_BASE);
-        close(fd);
+        load_binary(user_command_line[0]);
 
         uint16_t relotable =
             (ram[TPA_BASE + 2] | (ram[TPA_BASE + 3] << 8)) + TPA_BASE;
         relocate(relotable);
 
-		/* Parse the first word of the command line into the primary FCB. */
+        /* Parse the first word of the command line into the primary FCB. */
 
-		makefcb(relotable, user_command_line[1]);
-		if (user_command_line[1])
-			makefcb(relotable+16, user_command_line[2]);
+        makefcb(relotable, user_command_line[1]);
+        if (user_command_line[1])
+            makefcb(relotable + 16, user_command_line[2]);
 
-		/* Generate the command line. */
+        /* Generate the command line. */
 
         dma = relotable + 37; /* leave space for the FCBs */
 
@@ -518,15 +590,14 @@ static const char* fill(uint8_t* dest, const char* src, int len)
         else
             src++;
         *dest++ = c;
-    }
-    while (--len);
+    } while (--len);
     return src;
 }
 
 void parse_filename(uint8_t fcb[16], const char* filename)
 {
     memset(fcb, 0, 16);
-    memset(fcb+1, ' ', 11);
+    memset(fcb + 1, ' ', 11);
 
     {
         const char* colon = strchr(filename, ':');
@@ -546,28 +617,28 @@ void parse_filename(uint8_t fcb[16], const char* filename)
 
     /* Read filename part. */
 
-    filename = fill(fcb+1, filename, 8);
+    filename = fill(fcb + 1, filename, 8);
     filename = strchr(filename, '.');
     if (filename)
-        fill(fcb+9, filename+1, 3);
+        fill(fcb + 9, filename + 1, 3);
 
-	set_result(get_xa(), filename);
+    set_result(get_xa(), filename);
     cpu->registers->p &= ~0x01;
 }
 
 static void bdos_parsefilename(void)
 {
-	uint8_t* fcb = &ram[dma];
-    const char* filename = (const char*) &ram[get_xa()];
+    uint8_t* fcb = &ram[dma];
+    const char* filename = (const char*)&ram[get_xa()];
 
-	parse_filename(fcb, filename);
+    parse_filename(fcb, filename);
 }
 
 void bdos_entry(uint8_t bdos_call, bool log)
 {
     if (log)
     {
-        if (bdos_call < sizeof(bdos_names)/sizeof(*bdos_names))
+        if (bdos_call < sizeof(bdos_names) / sizeof(*bdos_names))
             fprintf(stderr, "%s", bdos_names[bdos_call]);
         else
             fprintf(stderr, "BDOS_%d", bdos_call);
@@ -589,11 +660,13 @@ void bdos_entry(uint8_t bdos_call, bool log)
             case 40:
             {
                 struct fcb* fcb = find_fcb();
-                fprintf(stderr, " `FCB={'%c:%.11s' CR=%02x R=%02x%02x}",
+                fprintf(stderr,
+                    " `FCB={'%c:%.11s' CR=%02x R=%02x%02x}",
                     fcb->filename.drive + '@',
                     fcb->filename.bytes,
                     fcb->currentrecord,
-                    fcb->r[1], fcb->r[0]);
+                    fcb->r[1],
+                    fcb->r[0]);
                 break;
             }
         }
@@ -639,7 +712,7 @@ void bdos_entry(uint8_t bdos_call, bool log)
 		case 42: set_result((TPA_BASE>>8) | (himem&0xff00), true); break;
 		case 43: bdos_parsefilename(); break;
             // clang-format on
-    
+
         default:
             showregs();
             fatal("unimplemented bdos entry %d", bdos_call);
