@@ -2,7 +2,9 @@
 #define GLOBALS_H
 
 #include <stdbool.h>
+extern "C" {
 #include "third_party/lib6502/lib6502.h"
+}
 
 #define TPA_BASE 0x0200
 #define ZP_BASE 0x00

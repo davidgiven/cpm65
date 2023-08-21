@@ -159,8 +159,8 @@ static void cmd_delete_watchpoint(void)
 
 static void cmd_memory(void)
 {
-    char* w1 = strtok(NULL, " ");
-    char* w2 = strtok(NULL, " ");
+    const char* w1 = strtok(NULL, " ");
+    const char* w2 = strtok(NULL, " ");
 
     if (!w2)
         w2 = "100";
@@ -207,8 +207,8 @@ static void cmd_memory(void)
 
 static void cmd_unassemble(void)
 {
-    char* w1 = strtok(NULL, " ");
-    char* w2 = strtok(NULL, " ");
+    const char* w1 = strtok(NULL, " ");
+    const char* w2 = strtok(NULL, " ");
 
     if (!w2)
         w2 = "10";
@@ -349,7 +349,8 @@ void emulator_init(void)
     cpu = M6502_new(NULL, ram, NULL);
     singlestepping = flag_enter_debugger;
 
-    struct sigaction action = {.sa_handler = sigusr1_cb};
+    struct sigaction action;
+    action.sa_handler = sigusr1_cb;
     sigaction(SIGUSR1, &action, NULL);
 }
 

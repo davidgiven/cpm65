@@ -558,7 +558,7 @@ void parse_filename(uint8_t fcb[16], const char* filename)
 static void bdos_parsefilename(void)
 {
 	uint8_t* fcb = &ram[dma];
-    const char* filename = &ram[get_xa()];
+    const char* filename = (const char*) &ram[get_xa()];
 
 	parse_filename(fcb, filename);
 }
