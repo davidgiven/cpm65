@@ -36,6 +36,7 @@ MINIMAL_APPS = \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
+	$(OBJDIR)/comal.com \
 	apps/dump.asm \
 	apps/ls.asm \
 
