@@ -522,6 +522,7 @@ zproc screen_putstring
 zendproc
 
 zproc screen_scrollup
+    jsr hide_cursor
     ldx #0              ; current line
     zrepeat
         txa
@@ -550,11 +551,13 @@ zproc screen_scrollup
         sta (ptr), y
         dey
     zuntil_mi
+    jsr show_cursor
     rts
 zendproc
 
 zproc screen_scrolldown
-    ldx #39             ; current line
+    jsr hide_cursor
+    ldx #SCREEN_HEIGHT-1             ; current line
     zrepeat
         txa
         jsr calculate_line_address
@@ -583,6 +586,7 @@ zproc screen_scrolldown
         sta (ptr), y
         dey
     zuntil_mi
+    jsr show_cursor
     rts
 zendproc
 
