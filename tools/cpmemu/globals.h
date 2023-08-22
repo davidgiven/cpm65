@@ -4,7 +4,8 @@
 #include <stdbool.h>
 #include <string>
 #include <map>
-extern "C" {
+extern "C"
+{
 #include "third_party/lib6502/lib6502.h"
 }
 
@@ -39,10 +40,9 @@ extern void bios_entry(uint8_t bios_call);
 
 typedef struct
 {
-	uint8_t drive;
-	char bytes[11];
-}
-cpm_filename_t;
+    uint8_t drive;
+    char bytes[11];
+} cpm_filename_t;
 
 extern bool parse_fcb(uint8_t fcb[16], const char* filename);
 
@@ -66,4 +66,3 @@ extern bool flag_enter_debugger;
 extern char* const* user_command_line;
 
 #endif
-

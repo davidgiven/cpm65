@@ -61,14 +61,14 @@ void showregs(void)
     print_addr(cpu->registers->pc);
     int bytes = M6502_disassemble(cpu, cpu->registers->pc, buffer);
     printf(" : %04x : ", cpu->registers->pc);
-	for (int i=0; i<3; i++)
-	{
-		if (i < bytes)
-			printf("%02x ", ram[cpu->registers->pc + i]);
-		else
-			printf("   ");
-	}
-	printf(": %s\n", buffer);
+    for (int i = 0; i < 3; i++)
+    {
+        if (i < bytes)
+            printf("%02x ", ram[cpu->registers->pc + i]);
+        else
+            printf("   ");
+    }
+    printf(": %s\n", buffer);
 }
 
 static void cmd_register(void)
@@ -252,13 +252,13 @@ static void cmd_unassemble(void)
             char buffer[64];
             int len = M6502_disassemble(cpu, addr, buffer);
             printf(" : %04x : ", addr);
-			for (int i=0; i<3; i++)
-			{
-				if (i < len)
-					printf("%02x ", ram[addr + i]);
-				else
-					printf("   ");
-			}
+            for (int i = 0; i < 3; i++)
+            {
+                if (i < len)
+                    printf("%02x ", ram[addr + i]);
+                else
+                    printf("   ");
+            }
             printf(": %s\n", buffer);
 
             addr += len;
@@ -373,7 +373,7 @@ static void sigusr1_cb(int number)
 
 void emulator_init(void)
 {
-	memset(ram, 0xee, sizeof(ram));
+    memset(ram, 0xee, sizeof(ram));
 
     cpu = M6502_new(NULL, ram, NULL);
     singlestepping = flag_enter_debugger;

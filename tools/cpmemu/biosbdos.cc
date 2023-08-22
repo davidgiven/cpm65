@@ -231,7 +231,8 @@ static void load_binary(std::string filename)
                     GElf_Sym sym;
                     gelf_getsym(data, i, &sym);
 
-                    std::string name = elf_strptr(elf, shdr.sh_link, sym.st_name);
+                    std::string name =
+                        elf_strptr(elf, shdr.sh_link, sym.st_name);
                     uint16_t address = sym.st_value;
                     if (address >= loadAddress)
                     {
