@@ -38,6 +38,11 @@ p1:        .word 0
 bufferpos: .byte 0 ; current beginning of token in input buffer
 bufferend: .byte 0 ; current end of token in input buffer
 
+parsecmd:  .word 0 ; points into parser bytecode
+parsefailcmd:       .word 0 ; where we fail parsing to
+parsefailbufferpos: .byte 0 ; buffer position to rewind to
+parsefailstackptr:  .byte 0 ; stack pointer to rewind to
+
 OBJECT_TABLE_SIZE = 256
 
 zproc main
@@ -45,21 +50,7 @@ zproc main
     
     lda #0
     sta bufferpos
-    lda #4
-    sta bufferend
-    jsr get_atom
-
-    lda #0
-    sta bufferpos
-    lda #4
-    sta bufferend
-    jsr get_atom
-
-    lda #0
-    sta bufferpos
-    lda #5
-    sta bufferend
-    jsr get_atom
+    jsr parse_line
 
     rts
 zendproc
@@ -98,41 +89,10 @@ zproc clear
     lda stackbase+1
     sta stackptr+1
 
-    ; Clear the object table.
-
-    lda #1          ; counter
-    sta p1+0
-    lda #0
-    sta p1+1
-
-    zrepeat
-        lda p1+0    ; copy counter to object ID
-        sta p0+0
-        lda p1+1
-        sta p0+1
-
-        jsr find_object_slot ; get pointer to slot
-
-        lda #0          ; stores 0x0000 into slot
-        tay
-        sta (p0), y
-        iny
-        sta (p0), y
-
-        inc p1+0        ; increment counter
-        zif_eq
-            inc p1+1
-        zendif
-
-        lda p1+0
-        cmp #<OBJECT_TABLE_SIZE
-        zcontinueif_ne
-        lda p1+1
-        cmp #>OBJECT_TABLE_SIZE
-    zuntil_eq
-        
     rts
 zendproc
+
+; --- Objects and atoms -----------------------------------------------------
 
 ; Given an object ID in p0, returns in p0 the address in the object table of
 ; the slot.
@@ -376,14 +336,337 @@ zproc get_atom
     rts
 zendproc
 
+; --- Parser ----------------------------------------------------------------
+
+zproc parse_line
+    lda #<statement_rule
+    sta parsecmd+0
+    lda #>statement_rule
+    sta parsecmd+1
+
+    lda #<pop_succeed_ptr
+    pha
+    lda #>pop_succeed_ptr
+    pha
+zendproc
+    ; fall through
+zproc parse_state_machine
+    ldy #0
+    lda (parsecmd), y
+    sta p0+0
+    iny
+    lda (parsecmd), y
+    sta p0+1
+    jmp (p0)
+zendproc
+
+; Adds A to parsecmd.
+zproc parse_advance
+    clc
+    adc parsecmd+0
+    sta parsecmd+0
+    zif_cs
+        inc parsecmd+1
+    zendif
+    rts
+zendproc
+
+pop_succeed_ptr:
+    .word pop_succeed
+
+zproc pop_succeed
+    jmp pop_succeed
+zendproc
+
+zproc pop_panic
+    jmp pop_panic
+zendproc
+
+zproc pop_try
+    ; Push old backtracking state.
+
+    lda parsefailcmd+0
+    pha
+    lda parsefailcmd+1
+    pha
+    lda parsefailbufferpos
+    pha
+    lda parsefailstackptr
+    pha
+
+    ; Push the marker indicating that this is a backtracking state.
+
+    lda #0
+    pha
+    pha
+
+    ; Read parameter into p0.
+
+    ldy #2
+    lda (parsecmd), y
+    sta p0+0
+    iny
+    lda (parsecmd), y
+    sta p0+1
+
+    ; Advance.
+
+    lda #4
+    jsr parse_advance
+
+    ; Update backtracking state.
+
+    lda parsecmd+0
+    sta parsefailcmd+0
+    lda parsecmd+1
+    sta parsefailcmd+1
+    lda bufferpos
+    sta parsefailbufferpos
+    tsx
+    stx parsefailstackptr
+
+    ; Switch to rule being tried.
+
+    lda p0+0
+    sta parsecmd+0
+    lda p0+1
+    sta parsecmd+1
+
+    jmp parse_state_machine
+zendproc
+
+; Revert to a backtracking state.
+
+zproc pop_fail
+    ; Revert the state.
+
+    ldx parsefailstackptr
+    txs
+    lda parsefailbufferpos
+    sta bufferpos
+    lda parsefailcmd+0
+    sta parsecmd+0
+    lda parsefailcmd+1
+    sta parsecmd+1
+
+    ; Pop the old state off the stack.
+
+    pla             ; discard marker
+    pla
+
+    pla
+    sta parsefailstackptr
+    pla
+    sta parsefailbufferpos
+    pla
+    sta parsefailcmd+1
+    pla
+    sta parsefailcmd+0
+
+    jmp parse_state_machine
+zendproc
+
+zproc pop_jsr
+    ; Read parameter into p0.
+
+    ldy #2
+    lda (parsecmd), y
+    sta p0+0
+    iny
+    lda (parsecmd), y
+    sta p0+1
+
+    ; Advance.
+
+    lda #4
+    jsr parse_advance
+
+    ; Push return point.
+
+    lda parsecmd+0
+    pha
+    lda parsecmd+1
+    pha
+
+    ; Jump to the new rule.
+
+    lda p0+0
+    sta parsecmd+0
+    lda p0+1
+    sta parsecmd+1
+
+    jmp parse_state_machine
+zendproc
+
+zproc pop_return
+    ; Pop the return point.
+
+    pla
+    sta parsecmd+1
+    pla
+    sta parsecmd+0
+
+    ; Was this a backtracking marker?
+
+    lda parsecmd+0
+    ora parsecmd+1
+    zif_eq
+        ; It was. Discard the backtracking state and return again.
+
+        pla
+        pla
+        pla
+        pla
+        jmp pop_return
+    zendif
+
+    jmp parse_state_machine
+zendproc
+
+zproc parser_skip_whitespace
+    zloop
+        ldx bufferpos
+        lda input_buffer, x
+        cmp #' '
+        zbreakif_ne
+
+        inc bufferpos
+    zendloop
+    rts
+zendproc
+
+zproc pop_token
+    jsr parser_skip_whitespace
+
+    lda bufferpos
+    sta bufferend
+    zloop
+        ldx bufferend
+        lda input_buffer, x
+        cmp #'A'-1
+        zbreakif_cc
+        cmp #'Z'
+        zbreakif_cs
+
+        inc bufferend
+    zendloop
+
+    lda bufferpos
+    cmp bufferend
+    beq fail
+
+    jsr get_atom
+    ; returns pointer to token data in p0
+
+    ldy #2
+    lda p0+0
+    cmp (parsecmd), y
+    bne fail
+    iny
+    lda p0+1
+    cmp (parsecmd), y
+    bne fail
+
+    lda #4
+    jsr parse_advance
+
+    jmp parse_state_machine
+fail:
+    jmp pop_fail
+zendproc
+
+zproc pop_word
+    jmp pop_fail
+    jmp parse_state_machine
+zendproc
+
+zproc pop_number
+    jmp pop_fail
+    jmp parse_state_machine
+zendproc
+
+.macro P_TRY rule
+    .word pop_try
+    .word \rule
+.endm
+
+.macro P_JSR rule
+    .word pop_jsr
+    .word \rule
+.endm
+
+.macro P_PANIC
+    .word pop_panic
+.endm
+
+.macro P_RETURN
+    .word pop_return
+.endm
+
+.macro P_TOKEN token
+    .word pop_token
+    .word \token
+.endm
+
+.macro P_WORD
+    .word pop_word
+.endm
+
+.macro P_NUMBER
+    .word pop_number
+.endm
+
+statement_rule:
+    P_TRY assignment_rule
+    P_TRY print_rule
+    P_PANIC
+
+assignment_rule:
+    P_JSR lvalue_rule
+    P_TOKEN assignment_token
+    P_JSR expr_rule
+    P_RETURN
+
+print_rule:
+    P_TOKEN print_token
+    P_JSR optional_expr_rule
+    P_RETURN
+
+lvalue_rule:
+    P_WORD
+    P_RETURN
+
+optional_expr_rule:
+    P_TRY expr_rule
+    P_RETURN
+
+expr_rule:
+    P_NUMBER
+    P_RETURN
+
 input_buffer:
-    .ascii "WORDX"
+    .ascii "PRINT"
     .byte 0
 
-.bss
+.data
 
+.set token_count, 0
+.macro TOKEN name, values:vararg
+.data 1
+    .word \name
+.data 0
+\name:
+    .byte OBJECT_ATOM
+    .byte \values
+.set token_count, token_count + 1
+.endm
+    
+.data 1
 object_table:
-    .ds OBJECT_TABLE_SIZE * 2
+    TOKEN assignment_token, ':', '='|0x80
+    TOKEN print_token, 'P', 'R', 'I', 'N', 'T'|0x80
+.bss
+    .ds (OBJECT_TABLE_SIZE - token_count) * 2
 
 ; This must be last --- it's the beginning of the program workspace.
 
