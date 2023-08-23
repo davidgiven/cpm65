@@ -174,6 +174,48 @@ zproc deref_object
     rts
 zendproc
 
+; Start iterating through the object table. Chains on to find_next_object.
+
+zproc find_first_object
+    lda #0
+    sta p1+0
+    sta p1+1
+zendproc
+    ; fall through
+    ; Returns the next object id in p1, and the pointer to the slot in p0.
+    ; Returns C if there are no more objects.
+    ; Returns Z if the current slot is empty.
+zproc find_next_object
+    inc p1+0        ; increment counter
+    zif_eq
+        inc p1+1
+    zendif
+
+    lda p1+0
+    cmp #<OBJECT_TABLE_SIZE
+    bne not_eof
+    lda p1+1
+    cmp #>OBJECT_TABLE_SIZE
+    bne not_eof
+    sec             ; no more objects
+    rts
+
+not_eof:
+    lda p1+0
+    sta p0+0
+    lda p1+1
+    sta p0+1
+    jsr find_object_slot
+
+    ldy #0          ; check if value in slot is 0x0000
+    lda (p0), y
+    iny
+    ora (p0), y
+    rts
+zendproc
+
+; p1 is the object ID counter. p0 is
+; a pointer to the slot (which may contain zero
 ; Allocates a block of size p1 on the heap. The object ID is returned in p1 and
 ; a pointer to the new object in p0. The first byte of the block must be set
 ; to a valid object type.
@@ -210,24 +252,8 @@ zproc heap_alloc
 
     ; Find a free slot in the object table.
 
-    lda #1          ; counter
-    sta p1+0
-    lda #0
-    sta p1+1
-
+    jsr find_first_object
     zrepeat
-        lda p1+0    ; copy counter to object ID
-        sta p0+0
-        lda p1+1
-        sta p0+1
-
-        jsr find_object_slot ; get pointer to slot
-
-        ldy #0          ; check if value in slot is 0x0000
-        lda (p0), y
-        iny
-        ora (p0), y
-        
         zif_eq
             ; Found a free slot.
 
@@ -249,17 +275,8 @@ zproc heap_alloc
             rts
         zendif
 
-        inc p1+0        ; increment counter
-        zif_eq
-            inc p1+1
-        zendif
-
-        lda p1+0
-        cmp #<OBJECT_TABLE_SIZE
-        zcontinueif_ne
-        lda p1+1
-        cmp #>OBJECT_TABLE_SIZE
-    zuntil_eq
+        jsr find_next_object
+    zuntil_cs
         
     ; TODO: object table is full, error out
     rts
@@ -271,24 +288,8 @@ zendproc
 zproc get_atom
     ; Search the object table for atoms.
 
-    lda #1          ; counter
-    sta p1+0
-    lda #0
-    sta p1+1
-
+    jsr find_first_object
     zrepeat
-        lda p1+0    ; copy counter to object ID
-        sta p0+0
-        lda p1+1
-        sta p0+1
-
-        jsr find_object_slot ; get pointer to slot
-
-        ldy #0          ; check if value in slot is 0x0000
-        lda (p0), y
-        iny
-        ora (p0), y
-        
         zif_ne
             ; Dereference it.
 
@@ -332,17 +333,8 @@ zproc get_atom
             zendif
         zendif
 
-        inc p1+0        ; increment counter
-        zif_eq
-            inc p1+1
-        zendif
-
-        lda p1+0
-        cmp #<OBJECT_TABLE_SIZE
-        zcontinueif_ne
-        lda p1+1
-        cmp #>OBJECT_TABLE_SIZE
-    zuntil_eq
+        jsr find_next_object
+    zuntil_cs
 
     ; Atom not found, so allocate a new one.
 
