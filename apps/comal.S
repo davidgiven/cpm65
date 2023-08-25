@@ -25,9 +25,10 @@ ATOM_TYPE       = 0
 ATOM_DATA       = 1
 
 TOKEN_VARREF    = 1 ; +2 bytes for the ID
-TOKEN_PRINT     = 2
 TOKEN_MUL       = 0x0f
 TOKEN_ADD       = 0x10
+TOKEN_PRINT     = 0xfd
+TOKEN_PRINTNL   = 0xfe
 TOKEN_ASSIGN    = 0xff
 
 ZEROPAGE
@@ -887,10 +888,44 @@ assignment_rule:
 
 print_rule:
     P_TOKEN print_token
-    P_SHUNT TOKEN_PRINT
-    P_JSR optional_expr_rule
     P_COMMIT
+    P_TRY print_no_terminator_rule
+    P_TRY print_first_expr_rule
+    P_RETURN
+
+print_first_expr_rule:
+    P_SHUNT TOKEN_PRINT
+    P_JSR expr_rule
+    P_TRY print_expr_list_rule
+    P_RETURN
+
+print_expr_list_rule:
+    P_TRY print_no_terminator_rule
+    P_TRY print_terminator_rule
+    P_JSR print_separator_rule
+    P_COMMIT
+    P_SHUNT TOKEN_PRINT
+    P_JSR expr_rule
+    P_JMP print_expr_list_rule
+
+print_terminator_rule:
+    P_JSR print_separator_rule
     P_EOL
+    P_RETURN
+
+comma_rule:
+    P_CHAR ','
+    P_RETURN
+
+print_separator_rule:
+    P_TRY comma_rule
+semicolon_rule:
+    P_CHAR ';'
+    P_RETURN
+
+print_no_terminator_rule:
+    P_EOL
+    P_SHUNT TOKEN_PRINTNL
     P_RETURN
 
 lvalue_rule:
@@ -935,7 +970,7 @@ varref_rule:
     P_RETURN
 
 input_buffer:
-    .ascii "PRINT A"
+    .ascii "PRINT A,B+C;"
     .byte 0
 
 .data
