@@ -25,6 +25,7 @@ ATOM_TYPE       = 0
 ATOM_DATA       = 1
 
 TOKEN_VARREF    = 1 ; +2 bytes for the ID
+TOKEN_INTEGER   = 2 ; +4 bytes for the number
 TOKEN_MUL       = 0x0f
 TOKEN_ADD       = 0x10
 TOKEN_PRINT     = 0xfd
@@ -41,6 +42,9 @@ heapptr:   .word 0
 
 p0:        .word 0
 p1:        .word 0
+i0:        .word 0, 0
+i1:        .word 0, 0
+i2:        .word 0, 0
 
 bufferpos: .byte 0 ; current beginning of token in input buffer
 bufferend: .byte 0 ; current end of token in input buffer
@@ -138,6 +142,42 @@ zproc print_nl
 
     lda #0x0a
     jmp bdos_CONOUT
+zendproc
+
+; --- Maths -----------------------------------------------------------------
+
+; Computes i1i0 := i0 * i2.
+
+zproc mul4
+    lda #0              ; clear high part of result
+    sta i1+0
+    sta i1+1
+    sta i1+2
+    sta i1+3
+
+    clc
+    ldy #$21            ; bit counter
+
+    zrepeat
+        ldx #8              ; shift right result and lhs
+        zrepeat
+            ror i0-1, x
+            dex
+        zuntil_eq
+        zif_cs
+            ldx #-4 & 0xff      ; add rhs to low half of result
+            clc
+            zrepeat
+                lda i1+4, x
+                adc i2+4, x
+                sta i1+4, x
+                inx
+            zuntil_eq
+        zendif
+
+        dey
+    zuntil_eq
+    rts
 zendproc
 
 ; --- Objects and atoms -----------------------------------------------------
@@ -812,7 +852,76 @@ zproc pop_eol
 zendproc
 
 zproc pop_number
+    jsr parser_skip_whitespace
+
+    ldx #0
+    lda #10
+    sta i2+0
+    stx i2+1
+    stx i2+2
+    stx i2+3
+
+    stx i0+0
+    stx i0+1
+    stx i0+2
+    stx i0+3
+
+    lda bufferpos
+    sta bufferend
+    zloop
+        ldx bufferend
+        lda input_buffer, x
+        cmp #'0'-1
+        zbreakif_cc
+        cmp #'9'
+        zbreakif_cs
+
+        pha
+        jsr mul4
+        pla
+
+        sec
+        sbc #'0'
+        clc
+        adc i0+0
+        sta i0+0
+        zif_cs
+            inc i0+1
+            zif_eq
+                inc i0+2
+                zif_eq
+                    inc i0+3
+                zendif
+            zendif
+        zendif
+
+        inc bufferend
+    zendloop
+
+    lda bufferpos
+    cmp bufferend
+    beq 1f
+
+    lda #TOKEN_INTEGER
+    jsr queue_bytecode
+    lda i0+0
+    jsr queue_bytecode
+    lda i0+1
+    jsr queue_bytecode
+    lda i0+2
+    jsr queue_bytecode
+    lda i0+3
+    jsr queue_bytecode
+
+    lda bufferend
+    sta bufferpos
+
+    lda #2
+    jsr parse_advance
+    jmp parse_state_machine
+1:
     jmp pop_fail
+    jmp pop_panic
     jmp parse_state_machine
 zendproc
 
@@ -963,14 +1072,19 @@ multiplication_rule:
 
 leaf_rule:
     P_TRY varref_rule
+    P_TRY number_rule
     P_FAIL
 
 varref_rule:
     P_WORD
     P_RETURN
 
+number_rule:
+    P_NUMBER
+    P_RETURN
+
 input_buffer:
-    .ascii "PRINT A,B+C;"
+    .ascii "PRINT 1234 + 5678"
     .byte 0
 
 .data
