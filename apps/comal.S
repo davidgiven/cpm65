@@ -26,8 +26,9 @@ ATOM_DATA       = 1
 
 TOKEN_VARREF    = 1 ; +2 bytes for the ID
 TOKEN_PRINT     = 2
-TOKEN_ASSIGN    = 3
+TOKEN_MUL       = 0x0f
 TOKEN_ADD       = 0x10
+TOKEN_ASSIGN    = 0xff
 
 ZEROPAGE
 
@@ -448,7 +449,7 @@ zproc shunt_operator
         zrepeat
             ldx opstackptr
             cmp operator_stack, x
-            zbreakif_cs
+            zbreakif_cc
 
             pha
             lda operator_stack, x
@@ -549,6 +550,40 @@ zproc pop_try
 
     jmp parse_state_machine
 zendproc
+
+; We can't backtrack any more --- if we get a parse failure, panic.
+
+zproc pop_commit
+    lda parsefailstackptr
+    pha
+
+    lda #<pop_panic_ptr
+    pha
+    lda #>pop_panic_ptr
+    pha
+    lda bufferpos
+    pha
+    lda bytecodeptr
+    pha
+    lda opstackptr
+    pha
+
+    tsx
+    stx parsefailstackptr
+
+    ; Push the marker indicating that this is a backtracking state.
+
+    lda #0
+    pha
+    pha
+
+    lda #2
+    jsr parse_advance
+    jmp parse_state_machine
+zendproc
+
+pop_panic_ptr:
+    .word pop_panic
 
 ; Revert to a backtracking state.
 
@@ -761,6 +796,20 @@ zproc pop_char
     jmp parse_state_machine
 zendproc
 
+zproc pop_eol
+    jsr parser_skip_whitespace
+
+    ldx bufferpos
+    lda input_buffer, x
+    zif_ne
+        jmp pop_fail
+    zendif
+
+    lda #2
+    jsr parse_advance
+    jmp parse_state_machine
+zendproc
+
 zproc pop_number
     jmp pop_fail
     jmp parse_state_machine
@@ -793,6 +842,10 @@ zendproc
     .word pop_return
 .endm
 
+.macro P_COMMIT
+    .word pop_commit
+.endm
+
 .macro P_TOKEN token
     .word pop_token
     .word \token
@@ -816,6 +869,10 @@ zendproc
     .word pop_number
 .endm
 
+.macro P_EOL
+    .word pop_eol
+.endm
+
 statement_rule:
     P_TRY assignment_rule
     P_TRY print_rule
@@ -832,6 +889,8 @@ print_rule:
     P_TOKEN print_token
     P_SHUNT TOKEN_PRINT
     P_JSR optional_expr_rule
+    P_COMMIT
+    P_EOL
     P_RETURN
 
 lvalue_rule:
@@ -842,16 +901,30 @@ optional_expr_rule:
     P_TRY expr_rule
     P_RETURN
 
+compulsory_expr_rule:
+    P_TRY expr_rule
+    P_PANIC
+
 expr_rule:
-    P_TRY addition_rule
+    P_TRY binop_rule
     P_TRY leaf_rule
     P_FAIL
 
-addition_rule:
+binop_rule:
     P_JSR leaf_rule
+    P_TRY addition_rule
+    P_TRY multiplication_rule
+    P_FAIL
+
+addition_rule:
     P_CHAR '+'
     P_SHUNT TOKEN_ADD
-    P_JMP expr_rule
+    P_JMP compulsory_expr_rule
+
+multiplication_rule:
+    P_CHAR '*'
+    P_SHUNT TOKEN_MUL
+    P_JMP compulsory_expr_rule
 
 leaf_rule:
     P_TRY varref_rule
@@ -862,7 +935,7 @@ varref_rule:
     P_RETURN
 
 input_buffer:
-    .ascii "A = A+B"
+    .ascii "PRINT A"
     .byte 0
 
 .data
