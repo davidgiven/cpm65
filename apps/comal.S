@@ -217,6 +217,37 @@ zproc print_string
     rts
 zendproc
 
+; Returns !C if not, C is it is.
+; Preserves X and Y.
+zproc isletter
+    cmp #'A'
+    bcc 1f
+    cmp #'Z'+1
+    bcc 2f
+islower:
+    cmp #'a'
+    bcc 1f
+    cmp #'z'+1
+    bcc 2f
+1:
+    ; fail
+    clc
+    rts
+2:
+    ; succeed
+    sec
+    rts
+zendproc
+
+; Preserves X and Y.
+zproc toupper
+    jsr islower
+    zif_cs
+        eor #0x20
+    zendif
+    rts
+zendproc
+
 ; --- Maths -----------------------------------------------------------------
 
 ; Computes i1i0 := i0 * i2.
@@ -890,10 +921,8 @@ zproc parser_fetch_word
     zloop
         ldx bufferend
         lda input_buffer, x
-        cmp #'A'-1
+        jsr isletter
         zbreakif_cc
-        cmp #'Z'
-        zbreakif_cs
 
         inc bufferend
     zendloop
@@ -921,9 +950,10 @@ zproc pop_token
         inx
         iny
 
-        lda (parsecmd), y
+        lda input_buffer, x
+        jsr toupper
+        eor (parsecmd), y
         and #0x7f
-        cmp input_buffer, x
         zif_ne
             jmp pop_fail
         zendif
@@ -937,12 +967,9 @@ zproc pop_token
     ; Check that this is the end of a word.
 
     lda input_buffer, x
-    cmp #'A'-1
+    jsr isletter
     zif_cs
-        cmp #'Z'
-        zif_cc
-            jmp pop_fail
-        zendif
+        jmp pop_fail
     zendif
 
     iny
