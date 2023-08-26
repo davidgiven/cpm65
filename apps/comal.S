@@ -912,24 +912,44 @@ zproc parser_fetch_word
 zendproc
 
 zproc pop_token
-    jsr parser_fetch_word
-    ; returns pointer to token data in p0
+    jsr parser_skip_whitespace
 
-    ldy #2
-    lda p0+0
-    cmp (parsecmd), y
-    bne 1f
+    ldx bufferpos
+    dex
+    ldy #1 ; 2 - 1
+    zrepeat
+        inx
+        iny
+
+        lda (parsecmd), y
+        and #0x7f
+        cmp input_buffer, x
+        zif_ne
+            jmp pop_fail
+        zendif
+
+        lda (parsecmd), y
+    zuntil_mi
+
+    inx
+    stx bufferpos
+
+    ; Check that this is the end of a word.
+
+    lda input_buffer, x
+    cmp #'A'-1
+    zif_cs
+        cmp #'Z'
+        zif_cc
+            jmp pop_fail
+        zendif
+    zendif
+
     iny
-    lda p0+1
-    cmp (parsecmd), y
-    bne 1f
-
-    lda #4
+    tya
     jsr parse_advance
 
     jmp parse_state_machine
-1:
-    jmp pop_fail
 zendproc
 
 zproc pop_word
@@ -946,23 +966,6 @@ zproc pop_word
     lda #2
     jsr parse_advance
 
-    jmp parse_state_machine
-zendproc
-
-zproc pop_char
-    jsr parser_skip_whitespace
-
-    ldy #2
-    lda (parsecmd), y
-    ldx bufferpos
-    cmp input_buffer, x
-    zif_ne
-        jmp pop_fail
-    zendif
-    inc bufferpos
-
-    lda #3
-    jsr parse_advance
     jmp parse_state_machine
 zendproc
 
@@ -1083,9 +1086,9 @@ zendproc
     .word pop_commit
 .endm
 
-.macro P_TOKEN token
+.macro P_TOKEN bytes:vararg
     .word pop_token
-    .word \token
+    .byte \bytes
 .endm
 
 .macro P_SHUNT token
@@ -1095,11 +1098,6 @@ zendproc
 
 .macro P_FLUSH
     .word pop_flush
-.endm
-
-.macro P_CHAR c
-    .word pop_char
-    .byte \c
 .endm
 
 .macro P_WORD
@@ -1115,19 +1113,22 @@ zendproc
 .endm
 
 statement_rule:
-    P_TRY assignment_rule
     P_TRY print_rule
+    P_TRY assignment_rule
+;    P_TRY for_rule
+;    P_TRY if_rule
+;    P_TRY proc_rule
     P_PANIC
 
 assignment_rule:
     P_JSR lvalue_rule
-    P_CHAR '='
+    P_TOKEN '='|0x80
     P_SHUNT TOKEN_ASSIGN
     P_COMMIT
     P_JSR expr_rule
     P_TRY eol_rule
     P_FLUSH
-    P_CHAR ';'
+    P_TOKEN ';'|0x80
     P_JMP assignment_rule
 
 eol_rule:
@@ -1135,7 +1136,7 @@ eol_rule:
     P_RETURN
 
 print_rule:
-    P_TOKEN print_token
+    P_TOKEN 'P', 'R', 'I', 'N', 'T'|0x80
     P_COMMIT
     P_TRY print_no_terminator_rule
     P_SHUNT TOKEN_PRINT
@@ -1155,13 +1156,13 @@ print_terminator_rule:
     P_RETURN
 
 comma_rule:
-    P_CHAR ','
+    P_TOKEN ','|0x80
     P_RETURN
 
 print_separator_rule:
     P_TRY comma_rule
 semicolon_rule:
-    P_CHAR ';'
+    P_TOKEN ';'|0x80
     P_RETURN
 
 print_no_terminator_rule:
@@ -1189,12 +1190,12 @@ expr_rule:
     P_RETURN
 
 addition_rule:
-    P_CHAR '+'
+    P_TOKEN '+'|0x80
     P_SHUNT TOKEN_ADD
     P_JMP compulsory_expr_rule
 
 multiplication_rule:
-    P_CHAR '*'
+    P_TOKEN '*'|0x80
     P_SHUNT TOKEN_MUL
     P_JMP compulsory_expr_rule
 
@@ -1213,22 +1214,9 @@ number_rule:
 
 .data
 
-.set token_count, 0
-.macro TOKEN name, values:vararg
-.data 1
-    .word \name
-.data 0
-\name:
-    .byte OBJECT_ATOM
-    .byte \values
-.set token_count, token_count + 1
-.endm
-    
-.data 1
-object_table:
-    TOKEN print_token, 'P', 'R', 'I', 'N', 'T'|0x80
 .bss
-    .ds (OBJECT_TABLE_SIZE - token_count) * 2
+object_table:
+    .ds OBJECT_TABLE_SIZE * 2
 
 input_buffer:
     .ds 256
