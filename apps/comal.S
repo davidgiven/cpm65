@@ -53,17 +53,60 @@ bytecodeptr:        .byte 0 ; current position in the bytecode
 opstackptr:         .byte 0 ; operator stack pointer
 parsecmd:           .word 0 ; points into parser bytecode
 parsefailstackptr:  .byte 0 ; stack pointer to rewind to
+parsestartstackptr: .byte 0 ; stack pointer when parse starts
 
 OBJECT_TABLE_SIZE = 256
 
 zproc main
     jsr clear
-    
-    lda #0
-    sta bufferpos
-    jsr parse_line
+zendproc
+    ; fall through
+zproc mainloop
+    ldx #0xff
+    txs
 
-    rts
+    zloop
+        ; Read a line from the console.
+
+        lda #'$'
+        jsr bdos_CONOUT
+        jsr print_space
+        
+        lda #255
+        sta input_buffer+0
+        lda #<input_buffer
+        ldx #>input_buffer
+        ldy #BDOS_READ_LINE
+        jsr BDOS
+        jsr print_nl
+
+        ; Parse it.
+
+        ldx input_buffer+1
+        lda #0
+        sta input_buffer+2, x
+
+        lda #2
+        sta bufferpos
+        jsr parse_line
+
+        ; Successful parse.
+
+        lda #0
+        sta p0+0
+        zloop
+            ldx p0+0
+            cpx bytecodeptr
+            zbreakif_eq
+
+            lda output_bytecode, x
+            jsr print_hex8_number
+            jsr print_space
+
+            inc p0+0
+        zendloop
+        jsr print_nl
+    zendloop
 zendproc
 
 zproc clear
@@ -136,12 +179,42 @@ print_hex4_number:
     rts
 zendproc
 
+; --- Output ----------------------------------------------------------------
+
+zproc print_space
+    lda #' '
+    jmp bdos_CONOUT
+zendproc
+
 zproc print_nl
     lda #0x0d
     jsr bdos_CONOUT
 
     lda #0x0a
     jmp bdos_CONOUT
+zendproc
+
+; Prints the high-bit-terminated string in AX.
+
+zproc print_string
+    sta p0+0
+    stx p0+1
+
+    ldy #0xff
+    sty p1+0
+
+    zrepeat
+        inc p1+0
+        ldy p1+0
+        lda (p0), y
+        and #0x7f
+        jsr bdos_CONOUT
+
+        ldy p1+0
+        lda (p0), y
+    zuntil_mi
+
+    rts
 zendproc
 
 ; --- Maths -----------------------------------------------------------------
@@ -430,6 +503,8 @@ zproc parse_line
     lda #0
     sta bytecodeptr
     sta opstackptr
+    tsx
+    stx parsestartstackptr
 
     lda #<statement_rule
     sta parsecmd+0
@@ -450,15 +525,16 @@ zproc parse_state_machine
     lda (parsecmd), y
     sta p0+1
 
+#if 0
     tsx
     txa
     jsr print_hex8_number
-    lda #' '
-    jsr bdos_CONOUT
+    jsr print_space
     lda parsecmd+0
     ldx parsecmd+1
     jsr print_hex16_number
     jsr print_nl
+#endif
 
     jmp (p0)
 zendproc
@@ -528,11 +604,52 @@ pop_succeed_ptr:
 
 zproc pop_succeed
     jsr unstack_operators
-    brk
+
+    ldx parsestartstackptr
+    txs
+    rts
 zendproc
 
 zproc pop_panic
-    brk
+    ldx parsestartstackptr
+    txs
+
+    lda #<1f
+    ldx #>1f
+    jsr print_string
+
+    lda #0
+    sta p0+0
+    zrepeat
+        ldx p0+0
+        lda input_buffer+2, x
+        jsr bdos_CONOUT
+
+        inc p0+0
+        ldx p0+0
+        cpx input_buffer+1
+    zuntil_eq
+    jsr print_nl
+
+    lda #2
+    sta p0+0
+    zloop
+        ldx p0+0
+        cpx bufferpos
+        zbreakif_eq
+
+        jsr print_space
+        inc p0+0
+    zendloop
+    lda #'^'
+    jsr bdos_CONOUT
+    jsr print_nl
+
+    jmp mainloop
+1:
+    .ascii "\r\nSyntax error\r"
+    .byte '\n'|0x80
+
 zendproc
 
 zproc pop_try
@@ -550,12 +667,14 @@ zproc pop_try
     lda #4
     jsr parse_advance
 
+#if 0
     lda #'>'
     jsr bdos_CONOUT
     lda parsecmd+0
     ldx parsecmd+1
     jsr print_hex16_number
     jsr print_nl
+#endif
 
     ; Push backtracking state.
 
@@ -631,9 +750,11 @@ pop_panic_ptr:
 zproc pop_fail
     ; Revert the state.
 
+#if 0
     lda #'<'
     jsr bdos_CONOUT
     jsr print_nl
+#endif
 
     ldx parsefailstackptr
     txs
@@ -736,6 +857,14 @@ zproc pop_shunt
     jsr shunt_operator
 
     lda #3
+    jsr parse_advance
+    jmp parse_state_machine
+zendproc
+
+zproc pop_flush
+    jsr unstack_operators
+
+    lda #2
     jsr parse_advance
     jmp parse_state_machine
 zendproc
@@ -921,8 +1050,6 @@ zproc pop_number
     jmp parse_state_machine
 1:
     jmp pop_fail
-    jmp pop_panic
-    jmp parse_state_machine
 zendproc
 
 .macro P_TRY rule
@@ -966,6 +1093,10 @@ zendproc
     .byte \token
 .endm
 
+.macro P_FLUSH
+    .word pop_flush
+.endm
+
 .macro P_CHAR c
     .word pop_char
     .byte \c
@@ -992,22 +1123,23 @@ assignment_rule:
     P_JSR lvalue_rule
     P_CHAR '='
     P_SHUNT TOKEN_ASSIGN
+    P_COMMIT
     P_JSR expr_rule
+    P_TRY eol_rule
+    P_FLUSH
+    P_CHAR ';'
+    P_JMP assignment_rule
+
+eol_rule:
+    P_EOL
     P_RETURN
 
 print_rule:
     P_TOKEN print_token
     P_COMMIT
     P_TRY print_no_terminator_rule
-    P_TRY print_first_expr_rule
-    P_RETURN
-
-print_first_expr_rule:
     P_SHUNT TOKEN_PRINT
     P_JSR expr_rule
-    P_TRY print_expr_list_rule
-    P_RETURN
-
 print_expr_list_rule:
     P_TRY print_no_terminator_rule
     P_TRY print_terminator_rule
@@ -1050,15 +1182,11 @@ compulsory_expr_rule:
     P_PANIC
 
 expr_rule:
-    P_TRY binop_rule
-    P_TRY leaf_rule
-    P_FAIL
-
-binop_rule:
     P_JSR leaf_rule
+    P_COMMIT
     P_TRY addition_rule
     P_TRY multiplication_rule
-    P_FAIL
+    P_RETURN
 
 addition_rule:
     P_CHAR '+'
@@ -1083,10 +1211,6 @@ number_rule:
     P_NUMBER
     P_RETURN
 
-input_buffer:
-    .ascii "PRINT 1234 + 5678"
-    .byte 0
-
 .data
 
 .set token_count, 0
@@ -1106,6 +1230,8 @@ object_table:
 .bss
     .ds (OBJECT_TABLE_SIZE - token_count) * 2
 
+input_buffer:
+    .ds 256
 output_bytecode:
     .ds 256
 operator_stack:
