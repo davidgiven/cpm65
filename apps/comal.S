@@ -52,9 +52,17 @@ bufferend: .byte 0 ; current end of token in input buffer
 
 bytecodeptr:        .byte 0 ; current position in the bytecode
 opstackptr:         .byte 0 ; operator stack pointer
+
+; Parser temporaries
+
 parsecmd:           .word 0 ; points into parser bytecode
 parsefailstackptr:  .byte 0 ; stack pointer to rewind to
 parsestartstackptr: .byte 0 ; stack pointer when parse starts
+
+; Lister temporaries
+
+treeroot:           .byte 0 ; address of topmost node
+emptystack:         .byte 0 ; SP when empty
 
 TOKEN_EOL       = 0x00 ; end of line
 TOKEN_VARREF    = 0x01 ; +2 bytes for the ID
@@ -70,24 +78,44 @@ TOKEN_ASSIGN    = 0x08
 
 .data 1
 token_precedence_table:
-.macro token_data token, precedence
+.data 2
+token_size_table:
+.data 3
+token_listers_hi:
+.data 4
+token_listers_lo:
+.data 5
+token_aux_hi:
+.data 6
+token_aux_lo:
+.macro token_data token, precedence, tokensize, pops, pushes, lister, aux
     .if \token != tokenvalue
         .error "Out of sequence token \token"
     .endif
     .data 1
     .byte \precedence
+    .data 2
+    .byte (\tokensize) | (\pops << 4) | (\pushes << 7)
+    .data 3
+    .byte (\lister-1)@mos16hi
+    .data 4
+    .byte (\lister-1)@mos16lo
+    .data 5
+    .byte \aux@mos16hi
+    .data 6
+    .byte \aux@mos16lo
     .set tokenvalue, tokenvalue+1
 .endm
         
-token_data TOKEN_EOL, 0xff
-token_data TOKEN_VARREF, 0xff
-token_data TOKEN_INTEGER, 0xff
-token_data TOKEN_MUL, 10
-token_data TOKEN_ADD, 9
-token_data TOKEN_SUB, 9
-token_data TOKEN_PRINT, 0
-token_data TOKEN_PRINTNL, 0
-token_data TOKEN_ASSIGN, 0
+token_data TOKEN_EOL,     15, 1, 0, 0, lister_bad,    lister_bad
+token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref, lister_bad
+token_data TOKEN_INTEGER, 15, 5, 0, 1, lister_bad,    lister_bad
+token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,  keyword_mul
+token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,  keyword_add
+token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,  keyword_sub
+token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,  lister_bad
+token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_bad,    lister_bad
+token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_infix,  keyword_assign
 
 OBJECT_TABLE_SIZE = 256
 
@@ -133,13 +161,17 @@ zproc mainloop
             cpx bytecodeptr
             zbreakif_eq
 
-            lda output_bytecode, x
+            lda bytecode_buffer, x
             jsr print_hex8_number
             jsr print_space
 
             inc p0+0
         zendloop
         jsr print_nl
+
+        ; Print line back again.
+
+        jsr list_line
     zendloop
 zendproc
 
@@ -215,6 +247,12 @@ zendproc
 
 ; --- Output ----------------------------------------------------------------
 
+; As for print_string, but puts a space after it.
+
+zproc print_separated_string
+    jsr print_string
+zendproc
+    ; fall through
 zproc print_space
     lda #' '
     jmp bdos_CONOUT
@@ -562,6 +600,168 @@ zproc get_atom
     rts
 zendproc
 
+; --- Lister ----------------------------------------------------------------
+
+; Renders the line in bytecode_buffer.
+
+; operator_stack contains the tree.
+; <bytecode address> {<child tree nodes>}*
+
+; 1 2 + print
+; 0 1 2 3
+
+; 0 1 2 a b 3 c
+; a b c d e f g
+;           ^
+
+zproc list_line
+    lda #0
+    sta bytecodeptr
+    sta opstackptr
+    tsx
+    stx emptystack
+
+    zloop
+        ; Create the first byte of the tree node.
+
+        ldx bytecodeptr
+        lda bytecode_buffer, x
+        zbreakif_eq
+        ldy opstackptr
+        sty treeroot
+        txa
+        sta operator_stack, y
+        inc opstackptr
+
+        ; Pop consumed stack items.
+
+        ldx bytecodeptr
+        ldy bytecode_buffer, x
+        lda token_size_table, y
+        and #0b01110000
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        tax
+        jmp 1f
+        zrepeat
+            pla
+            ldy opstackptr
+            sta operator_stack, y
+            inc opstackptr
+
+        1:
+            dex
+        zuntil_mi
+        
+        ; Push produced stack items.
+
+        ldx bytecodeptr
+        ldy bytecode_buffer, x
+        lda token_size_table, y
+        zif_mi
+            lda treeroot
+            pha
+        zendif
+
+        ; Is the stack empty? If so, flush out the current tree.
+
+        tsx
+        cpx emptystack
+        zif_eq
+            ldx treeroot
+            jsr list_clause
+
+            lda #0
+            sta opstackptr
+        zendif
+
+        ; Move to next bytecode.
+
+        ldx bytecodeptr
+        ldy bytecode_buffer, x
+        lda token_size_table, y
+        and #0b00001111
+        clc
+        adc bytecodeptr
+        sta bytecodeptr
+    zendloop
+    
+    brk
+zendproc
+
+; Takes the tree node address in X.
+zproc list_clause
+    lda operator_stack, x       ; get bytecode address
+    tay
+    lda bytecode_buffer, y      ; get bytecode
+    tay
+    lda token_listers_hi, y     ; get lister routine
+    pha
+    lda token_listers_lo, y
+    pha
+    rts
+zendproc
+
+zproc lister_bad
+    brk
+zendproc
+
+zproc lister_print
+    lda #<keyword_print
+    ldx #>keyword_print
+    jsr print_separated_string
+
+    ldy treeroot
+    ldx operator_stack+1, y
+    jmp list_clause
+zendproc
+
+zproc lister_varref
+    lda operator_stack, x       ; get bytecode address
+    tax
+    lda bytecode_buffer+1, x
+    sta p0+0
+    lda bytecode_buffer+2, x
+    sta p0+1
+    jsr deref_object
+
+    ldx p0+1
+    inc p0+0
+    zif_eq
+        inx
+    zendif
+    lda p0+0
+    jmp print_string
+zendproc
+
+zproc lister_infix
+    txa
+    pha
+    tay
+
+    ldx operator_stack+2, y
+    jsr list_clause
+    jsr print_space
+
+    pla
+    pha
+    tax
+    lda operator_stack, x       ; get bytecode address
+    tay
+    lda bytecode_buffer, y      ; get bytecode
+    tay
+    ldx token_aux_hi, y
+    lda token_aux_lo, y
+    jsr print_separated_string
+
+    pla
+    tay
+    ldx operator_stack+1, y
+    jmp list_clause
+zendproc
+   
 ; --- Parser ----------------------------------------------------------------
 
 zproc parse_line
@@ -619,7 +819,7 @@ zendproc
 ; Preserves Y.
 zproc queue_bytecode
     ldx bytecodeptr
-    sta output_bytecode, x
+    sta bytecode_buffer, x
     inx
     stx bytecodeptr
     rts
@@ -979,7 +1179,9 @@ zproc parser_fetch_word
     jmp pop_fail
 zendproc
 
-zproc pop_token
+; Used by pop*token. Leaves the buffer position in X.
+
+zproc skip_token
     jsr parser_skip_whitespace
 
     ldx bufferpos
@@ -1002,6 +1204,11 @@ zproc pop_token
 
     inx
     stx bufferpos
+    rts
+zendproc
+
+zproc pop_token
+    jsr skip_token
 
     ; Check that this is the end of a word.
 
@@ -1011,6 +1218,7 @@ zproc pop_token
         jmp pop_fail
     zendif
 
+1:
     iny
     tya
     jsr parse_advance
@@ -1018,12 +1226,17 @@ zproc pop_token
     jmp parse_state_machine
 zendproc
 
+zproc pop_eager_token
+    jsr skip_token
+    jmp 1b
+zendproc
+
 zproc pop_word
     jsr parser_fetch_word
 
     lda #TOKEN_VARREF
     jsr queue_bytecode
-    sta output_bytecode, x
+    sta bytecode_buffer, x
     lda p1+0
     jsr queue_bytecode
     lda p1+1
@@ -1157,6 +1370,11 @@ zendproc
     .byte \bytes
 .endm
 
+.macro P_EAGER_TOKEN bytes:vararg
+    .word pop_eager_token
+    .byte \bytes
+.endm
+
 .macro P_SHUNT token
     .word pop_shunt
     .byte \token
@@ -1188,20 +1406,31 @@ statement_rule:
 
 assignment_rule:
     P_JSR lvalue_rule
-    P_TOKEN '='|0x80
+    P_EAGER_TOKEN '='|0x80
     P_SHUNT TOKEN_ASSIGN
     P_COMMIT
     P_JSR expr_rule
     P_TRY eol_rule
     P_FLUSH
-    P_TOKEN ';'|0x80
+    P_EAGER_TOKEN ';'|0x80
     P_JMP assignment_rule
+
+assignment_operator_rule:
+    P_TRY equals_rule
+keyword_assign = . + 2
+    P_EAGER_TOKEN ':', '='|0x80
+    P_RETURN
+
+equals_rule:
+    P_EAGER_TOKEN '='|0x80
+    P_RETURN
 
 eol_rule:
     P_EOL
     P_RETURN
 
 print_rule:
+keyword_print = . + 2
     P_TOKEN 'P', 'R', 'I', 'N', 'T'|0x80
     P_COMMIT
     P_TRY print_no_terminator_rule
@@ -1222,13 +1451,13 @@ print_terminator_rule:
     P_RETURN
 
 comma_rule:
-    P_TOKEN ','|0x80
+    P_EAGER_TOKEN ','|0x80
     P_RETURN
 
 print_separator_rule:
     P_TRY comma_rule
 semicolon_rule:
-    P_TOKEN ';'|0x80
+    P_EAGER_TOKEN ';'|0x80
     P_RETURN
 
 print_no_terminator_rule:
@@ -1252,16 +1481,25 @@ expr_rule:
     P_JSR leaf_rule
     P_COMMIT
     P_TRY addition_rule
+    P_TRY subtraction_rule
     P_TRY multiplication_rule
     P_RETURN
 
 addition_rule:
-    P_TOKEN '+'|0x80
+keyword_add = . + 2
+    P_EAGER_TOKEN '+'|0x80
     P_SHUNT TOKEN_ADD
     P_JMP compulsory_expr_rule
 
+subtraction_rule:
+keyword_sub = . + 2
+    P_EAGER_TOKEN '-'|0x80
+    P_SHUNT TOKEN_SUB
+    P_JMP compulsory_expr_rule
+
 multiplication_rule:
-    P_TOKEN '*'|0x80
+keyword_mul = . + 2
+    P_EAGER_TOKEN '*'|0x80
     P_SHUNT TOKEN_MUL
     P_JMP compulsory_expr_rule
 
@@ -1286,7 +1524,7 @@ object_table:
 
 input_buffer:
     .ds 256
-output_bytecode:
+bytecode_buffer:
     .ds 256
 operator_stack:
     .ds 256
