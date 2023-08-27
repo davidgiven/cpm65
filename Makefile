@@ -38,6 +38,7 @@ MINIMAL_APPS = \
 	$(OBJDIR)/submit.com \
 	apps/dump.asm \
 	apps/ls.asm \
+	apps/cpm65.inc \
 
 APPS = \
 	$(MINIMAL_APPS) \
@@ -45,7 +46,6 @@ APPS = \
 	$(OBJDIR)/objdump.com \
 	apps/bedit.asm \
 	apps/dinfo.asm \
-	apps/cpm65.inc \
 	apps/drivers.inc \
 	cpmfs/asm.txt \
 	cpmfs/basic.txt \
