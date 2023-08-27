@@ -18,19 +18,20 @@
 ;    interpreter
 ; lo TPABASE
 
+; IMPORTANT --- remember how comparisons work!
+;
+; lda A
+; cmp #NUM
+; If the Z flag is 0, then A <> NUM and BNE will branch
+; If the Z flag is 1, then A = NUM and BEQ will branch
+; If the C flag is 0, then A (unsigned) < NUM (unsigned) and BCC will branch
+; If the C flag is 1, then A (unsigned) >= NUM (unsigned) and BCS will branch
+
 OBJECT_FREE     = 0
 OBJECT_ATOM     = 1
 
 ATOM_TYPE       = 0
 ATOM_DATA       = 1
-
-TOKEN_VARREF    = 1 ; +2 bytes for the ID
-TOKEN_INTEGER   = 2 ; +4 bytes for the number
-TOKEN_MUL       = 0x0f
-TOKEN_ADD       = 0x10
-TOKEN_PRINT     = 0xfd
-TOKEN_PRINTNL   = 0xfe
-TOKEN_ASSIGN    = 0xff
 
 ZEROPAGE
 
@@ -54,6 +55,39 @@ opstackptr:         .byte 0 ; operator stack pointer
 parsecmd:           .word 0 ; points into parser bytecode
 parsefailstackptr:  .byte 0 ; stack pointer to rewind to
 parsestartstackptr: .byte 0 ; stack pointer when parse starts
+
+TOKEN_EOL       = 0x00 ; end of line
+TOKEN_VARREF    = 0x01 ; +2 bytes for the ID
+TOKEN_INTEGER   = 0x02 ; +4 bytes for the number
+TOKEN_MUL       = 0x03
+TOKEN_ADD       = 0x04
+TOKEN_SUB       = 0x05
+TOKEN_PRINT     = 0x06
+TOKEN_PRINTNL   = 0x07
+TOKEN_ASSIGN    = 0x08
+
+.set tokenvalue, 0
+
+.data 1
+token_precedence_table:
+.macro token_data token, precedence
+    .if \token != tokenvalue
+        .error "Out of sequence token \token"
+    .endif
+    .data 1
+    .byte \precedence
+    .set tokenvalue, tokenvalue+1
+.endm
+        
+token_data TOKEN_EOL, 0xff
+token_data TOKEN_VARREF, 0xff
+token_data TOKEN_INTEGER, 0xff
+token_data TOKEN_MUL, 10
+token_data TOKEN_ADD, 9
+token_data TOKEN_SUB, 9
+token_data TOKEN_PRINT, 0
+token_data TOKEN_PRINTNL, 0
+token_data TOKEN_ASSIGN, 0
 
 OBJECT_TABLE_SIZE = 256
 
@@ -582,6 +616,7 @@ zproc parse_advance
 zendproc
 
 ; Pushes A onto the bytecode queue.
+; Preserves Y.
 zproc queue_bytecode
     ldx bytecodeptr
     sta output_bytecode, x
@@ -592,26 +627,30 @@ zendproc
 
 ; Shunts the operator A through the shunting yard algorithm.
 zproc shunt_operator
-    ldx opstackptr
-    zif_ne
-        zrepeat
-            ldx opstackptr
-            cmp operator_stack, x
-            zbreakif_cc
+    tay             ; Y contains operator throughout
 
-            pha
-            lda operator_stack, x
-            dec opstackptr
-            jsr queue_bytecode
-            pla
+    jmp 1f
+    zrepeat
+        ldx opstackptr
+        lda operator_stack, x
+        tax
+        lda token_precedence_table, x ; priority of operator
+        cmp token_precedence_table, y ; priority of TOS
+        zbreakif_cc ; stack if TOS < operator
 
-            ldx opstackptr
-        zuntil_eq
-    zendif
+        dec opstackptr
+        txa
+        jsr queue_bytecode
+
+    1:
+        ldx opstackptr
+    zuntil_eq
 
     ; Stack the operator onto the operator stack.
 
+    ldx opstackptr
     inx
+    tya
     sta operator_stack, x
     stx opstackptr
     rts
