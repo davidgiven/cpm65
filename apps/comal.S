@@ -119,7 +119,7 @@ token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,   keyword_add
 token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,   keyword_sub
 token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad
 token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad
-token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_infix,   keyword_assign
+token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign
 
 OBJECT_TABLE_SIZE = 256
 
@@ -139,18 +139,18 @@ zproc mainloop
         jsr print_space
         
         lda #255
-        sta input_buffer+0
-        lda #<input_buffer
-        ldx #>input_buffer
+        sta text_buffer+0
+        lda #<text_buffer
+        ldx #>text_buffer
         ldy #BDOS_READ_LINE
         jsr BDOS
         jsr print_nl
 
         ; Parse it.
 
-        ldx input_buffer+1
+        ldx text_buffer+1
         lda #0
-        sta input_buffer+2, x
+        sta text_buffer+2, x
 
         lda #2
         sta bufferpos
@@ -175,7 +175,22 @@ zproc mainloop
 
         ; Print line back again.
 
+        lda #0
+        sta bufferpos
+        sta bufferend
         jsr list_line
+
+        zloop
+            ldx bufferpos
+            cpx bufferend
+            zbreakif_eq
+        
+            lda text_buffer, x
+            jsr bdos_CONOUT
+
+            inc bufferpos
+        zendloop
+        jsr print_nl
     zendloop
 zendproc
 
@@ -321,6 +336,49 @@ zproc toupper
     zif_cs
         eor #0x20
     zendif
+    rts
+zendproc
+
+; --- Buffer output ---------------------------------------------------------
+
+; Outputs the high-bit-terminated string in AX.
+
+zproc buffer_print_string
+    sta p0+0
+    stx p0+1
+
+    ldy #0xff
+    sty p1+0
+
+    ldx bufferend
+    zrepeat
+        inc p1+0
+        ldy p1+0
+        lda (p0), y
+        and #0x7f
+        sta text_buffer, x
+        inx
+
+        ldy p1+0
+        lda (p0), y
+    zuntil_mi
+    stx bufferend
+
+    rts
+zendproc
+
+zproc buffer_print_separated_string
+    jsr buffer_print_string
+zendproc
+    ; fall through
+zproc buffer_print_space
+    lda #' '
+zendproc
+    ; fall through
+zproc buffer_print_char
+    ldx bufferend
+    sta text_buffer, x
+    inc bufferend
     rts
 zendproc
 
@@ -541,7 +599,7 @@ zproc get_atom
                 zloop
                     lda (p0), y
                     and #0x7f
-                    cmp input_buffer, x
+                    cmp text_buffer, x
                     zbreakif_ne
 
                     inx
@@ -586,7 +644,7 @@ zproc get_atom
 
     ldx bufferpos
     zrepeat
-        lda input_buffer, x ; get char from buffer
+        lda text_buffer, x ; get char from buffer
         iny
         sta (p0), y         ; store into object
         inx
@@ -707,9 +765,9 @@ zproc list_line
     bit listerflags
     zif_vs
         lda #','
-        jsr bdos_CONOUT
+        jsr buffer_print_char
     zendif
-    jmp print_nl
+    rts
 zendproc
 
 ; Takes the tree node address in X.
@@ -737,7 +795,7 @@ zproc lister_print
         lda #<keyword_comma
         ldx #>keyword_comma
     zendif
-    jsr print_separated_string
+    jsr buffer_print_separated_string
 
     lda listerflags
     ora #LISTERFLAG_COMMA
@@ -749,6 +807,13 @@ zproc lister_print
 zendproc
 
 zproc lister_printnl
+    bit listerflags
+    zif_pl                      ; if !LISTERFLAG_NOTSTART
+        lda #<keyword_print
+        ldx #>keyword_print
+        jmp buffer_print_string
+    zendif
+
     lda listerflags
     and #(~LISTERFLAG_COMMA) & 0xff
     sta listerflags
@@ -770,16 +835,31 @@ zproc lister_varref
         inx
     zendif
     lda p0+0
-    jmp print_string
+    jmp buffer_print_string
 zendproc
 
+zproc lister_assign
+    bit listerflags
+    zif_mi
+        txa
+        pha
+
+        lda #<keyword_semicolon
+        ldx #>keyword_semicolon
+        jsr buffer_print_separated_string
+
+        pla
+        tax
+    zendif
+zendproc
+    ; fall through
 zproc lister_infix
     txa
     pha
 
     ldy operator_stack+2, x     ; get first parameter tree address
     jsr list_parenthesised_clause
-    jsr print_space
+    jsr buffer_print_space
 
     pla
     pha
@@ -790,7 +870,7 @@ zproc lister_infix
     tay
     ldx token_aux_hi, y
     lda token_aux_lo, y
-    jsr print_separated_string
+    jsr buffer_print_separated_string
 
     pla
     tax                         ; recover current node tree address
@@ -818,13 +898,13 @@ zproc list_parenthesised_clause
     cmp p0+1
     zif_cc                      ; parameter is lower precedence
         lda #'('
-        jsr bdos_CONOUT
+        jsr buffer_print_char
 
         ldx p0+0                ; tree address of parameter to print
         jsr list_clause
 
         lda #')'
-        jmp bdos_CONOUT
+        jmp buffer_print_char
     zendif
 
     ldx p0+0                ; tree address of parameter to print
@@ -975,12 +1055,12 @@ zproc pop_panic
     sta p0+0
     zrepeat
         ldx p0+0
-        lda input_buffer+2, x
+        lda text_buffer+2, x
         jsr bdos_CONOUT
 
         inc p0+0
         ldx p0+0
-        cpx input_buffer+1
+        cpx text_buffer+1
     zuntil_eq
     jsr print_nl
 
@@ -1237,7 +1317,7 @@ zendproc
 zproc parser_skip_whitespace
     zloop
         ldx bufferpos
-        lda input_buffer, x
+        lda text_buffer, x
         cmp #' '
         zbreakif_ne
 
@@ -1254,7 +1334,7 @@ zproc parser_fetch_word
     sta bufferend
     zloop
         ldx bufferend
-        lda input_buffer, x
+        lda text_buffer, x
         jsr isletter
         zbreakif_cc
 
@@ -1286,7 +1366,7 @@ zproc skip_token
         inx
         iny
 
-        lda input_buffer, x
+        lda text_buffer, x
         jsr toupper
         eor (parsecmd), y
         and #0x7f
@@ -1307,7 +1387,7 @@ zproc pop_token
 
     ; Check that this is the end of a word.
 
-    lda input_buffer, x
+    lda text_buffer, x
     jsr isletter
     zif_cs
         jmp pop_fail
@@ -1347,7 +1427,7 @@ zproc pop_eol
     jsr parser_skip_whitespace
 
     ldx bufferpos
-    lda input_buffer, x
+    lda text_buffer, x
     zif_ne
         jmp pop_fail
     zendif
@@ -1376,7 +1456,7 @@ zproc pop_number
     sta bufferend
     zloop
         ldx bufferend
-        lda input_buffer, x
+        lda text_buffer, x
         cmp #'0'-1
         zbreakif_cc
         cmp #'9'
@@ -1557,6 +1637,7 @@ keyword_comma = . + 2
 print_separator_rule:
     P_TRY comma_rule
 semicolon_rule:
+keyword_semicolon = . + 2
     P_EAGER_TOKEN ';'|0x80
     P_RETURN
 
@@ -1632,7 +1713,7 @@ number_rule:
 object_table:
     .ds OBJECT_TABLE_SIZE * 2
 
-input_buffer:
+text_buffer:
     .ds 256
 bytecode_buffer:
     .ds 256
