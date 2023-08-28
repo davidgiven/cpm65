@@ -776,10 +776,9 @@ zendproc
 zproc lister_infix
     txa
     pha
-    tay
 
-    ldx operator_stack+2, y
-    jsr list_clause
+    ldy operator_stack+2, x     ; get first parameter tree address
+    jsr list_parenthesised_clause
     jsr print_space
 
     pla
@@ -794,11 +793,44 @@ zproc lister_infix
     jsr print_separated_string
 
     pla
-    tay
-    ldx operator_stack+1, y
+    tax                         ; recover current node tree address
+    ldy operator_stack+1, x     ; get second parameter tree address
+zendproc
+    ; falls through
+   
+; On entry,
+; X = tree address of current node
+; Y = tree address of node to print
+; Corrupts everything!
+
+zproc list_parenthesised_clause
+    sty p0+0
+
+    ldy operator_stack+0, x     ; get current bytecode address
+    ldx bytecode_buffer, y      ; get current bytecode
+    lda token_precedence_table, x ; get current bytecode precedence
+    sta p0+1
+
+    ldy p0+0
+    ldx operator_stack+0, y     ; get parameter bytecode address
+    ldy bytecode_buffer, x      ; get parameter bytecode
+    lda token_precedence_table, y ; get parameter precedence
+    cmp p0+1
+    zif_cc                      ; parameter is lower precedence
+        lda #'('
+        jsr bdos_CONOUT
+
+        ldx p0+0                ; tree address of parameter to print
+        jsr list_clause
+
+        lda #')'
+        jmp bdos_CONOUT
+    zendif
+
+    ldx p0+0                ; tree address of parameter to print
     jmp list_clause
 zendproc
-   
+
 ; --- Parser ----------------------------------------------------------------
 
 zproc parse_line
@@ -870,6 +902,7 @@ zproc shunt_operator
     zrepeat
         ldx opstackptr
         lda operator_stack, x
+        zbreakif_eq ; if TOS is 0, it's a parenthesis
         tax
         lda token_precedence_table, x ; priority of operator
         cmp token_precedence_table, y ; priority of TOS
@@ -885,6 +918,7 @@ zproc shunt_operator
 
     ; Stack the operator onto the operator stack.
 
+stack_operator:
     ldx opstackptr
     inx
     tya
@@ -893,17 +927,25 @@ zproc shunt_operator
     rts
 zendproc
 
-; Unstacks all remaining operators.
+; Unstacks operators down to and including a parenthesis marker (or the stack
+; is empty).
+
 zproc unstack_operators
     zloop
         ldx opstackptr
-        zbreakif_eq
+        zif_eq
+            rts
+        zendif
 
         lda operator_stack, x
+        zif_eq
+            dec opstackptr
+            rts
+        zendif
+
         dec opstackptr
         jsr queue_bytecode
     zendloop
-    rts
 zendproc
     
 pop_succeed_ptr:
@@ -911,6 +953,10 @@ pop_succeed_ptr:
 
 zproc pop_succeed
     jsr unstack_operators
+
+    lda #0
+    ldx bytecodeptr
+    sta bytecode_buffer, x
 
     ldx parsestartstackptr
     txs
@@ -1166,6 +1212,18 @@ zproc pop_shunt
     lda #3
     jsr parse_advance
     jmp parse_state_machine
+zendproc
+
+zproc pop_paren
+    ldy #0
+    jsr stack_operator
+
+    lda #2
+    jsr parse_advance
+    jmp parse_state_machine
+zendproc
+
+zproc pop_endparen
 zendproc
 
 zproc pop_flush
@@ -1433,6 +1491,10 @@ zendproc
     .word pop_eol
 .endm
 
+.macro P_PAREN
+    .word pop_paren
+.endm
+
 statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -1542,9 +1604,19 @@ keyword_mul = . + 2
     P_JMP compulsory_expr_rule
 
 leaf_rule:
+    P_TRY parenthesised_rule
     P_TRY varref_rule
     P_TRY number_rule
     P_FAIL
+
+parenthesised_rule:
+    P_EAGER_TOKEN '('|0x80
+    P_COMMIT
+    P_PAREN
+    P_JSR expr_rule
+    P_EAGER_TOKEN ')'|0x80
+    P_FLUSH
+    P_RETURN
 
 varref_rule:
     P_WORD
