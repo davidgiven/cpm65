@@ -61,8 +61,12 @@ parsestartstackptr: .byte 0 ; stack pointer when parse starts
 
 ; Lister temporaries
 
-treeroot:           .byte 0 ; address of topmost node
-emptystack:         .byte 0 ; SP when empty
+listerroot:         .byte 0 ; address of topmost node
+listersp:           .byte 0 ; SP when empty
+listerflags:        .byte 0 ; flags
+
+LISTERFLAG_NOTSTART = 1<<7
+LISTERFLAG_COMMA    = 1<<6
 
 TOKEN_EOL       = 0x00 ; end of line
 TOKEN_VARREF    = 0x01 ; +2 bytes for the ID
@@ -107,15 +111,15 @@ token_aux_lo:
     .set tokenvalue, tokenvalue+1
 .endm
         
-token_data TOKEN_EOL,     15, 1, 0, 0, lister_bad,    lister_bad
-token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref, lister_bad
-token_data TOKEN_INTEGER, 15, 5, 0, 1, lister_bad,    lister_bad
-token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,  keyword_mul
-token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,  keyword_add
-token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,  keyword_sub
-token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,  lister_bad
-token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_bad,    lister_bad
-token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_infix,  keyword_assign
+token_data TOKEN_EOL,     15, 1, 0, 0, lister_bad,     lister_bad
+token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref,  lister_bad
+token_data TOKEN_INTEGER, 15, 5, 0, 1, lister_bad,     lister_bad
+token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,   keyword_mul
+token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,   keyword_add
+token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,   keyword_sub
+token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad
+token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad
+token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_infix,   keyword_assign
 
 OBJECT_TABLE_SIZE = 256
 
@@ -618,8 +622,9 @@ zproc list_line
     lda #0
     sta bytecodeptr
     sta opstackptr
+    sta listerflags
     tsx
-    stx emptystack
+    stx listersp
 
     zloop
         ; Create the first byte of the tree node.
@@ -628,7 +633,7 @@ zproc list_line
         lda bytecode_buffer, x
         zbreakif_eq
         ldy opstackptr
-        sty treeroot
+        sty listerroot
         txa
         sta operator_stack, y
         inc opstackptr
@@ -661,20 +666,23 @@ zproc list_line
         ldy bytecode_buffer, x
         lda token_size_table, y
         zif_mi
-            lda treeroot
+            lda listerroot
             pha
         zendif
 
         ; Is the stack empty? If so, flush out the current tree.
 
         tsx
-        cpx emptystack
+        cpx listersp
         zif_eq
-            ldx treeroot
+            ldx listerroot
             jsr list_clause
 
             lda #0
             sta opstackptr
+            lda listerflags
+            ora #LISTERFLAG_NOTSTART
+            sta listerflags
         zendif
 
         ; Move to next bytecode.
@@ -688,7 +696,20 @@ zproc list_line
         sta bytecodeptr
     zendloop
     
-    brk
+    ; Assert that the stack is empty.
+
+    tsx
+    cpx listersp
+    zif_ne
+        brk
+    zendif
+
+    bit listerflags
+    zif_vs
+        lda #','
+        jsr bdos_CONOUT
+    zendif
+    jmp print_nl
 zendproc
 
 ; Takes the tree node address in X.
@@ -711,13 +732,29 @@ zendproc
 zproc lister_print
     lda #<keyword_print
     ldx #>keyword_print
+    bit listerflags
+    zif_mi                      ; if LISTERFLAG_NOTSTART
+        lda #<keyword_comma
+        ldx #>keyword_comma
+    zendif
     jsr print_separated_string
 
-    ldy treeroot
+    lda listerflags
+    ora #LISTERFLAG_COMMA
+    sta listerflags
+
+    ldy listerroot
     ldx operator_stack+1, y
     jmp list_clause
 zendproc
 
+zproc lister_printnl
+    lda listerflags
+    and #(~LISTERFLAG_COMMA) & 0xff
+    sta listerflags
+    rts
+zendproc
+    
 zproc lister_varref
     lda operator_stack, x       ; get bytecode address
     tax
@@ -1451,6 +1488,7 @@ print_terminator_rule:
     P_RETURN
 
 comma_rule:
+keyword_comma = . + 2
     P_EAGER_TOKEN ','|0x80
     P_RETURN
 
