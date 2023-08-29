@@ -29,6 +29,7 @@
 
 OBJECT_FREE     = 0
 OBJECT_ATOM     = 1
+OBJECT_INTEGER  = 2
 
 ATOM_TYPE       = 0
 ATOM_DATA       = 1
@@ -43,6 +44,9 @@ heapptr:   .word 0
 
 p0:        .word 0
 p1:        .word 0
+v0:        .byte 0
+v1:        .byte 0
+v2:        .byte 0
 i0:        .word 0, 0
 i1:        .word 0, 0
 i2:        .word 0, 0
@@ -65,6 +69,11 @@ listerroot:         .byte 0 ; address of topmost node
 listersp:           .byte 0 ; SP when empty
 listerflags:        .byte 0 ; flags
 
+; Interpreter temporaries
+
+execlineptr:        .word 0 ; line of code currently being run
+execbyteptr:        .byte 0 ; offset into the line of code
+
 LISTERFLAG_NOTSTART = 1<<7
 LISTERFLAG_COMMA    = 1<<6
 
@@ -72,11 +81,12 @@ TOKEN_EOL       = 0x00 ; end of line
 TOKEN_VARREF    = 0x01 ; +2 bytes for the ID
 TOKEN_INTEGER   = 0x02 ; +4 bytes for the number
 TOKEN_MUL       = 0x03
-TOKEN_ADD       = 0x04
-TOKEN_SUB       = 0x05
-TOKEN_PRINT     = 0x06
-TOKEN_PRINTNL   = 0x07
-TOKEN_ASSIGN    = 0x08
+TOKEN_DIV       = 0x04
+TOKEN_ADD       = 0x05
+TOKEN_SUB       = 0x06
+TOKEN_PRINT     = 0x07
+TOKEN_PRINTNL   = 0x08
+TOKEN_ASSIGN    = 0x09
 
 .set tokenvalue, 0
 
@@ -92,7 +102,11 @@ token_listers_lo:
 token_aux_hi:
 .data 6
 token_aux_lo:
-.macro token_data token, precedence, tokensize, pops, pushes, lister, aux
+.data 7
+token_exec_hi:
+.data 8
+token_exec_lo:
+.macro token_data token, precedence, tokensize, pops, pushes, lister, aux, exec
     .if \token != tokenvalue
         .error "Out of sequence token \token"
     .endif
@@ -108,18 +122,23 @@ token_aux_lo:
     .byte \aux@mos16hi
     .data 6
     .byte \aux@mos16lo
+    .data 7
+    .byte (\exec-1)@mos16hi
+    .data 8
+    .byte (\exec-1)@mos16lo
     .set tokenvalue, tokenvalue+1
 .endm
         
-token_data TOKEN_EOL,     15, 1, 0, 0, lister_bad,     lister_bad
-token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref,  lister_bad
-token_data TOKEN_INTEGER, 15, 5, 0, 1, lister_bad,     lister_bad
-token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,   keyword_mul
-token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,   keyword_add
-token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,   keyword_sub
-token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad
-token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad
-token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign
+token_data TOKEN_EOL,     15, 1, 0, 0, lister_bad,     lister_bad,     exec_bad
+token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref,  lister_bad,     exec_bad
+token_data TOKEN_INTEGER, 15, 5, 0, 1, lister_integer, lister_bad,     exec_integer
+token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,   keyword_mul,    exec_mul
+token_data TOKEN_DIV,     10, 1, 2, 1, lister_infix,   keyword_div,    exec_div
+token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,   keyword_add,    exec_add
+token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,   keyword_sub,    exec_sub
+token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad,     exec_print
+token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl
+token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign, exec_bad
 
 OBJECT_TABLE_SIZE = 256
 
@@ -179,18 +198,18 @@ zproc mainloop
         sta bufferpos
         sta bufferend
         jsr list_line
-
-        zloop
-            ldx bufferpos
-            cpx bufferend
-            zbreakif_eq
-        
-            lda text_buffer, x
-            jsr bdos_CONOUT
-
-            inc bufferpos
-        zendloop
+        jsr print_buffer
         jsr print_nl
+
+        ; Run it.
+
+        lda #<bytecode_buffer
+        sta execlineptr+0
+        lda #>bytecode_buffer
+        sta execlineptr+1
+        lda #0
+        sta execbyteptr
+        jsr exec_line
     zendloop
 zendproc
 
@@ -308,6 +327,22 @@ zproc print_string
     rts
 zendproc
 
+; Prints the text buffer.
+
+zproc print_buffer
+    zloop
+        ldx bufferpos
+        cpx bufferend
+        zbreakif_eq
+    
+        lda text_buffer, x
+        jsr bdos_CONOUT
+
+        inc bufferpos
+    zendloop
+    rts
+zendproc
+
 ; Returns !C if not, C is it is.
 ; Preserves X and Y.
 zproc isletter
@@ -336,6 +371,189 @@ zproc toupper
     zif_cs
         eor #0x20
     zendif
+    rts
+zendproc
+
+; --- Interpreter -----------------------------------------------------------
+
+zproc exec_line
+    lda #0
+    sta bufferpos
+    sta bufferend
+zendproc
+    ; fall through
+zproc exec
+    ldy execbyteptr
+    lda (execlineptr), y
+    zif_eq  
+        rts
+    zendif
+    tax
+    
+    ; Push return address.
+
+    lda #>(exec-1)
+    pha
+    lda #<(exec-1)
+    pha
+
+    inc execbyteptr
+    lda token_exec_hi, x     ; get execution routine
+    pha
+    lda token_exec_lo, x
+    pha
+    rts
+zendproc
+
+zproc exec_print
+    jsr pop_i0
+    jsr buffer_print_i0
+    jmp print_buffer
+zendproc
+
+zproc exec_printnl
+    jsr buffer_print_nl
+    jmp print_buffer
+zendproc
+
+zproc exec_integer
+    ldy execbyteptr
+    ldx #0
+    zrepeat
+        lda (execlineptr), y
+        sta i0, x
+        iny
+        inx
+        cpx #4
+    zuntil_eq
+    sty execbyteptr
+
+    lda #OBJECT_INTEGER
+    sta v0
+    jmp push_i0
+zendproc
+
+zproc exec_add
+    jsr pop_i1
+    jsr pop_i0
+
+    ldx #-4 & 0xff
+    clc
+    zrepeat
+        lda i0+4, x
+        adc i1+4, x
+        sta i0+4, x
+        inx
+    zuntil_eq
+
+    jmp push_i0
+zendproc
+
+zproc exec_sub
+    jsr pop_i1
+    jsr pop_i0
+
+    ldx #-4 & 0xff
+    sec
+    zrepeat
+        lda i0+4, x
+        sbc i1+4, x
+        sta i0+4, x
+        inx
+    zuntil_eq
+
+    jmp push_i0
+zendproc
+
+zproc exec_mul
+    jsr pop_i2
+    jsr pop_i0
+
+    jsr mul4
+
+    jmp push_i0
+zendproc
+
+zproc exec_div
+    jsr pop_i2
+    jsr pop_i0
+
+    jsr divs4
+
+    jmp push_i0
+zendproc
+
+zproc exec_bad
+    brk
+zendproc
+
+zproc push_i2
+    ldx #i2
+    bne push_ix
+zendproc
+
+zproc push_i1
+    ldx #i1
+    bne push_ix
+zendproc
+
+zproc push_i0
+    ldx #i0
+zendproc
+    ; fall through
+zproc push_ix
+    ldy #0
+    lda v0
+    sta (stackptr), y
+    zrepeat
+        iny
+        lda 0, x
+        sta (stackptr), y
+        inx
+        cpy #4
+    zuntil_eq
+
+    lda #5
+    clc
+    adc stackptr+0
+    sta stackptr+0
+    zif_cs
+        inc stackptr+1
+    zendif
+    rts
+zendproc
+
+zproc pop_i2
+    ldx #i2
+    bne pop_ix              ; always taken
+zendproc
+zproc pop_i1
+    ldx #i1
+    bne pop_ix              ; always taken
+zendproc
+zproc pop_i0
+    ldx #i0
+zendproc
+    ; fall through
+zproc pop_ix
+    sec
+    lda stackptr+0
+    sbc #5
+    sta stackptr+0
+    zif_cc
+        dec stackptr+1
+    zendif
+
+    ldy #0
+    lda (stackptr), y
+    sta v0
+    zrepeat
+        iny
+        lda (stackptr), y
+        sta 0, x
+        inx
+        cpy #4
+    zuntil_eq
     rts
 zendproc
 
@@ -382,6 +600,13 @@ zproc buffer_print_char
     rts
 zendproc
 
+zproc buffer_print_nl
+    lda #0x0d
+    jsr buffer_print_char
+    lda #0x0a
+    bne buffer_print_char       ; always taken
+zendproc
+
 ; --- Maths -----------------------------------------------------------------
 
 ; Computes i1i0 := i0 * i2.
@@ -414,6 +639,140 @@ zproc mul4
         zendif
 
         dey
+    zuntil_eq
+    rts
+zendproc
+
+; Computes i0 rem i1 := i0 / i2, unsigned.
+
+zproc divu4
+    lda #0              ; clear remainder
+    ldx #3
+    zrepeat
+        sta i1, x
+        dex
+    zuntil_mi
+
+    ldy #32             ; bit counter
+    zrepeat
+        ldx #-8 & 0xff      ; left shift result and remainder
+        clc
+        zrepeat
+            rol i0+8, x
+            inx
+        zuntil_eq
+
+        sec                 ; if remainder < rhs
+        ldx #-4 & 0xff
+        zrepeat
+            lda i1+4, x
+            sbc i2+4, x
+            inx
+        zuntil_eq
+        zif_cs
+            ldx #-4 & 0xff      ; remainder := remainder - rhs
+            zrepeat
+                lda i1+4, x
+                sbc i2+4, x
+                sta i1+4, x
+                inx
+            zuntil_eq
+            inc i0
+        zendif
+
+        dey
+    zuntil_eq
+    rts
+zendproc
+
+; Computes i0 rem i1 := i0 / i2, signed.
+
+zproc divs4
+    lda i0+3            ; high byte of LHS
+    eor i2+3            ; high byte of RHS
+    php                 ; save sign of result for later
+    lda i0+3            ; high byte of LHS
+    php                 ; save sign of remainder for later
+    zif_mi              ; negate LHS if negative
+        jsr negi0
+    zendif
+
+    lda i2+3            ; get sign of RHS
+    zif_mi
+        jsr negi2       ; negate RHS if negative
+    zendif
+
+    jsr divu4           ; actually do the division
+
+    plp                 ; get sign of remainder
+    zif_mi
+        jsr negi1       ; negate remainder if required
+    zendif
+
+    plp                 ; get sign of result
+    zif_mi
+        jsr negi0       ; invert result if required
+    zendif
+    rts
+zendproc
+
+; Negates i0/i1/i2.
+
+zproc negi0
+    ldx #i0
+    bne negi            ; always taken
+zendproc
+
+zproc negi1
+    ldx #i1
+    bne negi            ; always taken
+zendproc
+
+zproc negi2
+    ldx #i2
+zendproc
+    ; falls through
+zproc negi
+    ldy #(-4) & 0xff
+    sec
+    zrepeat
+        lda #0
+        sbc 0, x
+        sta 0, x
+        inx
+        iny
+    zuntil_eq
+    rts
+zendproc
+
+zproc buffer_print_i0
+    lda #10
+    sta i2+0
+    lda #0
+    sta i2+1
+    sta i2+2
+    sta i2+3
+    sta p0+0
+
+    zrepeat
+        jsr divu4
+        lda i1+0
+        pha
+        inc p0+0
+
+        lda i0+0
+        ora i0+1
+        ora i0+2
+        ora i0+3
+    zuntil_eq
+
+    zrepeat
+        pla
+        clc
+        adc #'0'
+        jsr buffer_print_char
+
+        dec p0+0
     zuntil_eq
     rts
 zendproc
@@ -836,6 +1195,22 @@ zproc lister_varref
     zendif
     lda p0+0
     jmp buffer_print_string
+zendproc
+
+zproc lister_integer
+    lda operator_stack, x       ; get bytecode address
+    tax
+
+    ldy #0
+    zrepeat
+        lda bytecode_buffer+1, x
+        sta i0, y
+        inx
+        iny
+        cpy #4
+    zuntil_eq
+
+    jmp buffer_print_i0
 zendproc
 
 zproc lister_assign
@@ -1457,9 +1832,9 @@ zproc pop_number
     zloop
         ldx bufferend
         lda text_buffer, x
-        cmp #'0'-1
+        cmp #'0'
         zbreakif_cc
-        cmp #'9'
+        cmp #'9'+1
         zbreakif_cs
 
         pha
@@ -1664,6 +2039,7 @@ expr_rule:
     P_TRY addition_rule
     P_TRY subtraction_rule
     P_TRY multiplication_rule
+    P_TRY division_rule
     P_RETURN
 
 addition_rule:
@@ -1682,6 +2058,12 @@ multiplication_rule:
 keyword_mul = . + 2
     P_EAGER_TOKEN '*'|0x80
     P_SHUNT TOKEN_MUL
+    P_JMP compulsory_expr_rule
+
+division_rule:
+keyword_div = . + 2
+    P_EAGER_TOKEN '/'|0x80
+    P_SHUNT TOKEN_DIV
     P_JMP compulsory_expr_rule
 
 leaf_rule:
