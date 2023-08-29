@@ -84,9 +84,10 @@ TOKEN_MUL       = 0x03
 TOKEN_DIV       = 0x04
 TOKEN_ADD       = 0x05
 TOKEN_SUB       = 0x06
-TOKEN_PRINT     = 0x07
-TOKEN_PRINTNL   = 0x08
-TOKEN_ASSIGN    = 0x09
+TOKEN_MOD       = 0x07
+TOKEN_PRINT     = 0x08
+TOKEN_PRINTNL   = 0x09
+TOKEN_ASSIGN    = 0x0a
 
 .set tokenvalue, 0
 
@@ -136,6 +137,7 @@ token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,   keyword_mul,    exec_mul
 token_data TOKEN_DIV,     10, 1, 2, 1, lister_infix,   keyword_div,    exec_div
 token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,   keyword_add,    exec_add
 token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,   keyword_sub,    exec_sub
+token_data TOKEN_MOD,     10, 1, 2, 1, lister_infix,   keyword_mod,    exec_mod
 token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad,     exec_print
 token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl
 token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign, exec_bad
@@ -483,6 +485,15 @@ zproc exec_div
     jmp push_i0
 zendproc
 
+zproc exec_mod
+    jsr pop_i2
+    jsr pop_i0
+
+    jsr divs4
+
+    jmp push_i1
+zendproc
+
 zproc exec_bad
     brk
 zendproc
@@ -558,6 +569,50 @@ zproc pop_ix
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
+
+; Prints the decimal number in i0.
+
+zproc buffer_print_i0
+    lda #10
+    sta i2+0
+    lda #0
+    sta i2+1
+    sta i2+2
+    sta i2+3
+    sta p0+0
+
+    ; Is this a negative number?
+
+    lda i0+3
+    zif_mi
+        lda #'-'
+        jsr buffer_print_char
+
+        jsr negi0
+    zendif
+
+    zrepeat
+        jsr divu4
+        lda i1+0
+        pha
+        inc p0+0
+
+        lda i0+0
+        ora i0+1
+        ora i0+2
+        ora i0+3
+    zuntil_eq
+
+    zrepeat
+        pla
+        clc
+        adc #'0'
+        jsr buffer_print_char
+
+        dec p0+0
+    zuntil_eq
+    rts
+zendproc
 
 ; Outputs the high-bit-terminated string in AX.
 
@@ -741,38 +796,6 @@ zproc negi
         sta 0, x
         inx
         iny
-    zuntil_eq
-    rts
-zendproc
-
-zproc buffer_print_i0
-    lda #10
-    sta i2+0
-    lda #0
-    sta i2+1
-    sta i2+2
-    sta i2+3
-    sta p0+0
-
-    zrepeat
-        jsr divu4
-        lda i1+0
-        pha
-        inc p0+0
-
-        lda i0+0
-        ora i0+1
-        ora i0+2
-        ora i0+3
-    zuntil_eq
-
-    zrepeat
-        pla
-        clc
-        adc #'0'
-        jsr buffer_print_char
-
-        dec p0+0
     zuntil_eq
     rts
 zendproc
@@ -1829,6 +1852,17 @@ zproc pop_number
 
     lda bufferpos
     sta bufferend
+
+    ; Is the number negative?
+
+    ldx bufferend
+    lda text_buffer, x
+    cmp #'-'
+    php                 ; save comparison result for later
+    zif_eq
+        inc bufferend
+    zendif
+
     zloop
         ldx bufferend
         lda text_buffer, x
@@ -1862,6 +1896,11 @@ zproc pop_number
     lda bufferpos
     cmp bufferend
     beq 1f
+
+    plp                 ; is the number remainder?
+    zif_eq
+        jsr negi0
+    zendif
 
     lda #TOKEN_INTEGER
     jsr queue_bytecode
@@ -2040,6 +2079,7 @@ expr_rule:
     P_TRY subtraction_rule
     P_TRY multiplication_rule
     P_TRY division_rule
+    P_TRY modulus_rule
     P_RETURN
 
 addition_rule:
@@ -2064,6 +2104,12 @@ division_rule:
 keyword_div = . + 2
     P_EAGER_TOKEN '/'|0x80
     P_SHUNT TOKEN_DIV
+    P_JMP compulsory_expr_rule
+
+modulus_rule:
+keyword_mod = . + 2
+    P_TOKEN 'M', 'O', 'D'|0x80
+    P_SHUNT TOKEN_MOD
     P_JMP compulsory_expr_rule
 
 leaf_rule:
