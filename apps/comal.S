@@ -422,7 +422,7 @@ zproc exec
 zendproc
 
 zproc exec_print
-    jsr pop_i0
+    jsr pop_deref_i0
     jsr buffer_print_i0
     jmp print_buffer
 zendproc
@@ -469,7 +469,7 @@ zproc push_value_from_bytecode
 zendproc
 
 zproc exec_assign
-    jsr pop_i1              ; value to assign
+    jsr pop_deref_i1        ; value to assign
     jsr pop_i0              ; lvalue (variable reference)
 
     ; Find the hash node.
@@ -506,8 +506,8 @@ zproc exec_assign
 zendproc
 
 zproc exec_add
-    jsr pop_i1
-    jsr pop_i0
+    jsr pop_deref_i1
+    jsr pop_deref_i0
 
     ldx #-4 & 0xff
     clc
@@ -522,8 +522,8 @@ zproc exec_add
 zendproc
 
 zproc exec_sub
-    jsr pop_i1
-    jsr pop_i0
+    jsr pop_deref_i1
+    jsr pop_deref_i0
 
     ldx #-4 & 0xff
     sec
@@ -538,8 +538,8 @@ zproc exec_sub
 zendproc
 
 zproc exec_mul
-    jsr pop_i2
-    jsr pop_i0
+    jsr pop_deref_i2
+    jsr pop_deref_i0
 
     jsr mul4
 
@@ -547,8 +547,8 @@ zproc exec_mul
 zendproc
 
 zproc exec_div
-    jsr pop_i2
-    jsr pop_i0
+    jsr pop_deref_i2
+    jsr pop_deref_i0
 
     jsr divs4
 
@@ -556,8 +556,8 @@ zproc exec_div
 zendproc
 
 zproc exec_mod
-    jsr pop_i2
-    jsr pop_i0
+    jsr pop_deref_i2
+    jsr pop_deref_i0
 
     jsr divs4
 
@@ -607,6 +607,10 @@ zproc push_ix
     jmp extend_stack
 zendproc
 
+zproc pop_deref_i2
+    jsr deref_tos
+zendproc
+    ; fall through
 zproc pop_i2
     ldx #i2
     jsr pop_ix
@@ -615,6 +619,10 @@ zproc pop_i2
     rts
 zendproc
 
+zproc pop_deref_i1
+    jsr deref_tos
+zendproc
+    ; fall through
 zproc pop_i1
     ldx #i1
     jsr pop_ix
@@ -623,6 +631,10 @@ zproc pop_i1
     rts
 zendproc
 
+zproc pop_deref_i0
+    jsr deref_tos
+zendproc
+    ; fall through
 zproc pop_i0
     ldx #i0
     jsr pop_ix
@@ -643,6 +655,66 @@ zproc pop_ix
         dex
         dey
     zuntil_eq
+    rts
+zendproc
+
+; If TOS is a OBJECT_VAR, dereference it.
+
+zproc deref_tos
+    ; Get the address of the object.
+
+    sec
+    lda stackptr+0
+    sbc #5
+    sta p0+0
+    ldx stackptr+1
+    zif_cc
+        dex
+    zendif
+    stx p0+1
+
+    ; Is this a OBJECT_VAR?
+
+    ldy #0
+    lda (p0), y
+    cmp #OBJECT_VAR
+    zif_eq
+        lda p0+0
+        pha
+        lda p0+1
+        pha
+
+        ; Dereference it.
+
+        iny                 ; object ID -> p1
+        lda (p0), y
+        sta p1+0
+        iny
+        lda (p0), y
+        sta p1+1
+
+        lda #<global_variables
+        sta p0+0
+        lda #>global_variables
+        sta p0+1
+
+        jsr hash_deref          ; return ptr to node in p0
+
+        ; Copy the value to TOS.
+
+        pla
+        sta p1+1
+        pla
+        sta p1+0
+
+        ldy #4
+        zrepeat
+            lda (p0), y
+            sta (p1), y
+            dey
+        zuntil_mi
+    zendif
+
     rts
 zendproc
 
