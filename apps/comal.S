@@ -30,9 +30,22 @@
 OBJECT_FREE     = 0
 OBJECT_ATOM     = 1
 OBJECT_INTEGER  = 2
+OBJECT_VAR      = 3
 
 ATOM_TYPE       = 0
 ATOM_DATA       = 1
+
+HASH_SLOTS      = 16
+
+; Hash node structure:
+;  0    - object type
+;  1..4 - data
+;  5..6 - key
+;  7..8 - object ID of next node
+
+HASHNODE_KEY    = 5
+HASHNODE_NEXT   = 7
+HASHNODE_SIZE   = 9
 
 ZEROPAGE
 
@@ -44,6 +57,7 @@ heapptr:   .word 0
 
 p0:        .word 0
 p1:        .word 0
+p2:        .word 0
 v0:        .byte 0
 v1:        .byte 0
 v2:        .byte 0
@@ -131,7 +145,7 @@ token_exec_lo:
 .endm
         
 token_data TOKEN_EOL,     15, 1, 0, 0, lister_bad,     lister_bad,     exec_bad
-token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref,  lister_bad,     exec_bad
+token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref,  lister_bad,     exec_varref
 token_data TOKEN_INTEGER, 15, 5, 0, 1, lister_integer, lister_bad,     exec_integer
 token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,   keyword_mul,    exec_mul
 token_data TOKEN_DIV,     10, 1, 2, 1, lister_infix,   keyword_div,    exec_div
@@ -140,7 +154,7 @@ token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,   keyword_sub,    exec_sub
 token_data TOKEN_MOD,     10, 1, 2, 1, lister_infix,   keyword_mod,    exec_mod
 token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad,     exec_print
 token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl
-token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign, exec_bad
+token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign, exec_assign
 
 OBJECT_TABLE_SIZE = 256
 
@@ -419,20 +433,76 @@ zproc exec_printnl
 zendproc
 
 zproc exec_integer
-    ldy execbyteptr
-    ldx #0
-    zrepeat
-        lda (execlineptr), y
-        sta i0, x
-        iny
-        inx
-        cpx #4
-    zuntil_eq
-    sty execbyteptr
-
+    ldx #4
     lda #OBJECT_INTEGER
+    bne push_value_from_bytecode    ; always taken
+zendproc
+
+zproc exec_varref
+    ldx #2
+    lda #OBJECT_VAR
+    bne push_value_from_bytecode    ; always taken
+zendproc
+
+; On entry, X is the number of bytes to copy.
+; A is the object type.
+
+zproc push_value_from_bytecode
+    pha
+
+    clc
+    txa
+    adc execbyteptr         ; advance execbyteptr
+    sta execbyteptr
+    tay
+
+    zrepeat
+        dey
+        lda (execlineptr), y
+        sta i0-1, x         ; offset for postdecrement
+        dex
+    zuntil_eq
+
+    pla
     sta v0
     jmp push_i0
+zendproc
+
+zproc exec_assign
+    jsr pop_i1              ; value to assign
+    jsr pop_i0              ; lvalue (variable reference)
+
+    ; Find the hash node.
+
+    lda i0+0                ; object ID -> p1
+    sta p1+0
+    lda i0+1
+    sta p1+1
+
+    lda #<global_variables
+    sta p0+0
+    lda #>global_variables
+    sta p0+1
+
+    jsr hash_deref          ; return ptr to node in p0
+
+    ; Copy value into node.
+
+    ldy #0
+    lda v1
+    sta (p0), y
+    iny
+
+    ldx #-4 & 0xff
+    clc
+    zrepeat
+        lda i1+4, x
+        sta (p0), y
+        iny
+        inx
+    zuntil_eq
+
+    rts
 zendproc
 
 zproc exec_add
@@ -499,23 +569,32 @@ zproc exec_bad
 zendproc
 
 zproc push_i2
+    ldy #0
+    lda v2
+    sta (stackptr), y
+
     ldx #i2
     bne push_ix
 zendproc
 
 zproc push_i1
+    ldy #0
+    lda v1
+    sta (stackptr), y
+
     ldx #i1
     bne push_ix
 zendproc
 
 zproc push_i0
+    ldy #0
+    lda v0
+    sta (stackptr), y
+
     ldx #i0
 zendproc
     ; fall through
 zproc push_ix
-    ldy #0
-    lda v0
-    sta (stackptr), y
     zrepeat
         iny
         lda 0, x
@@ -525,46 +604,66 @@ zproc push_ix
     zuntil_eq
 
     lda #5
+    jmp extend_stack
+zendproc
+
+zproc pop_i2
+    ldx #i2
+    jsr pop_ix
+    lda (stackptr), y
+    sta v2
+    rts
+zendproc
+
+zproc pop_i1
+    ldx #i1
+    jsr pop_ix
+    lda (stackptr), y
+    sta v1
+    rts
+zendproc
+
+zproc pop_i0
+    ldx #i0
+    jsr pop_ix
+    lda (stackptr), y
+    sta v0
+    rts
+zendproc
+
+    ; Returns Y=0
+zproc pop_ix
+    lda #5
+    jsr retract_stack
+
+    ldy #4
+    zrepeat
+        lda (stackptr), y
+        sta +3, x
+        dex
+        dey
+    zuntil_eq
+    rts
+zendproc
+
+zproc retract_stack
+    eor #0xff
+    sec
+    adc stackptr+0
+    sta stackptr+0
+    zif_cc
+        dec stackptr+1
+    zendif
+    rts
+zendproc
+
+zproc extend_stack
     clc
     adc stackptr+0
     sta stackptr+0
     zif_cs
         inc stackptr+1
     zendif
-    rts
-zendproc
-
-zproc pop_i2
-    ldx #i2
-    bne pop_ix              ; always taken
-zendproc
-zproc pop_i1
-    ldx #i1
-    bne pop_ix              ; always taken
-zendproc
-zproc pop_i0
-    ldx #i0
-zendproc
-    ; fall through
-zproc pop_ix
-    sec
-    lda stackptr+0
-    sbc #5
-    sta stackptr+0
-    zif_cc
-        dec stackptr+1
-    zendif
-
-    ldy #0
-    lda (stackptr), y
-    sta v0
-    zrepeat
-        iny
-        lda (stackptr), y
-        sta 0, x
-        inx
-        cpy #4
-    zuntil_eq
     rts
 zendproc
 
@@ -800,6 +899,134 @@ zproc negi
     rts
 zendproc
 
+; --- Hashing stuff ---------------------------------------------------------
+
+; Returns a (possibly new) value node for a given ID.
+; On entry:
+;   p0 - pointer to hash table
+;   p1 - ID
+; On exit:
+;   p0 - pointer to value node
+
+zproc hash_deref
+    ; Hash the ID.
+
+    lda p1+0
+    eor p1+1
+    and #HASH_SLOTS-1
+    
+    ; Get the address of the hash slot.
+
+    asl a
+    adc p0+0            ; we know C is clear
+    sta p0+0
+    zif_cs
+        inc p0+1
+    zendif
+
+    ; Walk the list.
+
+    zloop
+        ; Here, p0 is the _address_ of the object ID of the first node.
+
+        ldy #0
+        lda (p0), y
+        sta p2+0
+        iny
+        lda (p0), y
+        sta p2+1        ; get the object ID
+        ora p2+0        ; test if null
+        zbreakif_eq
+
+        ; Get the pointer to the node from the ID.
+
+        lda p2+0
+        sta p0+0
+        lda p2+1
+        sta p0+1
+        jsr deref_object
+        
+        ; Is this the node we're looking for?
+
+        ldy #HASHNODE_KEY
+        lda (p0), y
+        cmp p1+0
+        zif_eq
+            iny
+            lda (p0), y
+            cmp p1+1
+            zif_eq
+                ; Yes. We've found a matching node. Just return it.
+
+                rts
+            zendif
+        zendif
+
+        ; Didn't match. Go on to the next item in the chain.
+
+        clc
+        lda p0+0
+        adc #HASHNODE_NEXT
+        sta p0+0
+        zif_eq
+            inc p0+1
+        zendif
+    zendloop
+
+    ; Reached the end of the chain --- allocate a new node.
+    
+    lda p0+0
+    pha
+    lda p0+1
+    pha
+    lda p1+0
+    pha
+    lda p1+1
+    pha
+
+    lda #HASHNODE_SIZE
+    sta p1+0
+    lda #0
+    sta p1+1
+    jsr heap_alloc          ; returns pointer in p0, id in p1
+
+    ; Zero the node.
+
+    ldy #HASHNODE_SIZE-1
+    lda #0
+    zrepeat
+        sta (p0), y
+        dey
+    zuntil_mi
+
+    ; Set the node's key.
+
+    ldy #HASHNODE_KEY+1
+    pla
+    sta (p0), y
+    dey
+    pla
+    sta (p0), y
+
+    ; Add this new node to the chain.
+
+    pla
+    sta p2+1
+    pla
+    sta p2+0                ; recover address of object ID
+
+    ldy #0
+    lda p1+0
+    sta (p2), y
+    iny
+    lda p1+1
+    sta (p2), y
+
+    ; Return the new node.
+
+    rts
+zendproc
+
 ; --- Objects and atoms -----------------------------------------------------
 
 ; Given an object ID in p0, returns in p0 the address in the object table of
@@ -882,8 +1109,6 @@ not_eof:
     rts
 zendproc
 
-; p1 is the object ID counter. p0 is
-; a pointer to the slot (which may contain zero
 ; Allocates a block of size p1 on the heap. The object ID is returned in p1 and
 ; a pointer to the new object in p0. The first byte of the block must be set
 ; to a valid object type.
@@ -2141,6 +2366,8 @@ number_rule:
 object_table:
     .ds OBJECT_TABLE_SIZE * 2
 
+global_variables:
+    .ds HASH_SLOTS * 2
 text_buffer:
     .ds 256
 bytecode_buffer:
