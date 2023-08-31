@@ -13,7 +13,7 @@
 ;   * 3x8 empty scan lines
 ;   * 24 rows of:
 ;       - 1 empty scan line
-;       - 6 scanlines of mode 8 (6*40=240 bytes)
+;       - 6 scanlines of Antic mode 15 (6*40=240 bytes)
 ;       - 1 empty scan line
 ;   * end of display list
 ;
@@ -28,6 +28,9 @@
 ; The 40 columns BIOS driver uses four consecutive pages for its display
 ; list and screen memory, starting at where SDLSTL points. We reuse this
 ; memory for four rows of our new screen.
+;
+; Antic mode 15 is 320 pixels monochrome.
+; Character bounding box is 4x6 pixels, glyphs are 3x6 pixels.
 
 ; -------------------------------------------------------------------------
 
@@ -48,6 +51,14 @@ ptr:    .fill 2
 
 drv_zp_end:
 
+SCREEN_WIDTH = 80
+SCREEN_HEIGHT = 24
+
+; Reuse Atari OS locations, similar to the 40 columns BIOS drivers
+
+cursorx = COLCRS
+cursory = ROWCRS
+
 ; -------------------------------------------------------------------------
 
 zproc main
@@ -55,6 +66,8 @@ zproc main
 zendproc
 
 ; -------------------------------------------------------------------------
+
+; SCREEN80 DESCRIPTION AND DISPATCHER
 
 drv_screen80:
     .word DRVID_SCREEN
@@ -104,6 +117,8 @@ zendproc
 
 ; -------------------------------------------------------------------------
 
+; TTY80 DESCRIPTION AND DISPATCHER
+
 drv_tty80:
     .word DRVID_TTY
     .word drv_tty80_strat
@@ -127,6 +142,8 @@ drv_tty80_jump_hi:
 zendproc
 
 ; -------------------------------------------------------------------------
+
+; INITIALIZE DRIVERS
 
 zproc init
     ldy #BDOS_GET_BIOS
@@ -177,6 +194,8 @@ zproc init
     ldy #BIOS_SETZP
     jsr BIOS
 
+    jsr screen80_clear
+
     lda #<banner
     ldx #>banner
     ldy #BDOS_WRITE_STRING
@@ -187,53 +206,126 @@ zendproc
 
 ; -------------------------------------------------------------------------
 
+; SCREEN80 IMPLEMENTATION
+
 zproc screen80_version
-    jmp (next_screen)
+    lda #0
+    rts
 zendproc
+
 zproc screen80_getsize
-    jmp (next_screen)
+    lda #SCREEN_WIDTH-1
+    ldx #SCREEN_HEIGHT-1
+    rts
 zendproc
+
+; Cycle through all LMS addresses and write 240 zeroes, home cursor
+
 zproc screen80_clear
-    jmp (next_screen)
+    sec
+    rts
 zendproc
+
 zproc screen80_setcursor
-    jmp (next_screen)
+    jmp (next_screen)           ; sets cursorx/cursory (COLCRS/ROWCRS)
 zendproc
+
 zproc screen80_getcursor
-    jmp (next_screen)
+    jmp (next_screen)           ; gets cursorx/cursory (COLCRS/ROWCRS)
 zendproc
+
 zproc screen80_putchar
-    jmp (next_screen)
+    sec
+    rts
 zendproc
+
 zproc screen80_putstring
-    jmp (next_screen)
+    sec
+    rts
 zendproc
+
 zproc screen80_getchar
-    jmp (next_screen)
+    jmp (next_screen)           ; keyboard input through BIOS driver
 zendproc
+
+; Rotate LMS addresses in display list up, find bottom line, and clear
+
 zproc screen80_scrollup
-    jmp (next_screen)
+    sec
+    rts
 zendproc
+
+; Rotate LMS addresses in display list down, find top line, and clear
+
 zproc screen80_scrolldown
-    jmp (next_screen)
+    sec
+    rts
 zendproc
+
 zproc screen80_cleartoeol
-    jmp (next_screen)
+    sec
+    rts
 zendproc
 
 ; -------------------------------------------------------------------------
+
+; TTY80 IMPLEMENTATION
+
+; Call embedded BIOS tty driver for input
 
 zproc tty80_const
     jmp (next_tty)
 zendproc
+
 zproc tty80_conin
     jmp (next_tty)
 zendproc
+
 zproc tty80_conout
+;    rts
     jmp (next_tty)
 zendproc
 
 ; -------------------------------------------------------------------------
+
+; HELPER FUNCTIONS
+
+; Wait for vertical blank interrupt
+
+zproc wait_for_vbi
+    lda RTCLOK
+wait:
+    cmp RTCLOK
+    beq wait
+    rts
+zendproc
+
+; Properly coded, hide and show can be merged.
+; Show cursor needs to refind the new curlineptr, hide cursor does not.
+; Toggle cursor with eor mask
+
+; Show cursor
+
+zproc show_cursor
+    nop
+zendproc            ; fallthrough
+
+; Hide cursor
+
+zproc hide_cursor
+    rts
+zendproc
+
+; Sets (ptr),y to the location of the cursor
+; cache in curlineptr
+; cursorsx & 1 determines left (0b11110000) or right (0b00001111) mask
+; return cursorx & 1 in carry
+
+zproc find_cursor_address
+    rts
+zendproc
+
+; BIOS trampoline
 
 zproc BIOS
     jmp $1234
@@ -241,11 +333,23 @@ zendproc
 
 ; -------------------------------------------------------------------------
 
+; MISCELLANEOUS DATA
+
     .data
 
 banner:
     .ascii "tty80/screen80 driver loaded."
     .byte 13, 10, 0
+
+; Include binary font data here. 96 glyphs * 6 bytes (both left and right
+; position) equals 576 bytes
+
+font:
+    #include "../third_party/fonts/atari/ivo3x6.inc"
+
+; -------------------------------------------------------------------------
+
+; UNINITIALIZED
 
     .bss
 
@@ -254,9 +358,27 @@ next_tty:
 next_screen:
     .fill 2
 
-; This "trick" saves a lot of calculations
+; This "trick" saves a lot of calculations. Assembler/linker calculates
+; the positions and offsets.
 
     .align 0x0100
+
+; 3x$70             ; 3x8 empty scan lines
+; 24x {
+;   $00             ; empty scan line
+;   $4f, lsb, msb   ; mode 15 + LMS, lsb+msb of screen memory
+;   5x$0f           ; 5x mode 15
+;   $00             ; empty scan line
+; }                 ; wait for vb and jump to start of DL
+; $41, lsb, msb
+;
+; total = 3 + 24*10 + 3 = 246, fits in one page, so it never crosses an
+; important boundary.
+
+; helper offsets, point to lsb, not the LMS instruction.
+
+first_lms=.+5
+last_lms=.+235
 
 display_list:
     .fill 256
@@ -266,6 +388,8 @@ display_list:
 
 screen_memory:
     .fill 256*20
+
+; Increase TPA bottom to here
 
 reserve_tpa_end:
 
