@@ -8,6 +8,29 @@
 ;
 ; -------------------------------------------------------------------------
 
+; 80 columns by 24 rows.
+; We create a page aligned Antic Display List to display the following:
+;   * 3x8 empty scan lines
+;   * 24 rows of:
+;       - 1 empty scan line
+;       - 6 scanlines of mode 8 (6*40=240 bytes)
+;       - 1 empty scan line
+;   * end of display list
+;
+; Each row has its own LMS to a page aligned block of 240 bytes, making
+; indexing trivial, and scrollup/down is a matter of pointer adjustment.
+; Page alignment wastes 24*16 bytes, but assures us we never cross a 1K
+; boundary (display list) or 4K boundary (screen memory), which are Antic
+; requirements.
+; We save 24*2*40 bytes by utilizing the Antic's ability to display empty
+; lines, at the cost of having a slightly smaller cursor.
+
+; The 40 columns BIOS driver uses four consecutive pages for its display
+; list and screen memory, starting at where SDLSTL points. We reuse this
+; memory for four rows of our new screen.
+
+; -------------------------------------------------------------------------
+
 #include "zif.inc"
 
 ; force to include the clang version and not the asm.com version
@@ -143,9 +166,7 @@ zproc init
 
     ldy #BIOS_GETTPA
     jsr BIOS
-; reserve 2 pages for now, later calculate total new screen memory and code
-    clc
-    adc #2
+    lda #>reserve_tpa_end
     ldy #BIOS_SETTPA
     jsr BIOS
 
@@ -229,9 +250,24 @@ banner:
     .bss
 
 next_tty:
-    .word 0
+    .fill 2
 next_screen:
-    .word 0
+    .fill 2
+
+; This "trick" saves a lot of calculations
+
+    .align 0x0100
+
+display_list:
+    .fill 256
+
+; 20 rows here, the other 4 are at the old location of the 40 columns
+; display list and screen memory
+
+screen_memory:
+    .fill 256*20
+
+reserve_tpa_end:
 
 ; -------------------------------------------------------------------------
 
