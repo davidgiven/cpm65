@@ -501,7 +501,7 @@ zproc exec_assign
     ; Copy value into node.
 
     ldy #OBJECT_TYPE
-    lda v1
+    lda v0
     sta (p0), y
     iny
 
@@ -519,8 +519,7 @@ zendproc
 
 zproc exec_add
     jsr deref_i0        ; RHS
-    jsr pop_i1
-    jsr deref_i1        ; LHS
+    jsr pop_and_deref_i1 ; LHS
 
     ldx #-4 & 0xff
     clc
@@ -536,8 +535,7 @@ zendproc
 
 zproc exec_sub
     jsr deref_i0        ; RHS
-    jsr pop_i1
-    jsr deref_i1        ; LHS
+    jsr pop_and_deref_i1 ; LHS
 
     ldx #-4 & 0xff
     sec
@@ -553,8 +551,7 @@ zendproc
 
 zproc exec_mul
     jsr deref_i0        ; RHS
-    jsr pop_i2
-    jsr deref_i2        ; LHS
+    jsr pop_and_deref_i2 ; LHS
 
     jmp mul4
 zendproc
@@ -562,8 +559,7 @@ zendproc
 zproc exec_div
     jsr deref_i0        ; RHS
     jsr i0_to_i2
-    jsr pop_i0
-    jsr deref_i0        ; LHS
+    jsr pop_and_deref_i0 ; LHS
 
     jmp divs4
 zendproc
@@ -571,8 +567,7 @@ zendproc
 zproc exec_mod
     jsr deref_i0        ; RHS
     jsr i0_to_i2
-    jsr pop_i0
-    jsr deref_i0        ; LHS
+    jsr pop_and_deref_i0 ; LHS
 
     jsr divs4
     jmp i1_to_i0
@@ -661,72 +656,82 @@ zproc pop_ix
     rts
 zendproc
 
-zproc deref_i0
-    lda v0
-    cmp #OTYPE_VAR
-    zif_eq
-        ldx #i0
-        jsr deref_ix
-        sta v0
-    zendif
-    rts
+zproc pop_and_deref_i1
+    jsr pop_i1
 zendproc
-
+    ; falls through
 zproc deref_i1
-    lda v1
-    cmp #OTYPE_VAR
-    zif_eq
-        ldx #i1
-        jsr deref_ix
-        sta v1
-    zendif
-    rts
+    ldx #i1
+    ldy #v1
+    jmp deref_ix
 zendproc
 
+zproc pop_and_deref_i2
+    jsr pop_i2
+zendproc
+    ; falls through
 zproc deref_i2
-    lda v2
-    cmp #OTYPE_VAR
-    zif_eq
-        ldx #i2
-        jsr deref_ix
-        sta v2
-    zendif
-    rts
+    ldx #i2
+    ldy #v2
+    jmp deref_ix
 zendproc
 
+zproc pop_and_deref_i0
+    jsr pop_i0
+zendproc
+    ; falls through
+zproc deref_i0
+    ldx #i0
+    ldy #v0
+zendproc
+    ; falls through
+
+; On entry:
+;   X - address of i register
+;   Y - address of type byte
 zproc deref_ix
-    lda 0, x            ; object ID -> p1
-    sta p1+0
-    lda 1, x
-    sta p1+1
+    lda 0, y
+    cmp #OTYPE_VAR      ; is the object a variable reference?
+    zif_eq
+        tya
+        pha
 
-    txa
-    pha
+        lda 0, x            ; object ID -> p1
+        sta p1+0
+        lda 1, x
+        sta p1+1
 
-    lda #<global_variables
-    sta p0+0
-    lda #>global_variables
-    sta p0+1
+        txa
+        pha
 
-    jsr hash_deref          ; return ptr to node in p0
+        lda #<global_variables
+        sta p0+0
+        lda #>global_variables
+        sta p0+1
 
-    pla
-    tax
+        jsr hash_deref          ; return ptr to node in p0
 
-    ; Copy the value to register.
+        pla
+        tax
 
-    ldy #OBJECT_DATA
-    zrepeat
-        lda (p0), y         ; get byte from object
-        sta 0, x            ; write to register
-        inx
-        iny
-        cpy #OBJECT_DATA+4
-    zuntil_eq
+        ; Copy the value to register.
 
-    ; Exits with the type byte in A.
+        ldy #OBJECT_DATA
+        zrepeat
+            lda (p0), y         ; get byte from object
+            sta 0, x            ; write to register
+            inx
+            iny
+            cpy #OBJECT_DATA+4
+        zuntil_eq
 
-    lda (p0), y
+        ; Write the type byte.
+
+        pla
+        tax
+        lda (p0), y
+        sta 0, x
+    zendif
     rts
 zendproc
 
