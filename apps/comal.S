@@ -112,6 +112,7 @@ TOKEN_MOD       = 0x07
 TOKEN_PRINT     = 0x08
 TOKEN_PRINTNL   = 0x09
 TOKEN_ASSIGN    = 0x0a
+TOKEN_NEG       = 0x0b
 
 .set tokenvalue, 0
 
@@ -165,6 +166,7 @@ token_data TOKEN_MOD,     10, 1, 2, 1, lister_infix,   keyword_mod,    exec_mod
 token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad,     exec_print
 token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl
 token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign, exec_assign
+token_data TOKEN_NEG,     14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_neg
 
 OBJECT_TABLE_SIZE = 256
 
@@ -541,6 +543,22 @@ zproc exec_sub
     sec
     zrepeat
         lda i1+4, x
+        sbc i0+4, x
+        sta i0+4, x
+        inx
+    zuntil_eq
+
+    rts
+zendproc
+
+zproc exec_neg
+    jsr deref_i0
+    jsr pop_and_deref_i1 ; LHS
+
+    ldx #-4 & 0xff
+    sec
+    zrepeat
+        lda #0
         sbc i0+4, x
         sta i0+4, x
         inx
@@ -1651,6 +1669,24 @@ zproc list_parenthesised_clause
     jmp list_clause
 zendproc
 
+zproc lister_prefix
+    txa
+    pha
+
+    lda operator_stack, x       ; get bytecode address
+    tay
+    lda bytecode_buffer, y      ; get bytecode
+    tay
+    ldx token_aux_hi, y
+    lda token_aux_lo, y
+    jsr buffer_print_string
+
+    pla
+    tax                         ; recover current node tree address
+    ldy operator_stack+1, x     ; get second parameter tree address
+    jmp list_parenthesised_clause
+zendproc
+
 ; --- Parser ----------------------------------------------------------------
 
 zproc parse_line
@@ -2180,17 +2216,20 @@ zendproc
 zproc pop_number
     jsr parser_skip_whitespace
 
-    ldx #0
+    ; Clear i2 and i0.
+
+    ldx #3
+    lda #0
+    zrepeat
+        sta i2, x
+        sta i0, x
+        dex
+    zuntil_mi
+
+    ; Set i2 to 10 for the multiplication.
+
     lda #10
     sta i2+0
-    stx i2+1
-    stx i2+2
-    stx i2+3
-
-    stx i0+0
-    stx i0+1
-    stx i0+2
-    stx i0+3
 
     lda bufferpos
     sta bufferend
@@ -2202,6 +2241,7 @@ zproc pop_number
     cmp #'-'
     php                 ; save comparison result for later
     zif_eq
+        inc bufferpos
         inc bufferend
     zendif
 
@@ -2239,7 +2279,7 @@ zproc pop_number
     cmp bufferend
     beq 1f
 
-    plp                 ; is the number remainder?
+    plp                 ; is the number negative?
     zif_eq
         jsr negi0
     zendif
@@ -2458,6 +2498,7 @@ leaf_rule:
     P_TRY parenthesised_rule
     P_TRY varref_rule
     P_TRY number_rule
+    P_TRY negate_rule
     P_FAIL
 
 parenthesised_rule:
@@ -2475,6 +2516,14 @@ varref_rule:
 
 number_rule:
     P_NUMBER
+    P_RETURN
+
+negate_rule:
+keyword_neg = . + 2
+    P_EAGER_TOKEN '-'|0x80
+    P_COMMIT
+    P_SHUNT TOKEN_NEG
+    P_JSR leaf_rule
     P_RETURN
 
 .data
