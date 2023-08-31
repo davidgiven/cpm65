@@ -8,16 +8,17 @@
 ; 5. Correctness
 
 ; hi TPAEND
-;    heap
-;      v
-;
-;      ^
+;             <-- progtop
+;    comal bytecode (in reverse)
+;             <-- progbase
 ;    stack
-;    comal bytecode
-;    object table
-;    interpreter
+;             <-- stackptr
+;
+;             <-- heapptr
+;    heap
+;             <-- heapbase
+;    interpreter and workspace
 ; lo TPABASE
-
 ; IMPORTANT --- remember how comparisons work!
 ;
 ; lda A
@@ -27,33 +28,42 @@
 ; If the C flag is 0, then A (unsigned) < NUM (unsigned) and BCC will branch
 ; If the C flag is 1, then A (unsigned) >= NUM (unsigned) and BCS will branch
 
-OBJECT_FREE     = 0
-OBJECT_ATOM     = 1
-OBJECT_INTEGER  = 2
-OBJECT_VAR      = 3
+OBJECT_SIZE     = 0
+OBJECT_TYPE     = 2
+OBJECT_DATA     = 3
 
-ATOM_TYPE       = 0
-ATOM_DATA       = 1
+OTYPE_FREE      = 0
+OTYPE_ATOM      = 1
+OTYPE_INTEGER   = 2
+OTYPE_VAR       = 3
 
 HASH_SLOTS      = 16
 
 ; Hash node structure:
+;  0..1 - object size
+;  2    - object type
+;  3..6 - data
+;  7..8 - key
+;  9..a - object ID of next node
+
+HASHNODE_KEY    = 7
+HASHNODE_NEXT   = 9
+HASHNODE_SIZE   = 0xb
+
+; Stack value structure:
 ;  0    - object type
 ;  1..4 - data
-;  5..6 - key
-;  7..8 - object ID of next node
 
-HASHNODE_KEY    = 5
-HASHNODE_NEXT   = 7
-HASHNODE_SIZE   = 9
+STACKVALUE_TYPE = 0
+STACKVALUE_DATA = 1
+STACKVALUE_SIZE = 5
 
 ZEROPAGE
 
-progbase:  .word 0
-stackbase: .word 0
-stackptr:  .word 0
-heaptop:   .word 0
 heapptr:   .word 0
+stackptr:  .word 0
+progbase:  .word 0
+progtop:   .word 0
 
 p0:        .word 0
 p1:        .word 0
@@ -234,34 +244,28 @@ zproc clear
 
     ldy #BDOS_GETTPA
     jsr BDOS
-    stx heaptop+1
-    stx heapptr+1
+    stx progtop+1
     lda #0
-    sta heaptop+0
-    sta heapptr+0
+    sta progtop+0
 
-    lda #<program_end
+    lda #<heapbase
+    sta heapptr+0
+    lda #>heapbase
+    sta heapptr+1
+
+    sec
+    lda progtop+0
+    sbc #1
     sta progbase+0
-    lda #>program_end
+    sta stackptr+0
+    lda progtop+1
+    sbc #0
     sta progbase+1
+    sta stackptr+1
 
     lda #0
     tay
     sta (progbase), y
-
-    lda progbase+0
-    sta stackbase+0
-    lda progbase+1
-    sta stackbase+1
-    inc stackbase+0
-    zif_eq
-        inc stackbase+1
-    zendif
-
-    lda stackbase+0
-    sta stackptr+0
-    lda stackbase+1
-    sta stackptr+1
 
     rts
 zendproc
@@ -434,13 +438,13 @@ zendproc
 
 zproc exec_integer
     ldx #4
-    lda #OBJECT_INTEGER
+    lda #OTYPE_INTEGER
     bne push_value_from_bytecode    ; always taken
 zendproc
 
 zproc exec_varref
     ldx #2
-    lda #OBJECT_VAR
+    lda #OTYPE_VAR
     bne push_value_from_bytecode    ; always taken
 zendproc
 
@@ -488,7 +492,7 @@ zproc exec_assign
 
     ; Copy value into node.
 
-    ldy #0
+    ldy #OBJECT_TYPE
     lda v1
     sta (p0), y
     iny
@@ -569,32 +573,33 @@ zproc exec_bad
 zendproc
 
 zproc push_i2
-    ldy #0
-    lda v2
-    sta (stackptr), y
-
+    ldy v2
     ldx #i2
     bne push_ix
 zendproc
 
 zproc push_i1
-    ldy #0
-    lda v1
-    sta (stackptr), y
-
+    ldy v1
     ldx #i1
     bne push_ix
 zendproc
 
 zproc push_i0
-    ldy #0
-    lda v0
-    sta (stackptr), y
-
+    ldy v0
     ldx #i0
 zendproc
     ; fall through
+    ; On entry:
+    ;   x = address of i register
+    ;   y = value byte
 zproc push_ix
+    lda #STACKVALUE_SIZE
+    jsr extend_stack
+
+    tya
+    ldy #STACKVALUE_TYPE
+    sta (stackptr), y
+
     zrepeat
         iny
         lda 0, x
@@ -602,9 +607,7 @@ zproc push_ix
         inx
         cpy #4
     zuntil_eq
-
-    lda #5
-    jmp extend_stack
+    rts
 zendproc
 
 zproc pop_deref_i2
@@ -614,7 +617,6 @@ zendproc
 zproc pop_i2
     ldx #i2
     jsr pop_ix
-    lda (stackptr), y
     sta v2
     rts
 zendproc
@@ -626,7 +628,6 @@ zendproc
 zproc pop_i1
     ldx #i1
     jsr pop_ix
-    lda (stackptr), y
     sta v1
     rts
 zendproc
@@ -638,16 +639,12 @@ zendproc
 zproc pop_i0
     ldx #i0
     jsr pop_ix
-    lda (stackptr), y
     sta v0
     rts
 zendproc
 
-    ; Returns Y=0
+    ; Returns A=object type
 zproc pop_ix
-    lda #5
-    jsr retract_stack
-
     ldy #4
     zrepeat
         lda (stackptr), y
@@ -655,42 +652,33 @@ zproc pop_ix
         dex
         dey
     zuntil_eq
+
+    lda (stackptr), y       ; type field, at y=0
+    pha
+
+    lda #STACKVALUE_SIZE
+    jsr retract_stack
+
+    pla
     rts
 zendproc
 
 ; If TOS is a OBJECT_VAR, dereference it.
 
 zproc deref_tos
-    ; Get the address of the object.
-
-    sec
-    lda stackptr+0
-    sbc #5
-    sta p0+0
-    ldx stackptr+1
-    zif_cc
-        dex
-    zendif
-    stx p0+1
-
     ; Is this a OBJECT_VAR?
 
-    ldy #0
-    lda (p0), y
-    cmp #OBJECT_VAR
+    ldy #STACKVALUE_TYPE
+    lda (stackptr), y
+    cmp #OTYPE_VAR
     zif_eq
-        lda p0+0
-        pha
-        lda p0+1
-        pha
-
         ; Dereference it.
 
         iny                 ; object ID -> p1
-        lda (p0), y
+        lda (stackptr), y
         sta p1+0
         iny
-        lda (p0), y
+        lda (stackptr), y
         sta p1+1
 
         lda #<global_variables
@@ -702,23 +690,22 @@ zproc deref_tos
 
         ; Copy the value to TOS.
 
-        pla
-        sta p1+1
-        pla
-        sta p1+0
-
         ldy #4
         zrepeat
             lda (p0), y
-            sta (p1), y
+            iny                 ; +2, for OBJECT_TYPE
+            iny
+            sta (stackptr), y
+            dey                 ; -2, for STACKVALUE_TYPE
             dey
+            dey                 ; loop decrement
         zuntil_mi
     zendif
 
     rts
 zendproc
 
-zproc retract_stack
+zproc extend_stack
     eor #0xff
     sec
     adc stackptr+0
@@ -729,7 +716,7 @@ zproc retract_stack
     rts
 zendproc
 
-zproc extend_stack
+zproc retract_stack
     clc
     adc stackptr+0
     sta stackptr+0
@@ -1069,6 +1056,7 @@ zproc hash_deref
     zrepeat
         sta (p0), y
         dey
+        cpy #OBJECT_DATA
     zuntil_mi
 
     ; Set the node's key.
@@ -1184,33 +1172,31 @@ zendproc
 ; Allocates a block of size p1 on the heap. The object ID is returned in p1 and
 ; a pointer to the new object in p0. The first byte of the block must be set
 ; to a valid object type.
+;
+; On entry, A is the new objec type.
 
 zproc heap_alloc
-    ; Store the size of the object above the object itself on the heap.
+    ; Initialise the object header.
 
-    sec
-    lda heapptr+0
-    sbc #2
-    sta heapptr+0
-    zif_cc
-        dec heapptr+1
-    zendif
-
-    ldy #0
-    lda p1+0
+    ldy #OBJECT_TYPE
     sta (heapptr), y
-    iny
+    dey
     lda p1+1
+    sta (heapptr), y
+    dey
+    lda p1+0
     sta (heapptr), y
 
     ; Allocate the object itself.
 
-    sec
+    clc
     lda heapptr+0
-    sbc p1+0
+    sta p2+0            ; put the object pointer into p2
+    adc p1+0
     sta heapptr+0
     lda heapptr+1
-    sbc p1+1
+    sta p2+1
+    adc p1+1
     sta heapptr+1
 
     ; TODO: check for running out of memory here.
@@ -1220,20 +1206,19 @@ zproc heap_alloc
     jsr find_first_object
     zrepeat
         zif_eq
-            ; Found a free slot.
+            ; Found a free slot (and copy the pointer into XA).
 
-            lda heapptr+1
+            lda p2+1
             sta (p0), y
+            tax
             dey
-            lda heapptr+0
+            lda p2+0
             sta (p0), y
 
             ; Return the object pointer in p0.
 
-            lda heapptr+0
             sta p0+0
-            lda heapptr+1
-            sta p0+1
+            stx p0+1
 
             ; ID is returned in p1.
 
@@ -1267,13 +1252,13 @@ zproc get_atom
 
             ; Is this an atom?
 
-            ldy #ATOM_TYPE
+            ldy #OBJECT_TYPE
             lda (p0), y
-            cmp #OBJECT_ATOM
+            cmp #OTYPE_ATOM
             zif_eq
                 ; Compare the text.
 
-                ldy #ATOM_DATA
+                ldy #OBJECT_DATA
                 ldx bufferpos
                 zloop
                     lda (p0), y
@@ -1307,24 +1292,22 @@ zproc get_atom
     lda bufferend
     sbc bufferpos           ; get length of atom
     clc
-    adc #ATOM_DATA          ; add one for the header
+    adc #OBJECT_DATA        ; add on the header
 
     sta p1+0
     lda #0
     sta p1+1
+    lda #OTYPE_ATOM         ; object type
     jsr heap_alloc          ; allocate space for the atom
     ; id is in p1, pointer in p0
 
-    ldy #ATOM_TYPE          ; set the type
-    lda #OBJECT_ATOM
-    sta (p0), y
-
     ; Copy the word into the heap object.
 
+    ldy #OBJECT_DATA-1      ; -1 to compensate for predecrement later
     ldx bufferpos
     zrepeat
-        lda text_buffer, x ; get char from buffer
         iny
+        lda text_buffer, x ; get char from buffer
         sta (p0), y         ; store into object
         inx
         cpx bufferend
@@ -2449,7 +2432,7 @@ operator_stack:
 
 ; This must be last --- it's the beginning of the program workspace.
 
-program_end:
+heapbase:
 
 ; vim: ts=4 sw=4 et:
 
