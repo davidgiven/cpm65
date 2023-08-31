@@ -1,6 +1,6 @@
 #! /bin/sh
 
-in=ivo3x6.fnt
+in=ivo3x6.fon
 out=ivo3x6.dat
 outinc=ivo3x6.inc
 
