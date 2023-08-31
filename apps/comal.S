@@ -71,7 +71,7 @@ p2:        .word 0
 v0:        .byte 0
 v1:        .byte 0
 v2:        .byte 0
-i0:        .word 0, 0
+i0:        .word 0, 0 ; also, TOS when executing
 i1:        .word 0, 0
 i2:        .word 0, 0
 
@@ -426,8 +426,9 @@ zproc exec
 zendproc
 
 zproc exec_print
-    jsr pop_deref_i0
+    jsr deref_i0
     jsr buffer_print_i0
+    jsr pop_i0
     jmp print_buffer
 zendproc
 
@@ -436,23 +437,32 @@ zproc exec_printnl
     jmp print_buffer
 zendproc
 
-zproc exec_integer
-    ldx #4
-    lda #OTYPE_INTEGER
-    bne push_value_from_bytecode    ; always taken
-zendproc
-
 zproc exec_varref
     ldx #2
     lda #OTYPE_VAR
     bne push_value_from_bytecode    ; always taken
 zendproc
 
+zproc exec_integer
+    ldx #4
+    lda #OTYPE_INTEGER
+zendproc
+    ; falls through
+
 ; On entry, X is the number of bytes to copy.
 ; A is the object type.
 
 zproc push_value_from_bytecode
     pha
+    txa
+    pha
+
+    jsr push_i0
+
+    pla
+    tax
+    pla
+    sta v0
 
     clc
     txa
@@ -467,20 +477,18 @@ zproc push_value_from_bytecode
         dex
     zuntil_eq
 
-    pla
-    sta v0
-    jmp push_i0
+    rts
 zendproc
 
 zproc exec_assign
-    jsr pop_deref_i1        ; value to assign
-    jsr pop_i0              ; lvalue (variable reference)
+    jsr deref_i0            ; value to assign
+    jsr pop_i1              ; lvalue (variable reference)
 
     ; Find the hash node.
 
-    lda i0+0                ; object ID -> p1
+    lda i1+0                ; object ID -> p1
     sta p1+0
-    lda i0+1
+    lda i1+1
     sta p1+1
 
     lda #<global_variables
@@ -500,18 +508,19 @@ zproc exec_assign
     ldx #-4 & 0xff
     clc
     zrepeat
-        lda i1+4, x
+        lda i0+4, x
         sta (p0), y
         iny
         inx
     zuntil_eq
 
-    rts
+    jmp pop_i0
 zendproc
 
 zproc exec_add
-    jsr pop_deref_i1
-    jsr pop_deref_i0
+    jsr deref_i0        ; RHS
+    jsr pop_i1
+    jsr deref_i1        ; LHS
 
     ldx #-4 & 0xff
     clc
@@ -522,50 +531,51 @@ zproc exec_add
         inx
     zuntil_eq
 
-    jmp push_i0
+    rts
 zendproc
 
 zproc exec_sub
-    jsr pop_deref_i1
-    jsr pop_deref_i0
+    jsr deref_i0        ; RHS
+    jsr pop_i1
+    jsr deref_i1        ; LHS
 
     ldx #-4 & 0xff
     sec
     zrepeat
-        lda i0+4, x
-        sbc i1+4, x
+        lda i1+4, x
+        sbc i0+4, x
         sta i0+4, x
         inx
     zuntil_eq
 
-    jmp push_i0
+    rts
 zendproc
 
 zproc exec_mul
-    jsr pop_deref_i2
-    jsr pop_deref_i0
+    jsr deref_i0        ; RHS
+    jsr pop_i2
+    jsr deref_i2        ; LHS
 
-    jsr mul4
-
-    jmp push_i0
+    jmp mul4
 zendproc
 
 zproc exec_div
-    jsr pop_deref_i2
-    jsr pop_deref_i0
+    jsr deref_i0        ; RHS
+    jsr i0_to_i2
+    jsr pop_i0
+    jsr deref_i0        ; LHS
 
-    jsr divs4
-
-    jmp push_i0
+    jmp divs4
 zendproc
 
 zproc exec_mod
-    jsr pop_deref_i2
-    jsr pop_deref_i0
+    jsr deref_i0        ; RHS
+    jsr i0_to_i2
+    jsr pop_i0
+    jsr deref_i0        ; LHS
 
     jsr divs4
-
-    jmp push_i1
+    jmp i1_to_i0
 zendproc
 
 zproc exec_bad
@@ -610,10 +620,6 @@ zproc push_ix
     rts
 zendproc
 
-zproc pop_deref_i2
-    jsr deref_tos
-zendproc
-    ; fall through
 zproc pop_i2
     ldx #i2
     jsr pop_ix
@@ -621,10 +627,6 @@ zproc pop_i2
     rts
 zendproc
 
-zproc pop_deref_i1
-    jsr deref_tos
-zendproc
-    ; fall through
 zproc pop_i1
     ldx #i1
     jsr pop_ix
@@ -632,10 +634,6 @@ zproc pop_i1
     rts
 zendproc
 
-zproc pop_deref_i0
-    jsr deref_tos
-zendproc
-    ; fall through
 zproc pop_i0
     ldx #i0
     jsr pop_ix
@@ -663,45 +661,72 @@ zproc pop_ix
     rts
 zendproc
 
-; If TOS is a OBJECT_VAR, dereference it.
-
-zproc deref_tos
-    ; Is this a OBJECT_VAR?
-
-    ldy #STACKVALUE_TYPE
-    lda (stackptr), y
+zproc deref_i0
+    lda v0
     cmp #OTYPE_VAR
     zif_eq
-        ; Dereference it.
-
-        iny                 ; object ID -> p1
-        lda (stackptr), y
-        sta p1+0
-        iny
-        lda (stackptr), y
-        sta p1+1
-
-        lda #<global_variables
-        sta p0+0
-        lda #>global_variables
-        sta p0+1
-
-        jsr hash_deref          ; return ptr to node in p0
-
-        ; Copy the value to TOS.
-
-        ldy #4
-        zrepeat
-            lda (p0), y
-            iny                 ; +2, for OBJECT_TYPE
-            iny
-            sta (stackptr), y
-            dey                 ; -2, for STACKVALUE_TYPE
-            dey
-            dey                 ; loop decrement
-        zuntil_mi
+        ldx #i0
+        jsr deref_ix
+        sta v0
     zendif
+    rts
+zendproc
 
+zproc deref_i1
+    lda v1
+    cmp #OTYPE_VAR
+    zif_eq
+        ldx #i1
+        jsr deref_ix
+        sta v1
+    zendif
+    rts
+zendproc
+
+zproc deref_i2
+    lda v2
+    cmp #OTYPE_VAR
+    zif_eq
+        ldx #i2
+        jsr deref_ix
+        sta v2
+    zendif
+    rts
+zendproc
+
+zproc deref_ix
+    lda 0, x            ; object ID -> p1
+    sta p1+0
+    lda 1, x
+    sta p1+1
+
+    txa
+    pha
+
+    lda #<global_variables
+    sta p0+0
+    lda #>global_variables
+    sta p0+1
+
+    jsr hash_deref          ; return ptr to node in p0
+
+    pla
+    tax
+
+    ; Copy the value to register.
+
+    ldy #OBJECT_DATA
+    zrepeat
+        lda (p0), y         ; get byte from object
+        sta 0, x            ; write to register
+        inx
+        iny
+        cpy #OBJECT_DATA+4
+    zuntil_eq
+
+    ; Exits with the type byte in A.
+
+    lda (p0), y
     rts
 zendproc
 
@@ -821,6 +846,38 @@ zproc buffer_print_nl
 zendproc
 
 ; --- Maths -----------------------------------------------------------------
+
+zproc i0_to_i2
+    lda v0
+    sta v2
+
+    ldx #i0
+    ldy #i2
+    bne i_to_i      ; always taken
+zendproc
+
+zproc i1_to_i0
+    lda v1
+    sta v0
+
+    ldx #i1
+    ldy #i0
+    bne i_to_i      ; always taken
+zendproc
+
+; Copies four bytes from x to y.
+
+zproc i_to_i
+    lda 0, x
+    sta 0, y
+    lda 1, x
+    sta 1, y
+    lda 2, x
+    sta 2, y
+    lda 3, x
+    sta 3, y
+    rts
+zendproc
 
 ; Computes i1i0 := i0 * i2.
 
