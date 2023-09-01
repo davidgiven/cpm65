@@ -1030,7 +1030,9 @@ zproc exec_list
             lda (execlineptr), y
             cmp i2+0
         zendif
-        zbreakif_cs
+        zif_ne
+            zbreakif_cs
+        zendif
             
         ; Print the line number.
 
