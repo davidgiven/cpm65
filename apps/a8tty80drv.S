@@ -48,6 +48,7 @@ ZEROPAGE
 drv_zp_begin:
 
 ptr:            .fill 2
+ptr1:           .fill 2
 curlineptr:     .fill 2
 
 drv_zp_end:
@@ -249,13 +250,13 @@ five_lines:
 ; fixup last four lms addresses to point to old 40 column screen memory
 
     ldx SAVMSC+1
-    stx last_lms-30+1
+    stx last_lms_msb-30
     inx
-    stx last_lms-20+1
+    stx last_lms_msb-20
     inx
-    stx last_lms-10+1
+    stx last_lms_msb-10
     inx
-    stx last_lms-00+1
+    stx last_lms_msb
 
 ; switch display list
 
@@ -264,7 +265,7 @@ five_lines:
     lda #>display_list
     sta SDLSTL+1
 
-; clear screen, home cursor, and cache first curlineptr
+; clear screen, home cursor, cache first curlineptr, print banner
 
     jsr screen80_clear
 
@@ -294,16 +295,52 @@ zendproc
 ; Cycle through all LMS addresses and write 240 zeroes, home cursor
 
 zproc screen80_clear
-    sec
-    rts
+    lda #<first_lms_msb
+    sta ptr
+    lda #>first_lms_msb
+    sta ptr+1
+
+    ldx #24
+
+clear_screen:
+    ldy #0
+    sty ptr1            ; lsb is always 0
+    lda (ptr),y         ; retrieve lms msb from display list
+    sta ptr1+1
+
+    tya
+clear_line:
+    sta (ptr1),y
+    iny
+    cpy #240
+    bne clear_line
+
+    lda ptr
+    clc
+    adc #10             ; next lms
+    sta ptr             ; msb always stays on the same page
+
+    dex
+    bne clear_screen
+
+    stx cursorx
+    stx cursory
+    jmp show_cursor
 zendproc
 
 zproc screen80_setcursor
-    jmp (next_screen)           ; sets cursorx/cursory (COLCRS/ROWCRS)
+    pha
+    jsr hide_cursor
+    pla
+    sta cursorx
+    stx cursory
+    jmp show_cursor
 zendproc
 
 zproc screen80_getcursor
-    jmp (next_screen)           ; gets cursorx/cursory (COLCRS/ROWCRS)
+    lda cursorx
+    ldx cursory
+    rts
 zendproc
 
 zproc screen80_putchar
@@ -419,21 +456,25 @@ banner:
 font:
     #include "../third_party/fonts/atari/ivo3x6.inc"
 
-; -------------------------------------------------------------------------
-
-; UNINITIALIZED
-
-    .bss
+; put these here instead of in .bss saves almost a page because .bss is
+; always page aligned and soon we re-align for the display list and
+; screen memory
 
 next_tty:
     .fill 2
 next_screen:
     .fill 2
 
+; -------------------------------------------------------------------------
+
+; UNINITIALIZED
+
+    .bss
+
 ; This "trick" saves a lot of calculations. Assembler/linker calculates
 ; the positions and offsets.
 
-    .align 0x0100
+    .align 0x0100   ; always true
 
 ; 3x$70             ; 3x8 empty scan lines
 ; 24x {
@@ -449,8 +490,8 @@ next_screen:
 
 ; helper offsets, point to lsb, not the LMS instruction.
 
-first_lms=.+5
-last_lms=.+235
+first_lms_msb=.+6
+last_lms_msb=.+236
 end_dl=.+243
 
 display_list:
