@@ -332,10 +332,26 @@ clear_line:
     jmp show_cursor
 zendproc
 
+; On top of the official specification, we clip (A,X) at the screen edges
+
 zproc screen80_setcursor
+    cmp #SCREEN_WIDTH
+    bcc xpos_less_than
+
+    lda #SCREEN_WIDTH-1
+
+xpos_less_than:
     pha
+
     txa
+    cmp #SCREEN_HEIGHT
+    bcc ypos_less_than
+
+    lda #SCREEN_HEIGHT-1
+
+ypos_less_than:
     pha
+
     jsr hide_cursor
     pla
     tax
