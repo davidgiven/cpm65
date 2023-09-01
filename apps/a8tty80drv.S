@@ -30,7 +30,8 @@
 ; memory for four rows of our new screen.
 ;
 ; Antic mode 15 is 320 pixels monochrome.
-; Character bounding box is 4x6 pixels, glyphs are 3x6 pixels.
+; Character bounding box is 3x6 pixels, one glyph with padding is 4x6
+; pixels.
 
 ; -------------------------------------------------------------------------
 
@@ -208,7 +209,7 @@ zproc init
     lda #>screen_memory
     sta ptr+1               ; msb of lms address
 
-    clc                     ; necessary?
+    clc
     ldy #3
 loop24:
     lda #0
@@ -239,7 +240,7 @@ five_lines:
     bne loop24
 
     sta end_dl+1
-    lda #$41
+    lda #$41                ; end of display list
     sta end_dl
     lda #>display_list
     sta end_dl+2
@@ -255,7 +256,7 @@ five_lines:
     inx
     stx last_lms_msb
 
-; switch display list
+; switch to new display list
 
     lda #0
     sta COLOR1              ; hide non-cleared screen memory
@@ -351,6 +352,7 @@ zproc screen80_getcursor
 zendproc
 
 zproc screen80_putchar
+    pha
     and #$7f                ; just to be sure
     cmp #32
     zif_cc
@@ -430,6 +432,12 @@ mask1=.+1
     cpx #6                  ; hint: store glyphs upside down and dex from 5-0
     bne blitloop
 
+    pla
+    cmp #127                ; we did backspace space
+    zif_eq
+        rts
+    zendif
+
     lda cursorx
     cmp #SCREEN_WIDTH-1
     zif_ne
@@ -485,13 +493,13 @@ zproc tty80_conout
     pha
     jsr hide_cursor
     pla
-    cmp #13
+    cmp #13                     ; Carriage Return
     zif_eq
         lda #0
         sta cursorx
         jmp show_cursor
     zendif
-    cmp #127
+    cmp #127                    ; Backspace
     zif_eq
         dec cursorx
         zif_mi
@@ -505,11 +513,12 @@ zproc tty80_conout
                 jsr screen80_scrolldown
             zendif
         zendif
-        ; jsr find_cursor_line_address
-        ; write space without advancing, show cursor
+        jsr find_cursor_line_address
+        lda #127
+        jsr screen80_putchar
         jmp show_cursor
     zendif
-    cmp #10
+    cmp #10                     ; Newline
     beq write_nl
 
     tax
