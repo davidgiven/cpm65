@@ -126,6 +126,8 @@ TOKEN_PRINTNL   = 0x09
 TOKEN_ASSIGN    = 0x0a
 TOKEN_NEG       = 0x0b
 TOKEN_LINEENTRY = 0x0c
+TOKEN_ZERO      = 0x0d
+TOKEN_LIST      = 0x0e
 
 .set tokenvalue, 0
 
@@ -181,6 +183,8 @@ token_data TOKEN_PRINTNL,    0, 1, 0, 0, lister_printnl, lister_bad,     exec_pr
 token_data TOKEN_ASSIGN,     0, 1, 2, 0, lister_assign,  keyword_assign, exec_assign
 token_data TOKEN_NEG,       14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_neg
 token_data TOKEN_LINEENTRY,  0, 1, 1, 0, lister_nop,     lister_bad,     exec_lineentry
+token_data TOKEN_ZERO,      15, 1, 0, 1, lister_simple,  keyword_zero,   exec_zero
+token_data TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,     exec_list
 
 OBJECT_TABLE_SIZE = 256
 
@@ -246,6 +250,13 @@ zproc mainloop
         lda #0
         sta bufferpos
         sta bufferend
+
+        lda #<bytecode_buffer
+        sta execlineptr+0
+        lda #>bytecode_buffer
+        sta execlineptr+1
+        lda #1
+        sta execbyteptr
         jsr list_line
         jsr print_buffer
         jsr print_nl
@@ -473,6 +484,22 @@ zproc find_line
     rts
 zendproc
 
+zproc goto_next_line
+    ldy #LINE_SIZE
+    lda (execlineptr), y
+
+    clc
+    adc execlineptr+0
+    sta execlineptr+0
+    zif_cs
+        inc execlineptr+1
+    zendif
+
+    lda #LINE_DATA
+    sta execbyteptr
+    rts
+zendproc
+
 zproc exec_line
     lda #0
     sta bufferpos
@@ -518,6 +545,19 @@ zproc exec_varref
     ldx #2
     lda #OTYPE_VAR
     bne push_value_from_bytecode    ; always taken
+zendproc
+
+zproc exec_zero
+    jsr push_i0
+
+    lda #OTYPE_INTEGER
+    sta v0
+    lda #0
+    sta i0+0
+    sta i0+1
+    sta i0+2
+    sta i0+3
+    rts
 zendproc
 
 zproc exec_integer
@@ -855,6 +895,7 @@ zproc exec_lineentry
     ; TODO: ensure the stack is empty!
 
     ; Check line number validity.
+    ; TODO: check for 65535
 
     lda i0+2
     ora i0+3
@@ -950,6 +991,95 @@ zproc exec_lineentry
     ; Restart the main loop.
 
     jmp stack_destroyed
+zendproc
+
+zproc exec_list
+    ; end line in i0
+    jsr i0_to_i2        ; end line in i2
+    jsr pop_i0          ; start line in i0
+
+    ; Check line number validity.
+
+    lda i0+2
+    ora i0+3
+    ora i2+2
+    ora i2+3
+    zif_ne
+        brk
+    zendif
+
+    ; Turn list x, 0 to list x, 0xffff
+
+    lda i2+0
+    ora i2+1
+    zif_eq
+        dec i2+0
+        dec i2+1
+    zendif
+
+    jsr find_line       ; sets execlineptr
+    jmp 1f
+    zrepeat
+        ; Check terminating line.
+
+        ldy #LINE_NUMBER+1
+        lda (execlineptr), y
+        cmp i2+1
+        zif_eq
+            dey
+            lda (execlineptr), y
+            cmp i2+0
+        zendif
+        zbreakif_cs
+            
+        ; Print the line number.
+
+        ldy #LINE_NUMBER+0
+        lda (execlineptr), y
+        sta i0+0
+        iny
+        lda (execlineptr), y
+        sta i0+1
+        
+        ; Do the printing.
+
+        lda #0
+        sta bufferpos
+        sta bufferend
+
+        lda #LINE_DATA
+        sta execbyteptr
+
+        lda i2+0
+        pha
+        lda i2+1
+        pha
+
+        jsr buffer_print_i0
+        jsr buffer_print_space
+        jsr list_line
+        jsr print_buffer
+        jsr print_nl
+
+        pla
+        sta i2+1
+        pla
+        sta i2+0
+
+        jsr goto_next_line
+
+        ; Check for end of program.
+
+    1:
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+    zuntil_eq
+
+    ; Don't continue execution.
+
+    pla
+    pla
+    rts
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -1584,22 +1714,15 @@ zendproc
 
 ; --- Lister ----------------------------------------------------------------
 
-; Renders the line in bytecode_buffer.
+; Renders the line pointed to by execlineptr+execbyteptr.
 
 ; operator_stack contains the tree.
 ; <bytecode address> {<child tree nodes>}*
 
-; 1 2 + print
-; 0 1 2 3
-
-; 0 1 2 a b 3 c
-; a b c d e f g
-;           ^
-
 zproc list_line
-    ldx #1
+    ldx execbyteptr
     stx bytecodeptr
-    dex
+    ldx #0
     stx opstackptr
     stx listerflags
     tsx
@@ -1608,20 +1731,21 @@ zproc list_line
     zloop
         ; Create the first byte of the tree node.
 
-        ldx bytecodeptr
-        lda bytecode_buffer, x
+        ldy bytecodeptr
+        lda (execlineptr), y            ; read opcode
         zbreakif_eq
         ldy opstackptr
         sty listerroot
-        txa
+        lda bytecodeptr
         sta operator_stack, y
         inc opstackptr
 
         ; Pop consumed stack items.
 
-        ldx bytecodeptr
-        ldy bytecode_buffer, x
-        lda token_size_table, y
+        ldy bytecodeptr
+        lda (execlineptr), y            ; read opcode
+        tax
+        lda token_size_table, x
         and #0b01110000
         lsr a
         lsr a
@@ -1641,8 +1765,9 @@ zproc list_line
         
         ; Push produced stack items.
 
-        ldx bytecodeptr
-        ldy bytecode_buffer, x
+        ldy bytecodeptr
+        lda (execlineptr), y            ; read opcode
+        tay
         lda token_size_table, y
         zif_mi
             lda listerroot
@@ -1666,8 +1791,9 @@ zproc list_line
 
         ; Move to next bytecode.
 
-        ldx bytecodeptr
-        ldy bytecode_buffer, x
+        ldy bytecodeptr
+        lda (execlineptr), y            ; read opcode
+        tay
         lda token_size_table, y
         and #0b00001111
         clc
@@ -1695,7 +1821,7 @@ zendproc
 zproc list_clause
     lda operator_stack, x       ; get bytecode address
     tay
-    lda bytecode_buffer, y      ; get bytecode
+    lda (execlineptr), y        ; get bytecode
     tay
     lda token_listers_hi, y     ; get lister routine
     pha
@@ -1707,6 +1833,16 @@ zendproc
 
 zproc lister_bad
     brk
+zendproc
+
+zproc lister_simple
+    lda operator_stack, x       ; get bytecode address
+    tay
+    lda (execlineptr), y      ; get bytecode
+    tay
+    ldx token_aux_hi, y
+    lda token_aux_lo, y
+    jmp buffer_print_string
 zendproc
 
 zproc lister_print
@@ -1744,10 +1880,12 @@ zendproc
     
 zproc lister_varref
     lda operator_stack, x       ; get bytecode address
-    tax
-    lda bytecode_buffer+1, x
+    tay
+    iny
+    lda (execlineptr), y
     sta p0+0
-    lda bytecode_buffer+2, x
+    iny
+    lda (execlineptr), y
     sta p0+1
     jsr deref_object
 
@@ -1762,15 +1900,16 @@ zendproc
 
 zproc lister_integer
     lda operator_stack, x       ; get bytecode address
-    tax
+    tay
+    iny
 
-    ldy #0
+    ldx #0
     zrepeat
-        lda bytecode_buffer+1, x
-        sta i0, y
-        inx
+        lda (execlineptr), y
+        sta i0, x
         iny
-        cpy #4
+        inx
+        cpx #4
     zuntil_eq
 
     jmp buffer_print_i0
@@ -1804,7 +1943,7 @@ zproc lister_infix
     tax
     lda operator_stack, x       ; get bytecode address
     tay
-    lda bytecode_buffer, y      ; get bytecode
+    lda (execlineptr), y        ; get bytecode
     tay
     ldx token_aux_hi, y
     lda token_aux_lo, y
@@ -1825,13 +1964,15 @@ zproc list_parenthesised_clause
     sty p0+0
 
     ldy operator_stack+0, x     ; get current bytecode address
-    ldx bytecode_buffer, y      ; get current bytecode
+    lda (execlineptr), y        ; get current bytecode
+    tax
     lda token_precedence_table, x ; get current bytecode precedence
     sta p0+1
 
-    ldy p0+0
-    ldx operator_stack+0, y     ; get parameter bytecode address
-    ldy bytecode_buffer, x      ; get parameter bytecode
+    ldx p0+0
+    ldy operator_stack+0, x     ; get parameter bytecode address
+    lda (execlineptr), y        ; get parameter bytecode
+    tay
     lda token_precedence_table, y ; get parameter precedence
     cmp p0+1
     zif_cc                      ; parameter is lower precedence
@@ -1855,7 +1996,7 @@ zproc lister_prefix
 
     lda operator_stack, x       ; get bytecode address
     tay
-    lda bytecode_buffer, y      ; get bytecode
+    lda (execlineptr), y        ; get bytecode
     tay
     ldx token_aux_hi, y
     lda token_aux_lo, y
@@ -2477,15 +2618,23 @@ zproc pop_number
         jsr negi0
     zendif
 
-    lda #TOKEN_INTEGER
-    jsr queue_bytecode
     lda i0+0
-    jsr queue_bytecode
-    lda i0+1
-    jsr queue_bytecode
-    lda i0+2
-    jsr queue_bytecode
-    lda i0+3
+    ora i0+1
+    ora i0+2
+    ora i0+3
+    zif_eq              ; is the number zero?
+        lda #TOKEN_ZERO
+    zelse
+        lda #TOKEN_INTEGER
+        jsr queue_bytecode
+        lda i0+0
+        jsr queue_bytecode
+        lda i0+1
+        jsr queue_bytecode
+        lda i0+2
+        jsr queue_bytecode
+        lda i0+3
+    zendif
     jsr queue_bytecode
 
     lda bufferend
@@ -2571,6 +2720,7 @@ zendproc
 
 immediate_statement_rule:
     P_TRY lineentry_rule
+    P_TRY list_rule
 statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -2584,6 +2734,31 @@ lineentry_rule:
     P_COMMIT
     P_EMIT TOKEN_LINEENTRY
     P_JMP statement_rule
+
+list_rule:
+    P_TOKEN 'L', 'I', 'S', 'T'|0x80
+    P_COMMIT
+    P_TRY empty_list_rule
+    P_TRY single_list_rule
+    P_NUMBER
+    P_EAGER_TOKEN ','|0x80
+    P_NUMBER
+    P_EMIT TOKEN_LIST
+    P_RETURN
+
+empty_list_rule:
+    P_EOL
+    P_EMIT TOKEN_ZERO
+    P_EMIT TOKEN_ZERO
+    P_EMIT TOKEN_LIST
+    P_RETURN
+
+single_list_rule:
+    P_NUMBER
+    P_EOL
+    P_EMIT TOKEN_ZERO
+    P_EMIT TOKEN_LIST
+    P_RETURN
 
 assignment_rule:
     P_JSR lvalue_rule
@@ -2731,6 +2906,9 @@ keyword_neg = . + 2
     P_SHUNT TOKEN_NEG
     P_JSR leaf_rule
     P_RETURN
+
+keyword_zero:
+    .byte '0'|0x80
 
 .data
 
