@@ -196,9 +196,6 @@ zproc init
     ldy #BIOS_SETZP
     jsr BIOS
 
-;    lda #2
-;    sta COLOR2              ; debug: show where the empty line are
-
 ; create new display list
 
     lda #$70                ; 8 empty scan lines
@@ -224,7 +221,7 @@ loop24:
     inc ptr+1
 
     tya
-    adc #4                  ; faster than 4*iny
+    adc #4                  ; faster than 4*iny, both four bytes
     tay
 
     lda #$0f
@@ -260,6 +257,9 @@ five_lines:
 
 ; switch display list
 
+    lda #0
+    sta COLOR1              ; hide non-cleared screen memory
+
     lda #<display_list
     sta SDLSTL
     lda #>display_list
@@ -268,6 +268,9 @@ five_lines:
 ; clear screen, home cursor, cache first curlineptr, print banner
 
     jsr screen80_clear
+
+    lda #15
+    sta COLOR1              ; show again
 
     lda #<banner
     ldx #>banner
@@ -330,7 +333,11 @@ zendproc
 
 zproc screen80_setcursor
     pha
+    txa
+    pha
     jsr hide_cursor
+    pla
+    tax
     pla
     sta cursorx
     stx cursory
@@ -344,7 +351,91 @@ zproc screen80_getcursor
 zendproc
 
 zproc screen80_putchar
+    and #$7f                ; just to be sure
+    cmp #32
+    zif_cc
+        lda #32
+    zendif
+
     sec
+    sbc #32                 ; A is now in [0,95]
+
+; find glyph location
+
+    asl
+    pha                     ; save A*2
+
+    sta ptr                 ; store
+    lda #0
+    sta ptr+1
+
+    asl ptr
+    rol ptr+1               ; A*4 in (ptr)
+
+    pla
+    adc ptr
+    sta ptr
+    zif_cs
+        inc ptr+1
+    zendif                  ; A*6 in (ptr)
+
+    lda ptr
+    clc
+    adc #<font
+    sta glyph
+    lda ptr+1
+    adc #>font
+    sta glyph+1
+
+; blit glyph
+
+    lda cursorx
+    lsr
+    tay
+    bcc char_left
+
+char_right:
+    lda #$0f
+    bne set_mask
+
+char_left:
+    lda #$f0
+
+set_mask:
+    sta mask1
+    eor #$ff
+    sta mask2
+
+blit:
+    ldx #0
+    clc
+
+blitloop:
+    lda (curlineptr),y
+mask2=.+1
+    and #$ff
+    sta (curlineptr),y
+
+glyph=.+1
+    lda $1234,x
+mask1=.+1
+    and #$ff
+    ora (curlineptr),y
+    sta (curlineptr),y
+
+    tya
+    adc #SCREEN_WIDTH/2
+    tay
+    inx
+    cpx #6                  ; hint: store glyphs upside down and dex from 5-0
+    bne blitloop
+
+    lda cursorx
+    cmp #SCREEN_WIDTH-1
+    zif_ne
+        inc cursorx
+    zendif
+
     rts
 zendproc
 
@@ -391,8 +482,47 @@ zproc tty80_conin
 zendproc
 
 zproc tty80_conout
-;    rts
-    jmp (next_tty)
+    pha
+    jsr hide_cursor
+    pla
+    cmp #13
+    zif_eq
+        lda #0
+        sta cursorx
+        jmp show_cursor
+    zendif
+    cmp #127
+    zif_eq
+        dec cursorx
+        zif_mi
+            lda #SCREEN_WIDTH-1
+            sta cursorx
+
+            dec cursory
+            zif_mi
+                lda #0
+                sta cursory
+                jsr screen80_scrolldown
+            zendif
+        zendif
+        ; jsr find_cursor_line_address
+        ; write space without advancing, show cursor
+        jmp show_cursor
+    zendif
+    cmp #10
+    beq write_nl
+
+    tax
+    lda cursorx
+    pha
+    txa
+    jsr screen80_putchar
+
+    pla
+    cmp #SCREEN_WIDTH-1
+    beq write_nl
+
+    jmp show_cursor
 zendproc
 
 ; -------------------------------------------------------------------------
@@ -409,28 +539,90 @@ wait:
     rts
 zendproc
 
-; Properly coded, hide and show can be merged.
+; Do newline
+
+zproc write_nl
+    lda #0
+    sta cursorx
+
+    inc cursory
+    lda cursory
+    cmp #SCREEN_HEIGHT
+    zif_eq
+        dec cursory
+        jmp screen80_scrollup
+    zendif
+    jmp show_cursor
+zendproc
+
+; Hide and show are merged.
 ; Show cursor needs to refind the new curlineptr, hide cursor does not.
 ; Toggle cursor with eor mask
 
 ; Show cursor
 
 zproc show_cursor
-    nop
+    jsr find_cursor_line_address
 zendproc            ; fallthrough
 
 ; Hide cursor
 
 zproc hide_cursor
+    lda cursorx
+    lsr
+    tay             ; index in Y
+    bcc mask_left
+
+mask_right:
+    lda #$0f
+    sta mask
+    bne do_eor
+
+mask_left:
+    lda #$f0
+    sta mask
+
+do_eor:
+    clc
+    ldx #5
+
+eor_loop:
+    lda (curlineptr),y
+mask=.+1
+    eor #$ff
+    sta (curlineptr),y
+    tya
+    adc #SCREEN_WIDTH/2
+    tay
+    dex
+    bpl eor_loop
+
     rts
 zendproc
 
-; Sets (ptr),y to the location of the cursor
+; Sets (ptr),y to the line of the cursor
 ; cache in curlineptr
 ; cursorsx & 1 determines left (0b11110000) or right (0b00001111) mask
-; return cursorx & 1 in carry
 
-zproc find_cursor_address
+zproc find_cursor_line_address
+    lda #>first_lms_msb
+    sta ptr+1
+    lda cursory
+    asl
+    sta ptr             ; y*2 in ptr
+    asl
+    asl                 ; y*8 in A
+    clc
+    adc ptr             ; y*10 in A
+    adc #<first_lms_msb
+    sta ptr             ; points msb of screen memory of cursory
+
+    ldy #0
+    lda (ptr),y         ; retrieve MSB
+    sta ptr+1
+    sta curlineptr+1
+    sty ptr             ; LSB is always zero
+    sty curlineptr
     rts
 zendproc
 
