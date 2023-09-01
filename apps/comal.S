@@ -9,7 +9,7 @@
 
 ; hi TPAEND
 ;             <-- progtop
-;    comal bytecode (in reverse)
+;    comal bytecode
 ;             <-- progbase
 ;    stack
 ;             <-- stackptr
@@ -58,6 +58,18 @@ STACKVALUE_TYPE = 0
 STACKVALUE_DATA = 1
 STACKVALUE_SIZE = 5
 
+; Program storage: a flat list of lines, each of which looks like:
+;   0    - line size
+;   1..2 - line number
+;   3    - indentation
+;   4... - data
+; Lines should end in a TOKEN_EOL command (which may take a parameter).
+
+LINE_SIZE       = 0
+LINE_NUMBER     = 1
+LINE_INDENT     = 3
+LINE_DATA       = 4
+
 ZEROPAGE
 
 heapptr:   .word 0
@@ -78,7 +90,7 @@ i2:        .word 0, 0
 bufferpos: .byte 0 ; current beginning of token in input buffer
 bufferend: .byte 0 ; current end of token in input buffer
 
-bytecodeptr:        .byte 0 ; current position in the bytecode
+bytecodeptr:        .byte 0 ; used by parser and lister and editor
 opstackptr:         .byte 0 ; operator stack pointer
 
 ; Parser temporaries
@@ -113,6 +125,7 @@ TOKEN_PRINT     = 0x08
 TOKEN_PRINTNL   = 0x09
 TOKEN_ASSIGN    = 0x0a
 TOKEN_NEG       = 0x0b
+TOKEN_LINEENTRY = 0x0c
 
 .set tokenvalue, 0
 
@@ -155,23 +168,31 @@ token_exec_lo:
     .set tokenvalue, tokenvalue+1
 .endm
         
-token_data TOKEN_EOL,     15, 1, 0, 0, lister_bad,     lister_bad,     exec_bad
-token_data TOKEN_VARREF,  15, 3, 0, 1, lister_varref,  lister_bad,     exec_varref
-token_data TOKEN_INTEGER, 15, 5, 0, 1, lister_integer, lister_bad,     exec_integer
-token_data TOKEN_MUL,     10, 1, 2, 1, lister_infix,   keyword_mul,    exec_mul
-token_data TOKEN_DIV,     10, 1, 2, 1, lister_infix,   keyword_div,    exec_div
-token_data TOKEN_ADD,      9, 1, 2, 1, lister_infix,   keyword_add,    exec_add
-token_data TOKEN_SUB,      9, 1, 2, 1, lister_infix,   keyword_sub,    exec_sub
-token_data TOKEN_MOD,     10, 1, 2, 1, lister_infix,   keyword_mod,    exec_mod
-token_data TOKEN_PRINT,    0, 1, 1, 0, lister_print,   lister_bad,     exec_print
-token_data TOKEN_PRINTNL,  0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl
-token_data TOKEN_ASSIGN,   0, 1, 2, 0, lister_assign,  keyword_assign, exec_assign
-token_data TOKEN_NEG,     14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_neg
+token_data TOKEN_EOL,       15, 1, 0, 0, lister_bad,     lister_bad,     exec_bad
+token_data TOKEN_VARREF,    15, 3, 0, 1, lister_varref,  lister_bad,     exec_varref
+token_data TOKEN_INTEGER,   15, 5, 0, 1, lister_integer, lister_bad,     exec_integer
+token_data TOKEN_MUL,       10, 1, 2, 1, lister_infix,   keyword_mul,    exec_mul
+token_data TOKEN_DIV,       10, 1, 2, 1, lister_infix,   keyword_div,    exec_div
+token_data TOKEN_ADD,        9, 1, 2, 1, lister_infix,   keyword_add,    exec_add
+token_data TOKEN_SUB,        9, 1, 2, 1, lister_infix,   keyword_sub,    exec_sub
+token_data TOKEN_MOD,       10, 1, 2, 1, lister_infix,   keyword_mod,    exec_mod
+token_data TOKEN_PRINT,      0, 1, 1, 0, lister_print,   lister_bad,     exec_print
+token_data TOKEN_PRINTNL,    0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl
+token_data TOKEN_ASSIGN,     0, 1, 2, 0, lister_assign,  keyword_assign, exec_assign
+token_data TOKEN_NEG,       14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_neg
+token_data TOKEN_LINEENTRY,  0, 1, 1, 0, lister_nop,     lister_bad,     exec_lineentry
 
 OBJECT_TABLE_SIZE = 256
 
 zproc main
     jsr clear
+zendproc
+    ; fall through
+zproc stack_destroyed
+    lda progbase+0
+    sta stackptr+0
+    lda progbase+1
+    sta stackptr+1
 zendproc
     ; fall through
 zproc mainloop
@@ -235,7 +256,7 @@ zproc mainloop
         sta execlineptr+0
         lda #>bytecode_buffer
         sta execlineptr+1
-        lda #0
+        lda #1
         sta execbyteptr
         jsr exec_line
     zendloop
@@ -259,11 +280,9 @@ zproc clear
     lda progtop+0
     sbc #1
     sta progbase+0
-    sta stackptr+0
     lda progtop+1
     sbc #0
     sta progbase+1
-    sta stackptr+1
 
     lda #0
     tay
@@ -397,6 +416,62 @@ zproc toupper
 zendproc
 
 ; --- Interpreter -----------------------------------------------------------
+
+; Searches for line i0, and sets execlineptr to the address of the first line
+; which is not less than that line number.
+;
+; Returns Z if the line was found, !Z if it wasn't (and the new line needs to
+; be inserted).
+ 
+zproc find_line
+    ; Initialise search.
+
+    lda progbase+0
+    sta execlineptr+0
+    lda progbase+1
+    sta execlineptr+1
+
+    ; Do a linear search through the program text.
+
+    jmp 1f
+    zrepeat
+        ; Compare the line number.
+
+        ldy #LINE_NUMBER+1
+        lda (execlineptr), y
+        cmp i0+1
+        zif_eq              ; if high byte is =, test low byte
+            dey
+            lda (execlineptr), y
+            cmp i0+0
+        zendif
+        zif_cs              ; is high byte >=?
+            rts
+        zendif
+
+        ; Move to the next line.
+
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+        clc
+        adc execlineptr+0
+        sta execlineptr+0
+        zif_cs
+            inc execlineptr+1
+        zendif
+
+    1:
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+    zuntil_eq
+            
+    ; We didn't find the line. This means that all the lines in the program
+    ; have a smaller line number than the one asked for. Return the address
+    ; of the end marker.
+
+    lda #1                  ; clear Z
+    rts
+zendproc
 
 zproc exec_line
     lda #0
@@ -772,6 +847,109 @@ zproc retract_stack
         inc stackptr+1
     zendif
     rts
+zendproc
+
+; --- Editor ----------------------------------------------------------------
+
+zproc exec_lineentry
+    ; TODO: ensure the stack is empty!
+
+    ; Check line number validity.
+
+    lda i0+2
+    ora i0+3
+    zif_ne
+        brk
+    zendif
+
+    jsr find_line               ; sets execlineptr
+    zif_eq
+        ; The line already exists. Delete it.
+
+        brk
+    zendif
+
+    ; Calculate the size of the new line.
+
+    lda bytecode_buffer+0       ; length of bytecode in buffer
+    sec
+    sbc execbyteptr             ; position in buffer
+    clc
+    adc #LINE_DATA              ; fixed line header
+    sta p2+0
+    
+    ; Shuffle everything below this line down by that many bytes.
+
+    ; TODO: check for out of memory!
+
+    lda progbase+0
+    sta p0+0
+    sec
+    sbc p2+0
+    sta progbase+0
+    sta p1+0
+
+    lda progbase+1
+    sta p0+1
+    sbc #0
+    sta progbase+1
+    sta p1+1
+
+    zloop
+        lda p0+0
+        cmp execlineptr+0
+        zif_eq
+            lda p0+1
+            cmp execlineptr+1
+            zbreakif_eq
+        zendif
+
+        ldy #0
+        lda (p0), y
+        sta (p1), y
+
+        inc p0+0
+        zif_eq
+            inc p0+1
+        zendif
+
+        inc p1+0
+        zif_eq
+            inc p1+1
+        zendif
+    zendloop
+    ; leaves p1 as the address of our new line
+
+    ; Copy the bytecode.
+
+    ldy #LINE_DATA
+    ldx execbyteptr
+    zrepeat
+        lda bytecode_buffer, x
+        sta (p1), y
+        inx
+        iny
+        cpy p2+0
+    zuntil_eq
+
+    ; Initialise the line header.
+
+    ldy #LINE_SIZE
+    lda p2+0
+    sta (p1), y         ; line length
+    iny
+    lda i0+0
+    sta (p1), y         ; line number low
+    iny
+    lda i0+1
+    sta (p1), y         ; line number high
+    iny
+    lda #0
+    sta (p1), y         ; indent
+
+    ; Restart the main loop.
+
+    jmp stack_destroyed
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -1419,10 +1597,11 @@ zendproc
 ;           ^
 
 zproc list_line
-    lda #0
-    sta bytecodeptr
-    sta opstackptr
-    sta listerflags
+    ldx #1
+    stx bytecodeptr
+    dex
+    stx opstackptr
+    stx listerflags
     tsx
     stx listersp
 
@@ -1522,6 +1701,7 @@ zproc list_clause
     pha
     lda token_listers_lo, y
     pha
+lister_nop:
     rts
 zendproc
 
@@ -1690,15 +1870,16 @@ zendproc
 ; --- Parser ----------------------------------------------------------------
 
 zproc parse_line
-    lda #0
-    sta bytecodeptr
-    sta opstackptr
+    ldx #1
+    stx bytecodeptr
+    dex
+    stx opstackptr
     tsx
     stx parsestartstackptr
 
-    lda #<statement_rule
+    lda #<immediate_statement_rule
     sta parsecmd+0
-    lda #>statement_rule
+    lda #>immediate_statement_rule
     sta parsecmd+1
 
     lda #<pop_succeed_ptr
@@ -1810,9 +1991,11 @@ pop_succeed_ptr:
 zproc pop_succeed
     jsr unstack_operators
 
-    lda #0
+    lda #TOKEN_EOL
     ldx bytecodeptr
     sta bytecode_buffer, x
+    inx
+    stx bytecode_buffer+0
 
     ldx parsestartstackptr
     txs
@@ -2182,6 +2365,16 @@ zproc pop_eager_token
     jmp 1b
 zendproc
 
+zproc pop_emit
+    ldy #2
+    lda (parsecmd), y
+    jsr queue_bytecode
+
+    lda #3
+    jsr parse_advance
+    jmp parse_state_machine
+zendproc
+
 zproc pop_word
     jsr parser_fetch_word
 
@@ -2346,6 +2539,11 @@ zendproc
     .byte \bytes
 .endm
 
+.macro P_EMIT token
+    .word pop_emit
+    .byte \token
+.endm
+
 .macro P_SHUNT token
     .word pop_shunt
     .byte \token
@@ -2371,6 +2569,8 @@ zendproc
     .word pop_paren
 .endm
 
+immediate_statement_rule:
+    P_TRY lineentry_rule
 statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -2378,6 +2578,12 @@ statement_rule:
 ;    P_TRY if_rule
 ;    P_TRY proc_rule
     P_PANIC
+
+lineentry_rule:
+    P_NUMBER
+    P_COMMIT
+    P_EMIT TOKEN_LINEENTRY
+    P_JMP statement_rule
 
 assignment_rule:
     P_JSR lvalue_rule
