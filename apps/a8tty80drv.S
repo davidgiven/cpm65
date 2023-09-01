@@ -47,7 +47,8 @@ ZEROPAGE
 
 drv_zp_begin:
 
-ptr:    .fill 2
+ptr:            .fill 2
+curlineptr:     .fill 2
 
 drv_zp_end:
 
@@ -193,6 +194,77 @@ zproc init
     adc #drv_zp_end-drv_zp_begin
     ldy #BIOS_SETZP
     jsr BIOS
+
+;    lda #2
+;    sta COLOR2              ; debug: show where the empty line are
+
+; create new display list
+
+    lda #$70                ; 8 empty scan lines
+    sta display_list
+    sta display_list+1
+    sta display_list+2
+
+    lda #24
+    sta ptr                 ; counter
+    lda #>screen_memory
+    sta ptr+1               ; msb of lms address
+
+    clc                     ; necessary?
+    ldy #3
+loop24:
+    lda #0
+    sta display_list,y      ; 1 empty scan line
+    sta display_list+2,y    ; lms' lsb is always 0
+    lda #$4f
+    sta display_list+1,y
+    lda ptr+1
+    sta display_list+3,y
+    inc ptr+1
+
+    tya
+    adc #4                  ; faster than 4*iny
+    tay
+
+    lda #$0f
+    ldx #5
+five_lines:
+    sta display_list,y
+    iny
+    dex
+    bne five_lines
+
+    lda #0
+    sta display_list,y
+    iny
+    dec ptr
+    bne loop24
+
+    sta end_dl+1
+    lda #$41
+    sta end_dl
+    lda #>display_list
+    sta end_dl+2
+
+; fixup last four lms addresses to point to old 40 column screen memory
+
+    ldx SAVMSC+1
+    stx last_lms-30+1
+    inx
+    stx last_lms-20+1
+    inx
+    stx last_lms-10+1
+    inx
+    stx last_lms-00+1
+
+; switch display list
+
+    lda #<display_list
+    sta SDLSTL
+    lda #>display_list
+    sta SDLSTL+1
+
+; clear screen, home cursor, and cache first curlineptr
 
     jsr screen80_clear
 
@@ -379,6 +451,7 @@ next_screen:
 
 first_lms=.+5
 last_lms=.+235
+end_dl=.+243
 
 display_list:
     .fill 256
