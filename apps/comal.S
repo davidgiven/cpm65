@@ -128,6 +128,7 @@ TOKEN_NEG       = 0x0b
 TOKEN_LINEENTRY = 0x0c
 TOKEN_ZERO      = 0x0d
 TOKEN_LIST      = 0x0e
+TOKEN_DEL       = 0x0f
 
 .set tokenvalue, 0
 
@@ -185,6 +186,7 @@ token_data TOKEN_NEG,       14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_ne
 token_data TOKEN_LINEENTRY,  0, 1, 1, 0, lister_nop,     lister_bad,     exec_lineentry
 token_data TOKEN_ZERO,      15, 1, 0, 1, lister_simple,  keyword_zero,   exec_zero
 token_data TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,     exec_list
+token_data TOKEN_DEL,        0, 1, 1, 0, lister_nop,     lister_bad,     exec_del
 
 OBJECT_TABLE_SIZE = 256
 
@@ -895,7 +897,6 @@ zproc exec_lineentry
     ; TODO: ensure the stack is empty!
 
     ; Check line number validity.
-    ; TODO: check for 65535
 
     lda i0+2
     ora i0+3
@@ -907,7 +908,7 @@ zproc exec_lineentry
     zif_eq
         ; The line already exists. Delete it.
 
-        brk
+        jsr delete_current_line
     zendif
 
     ; Calculate the size of the new line.
@@ -991,6 +992,71 @@ zproc exec_lineentry
     ; Restart the main loop.
 
     jmp stack_destroyed
+zendproc
+
+zproc delete_current_line
+    ldy #LINE_SIZE
+    lda (execlineptr), y
+    sta p2+0
+
+    ; Calculate the new progbase.
+    ; 
+    ; LINE0 LINE1 LINE2 LINE3
+    ;       ^
+    ;       LINE0 LINE2 LINE3
+    ;             ^
+    ; execlineptr += size
+    ; progbase += size
+
+    clc
+    lda execlineptr+0
+    sta p0+0            ; lower copy pointer
+    adc p2+0
+    sta execlineptr+0
+    sta p1+0            ; upper copy pointer
+    lda execlineptr+1
+    sta p0+1
+    adc #0
+    sta execlineptr+1
+    sta p1+1
+
+    clc
+    lda progbase+0
+    adc p2+0
+    sta progbase+0
+    zif_cs
+        inc progbase+1
+    zendif
+
+    ; Move the bottom half of the program up.
+
+    zloop
+        lda p1+0
+        cmp progbase+0
+        zif_eq
+            lda p1+1
+            cmp progbase+1
+            zbreakif_eq
+        zendif
+
+        lda p0+0
+        zif_eq
+            dec p0+1
+        zendif
+        dec p0+0
+
+        lda p1+0
+        zif_eq
+            dec p1+1
+        zendif
+        dec p1+0
+
+        ldy #0
+        lda (p0), y
+        sta (p1), y
+    zendloop
+
+    rts
 zendproc
 
 zproc exec_list
@@ -1082,6 +1148,25 @@ zproc exec_list
     pla
     pla
     rts
+zendproc
+
+zproc exec_del
+    ; line in i0
+
+    ; Check line number validity.
+
+    lda i0+2
+    ora i0+3
+    zif_ne
+        brk
+    zendif
+
+    jsr find_line       ; sets execlineptr
+    zif_eq
+        jsr delete_current_line
+    zendif
+
+    jmp stack_destroyed
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -2723,6 +2808,7 @@ zendproc
 immediate_statement_rule:
     P_TRY lineentry_rule
     P_TRY list_rule
+    P_TRY del_rule
 statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -2746,6 +2832,13 @@ list_rule:
     P_EAGER_TOKEN ','|0x80
     P_NUMBER
     P_EMIT TOKEN_LIST
+    P_RETURN
+
+del_rule:
+    P_TOKEN 'D', 'E', 'L'|0x80
+    P_COMMIT
+    P_NUMBER
+    P_EMIT TOKEN_DEL
     P_RETURN
 
 empty_list_rule:
