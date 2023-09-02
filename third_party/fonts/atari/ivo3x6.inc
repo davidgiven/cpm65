@@ -52,7 +52,7 @@
     .byte  $66, $88, $44, $22, $22, $cc
     .byte  $ee, $44, $44, $44, $44, $44
     .byte  $aa, $aa, $aa, $aa, $aa, $66
-    .byte  $aa, $aa, $aa, $aa, $aa, $44
+    .byte  $aa, $aa, $aa, $aa, $44, $44
     .byte  $aa, $aa, $aa, $aa, $ee, $aa
     .byte  $aa, $aa, $44, $44, $aa, $aa
     .byte  $aa, $aa, $aa, $44, $44, $44
@@ -61,7 +61,7 @@
     .byte  $88, $88, $44, $44, $22, $22
     .byte  $cc, $44, $44, $44, $44, $cc
     .byte  $44, $aa, $00, $00, $00, $00
-    .byte  $00, $00, $00, $00, $00, $ff
+    .byte  $00, $00, $00, $00, $00, $ee
     .byte  $44, $44, $22, $00, $00, $00
     .byte  $00, $66, $aa, $aa, $aa, $66
     .byte  $88, $88, $cc, $aa, $aa, $cc
@@ -84,7 +84,7 @@
     .byte  $00, $66, $88, $44, $22, $cc
     .byte  $44, $44, $ee, $44, $44, $22
     .byte  $00, $aa, $aa, $aa, $aa, $66
-    .byte  $00, $aa, $aa, $aa, $aa, $44
+    .byte  $00, $aa, $aa, $aa, $44, $44
     .byte  $00, $aa, $aa, $aa, $ee, $aa
     .byte  $00, $aa, $aa, $44, $aa, $aa
     .byte  $00, $aa, $aa, $ee, $22, $cc
