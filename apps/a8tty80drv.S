@@ -361,6 +361,7 @@ zproc screen80_putchar
     jsr find_cursor_line_address
     pla
 
+putchar_for_putstring:
     pha
     and #$7f                ; just to be sure
     cmp #32
@@ -456,8 +457,26 @@ mask1=.+1
     rts
 zendproc
 
+; Putstring is slightly faster because it skips multiple calls to
+; find_cursor_line_address
+
 zproc screen80_putstring
-    sec
+    sta string
+    stx string+1
+
+    jsr find_cursor_line_address
+
+    zloop
+string=.+1
+        lda $1234
+        zbreakif_eq
+        jsr putchar_for_putstring
+        inc string
+        zif_cs
+            inc string+1
+        zendif
+    zendloop
+
     rts
 zendproc
 
@@ -809,10 +828,13 @@ font:
 ; total = 3 + 24*10 + 3 = 246, fits in one page, so it never crosses an
 ; important boundary.
 
-; helper offsets, point to lsb, not the LMS instruction.
+; point to msb, not the LMS instruction.
 
 first_lms_msb=.+6
 last_lms_msb=.+236
+
+; where the full end-of-dl instruction is
+
 end_dl=.+243
 
 display_list:
