@@ -50,7 +50,6 @@ drv_zp_begin:
 
 ptr:            .fill 2
 ptr1:           .fill 2
-curlineptr:     .fill 2
 
 drv_zp_end:
 
@@ -160,15 +159,15 @@ zproc init
     ldx #>DRVID_SCREEN
     ldy #BIOS_FINDDRV
     jsr BIOS
-    sta next_screen
-    stx next_screen+1
+    sta next_screen+1
+    stx next_screen+2
 
     lda #<DRVID_TTY
     ldx #>DRVID_TTY
     ldy #BIOS_FINDDRV
     jsr BIOS
-    sta next_tty
-    stx next_tty+1
+    sta next_tty+1
+    stx next_tty+2
 
 ; register new drivers
 
@@ -329,7 +328,7 @@ clear_line:
 
     stx cursorx
     stx cursory
-    jmp show_cursor
+    rts
 zendproc
 
 ; On top of the official specification, we clip (A,X) at the screen edges
@@ -339,24 +338,16 @@ zproc screen80_setcursor
     zif_cs
         lda #SCREEN_WIDTH-1
     zendif
-
-    pha
+    sta cursorx
 
     txa
     cmp #SCREEN_HEIGHT
     zif_cs
         lda #SCREEN_HEIGHT-1
     zendif
-
-    pha
-
-    jsr hide_cursor
-
-    pla
     sta cursory
-    pla
-    sta cursorx
-    jmp show_cursor
+
+    rts
 zendproc
 
 zproc screen80_getcursor
@@ -366,6 +357,10 @@ zproc screen80_getcursor
 zendproc
 
 zproc screen80_putchar
+    pha
+    jsr find_cursor_line_address
+    pla
+
     pha
     and #$7f                ; just to be sure
     cmp #32
@@ -381,25 +376,25 @@ zproc screen80_putchar
     asl
     pha                     ; save A*2
 
-    sta ptr                 ; store
+    sta ptr1                 ; store
     lda #0
-    sta ptr+1
+    sta ptr1+1
 
-    asl ptr
-    rol ptr+1               ; A*4 in (ptr)
+    asl ptr1
+    rol ptr1+1               ; A*4 in (ptr1)
 
     pla
-    adc ptr
-    sta ptr
+    adc ptr1
+    sta ptr1
     zif_cs
-        inc ptr+1
-    zendif                  ; A*6 in (ptr)
+        inc ptr1+1
+    zendif                  ; A*6 in (ptr1)
 
-    lda ptr
+    lda ptr1
     clc
     adc #<font
     sta glyph
-    lda ptr+1
+    lda ptr1+1
     adc #>font
     sta glyph+1
 
@@ -427,17 +422,17 @@ blit:
     clc
 
 blitloop:
-    lda (curlineptr),y
+    lda (ptr),y
 mask2=.+1
     and #$ff
-    sta (curlineptr),y
+    sta (ptr),y
 
 glyph=.+1
     lda $1234,x
 mask1=.+1
     and #$ff
-    ora (curlineptr),y
-    sta (curlineptr),y
+    ora (ptr),y
+    sta (ptr),y
 
     tya
     adc #SCREEN_WIDTH/2
@@ -467,7 +462,17 @@ zproc screen80_putstring
 zendproc
 
 zproc screen80_getchar
-    jmp (next_screen)           ; keyboard input through BIOS driver
+    jsr toggle_cursor
+
+    ldy #SCREEN_GETCHAR         ; this is faster than saving y
+    jsr next_screen
+
+    php
+    pha
+    jsr toggle_cursor
+    pla
+    plp
+    rts
 zendproc
 
 ; Rotate LMS addresses in display list up, find bottom line, and clear
@@ -572,13 +577,11 @@ zproc screen80_cleartoeol
     beq skip_clearing_bytes     ; we were at the last position of the line
 
     tay
-    sty ptr1
+    sty ptr1                    ; cursor position +0 or +1 in ptr1
 
-    lda curlineptr
-    sta ptr
-    lda curlineptr+1
-    sta ptr+1
+    jsr find_cursor_line_address
 
+    ldy ptr1
     ldx #5
     lda #0
 clear_loop:
@@ -591,13 +594,13 @@ clear_loop:
     clc
     adc #SCREEN_WIDTH/2
     sta ptr
-    ldy ptr1
+    ldy ptr1                    ; restart from cursor position (+0 or 1)
     lda #0
     dex
     bpl clear_loop
 
 skip_clearing_bytes:
-    jmp show_cursor
+    rts
 zendproc
 
 ; -------------------------------------------------------------------------
@@ -607,22 +610,27 @@ zendproc
 ; Call embedded BIOS tty driver for input
 
 zproc tty80_const
-    jmp (next_tty)
+    jmp next_tty
 zendproc
 
 zproc tty80_conin
-    jmp (next_tty)
+    jsr toggle_cursor
+
+    ldy #TTY_CONIN              ; this is faster than saving y
+    jsr next_tty
+
+    pha
+    jsr toggle_cursor
+    pla
+    rts
 zendproc
 
 zproc tty80_conout
-    pha
-    jsr hide_cursor
-    pla
     cmp #13                     ; Carriage Return
     zif_eq
         lda #0
         sta cursorx
-        jmp show_cursor
+        rts
     zendif
     cmp #127                    ; Backspace
     zif_eq
@@ -641,7 +649,7 @@ zproc tty80_conout
         jsr find_cursor_line_address
         lda #127
         jsr screen80_putchar
-        jmp show_cursor
+        rts
     zendif
     cmp #10                     ; Newline
     beq write_nl
@@ -656,7 +664,7 @@ zproc tty80_conout
     cmp #SCREEN_WIDTH-1
     beq write_nl
 
-    jmp show_cursor
+    rts
 zendproc
 
 ; -------------------------------------------------------------------------
@@ -686,22 +694,13 @@ zproc write_nl
         dec cursory
         jmp screen80_scrollup
     zendif
-    jmp show_cursor
+    rts
 zendproc
 
-; Hide and show are merged.
-; Show cursor needs to refind the new curlineptr, hide cursor does not.
 ; Toggle cursor with eor mask
 
-; Show cursor
-
-zproc show_cursor
+zproc toggle_cursor
     jsr find_cursor_line_address
-zendproc            ; fallthrough
-
-; Hide cursor
-
-zproc hide_cursor
     lda cursorx
     lsr
     tay             ; index in Y
@@ -721,10 +720,10 @@ do_eor:
     ldx #5
 
 eor_loop:
-    lda (curlineptr),y
+    lda (ptr),y
 mask=.+1
     eor #$ff
-    sta (curlineptr),y
+    sta (ptr),y
     tya
     adc #SCREEN_WIDTH/2
     tay
@@ -735,7 +734,6 @@ mask=.+1
 zendproc
 
 ; Sets (ptr) to the line of the cursor
-; cache in curlineptr
 ; cursorsx & 1 determines left (0b11110000) or right (0b00001111) mask
 
 zproc find_cursor_line_address
@@ -754,15 +752,21 @@ zproc find_cursor_line_address
     ldy #0
     lda (ptr),y         ; retrieve MSB
     sta ptr+1
-    sta curlineptr+1
     sty ptr             ; LSB is always zero
-    sty curlineptr
     rts
 zendproc
 
-; BIOS trampoline
+; Trampolines
 
 zproc BIOS
+    jmp $1234
+zendproc
+
+zproc next_tty
+    jmp $1234
+zendproc
+
+zproc next_screen
     jmp $1234
 zendproc
 
@@ -781,15 +785,6 @@ banner:
 
 font:
     #include "../third_party/fonts/atari/ivo3x6.inc"
-
-; put these here instead of in .bss saves almost a page because .bss is
-; always page aligned and soon we re-align for the display list and
-; screen memory
-
-next_tty:
-    .fill 2
-next_screen:
-    .fill 2
 
 ; -------------------------------------------------------------------------
 
