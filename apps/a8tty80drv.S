@@ -270,7 +270,7 @@ five_lines:
 
     jsr screen80_clear
 
-    lda #15
+    lda #13
     sta COLOR1              ; show again
 
     lda #<banner
@@ -475,8 +475,50 @@ zendproc
 ; Rotate LMS addresses in display list up, find bottom line, and clear
 
 zproc screen80_scrollup
-    sec
-    rts
+    lda #>display_list
+    sta ptr+1
+    sta ptr1+1
+
+    lda #<first_lms_msb
+    sta ptr
+    lda #<first_lms_msb+10
+    sta ptr1
+
+    ldy #0
+    ldx #SCREEN_HEIGHT-1
+
+    lda (ptr),y
+    pha
+    clc
+
+scrollup:
+    lda (ptr1),y
+    sta (ptr),y
+
+    lda ptr1
+    sta ptr
+
+    adc #10
+    sta ptr1
+
+    dex
+    bne scrollup
+
+    pla
+    sta (ptr),y
+
+    sta ptr+1
+
+    ldy #239
+    lda #0
+    sta ptr
+clear_last_line:
+    sta (ptr),y
+    dey
+    cpy #$ff
+    bne clear_last_line
+
+    jmp find_cursor_line_address
 zendproc
 
 ; Rotate LMS addresses in display list down, find top line, and clear
@@ -625,7 +667,7 @@ mask=.+1
     rts
 zendproc
 
-; Sets (ptr),y to the line of the cursor
+; Sets (ptr) to the line of the cursor
 ; cache in curlineptr
 ; cursorsx & 1 determines left (0b11110000) or right (0b00001111) mask
 
