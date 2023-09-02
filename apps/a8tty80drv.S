@@ -210,33 +210,34 @@ zproc init
 
     clc
     ldy #3
-loop24:
-    lda #0
-    sta display_list,y      ; 1 empty scan line
-    sta display_list+2,y    ; lms' lsb is always 0
-    lda #$4f
-    sta display_list+1,y
-    lda ptr+1
-    sta display_list+3,y
-    inc ptr+1
 
-    tya
-    adc #4                  ; faster than 4*iny, both four bytes
-    tay
+    zrepeat
+        lda #0
+        sta display_list,y      ; 1 empty scan line
+        sta display_list+2,y    ; lms' lsb is always 0
+        lda #$4f
+        sta display_list+1,y
+        lda ptr+1
+        sta display_list+3,y
+        inc ptr+1
 
-    lda #$0f
-    ldx #5
-five_lines:
-    sta display_list,y
-    iny
-    dex
-    bne five_lines
+        tya
+        adc #4                  ; faster than 4*iny, both four bytes
+        tay
 
-    lda #0
-    sta display_list,y
-    iny
-    dec ptr
-    bne loop24
+        lda #$0f
+        ldx #5
+        zrepeat
+            sta display_list,y
+            iny
+            dex
+        zuntil_eq
+
+        lda #0
+        sta display_list,y
+        iny
+        dec ptr
+    zuntil_eq
 
     sta end_dl+1
     lda #$41                ; end of display list
@@ -305,26 +306,26 @@ zproc screen80_clear
 
     ldx #24
 
-clear_screen:
-    ldy #0
-    sty ptr1            ; lsb is always 0
-    lda (ptr),y         ; retrieve lms msb from display list
-    sta ptr1+1
+    zrepeat
+        ldy #0
+        sty ptr1            ; lsb is always 0
+        lda (ptr),y         ; retrieve lms msb from display list
+        sta ptr1+1
 
-    tya
-clear_line:
-    sta (ptr1),y
-    iny
-    cpy #240
-    bne clear_line
+        tya
+        zrepeat             ; clear line with zeroes
+            sta (ptr1),y
+            iny
+            cpy #(SCREEN_WIDTH/2)*6
+        zuntil_eq
 
-    lda ptr
-    clc
-    adc #10             ; next lms
-    sta ptr             ; msb always stays on the same page
+        lda ptr
+        clc
+        adc #10             ; next lms
+        sta ptr             ; msb always stays on the same page
 
-    dex
-    bne clear_screen
+        dex
+    zuntil_eq
 
     stx cursorx
     stx cursory
@@ -418,29 +419,28 @@ set_mask:
     eor #$ff
     sta mask2
 
-blit:
     ldx #0
     clc
 
-blitloop:
-    lda (ptr),y
-mask2=.+1
-    and #$ff
-    sta (ptr),y
+    zrepeat
+        lda (ptr),y
+    mask2=.+1
+        and #$ff
+        sta (ptr),y
 
-glyph=.+1
-    lda $1234,x
-mask1=.+1
-    and #$ff
-    ora (ptr),y
-    sta (ptr),y
+    glyph=.+1
+        lda $1234,x
+    mask1=.+1
+        and #$ff
+        ora (ptr),y
+        sta (ptr),y
 
-    tya
-    adc #SCREEN_WIDTH/2
-    tay
-    inx
-    cpx #6                  ; hint: store glyphs upside down and dex from 5-0
-    bne blitloop
+        tya
+        adc #SCREEN_WIDTH/2
+        tay
+        inx
+        cpx #6              ; hint: store glyphs upside down and dex from 5-0
+    zuntil_eq
 
     pla
     cmp #127                ; we did backspace space
@@ -458,7 +458,8 @@ mask1=.+1
 zendproc
 
 ; Putstring is slightly faster because it skips multiple calls to
-; find_cursor_line_address
+; find_cursor_line_address. Because it uses putchar, it automatically
+; "bumps" against the end of the line.
 
 zproc screen80_putstring
     sta string
@@ -513,18 +514,18 @@ zproc screen80_scrollup
     pha
     clc
 
-scrollup:
-    lda (ptr1),y
-    sta (ptr),y
+    zrepeat
+        lda (ptr1),y
+        sta (ptr),y
 
-    lda ptr1
-    sta ptr
+        lda ptr1
+        sta ptr
 
-    adc #10
-    sta ptr1
+        adc #10
+        sta ptr1
 
-    dex
-    bne scrollup
+        dex
+    zuntil_eq
 
 same_code_for_scroll_down:
     pla                         ; put top line at the bottom
@@ -535,11 +536,12 @@ same_code_for_scroll_down:
     ldy #239
     lda #0
     sta ptr                     ; lsb is always zero
-clear_last_line:
-    sta (ptr),y
-    dey
-    cpy #$ff
-    bne clear_last_line
+
+    zrepeat                     ; clear last line
+        sta (ptr),y
+        dey
+        cpy #$ff
+    zuntil_eq
 
     jmp find_cursor_line_address
 zendproc
@@ -563,18 +565,18 @@ zproc screen80_scrolldown
     pha
     sec
 
-scroll_down:
-    lda (ptr1),y
-    sta (ptr),y
+    zrepeat
+        lda (ptr1),y
+        sta (ptr),y
 
-    lda ptr1
-    sta ptr
+        lda ptr1
+        sta ptr
 
-    sbc #10
-    sta ptr1
+        sbc #10
+        sta ptr1
 
-    dex
-    bne scroll_down
+        dex
+    zuntil_eq
 
     jmp same_code_for_scroll_down       ; but top line instead of bottom
 zendproc
@@ -603,20 +605,22 @@ zproc screen80_cleartoeol
     ldy ptr1
     ldx #5
     lda #0
-clear_loop:
-    sta (ptr),y
-    iny
-    cpy #SCREEN_WIDTH/2
-    bne clear_loop
 
-    lda ptr
-    clc
-    adc #SCREEN_WIDTH/2
-    sta ptr
-    ldy ptr1                    ; restart from cursor position (+0 or 1)
-    lda #0
-    dex
-    bpl clear_loop
+    zrepeat
+        zrepeat                 ; clear until end of scan line
+            sta (ptr),y
+            iny
+            cpy #SCREEN_WIDTH/2
+        zuntil_eq
+
+        lda ptr
+        clc
+        adc #SCREEN_WIDTH/2
+        sta ptr
+        ldy ptr1                    ; restart from cursor position (+0 or 1)
+        lda #0
+        dex
+    zuntil_mi
 
 skip_clearing_bytes:
     rts
@@ -694,9 +698,9 @@ zendproc
 
 zproc wait_for_vbi
     lda RTCLOK
-wait:
-    cmp RTCLOK
-    beq wait
+    zrepeat
+        cmp RTCLOK
+    zuntil_ne
     rts
 zendproc
 
@@ -738,16 +742,16 @@ do_eor:
     clc
     ldx #5
 
-eor_loop:
-    lda (ptr),y
-mask=.+1
-    eor #$ff
-    sta (ptr),y
-    tya
-    adc #SCREEN_WIDTH/2
-    tay
-    dex
-    bpl eor_loop
+    zrepeat
+        lda (ptr),y
+    mask=.+1
+        eor #$ff
+        sta (ptr),y
+        tya
+        adc #SCREEN_WIDTH/2
+        tay
+        dex
+    zuntil_mi
 
     rts
 zendproc
