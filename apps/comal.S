@@ -129,6 +129,7 @@ TOKEN_LINEENTRY = 0x0c
 TOKEN_ZERO      = 0x0d
 TOKEN_LIST      = 0x0e
 TOKEN_DEL       = 0x0f
+TOKEN_MONE      = 0x10
 
 .set tokenvalue, 0
 
@@ -186,7 +187,8 @@ token_data TOKEN_NEG,       14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_ne
 token_data TOKEN_LINEENTRY,  0, 1, 1, 0, lister_nop,     lister_bad,     exec_lineentry
 token_data TOKEN_ZERO,      15, 1, 0, 1, lister_simple,  keyword_zero,   exec_zero
 token_data TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,     exec_list
-token_data TOKEN_DEL,        0, 1, 1, 0, lister_nop,     lister_bad,     exec_del
+token_data TOKEN_DEL,        0, 1, 2, 0, lister_nop,     lister_bad,     exec_del
+token_data TOKEN_MONE,      15, 1, 0, 1, lister_simple,  keyword_mone,   exec_mone
 
 OBJECT_TABLE_SIZE = 256
 
@@ -552,14 +554,22 @@ zendproc
 zproc exec_zero
     jsr push_i0
 
-    lda #OTYPE_INTEGER
-    sta v0
     lda #0
+set_4x_constant:
     sta i0+0
     sta i0+1
     sta i0+2
     sta i0+3
+    lda #OTYPE_INTEGER
+    sta v0
     rts
+zendproc
+
+zproc exec_mone
+    jsr push_i0
+
+    lda #0xff
+    jmp set_4x_constant
 zendproc
 
 zproc exec_integer
@@ -1060,29 +1070,7 @@ zproc delete_current_line
 zendproc
 
 zproc exec_list
-    ; end line in i0
-    jsr i0_to_i2        ; end line in i2
-    jsr pop_i0          ; start line in i0
-
-    ; Check line number validity.
-
-    lda i0+2
-    ora i0+3
-    ora i2+2
-    ora i2+3
-    zif_ne
-        brk
-    zendif
-
-    ; Turn list x, 0 to list x, 0xffff
-
-    lda i2+0
-    ora i2+1
-    zif_eq
-        dec i2+0
-        dec i2+1
-    zendif
-
+    jsr adjust_line_range
     jsr find_line       ; sets execlineptr
     jmp 1f
     zrepeat
@@ -1151,22 +1139,61 @@ zproc exec_list
 zendproc
 
 zproc exec_del
-    ; line in i0
-
-    ; Check line number validity.
-
-    lda i0+2
-    ora i0+3
-    zif_ne
-        brk
-    zendif
-
+    jsr adjust_line_range
     jsr find_line       ; sets execlineptr
-    zif_eq
+
+    jmp 1f
+    zrepeat
+        ; Is the current line greater than the end of the range?
+
+        ldy #LINE_NUMBER+1
+        lda i2+1
+        cmp (execlineptr), y
+        zif_eq
+            dey
+            lda i2+0
+            cmp (execlineptr), y
+        zendif
+        zbreakif_cc
+
         jsr delete_current_line
-    zendif
+
+    1:
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+    zuntil_eq
 
     jmp stack_destroyed
+zendproc
+
+zproc adjust_line_range
+    ; end line in i0
+    jsr i0_to_i2        ; end line in i2
+    jsr pop_i0          ; start line in i0
+
+    ; Turn list 0, 0 to list 0, 0xffff
+
+    lda i0+0
+    ora i0+1
+    ora i2+0
+    ora i2+1
+    zif_eq
+        dec i2+0
+        dec i2+1
+    zendif
+
+    ; Turn list x, 0 to list x, x
+
+    lda i2+0
+    ora i2+1
+    zif_eq
+        lda i0+0
+        sta i2+0
+        lda i0+1
+        sta i2+1
+    zendif
+
+    rts
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -2712,15 +2739,24 @@ zproc pop_number
     zif_eq              ; is the number zero?
         lda #TOKEN_ZERO
     zelse
-        lda #TOKEN_INTEGER
-        jsr queue_bytecode
         lda i0+0
-        jsr queue_bytecode
-        lda i0+1
-        jsr queue_bytecode
-        lda i0+2
-        jsr queue_bytecode
-        lda i0+3
+        and i0+1
+        and i0+2
+        and i0+3
+        cmp #0xff
+        zif_eq          ; is the number minus one?
+            lda #TOKEN_MONE
+        zelse
+            lda #TOKEN_INTEGER
+            jsr queue_bytecode
+            lda i0+0
+            jsr queue_bytecode
+            lda i0+1
+            jsr queue_bytecode
+            lda i0+2
+            jsr queue_bytecode
+            lda i0+3
+        zendif
     zendif
     jsr queue_bytecode
 
@@ -2827,18 +2863,9 @@ list_rule:
     P_TOKEN 'L', 'I', 'S', 'T'|0x80
     P_COMMIT
     P_TRY empty_list_rule
-    P_TRY single_list_rule
-    P_NUMBER
-    P_EAGER_TOKEN ','|0x80
-    P_NUMBER
+    P_JSR line_range_rule
     P_EMIT TOKEN_LIST
-    P_RETURN
-
-del_rule:
-    P_TOKEN 'D', 'E', 'L'|0x80
-    P_COMMIT
-    P_NUMBER
-    P_EMIT TOKEN_DEL
+    P_EOL
     P_RETURN
 
 empty_list_rule:
@@ -2848,11 +2875,38 @@ empty_list_rule:
     P_EMIT TOKEN_LIST
     P_RETURN
 
-single_list_rule:
-    P_NUMBER
+del_rule:
+    P_TOKEN 'D', 'E', 'L'|0x80
+    P_COMMIT
+    P_JSR line_range_rule
+    P_EMIT TOKEN_DEL
     P_EOL
+    P_RETURN
+
+line_range_rule:
+    P_TRY open_left_line_range_rule
+    P_TRY single_line_range_rule
+    P_NUMBER
+    P_EAGER_TOKEN '-'|0x80
+    P_TRY eol_line_range_rule
+    P_NUMBER
+    P_RETURN
+
+single_line_range_rule:
+    P_NUMBER
     P_EMIT TOKEN_ZERO
-    P_EMIT TOKEN_LIST
+    P_EOL
+    P_RETURN
+
+open_left_line_range_rule:
+    P_EAGER_TOKEN '-'|0x80
+    P_EMIT TOKEN_ZERO
+    P_NUMBER
+    P_RETURN
+
+eol_line_range_rule:
+    P_EOL
+    P_EMIT TOKEN_MONE
     P_RETURN
 
 assignment_rule:
@@ -3004,6 +3058,8 @@ keyword_neg = . + 2
 
 keyword_zero:
     .byte '0'|0x80
+keyword_mone:
+    .byte '-', '1'|0x80
 
 .data
 
