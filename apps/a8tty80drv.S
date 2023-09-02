@@ -543,7 +543,7 @@ same_code_for_scroll_down:
         cpy #$ff
     zuntil_eq
 
-    jmp find_cursor_line_address
+    rts
 zendproc
 
 ; Rotate LMS addresses in display list down, find top line, and clear
