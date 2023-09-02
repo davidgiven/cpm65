@@ -480,14 +480,14 @@ zproc screen80_scrollup
     sta ptr1+1
 
     lda #<first_lms_msb
-    sta ptr
+    sta ptr                     ; ptr is destination
     lda #<first_lms_msb+10
-    sta ptr1
+    sta ptr1                    ; ptr1 is source
 
     ldy #0
     ldx #SCREEN_HEIGHT-1
 
-    lda (ptr),y
+    lda (ptr),y                 ; save top line for later
     pha
     clc
 
@@ -504,14 +504,15 @@ scrollup:
     dex
     bne scrollup
 
-    pla
+same_code_for_scroll_down:
+    pla                         ; put top line at the bottom
     sta (ptr),y
 
-    sta ptr+1
+    sta ptr+1                   ; set pointer to screen memory of bottom line
 
     ldy #239
     lda #0
-    sta ptr
+    sta ptr                     ; lsb is always zero
 clear_last_line:
     sta (ptr),y
     dey
@@ -524,8 +525,36 @@ zendproc
 ; Rotate LMS addresses in display list down, find top line, and clear
 
 zproc screen80_scrolldown
+    lda #>display_list
+    sta ptr+1
+    sta ptr1+1
+
+    lda #<last_lms_msb
+    sta ptr                     ; ptr is destination
+    lda #<last_lms_msb-10
+    sta ptr1                    ; ptr1 is source
+
+    ldy #0
+    ldx #SCREEN_HEIGHT-1
+
+    lda (ptr),y
+    pha
     sec
-    rts
+
+scroll_down:
+    lda (ptr1),y
+    sta (ptr),y
+
+    lda ptr1
+    sta ptr
+
+    sbc #10
+    sta ptr1
+
+    dex
+    bne scroll_down
+
+    jmp same_code_for_scroll_down       ; but top line instead of bottom
 zendproc
 
 zproc screen80_cleartoeol
