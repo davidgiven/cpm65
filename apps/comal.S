@@ -131,6 +131,7 @@ TOKEN_LIST      = 0x0e
 TOKEN_DEL       = 0x0f
 TOKEN_MONE      = 0x10
 TOKEN_RENUM     = 0x11
+TOKEN_RUN       = 0x12
 
 .set tokenvalue, 0
 
@@ -191,6 +192,7 @@ token_data TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,     exec_li
 token_data TOKEN_DEL,        0, 1, 2, 0, lister_nop,     lister_bad,     exec_del
 token_data TOKEN_MONE,      15, 1, 0, 1, lister_simple,  keyword_mone,   exec_mone
 token_data TOKEN_RENUM,      0, 1, 2, 0, lister_nop,     lister_bad,     exec_renum
+token_data TOKEN_RUN,        0, 1, 0, 0, lister_nop,     lister_bad,     exec_run
 
 OBJECT_TABLE_SIZE = 256
 
@@ -515,7 +517,7 @@ zendproc
 zproc exec
     ldy execbyteptr
     lda (execlineptr), y
-    zif_eq  
+    zif_eq                  ; TOKEN_EOL?
         rts
     zendif
     tax
@@ -533,6 +535,31 @@ zproc exec
     lda token_exec_lo, x
     pha
     rts
+zendproc
+
+zproc exec_run
+    ; Start at the beginning.
+
+    lda progbase+0
+    sta execlineptr+0
+    lda progbase+1
+    sta execlineptr+1
+    lda #LINE_DATA
+    sta execbyteptr
+
+    ; Keep going until the end.
+
+    jmp 1f
+    zrepeat
+        jsr exec_line
+        jsr goto_next_line
+
+    1:
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+    zuntil_eq
+
+    jmp mainloop
 zendproc
 
 zproc exec_print
@@ -2904,6 +2931,7 @@ immediate_statement_rule:
     P_TRY list_rule
     P_TRY del_rule
     P_TRY renum_rule
+    P_TRY run_rule
 statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -2991,6 +3019,11 @@ open_left_line_range_rule:
 eol_line_range_rule:
     P_EOL
     P_EMIT TOKEN_MONE
+    P_RETURN
+
+run_rule:
+    P_TOKEN 'R', 'U', 'N'|0x80
+    P_EMIT TOKEN_RUN
     P_RETURN
 
 assignment_rule:
