@@ -130,6 +130,7 @@ TOKEN_ZERO      = 0x0d
 TOKEN_LIST      = 0x0e
 TOKEN_DEL       = 0x0f
 TOKEN_MONE      = 0x10
+TOKEN_RENUM     = 0x11
 
 .set tokenvalue, 0
 
@@ -189,6 +190,7 @@ token_data TOKEN_ZERO,      15, 1, 0, 1, lister_simple,  keyword_zero,   exec_ze
 token_data TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,     exec_list
 token_data TOKEN_DEL,        0, 1, 2, 0, lister_nop,     lister_bad,     exec_del
 token_data TOKEN_MONE,      15, 1, 0, 1, lister_simple,  keyword_mone,   exec_mone
+token_data TOKEN_RENUM,      0, 1, 2, 0, lister_nop,     lister_bad,     exec_renum
 
 OBJECT_TABLE_SIZE = 256
 
@@ -1010,13 +1012,6 @@ zproc delete_current_line
     sta p2+0
 
     ; Calculate the new progbase.
-    ; 
-    ; LINE0 LINE1 LINE2 LINE3
-    ;       ^
-    ;       LINE0 LINE2 LINE3
-    ;             ^
-    ; execlineptr += size
-    ; progbase += size
 
     clc
     lda execlineptr+0
@@ -1194,6 +1189,69 @@ zproc adjust_line_range
     zendif
 
     rts
+zendproc
+
+zproc exec_renum
+    ; end line in i0
+    jsr pop_i2          ; start line in i0
+
+    ; Validate.
+
+    lda i2+3
+    ora i0+3
+    zif_mi
+        brk ; TODO: silly
+    zendif
+
+    ; Turn renum 0,x to renum 10,x
+
+    lda i2+0
+    ora i2+1
+    zif_eq
+        lda #10
+        sta i2+0
+    zendif
+
+    ; Turn renum x,0 to renum x,10
+
+    lda i0+0
+    ora i0+1
+    zif_eq
+        lda #10
+        sta i0+0
+    zendif
+
+    ; Iterate through each line.
+
+    lda progbase+0
+    sta execlineptr+0
+    lda progbase+1
+    sta execlineptr+1
+    jmp 1f
+    zrepeat
+        ldy #LINE_NUMBER
+        lda i2+0
+        sta (execlineptr), y
+        iny
+        lda i2+1
+        sta (execlineptr), y
+
+        clc
+        lda i0+0
+        adc i2+0
+        sta i2+0
+        lda i0+1
+        adc i2+1
+        sta i2+1
+
+        jsr goto_next_line
+
+    1:
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+    zuntil_eq
+
+    jmp stack_destroyed
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -2845,6 +2903,7 @@ immediate_statement_rule:
     P_TRY lineentry_rule
     P_TRY list_rule
     P_TRY del_rule
+    P_TRY renum_rule
 statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -2881,6 +2940,31 @@ del_rule:
     P_JSR line_range_rule
     P_EMIT TOKEN_DEL
     P_EOL
+    P_RETURN
+
+renum_rule:
+    P_TOKEN 'R', 'E', 'N', 'U', 'M'|0x80
+    P_COMMIT
+    P_JSR first_optional_number_or_zero_rule
+    P_JSR second_optional_number_or_zero_rule
+    P_EOL
+    P_EMIT TOKEN_RENUM
+    P_RETURN
+
+second_optional_number_or_zero_rule:
+    P_TRY comma_then_number_rule
+    P_EMIT TOKEN_ZERO
+    P_RETURN
+
+first_optional_number_or_zero_rule:
+    P_TRY number_rule
+    P_EMIT TOKEN_ZERO
+    P_RETURN
+
+comma_then_number_rule:
+    P_EAGER_TOKEN ','|0x80
+number_rule:
+    P_NUMBER
     P_RETURN
 
 line_range_rule:
@@ -3025,13 +3109,13 @@ keyword_mod = . + 2
     P_JMP compulsory_expr_rule
 
 leaf_rule:
-    P_TRY parenthesised_rule
-    P_TRY varref_rule
-    P_TRY number_rule
-    P_TRY negate_rule
+    P_TRY parenthesised_rvalue_rule
+    P_TRY varref_rvalue_rule
+    P_TRY number_rvalue_rule
+    P_TRY negate_rvalue_rule
     P_FAIL
 
-parenthesised_rule:
+parenthesised_rvalue_rule:
     P_EAGER_TOKEN '('|0x80
     P_COMMIT
     P_PAREN
@@ -3040,15 +3124,15 @@ parenthesised_rule:
     P_FLUSH
     P_RETURN
 
-varref_rule:
+varref_rvalue_rule:
     P_WORD
     P_RETURN
 
-number_rule:
+number_rvalue_rule:
     P_NUMBER
     P_RETURN
 
-negate_rule:
+negate_rvalue_rule:
 keyword_neg = . + 2
     P_EAGER_TOKEN '-'|0x80
     P_COMMIT
