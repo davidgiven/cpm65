@@ -336,28 +336,26 @@ zendproc
 
 zproc screen80_setcursor
     cmp #SCREEN_WIDTH
-    bcc xpos_less_than
+    zif_cs
+        lda #SCREEN_WIDTH-1
+    zendif
 
-    lda #SCREEN_WIDTH-1
-
-xpos_less_than:
     pha
 
     txa
     cmp #SCREEN_HEIGHT
-    bcc ypos_less_than
+    zif_cs
+        lda #SCREEN_HEIGHT-1
+    zendif
 
-    lda #SCREEN_HEIGHT-1
-
-ypos_less_than:
     pha
 
     jsr hide_cursor
+
     pla
-    tax
+    sta cursory
     pla
     sta cursorx
-    stx cursory
     jmp show_cursor
 zendproc
 
@@ -558,8 +556,48 @@ scroll_down:
 zendproc
 
 zproc screen80_cleartoeol
-    sec
-    rts
+    lda cursorx
+    ror
+    pha
+    php                         ; carry is set if cursorx is odd
+    zif_cs
+        lda #127                ; if cursorx is odd, we first clear the
+        jsr screen80_putchar    ; right half of the bytes
+    zendif
+    plp
+    pla
+    adc #0                      ; round up if carry was set
+
+    cmp #SCREEN_WIDTH/2
+    beq skip_clearing_bytes     ; we were at the last position of the line
+
+    tay
+    sty ptr1
+
+    lda curlineptr
+    sta ptr
+    lda curlineptr+1
+    sta ptr+1
+
+    ldx #5
+    lda #0
+clear_loop:
+    sta (ptr),y
+    iny
+    cpy #SCREEN_WIDTH/2
+    bne clear_loop
+
+    lda ptr
+    clc
+    adc #SCREEN_WIDTH/2
+    sta ptr
+    ldy ptr1
+    lda #0
+    dex
+    bpl clear_loop
+
+skip_clearing_bytes:
+    jmp show_cursor
 zendproc
 
 ; -------------------------------------------------------------------------
