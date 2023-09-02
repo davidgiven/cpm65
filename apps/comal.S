@@ -70,7 +70,14 @@ LINE_NUMBER     = 1
 LINE_INDENT     = 3
 LINE_DATA       = 4
 
+; Run state flags.
+
+RUNFLAG_RUNNING = 1<<0
+RUNFLAG_STOPPED = 1<<1
+
 ZEROPAGE
+
+runflags:  .byte 0
 
 heapptr:   .word 0
 stackptr:  .word 0
@@ -132,6 +139,8 @@ TOKEN_DEL       = 0x0f
 TOKEN_MONE      = 0x10
 TOKEN_RENUM     = 0x11
 TOKEN_RUN       = 0x12
+TOKEN_STOP      = 0x13
+TOKEN_CON       = 0x14
 
 .set tokenvalue, 0
 
@@ -193,6 +202,8 @@ token_data TOKEN_DEL,        0, 1, 2, 0, lister_nop,     lister_bad,     exec_de
 token_data TOKEN_MONE,      15, 1, 0, 1, lister_simple,  keyword_mone,   exec_mone
 token_data TOKEN_RENUM,      0, 1, 2, 0, lister_nop,     lister_bad,     exec_renum
 token_data TOKEN_RUN,        0, 1, 0, 0, lister_nop,     lister_bad,     exec_run
+token_data TOKEN_STOP,       0, 1, 0, 0, lister_simple,  keyword_stop,   exec_stop
+token_data TOKEN_CON,        0, 1, 0, 0, lister_nop,     lister_bad,     exec_con
 
 OBJECT_TABLE_SIZE = 256
 
@@ -205,6 +216,9 @@ zproc stack_destroyed
     sta stackptr+0
     lda progbase+1
     sta stackptr+1
+
+    lda #0
+    sta runflags
 zendproc
     ; fall through
 zproc mainloop
@@ -538,6 +552,8 @@ zproc exec
 zendproc
 
 zproc exec_run
+    ; TODO: clear variable storage
+
     ; Start at the beginning.
 
     lda progbase+0
@@ -549,6 +565,10 @@ zproc exec_run
 
     ; Keep going until the end.
 
+exec_loop:
+    lda #RUNFLAG_RUNNING
+    sta runflags
+
     jmp 1f
     zrepeat
         jsr exec_line
@@ -559,7 +579,61 @@ zproc exec_run
         lda (execlineptr), y
     zuntil_eq
 
+    lda #0
+    sta runflags
+
     jmp mainloop
+zendproc
+
+zproc exec_stop
+    lda #<1f
+    ldx #>1f
+    jsr print_string
+
+    lda #3
+    jsr extend_stack
+
+    ldy #0
+    lda execlineptr+0
+    sta (stackptr), y
+    iny
+    lda execlineptr+1
+    sta (stackptr), y
+    iny
+    lda execbyteptr
+    sta (stackptr), y
+
+    lda #RUNFLAG_RUNNING|RUNFLAG_STOPPED
+    sta runflags
+
+    jmp mainloop
+1:
+    .byte 13, 10
+    .ascii "Stopped"
+    .byte 13, 10|0x80
+zendproc
+    
+zproc exec_con
+    lda runflags
+    and #RUNFLAG_STOPPED
+    zif_eq
+        brk ; TODO: not stopped
+    zendif
+
+    ldy #2
+    lda (stackptr), y
+    sta execbyteptr
+    dey
+    lda (stackptr), y
+    sta execlineptr+1
+    dey
+    lda (stackptr), y
+    sta execlineptr+0
+
+    lda #3
+    jsr retract_stack
+
+    jmp exec_loop
 zendproc
 
 zproc exec_print
@@ -2932,9 +3006,11 @@ immediate_statement_rule:
     P_TRY del_rule
     P_TRY renum_rule
     P_TRY run_rule
+    P_TRY con_rule
 statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
+    P_TRY stop_rule
 ;    P_TRY for_rule
 ;    P_TRY if_rule
 ;    P_TRY proc_rule
@@ -3024,6 +3100,17 @@ eol_line_range_rule:
 run_rule:
     P_TOKEN 'R', 'U', 'N'|0x80
     P_EMIT TOKEN_RUN
+    P_RETURN
+
+stop_rule:
+keyword_stop = . + 2
+    P_TOKEN 'S', 'T', 'O', 'P'|0x80
+    P_EMIT TOKEN_STOP
+    P_RETURN
+
+con_rule:
+    P_TOKEN 'C', 'O', 'N'|0x80
+    P_EMIT TOKEN_CON
     P_RETURN
 
 assignment_rule:
