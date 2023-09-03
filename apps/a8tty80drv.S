@@ -419,7 +419,7 @@ set_mask:
     eor #$ff
     sta mask2
 
-    ldx #0
+    ldx #5
     clc
 
     zrepeat
@@ -438,9 +438,8 @@ set_mask:
         tya
         adc #SCREEN_WIDTH/2
         tay
-        inx
-        cpx #6              ; hint: store glyphs upside down and dex from 5-0
-    zuntil_eq
+        dex
+    zuntil_mi
 
     pla
     cmp #127                ; we did backspace space
