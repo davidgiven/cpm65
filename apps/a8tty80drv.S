@@ -352,9 +352,7 @@ zproc screen80_setcursor
 zendproc
 
 zproc screen80_getcursor
-    lda cursorx
-    ldx cursory
-    rts
+    jmp next_screen
 zendproc
 
 zproc screen80_putchar
