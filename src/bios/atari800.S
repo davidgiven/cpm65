@@ -511,8 +511,8 @@ zproc screen_putchar
 zendproc
 
 zproc screen_putstring
-    sta 1f+0
-    stx 1f+1
+    sta 1f+1
+    stx 1f+2
 
     jsr calculate_cursor_address
     ldx #0
@@ -524,8 +524,12 @@ zproc screen_putstring
         jsr convert_ascii_to_screencode
         sta (ptr), y
         iny
+        cpy #SCREEN_WIDTH
+        zbreakif_eq
         inx
     zendloop
+    dey
+    sty cursorx
 
     rts
 zendproc
