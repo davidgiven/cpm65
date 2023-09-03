@@ -403,7 +403,7 @@ screen_jmptable_lo:
     jmptablo screen_putchar
     jmptablo screen_putstring
     jmptablo screen_getchar
-    jmptablo fail
+    jmptablo screen_showcursor
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
@@ -417,7 +417,7 @@ screen_jmptable_hi:
     jmptabhi screen_putchar
     jmptabhi screen_putstring
     jmptabhi screen_getchar
-    jmptabhi fail
+    jmptabhi screen_showcursor
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
@@ -865,6 +865,20 @@ zproc show_cursor
     ora #$80
     sta (ptr),y
     rts
+zendproc
+
+zproc screen_showcursor
+    pha
+    jsr hide_cursor
+    pla
+    cmp #0
+    zif_eq
+        lda #$60            ; rts instruction
+    zelse
+        lda #$20            ; jsr instruction
+    zendif
+    sta show_cursor
+    jmp show_cursor
 zendproc
 
 ; ---------------------------------------------------------------------------
