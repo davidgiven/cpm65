@@ -471,9 +471,22 @@ zproc screen_clear
     rts
 zendproc
 
+; On top of the official specification, we clip (A,X) at the screen edges
+
 zproc screen_setcursor
+    cmp #SCREEN_WIDTH
+    zif_cs
+        lda #SCREEN_WIDTH-1
+    zendif
     sta cursorx
-    stx cursory
+
+    txa
+    cmp #SCREEN_HEIGHT
+    zif_cs
+        lda #SCREEN_HEIGHT-1
+    zendif
+    sta cursory
+
     rts
 zendproc
 
