@@ -90,7 +90,7 @@ drv_screen80_jump_lo:
     jmptablo screen80_putchar
     jmptablo screen80_putstring
     jmptablo screen80_getchar
-    jmptablo fail                   ; show cursor
+    jmptablo screen80_showcursor
     jmptablo screen80_scrollup
     jmptablo screen80_scrolldown
     jmptablo screen80_cleartoeol
@@ -105,7 +105,7 @@ drv_screen80_jump_hi:
     jmptabhi screen80_putchar
     jmptabhi screen80_putstring
     jmptabhi screen80_getchar
-    jmptabhi fail
+    jmptabhi screen80_showcursor
     jmptabhi screen80_scrollup
     jmptabhi screen80_scrolldown
     jmptabhi screen80_cleartoeol
@@ -625,6 +625,17 @@ skip_clearing_bytes:
     rts
 zendproc
 
+zproc screen80_showcursor
+    cmp #0
+    zif_eq
+        lda #$60                    ; rts instruction
+    zelse
+        lda #$20                    ; jsr instruction
+    zendif
+    sta toggle_cursor
+    rts
+zendproc
+
 ; -------------------------------------------------------------------------
 
 ; TTY80 IMPLEMENTATION
@@ -720,6 +731,8 @@ zproc write_nl
 zendproc
 
 ; Toggle cursor with eor mask
+; It is important that the first instruction is jsr. If it's changed,
+; showcursor has to be changed, too.
 
 zproc toggle_cursor
     jsr find_cursor_line_address
