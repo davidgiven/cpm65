@@ -407,7 +407,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
-    jmptablo fail
+    jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -421,7 +421,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-    jmptabhi fail
+    jmptabhi screen_setstyle
 zendproc
 
 zproc fail
@@ -530,6 +530,8 @@ zendproc
 zproc screen_putchar
     jsr convert_ascii_to_screencode
     ldy cursorx
+style=.+1
+    eor #$00
     sta (curlineptr), y
 
     lda cursorx
@@ -879,6 +881,17 @@ zproc screen_showcursor
     zendif
     sta show_cursor
     jmp show_cursor
+zendproc
+
+zproc screen_setstyle
+    cmp #STYLE_REVERSE
+    zif_eq
+        lda #$80
+    zelse
+        lda #0
+    zendif
+    sta style
+    rts
 zendproc
 
 ; ---------------------------------------------------------------------------
