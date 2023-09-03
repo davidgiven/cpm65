@@ -26,9 +26,7 @@ ptr1 = FMSZPG+2
 
 save_y = FMSZPG+4
 
-curlineptr = FMSZPG+5       ; 2 bytes
-
-; 0 bytes of FMSZPG left
+; 2 bytes of FMSZPG left
 
 charin = PTEMP      ; temporary on ZP that we don't use
 charout = PTEMP
@@ -204,11 +202,9 @@ init:
 
     stx dl_prologue+4
     stx SAVMSC+1
-    stx curlineptr+1
     lda #$40
     sta dl_prologue+3
     sta SAVMSC
-    sta curlineptr
 
     zrepeat
         lda dl_prologue,y
@@ -472,16 +468,13 @@ zproc screen_clear
     lda #0
     sta cursorx
     sta cursory
-    jmp show_cursor 
+    rts
 zendproc
 
 zproc screen_setcursor
-    pha
-    jsr hide_cursor
-    pla
     sta cursorx
     stx cursory
-    jmp show_cursor
+    rts
 zendproc
 
 zproc screen_getcursor
@@ -495,6 +488,7 @@ zendproc
 zproc screen_getchar
     sta ptr
     stx ptr+1
+
     clc
     ror ptr+1                       ; divide be two, we can only count
     ror ptr                         ; two centiseconds at a time
@@ -528,11 +522,14 @@ zproc screen_getchar
 zendproc
 
 zproc screen_putchar
+    pha
+    jsr calculate_cursor_address
+    pla
     jsr convert_ascii_to_screencode
     ldy cursorx
 style=.+1
     eor #$00
-    sta (curlineptr), y
+    sta (ptr), y
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
@@ -568,8 +565,6 @@ zproc screen_putstring
 zendproc
 
 zproc screen_scrollup
-    jsr hide_cursor
-
     lda SAVMSC
     sta ptr1
     lda SAVMSC+1
@@ -607,13 +602,10 @@ zproc screen_scrollup
         sta (ptr), y
         dey
     zuntil_mi
-    jmp show_cursor
-
+    rts
 zendproc
 
 zproc screen_scrolldown
-    jsr hide_cursor
-
     lda SAVMSC
     clc
     adc #<((SCREEN_HEIGHT-1)*SCREEN_WIDTH)
@@ -654,21 +646,20 @@ zproc screen_scrolldown
         sta (ptr), y
         dey
     zuntil_mi
-    jmp show_cursor
+    rts
 zendproc
 
 zproc screen_cleartoeol
-; no need to hide cursor, cursor is overwritten
+    jsr calculate_cursor_address
 
-    ldy cursorx
     lda #0                          ; screen memory space
     zrepeat
-        sta (curlineptr), y
+        sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
     zuntil_eq
 
-    jmp show_cursor
+    rts
 zendproc
 
 ; --- TTY DRIVER ------------------------------------------------------------
@@ -676,6 +667,8 @@ zendproc
 ; Blocks and waits for the next keypress; returns it in A.
 
 zproc tty_conin
+    jsr toggle_cursor
+
     ldx #1*16
     lda #CGBIN
     sta ICCOM,x
@@ -699,21 +692,24 @@ zproc tty_conin
     cmp #ATARI_EOL
     zif_eq
         lda #13
-        rts
+        bne 1f
     zendif
 
     cmp #ATARI_BS
     zif_eq
         lda #127            ; DEL not BS
-        rts
+        bne 1f
     zendif
 
     cmp #ATARI_TAB
     zif_eq
         lda #9
-;        rts    [[fallthrough]]
-    zendif
+    zendif                  ; fallthrough
 
+1:
+    pha
+    jsr toggle_cursor
+    pla
     rts
 zendproc
 
@@ -733,14 +729,11 @@ zendproc
 ; Output character in A
 
 zproc tty_conout
-    pha
-    jsr hide_cursor
-    pla
     cmp #13
     zif_eq
         lda #0
         sta cursorx
-        jmp show_cursor
+        rts
     zendif
     cmp #127
     zif_eq
@@ -757,8 +750,8 @@ zproc tty_conout
             zendif
         zendif
         jsr calculate_cursor_address
-        lda #$80                        ; cursor overwrites old character
-        sta (curlineptr),y
+        lda #0                        ; cursor overwrites old character
+        sta (ptr),y
         rts
     zendif
     cmp #10
@@ -774,7 +767,7 @@ zproc tty_conout
     cmp #SCREEN_WIDTH-1
     beq write_nl
 
-    jmp show_cursor
+    rts
 zendproc
 
 zproc write_nl
@@ -788,7 +781,7 @@ zproc write_nl
         dec cursory
         jmp screen_scrollup
     zendif
-    jmp show_cursor
+    rts
 zendproc
 
 ; Preserves X and Y.
@@ -809,7 +802,6 @@ zproc convert_ascii_to_screencode
 zendproc
 
 ; Sets (ptr), y to the location of the cursor.
-; ptr is cached in curlineptr
 
 zproc calculate_cursor_address
     ldy cursorx
@@ -845,42 +837,29 @@ zproc calculate_cursor_address
     clc
     adc SAVMSC
     sta ptr+0
-    sta curlineptr
     lda ptr+1
     and #3
     adc SAVMSC+1
     sta ptr+1
-    sta curlineptr+1
     rts
 
-zproc hide_cursor
-    ldy cursorx
-    lda (curlineptr),y
-    and #$7f
-    sta (curlineptr),y
-    rts
-zendproc
-
-zproc show_cursor
+zproc toggle_cursor
     jsr calculate_cursor_address
     lda (ptr),y
-    ora #$80
+    eor #$80
     sta (ptr),y
     rts
 zendproc
 
 zproc screen_showcursor
-    pha
-    jsr hide_cursor
-    pla
     cmp #0
     zif_eq
         lda #$60            ; rts instruction
     zelse
         lda #$20            ; jsr instruction
     zendif
-    sta show_cursor
-    jmp show_cursor
+    sta toggle_cursor
+    rts
 zendproc
 
 zproc screen_setstyle
