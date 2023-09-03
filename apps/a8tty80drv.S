@@ -94,7 +94,7 @@ drv_screen80_jump_lo:
     jmptablo screen80_scrollup
     jmptablo screen80_scrolldown
     jmptablo screen80_cleartoeol
-    jmptablo fail                   ; set style
+    jmptablo screen80_setstyle
 
 drv_screen80_jump_hi:
     jmptabhi screen80_version
@@ -109,7 +109,7 @@ drv_screen80_jump_hi:
     jmptabhi screen80_scrollup
     jmptabhi screen80_scrolldown
     jmptabhi screen80_cleartoeol
-    jmptabhi fail
+    jmptabhi screen80_setstyle
 zendproc
 
 zproc fail
@@ -416,6 +416,10 @@ char_left:
 
 set_mask:
     sta mask1
+    ldx style
+    zif_ne
+        sta style
+    zendif
     eor #$ff
     sta mask2
 
@@ -426,13 +430,15 @@ set_mask:
         lda (ptr),y
     mask2=.+1
         and #$ff
+    style=.+1
+        ora #$00
         sta (ptr),y
 
     glyph=.+1
         lda $1234,x
     mask1=.+1
         and #$ff
-        ora (ptr),y
+        eor (ptr),y
         sta (ptr),y
 
         tya
@@ -453,6 +459,11 @@ set_mask:
         inc cursorx
     zendif
 
+    rts
+zendproc
+
+zproc screen80_setstyle
+    sta style
     rts
 zendproc
 
