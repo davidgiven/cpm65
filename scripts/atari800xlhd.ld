@@ -19,7 +19,7 @@
 MEMORY {
     zp : ORIGIN = 0x80, LENGTH = 0x80
     lowram (rw) : ORIGIN = 0x500, LENGTH = 0x800
-    midram(rw) : ORIGIN = 0x3000, LENGTH = 0x800
+    midram(rw) : ORIGIN = 0x3000, LENGTH = 0xc00
     biosram(rw) : ORIGIN = 0xd800, LENGTH = 0x800
     bank_extra(rw) : ORIGIN = 0xe400, LENGTH = 0x1c00
 }

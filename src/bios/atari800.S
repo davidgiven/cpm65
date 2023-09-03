@@ -55,7 +55,7 @@ _start:
     .byte 0
 
 #ifdef ATARI_XL
-    .byte 16            ; (filesize(atari800xlhd.exe)+127)/128
+    .byte 17            ; (filesize(atari800xlhd.exe)+127)/128
 #else
 #   ifdef ATARI_HD
         .byte 13        ; (filesize(atari800hd.exe)+127)/128
@@ -490,7 +490,38 @@ zproc screen_getcursor
     rts
 zendproc
 
+; XZ = timeout in cs
+
 zproc screen_getchar
+    sta ptr
+    stx ptr+1
+    clc
+    ror ptr+1                       ; divide be two, we can only count
+    ror ptr                         ; two centiseconds at a time
+
+    ldy RTCLOK                      ; incremented every 1/50th of a second
+    iny
+
+    zloop
+        ldx CH
+        inx
+        zbreakif_eq                 ; break if key is pending
+        cpy RTCLOK
+        zif_eq
+            iny
+            dec ptr
+            zif_cs
+                dec ptr+1
+                ldx ptr+1
+                cpx #$ff
+                zif_eq
+                    sec             ; timer expired
+                    rts
+                zendif
+            zendif
+        zendif
+    zendloop
+
     jsr tty_conin
     clc
     rts
