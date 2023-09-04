@@ -27,7 +27,6 @@ TARGETS = \
 MINIMAL_APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
-	$(OBJDIR)/apps/cls.com \
 	$(OBJDIR)/apps/devices.com \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
@@ -54,6 +53,7 @@ APPS = \
 	cpmfs/hello.asm \
 
 SCREEN_APPS = \
+	$(OBJDIR)/apps/cls.com \
 	apps/cls.asm \
 	$(OBJDIR)/qe.com \
 
