@@ -183,7 +183,7 @@ $(OBJDIR)/%.com: $(OBJDIR)/third_party/%.o $(OBJDIR)/libcpm.a
 
 $(OBJDIR)/%.com: $(OBJDIR)/apps/%.o $(OBJDIR)/libcpm.a
 	@mkdir -p $(dir $@)
-	$(LLVM)mos-cpm65-clang $(CFLAGS65) -I. -o $@ $^
+	$(LLVM)mos-cpm65-clang $(CFLAGS65) -v -I. -o $@ $^
 
 $(OBJDIR)/%.com: %.asm $(OBJDIR)/asm.com bin/cpmemu $(wildcard apps/*.inc)
 	@mkdir -p $(dir $@)
@@ -339,12 +339,13 @@ $(OBJDIR)/src/bios/atari800.o: CFLAGS65 += -DATARI_SD
 $(OBJDIR)/atari800.exe:
 atari800.atr: $(OBJDIR)/atari800.exe $(OBJDIR)/bdos.sys Makefile \
 			$(MINIMAL_APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com \
-			$(SCREEN_APPS)
+			$(SCREEN_APPS) $(OBJDIR)/a8tty80drv.com
 	dd if=/dev/zero of=$@ bs=128 count=720
 	mkfs.cpm -f atari90 $@
 	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
+	cp $(OBJDIR)/a8tty80drv.com $(OBJDIR)/tty80drv.com
 	cpmcp -f atari90 $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(MINIMAL_APPS) $(SCREEN_APPS) 0:
-	cpmcp -f atari90 $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/olivetti.fnt 1:
+	cpmcp -f atari90 $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com $(OBJDIR)/tty80drv.com third_party/fonts/atari/olivetti.fnt 1:
 	cpmchattr -f atari90 $@ sr 0:ccp.sys o:bdos.sys
 	dd if=$(OBJDIR)/atari800.exe of=$@ bs=128 conv=notrunc
 	mv $@ $@.raw
@@ -356,12 +357,13 @@ $(OBJDIR)/src/bios/atari800hd.o: CFLAGS65 += -DATARI_HD
 $(OBJDIR)/atari800hd.exe:
 atari800hd.atr: $(OBJDIR)/atari800hd.exe $(OBJDIR)/bdos.sys Makefile \
 			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com \
-			$(SCREEN_APPS)
+			$(SCREEN_APPS) $(OBJDIR)/a8tty80drv.com
 	dd if=/dev/zero of=$@ bs=128 count=8190
 	mkfs.cpm -f atarihd $@
 	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
+	cp $(OBJDIR)/a8tty80drv.com $(OBJDIR)/tty80drv.com
 	cpmcp -f atarihd $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/*.fnt 1:
+	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com $(OBJDIR)/tty80drv.com third_party/fonts/atari/*.fnt 1:
 	cpmchattr -f atarihd $@ sr 0:ccp.sys 0:bdos.sys
 	dd if=$(OBJDIR)/atari800hd.exe of=$@ bs=128 conv=notrunc
 	mv $@ $@.raw
@@ -373,12 +375,13 @@ $(OBJDIR)/src/bios/atari800xlhd.o: CFLAGS65 += -DATARI_HD -DATARI_XL
 $(OBJDIR)/atari800xlhd.exe:
 atari800xlhd.atr: $(OBJDIR)/atari800xlhd.exe $(OBJDIR)/bdos.sys Makefile \
 			$(APPS) $(OBJDIR)/ccp.sys $(OBJDIR)/a8setfnt.com \
-			$(SCREEN_APPS)
+			$(SCREEN_APPS) $(OBJDIR)/a8tty80drv.com
 	dd if=/dev/zero of=$@ bs=128 count=8190
 	mkfs.cpm -f atarihd $@
 	cp $(OBJDIR)/a8setfnt.com $(OBJDIR)/setfnt.com
+	cp $(OBJDIR)/a8tty80drv.com $(OBJDIR)/tty80drv.com
 	cpmcp -f atarihd $@ $(OBJDIR)/bdos.sys $(OBJDIR)/ccp.sys $(APPS) $(SCREEN_APPS) 0:
-	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com third_party/fonts/atari/*.fnt 1:
+	cpmcp -f atarihd $@ $(OBJDIR)/apps/ls.com $(OBJDIR)/setfnt.com $(OBJDIR)/tty80drv.com third_party/fonts/atari/*.fnt 1:
 	cpmchattr -f atarihd $@ sr 0:ccp.sys 0:bdos.sys
 	dd if=$(OBJDIR)/atari800xlhd.exe of=$@ bs=128 conv=notrunc
 	mv $@ $@.raw
