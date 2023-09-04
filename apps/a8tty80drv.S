@@ -169,6 +169,12 @@ zproc init
     sta next_tty+1
     stx next_tty+2
 
+; disable BIOS cursor
+
+    ldy #SCREEN_SHOWCURSOR
+    lda #0
+    jsr next_screen
+
 ; register new drivers
 
     lda #<drv_screen80
