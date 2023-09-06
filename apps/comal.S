@@ -70,14 +70,7 @@ LINE_NUMBER     = 1
 LINE_INDENT     = 3
 LINE_DATA       = 4
 
-; Run state flags.
-
-RUNFLAG_RUNNING = 1<<0
-RUNFLAG_STOPPED = 1<<1
-
 ZEROPAGE
-
-runflags:  .byte 0
 
 heapptr:   .word 0
 stackptr:  .word 0
@@ -116,6 +109,8 @@ listerflags:        .byte 0 ; flags
 
 execlineptr:        .word 0 ; line of code currently being run
 execbyteptr:        .byte 0 ; offset into the line of code
+savedexeclineptr:   .word 0 ; line of code to CON to
+savedexecbyteptr:   .byte 0 ; offset into the line of code; 0 if no saved state
 
 LISTERFLAG_NOTSTART = 1<<7
 LISTERFLAG_COMMA    = 1<<6
@@ -218,7 +213,7 @@ zproc stack_destroyed
     sta stackptr+1
 
     lda #0
-    sta runflags
+    sta savedexecbyteptr
 zendproc
     ; fall through
 zproc mainloop
@@ -269,9 +264,7 @@ zproc mainloop
 
         ; Print line back again.
 
-        lda #0
-        sta bufferpos
-        sta bufferend
+        jsr reset_buffer
 
         lda #<bytecode_buffer
         sta execlineptr+0
@@ -289,7 +282,7 @@ zproc mainloop
         sta execlineptr+0
         lda #>bytecode_buffer
         sta execlineptr+1
-        lda #1
+        lda #LINE_DATA
         sta execbyteptr
         jsr exec_line
     zendloop
@@ -401,6 +394,15 @@ zproc print_string
     rts
 zendproc
 
+; Resets the text buffer.
+
+zproc reset_buffer
+    lda #0
+    sta bufferpos
+    sta bufferend
+    rts
+zendproc
+
 ; Prints the text buffer.
 
 zproc print_buffer
@@ -447,6 +449,96 @@ zproc toupper
     zendif
     rts
 zendproc
+
+; --- Error handling --------------------------------------------------------
+
+error_cant_continue:
+    lda #ERROR_CANT_CONTINUE
+    beq throw_error         ; always taken
+    
+error_invalid_parameter:
+    lda #ERROR_INVALID_PARAMETER
+    bne throw_error         ; always taken
+    
+error_silly:
+    lda #ERROR_SILLY
+    bne throw_error         ; always taken
+    
+error_no_such_variable:
+    lda #ERROR_NO_SUCH_VARIABLE
+    bne throw_error         ; always taken
+
+; Produces the error whose number is in A.
+
+zproc throw_error
+    ; Delete any saved state to prevent continues.
+
+    pha
+    lda #0
+    sta savedexecbyteptr
+    pla
+zendproc
+    ; fall through
+zproc throw_nonfatal_error
+    pha
+    jsr reset_buffer
+    jsr buffer_print_nl
+    pla
+
+    clc
+    adc #<message_table
+    ldx #>message_table
+    zif_cs
+        inx
+    zendif
+    jsr buffer_print_string
+
+    ; If the current line has a line number (i.e. wasn't transient), print it.
+
+    ldy #LINE_NUMBER+0
+    lda (execlineptr), y
+    iny
+    ora (execlineptr), y
+    zif_ne
+        lda #<1f
+        ldx #>1f
+        jsr buffer_print_string
+
+        jsr buffer_print_current_line_number
+    zendif
+
+    jsr buffer_print_nl
+    jsr print_buffer
+
+    jmp mainloop
+
+1:
+    .ascii " at line"
+    .byte ' '|0x80
+zendproc
+
+message_table:
+cant_continue_msg:          ; must be first
+    .ascii "Can't continu"
+    .byte 'e'|0x80
+invalid_parameter_msg:
+    .ascii "Invalid paramete"
+    .byte 'r'|0x80
+silly_msg:
+    .ascii "Sill"
+    .byte 'y'|0x80
+no_such_variable_msg:
+    .ascii "No such variabl"
+    .byte 'e'|0x80
+stopped_msg:
+    .ascii "Stoppe"
+    .byte 'd'|0x80
+
+ERROR_CANT_CONTINUE = cant_continue_msg - message_table
+ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
+ERROR_SILLY = silly_msg - message_table
+ERROR_NO_SUCH_VARIABLE = no_such_variable_msg - message_table
+ERROR_STOPPED = stopped_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -523,9 +615,7 @@ zproc goto_next_line
 zendproc
 
 zproc exec_line
-    lda #0
-    sta bufferpos
-    sta bufferend
+    jsr reset_buffer
 zendproc
     ; fall through
 zproc exec
@@ -566,9 +656,6 @@ zproc exec_run
     ; Keep going until the end.
 
 exec_loop:
-    lda #RUNFLAG_RUNNING
-    sta runflags
-
     jmp 1f
     zrepeat
         jsr exec_line
@@ -579,59 +666,48 @@ exec_loop:
         lda (execlineptr), y
     zuntil_eq
 
-    lda #0
-    sta runflags
-
     jmp mainloop
 zendproc
 
 zproc exec_stop
-    lda #<1f
-    ldx #>1f
-    jsr print_string
+    lda savedexecbyteptr
+    bne 1f
 
-    lda #3
-    jsr extend_stack
+    ldy #LINE_NUMBER+0
+    ora (execlineptr), y
+    iny
+    ora (execlineptr), y
+    zif_eq
+    1:
+        jmp error_cant_continue
+    zendif
 
-    ldy #0
     lda execlineptr+0
-    sta (stackptr), y
-    iny
+    sta savedexeclineptr+0
     lda execlineptr+1
-    sta (stackptr), y
-    iny
-    lda execbyteptr
-    sta (stackptr), y
+    sta savedexeclineptr+1
+    lda execbyteptr+0
+    sta savedexecbyteptr+0
 
-    lda #RUNFLAG_RUNNING|RUNFLAG_STOPPED
-    sta runflags
-
-    jmp mainloop
-1:
-    .byte 13, 10
-    .ascii "Stopped"
-    .byte 13, 10|0x80
+    lda #ERROR_STOPPED
+    jmp throw_nonfatal_error
 zendproc
     
 zproc exec_con
-    lda runflags
-    and #RUNFLAG_STOPPED
+    lda savedexecbyteptr
     zif_eq
-        brk ; TODO: not stopped
+        jmp error_cant_continue
     zendif
 
-    ldy #2
-    lda (stackptr), y
-    sta execbyteptr
-    dey
-    lda (stackptr), y
-    sta execlineptr+1
-    dey
-    lda (stackptr), y
+    lda savedexeclineptr+0
     sta execlineptr+0
+    lda savedexeclineptr+1
+    sta execlineptr+1
+    lda savedexecbyteptr+0
+    sta execbyteptr+0
 
-    lda #3
-    jsr retract_stack
+    lda #0
+    sta savedexecbyteptr
 
     jmp exec_loop
 zendproc
@@ -957,7 +1033,10 @@ zproc deref_ix
         lda #>global_variables
         sta p0+1
 
-        jsr hash_deref          ; return ptr to node in p0
+        jsr hash_deref_ro       ; return ptr to node in p0
+        zif_cs
+            jmp error_no_such_variable
+        zendif
 
         pla
         tax
@@ -1014,7 +1093,7 @@ zproc exec_lineentry
     lda i0+2
     ora i0+3
     zif_ne
-        brk
+        jmp error_invalid_parameter
     zendif
 
     jsr find_line               ; sets execlineptr
@@ -1184,20 +1263,7 @@ zproc exec_list
             zbreakif_cs
         zendif
             
-        ; Print the line number.
-
-        ldy #LINE_NUMBER+0
-        lda (execlineptr), y
-        sta i0+0
-        iny
-        lda (execlineptr), y
-        sta i0+1
-        
         ; Do the printing.
-
-        lda #0
-        sta bufferpos
-        sta bufferend
 
         lda #LINE_DATA
         sta execbyteptr
@@ -1207,7 +1273,8 @@ zproc exec_list
         lda i2+1
         pha
 
-        jsr buffer_print_i0
+        jsr reset_buffer
+        jsr buffer_print_current_line_number
         jsr buffer_print_space
         jsr list_line
         jsr print_buffer
@@ -1301,7 +1368,7 @@ zproc exec_renum
     lda i2+3
     ora i0+3
     zif_mi
-        brk ; TODO: silly
+        jmp error_silly
     zendif
 
     ; Turn renum 0,x to renum 10,x
@@ -1447,6 +1514,17 @@ zproc buffer_print_nl
     jsr buffer_print_char
     lda #0x0a
     bne buffer_print_char       ; always taken
+zendproc
+
+zproc buffer_print_current_line_number
+    ldy #LINE_NUMBER+0
+    lda (execlineptr), y
+    sta i0+0
+    iny
+    lda (execlineptr), y
+    sta i0+1
+        
+    jmp buffer_print_i0
 zendproc
 
 ; --- Maths -----------------------------------------------------------------
@@ -1621,14 +1699,15 @@ zendproc
 
 ; --- Hashing stuff ---------------------------------------------------------
 
-; Returns a (possibly new) value node for a given ID.
+; Returns a value node for a given ID.
 ; On entry:
 ;   p0 - pointer to hash table
 ;   p1 - ID
 ; On exit:
 ;   p0 - pointer to value node
+;   C if the node couldn't be found
 
-zproc hash_deref
+zproc hash_deref_ro
     ; Hash the ID.
 
     lda p1+0
@@ -1678,6 +1757,7 @@ zproc hash_deref
             zif_eq
                 ; Yes. We've found a matching node. Just return it.
 
+                clc
                 rts
             zendif
         zendif
@@ -1692,6 +1772,19 @@ zproc hash_deref
             inc p0+1
         zendif
     zendloop
+
+    ; The node wasn't found. Fail with an error.
+
+    sec
+    rts
+zendproc
+
+zproc hash_deref
+    jsr hash_deref_ro
+    zif_cc
+        ; The node already exists.
+        rts
+    zendif
 
     ; Reached the end of the chain --- allocate a new node.
     
@@ -2006,7 +2099,7 @@ zproc list_line
 
         ldy bytecodeptr
         lda (execlineptr), y            ; read opcode
-        zbreakif_eq
+        zbreakif_eq                     ; TOKEN_EOL
         ldy opstackptr
         sty listerroot
         lda bytecodeptr
@@ -2284,7 +2377,12 @@ zendproc
 ; --- Parser ----------------------------------------------------------------
 
 zproc parse_line
-    ldx #1
+    lda #0
+    sta bytecode_buffer+LINE_NUMBER+0
+    sta bytecode_buffer+LINE_NUMBER+1
+    sta bytecode_buffer+LINE_INDENT
+
+    ldx #LINE_DATA
     stx bytecodeptr
     dex
     stx opstackptr
@@ -2409,7 +2507,7 @@ zproc pop_succeed
     ldx bytecodeptr
     sta bytecode_buffer, x
     inx
-    stx bytecode_buffer+0
+    stx bytecode_buffer+LINE_SIZE
 
     ldx parsestartstackptr
     txs
