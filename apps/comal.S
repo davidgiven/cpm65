@@ -2412,7 +2412,7 @@ zproc parse_line
 
     ldx #LINE_DATA
     stx bytecodeptr
-    dex
+    ldx #0
     stx opstackptr
     tsx
     stx parsestartstackptr
