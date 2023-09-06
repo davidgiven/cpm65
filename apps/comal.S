@@ -419,7 +419,7 @@ zproc print_buffer
     rts
 zendproc
 
-; Returns !C if not, C is it is.
+; Returns !C if not, C if it is.
 ; Preserves X and Y.
 zproc isletter
     cmp #'A'
@@ -447,6 +447,34 @@ zproc toupper
     zif_cs
         eor #0x20
     zendif
+    rts
+zendproc
+
+; Returns !C if not, C if it is.
+zproc is_first_letter_of_word
+    cmp #'_'
+    beq 1f
+    jmp isletter
+1:
+    ; succeed
+    sec
+    rts
+zendproc
+
+; Returns !C if not, C if it is.
+zproc is_subsequent_letter_of_word
+    cmp #'\''
+    beq 1b
+
+    cmp #'0'
+    bcc 2f
+    cmp #'9'+1
+    bcc 1b
+
+    jmp is_first_letter_of_word
+2:
+    ; fail
+    clc
     rts
 zendproc
 
@@ -2803,14 +2831,19 @@ zproc parser_fetch_word
 
     lda bufferpos
     sta bufferend
-    zloop
-        ldx bufferend
-        lda text_buffer, x
-        jsr isletter
-        zbreakif_cc
 
-        inc bufferend
-    zendloop
+    ldx bufferend
+    lda text_buffer, x
+    jsr is_first_letter_of_word
+    zif_cs
+        zrepeat
+            inc bufferend
+
+            ldx bufferend
+            lda text_buffer, x
+            jsr is_subsequent_letter_of_word
+        zuntil_cc
+    zendif
 
     lda bufferpos
     cmp bufferend
@@ -2859,7 +2892,7 @@ zproc pop_token
     ; Check that this is the end of a word.
 
     lda text_buffer, x
-    jsr isletter
+    jsr is_subsequent_letter_of_word
     zif_cs
         jmp pop_fail
     zendif
