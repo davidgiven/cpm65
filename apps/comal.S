@@ -112,6 +112,13 @@ execbyteptr:        .byte 0 ; offset into the line of code
 savedexeclineptr:   .word 0 ; line of code to CON to
 savedexecbyteptr:   .byte 0 ; offset into the line of code; 0 if no saved state
 
+; Structure checker temporaries
+
+checkindent:        .byte 0 ; current indent level
+checklooplineptr:   .word 0 ; start of the current loop
+checkloopbyteptr:   .byte 0 ; likewise
+checklooptype:      .byte 0 ; loop type (token)
+
 LISTERFLAG_NOTSTART = 1<<7
 LISTERFLAG_COMMA    = 1<<6
 
@@ -136,6 +143,10 @@ TOKEN_RENUM     = 0x11
 TOKEN_RUN       = 0x12
 TOKEN_STOP      = 0x13
 TOKEN_CON       = 0x14
+TOKEN_REPEAT    = 0x15
+TOKEN_UNTIL     = 0x16
+TOKEN_NOT       = 0x17
+TOKEN_EQUALS    = 0x18
 
 .set tokenvalue, 0
 
@@ -155,7 +166,12 @@ token_aux_lo:
 token_exec_hi:
 .data 8
 token_exec_lo:
-.macro token_data token, precedence, tokensize, pops, pushes, lister, aux, exec
+.data 9
+token_check_hi:
+.data 10
+token_check_lo:
+
+.macro token_data token, precedence, tokensize, pops, pushes, lister, aux, exec, check
     .if \token != tokenvalue
         .error "Out of sequence token \token"
     .endif
@@ -175,30 +191,39 @@ token_exec_lo:
     .byte (\exec-1)@mos16hi
     .data 8
     .byte (\exec-1)@mos16lo
+    .data 9
+    .byte (\check-1)@mos16hi
+    .data 10
+    .byte (\check-1)@mos16lo
+
     .set tokenvalue, tokenvalue+1
 .endm
         
-token_data TOKEN_EOL,       15, 1, 0, 0, lister_bad,     lister_bad,     exec_bad
-token_data TOKEN_VARREF,    15, 3, 0, 1, lister_varref,  lister_bad,     exec_varref
-token_data TOKEN_INTEGER,   15, 5, 0, 1, lister_integer, lister_bad,     exec_integer
-token_data TOKEN_MUL,       10, 1, 2, 1, lister_infix,   keyword_mul,    exec_mul
-token_data TOKEN_DIV,       10, 1, 2, 1, lister_infix,   keyword_div,    exec_div
-token_data TOKEN_ADD,        9, 1, 2, 1, lister_infix,   keyword_add,    exec_add
-token_data TOKEN_SUB,        9, 1, 2, 1, lister_infix,   keyword_sub,    exec_sub
-token_data TOKEN_MOD,       10, 1, 2, 1, lister_infix,   keyword_mod,    exec_mod
-token_data TOKEN_PRINT,      0, 1, 1, 0, lister_print,   lister_bad,     exec_print
-token_data TOKEN_PRINTNL,    0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl
-token_data TOKEN_ASSIGN,     0, 1, 2, 0, lister_assign,  keyword_assign, exec_assign
-token_data TOKEN_NEG,       14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_neg
-token_data TOKEN_LINEENTRY,  0, 1, 1, 0, lister_nop,     lister_bad,     exec_lineentry
-token_data TOKEN_ZERO,      15, 1, 0, 1, lister_simple,  keyword_zero,   exec_zero
-token_data TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,     exec_list
-token_data TOKEN_DEL,        0, 1, 2, 0, lister_nop,     lister_bad,     exec_del
-token_data TOKEN_MONE,      15, 1, 0, 1, lister_simple,  keyword_mone,   exec_mone
-token_data TOKEN_RENUM,      0, 1, 2, 0, lister_nop,     lister_bad,     exec_renum
-token_data TOKEN_RUN,        0, 1, 0, 0, lister_nop,     lister_bad,     exec_run
-token_data TOKEN_STOP,       0, 1, 0, 0, lister_simple,  keyword_stop,   exec_stop
-token_data TOKEN_CON,        0, 1, 0, 0, lister_nop,     lister_bad,     exec_con
+token_data TOKEN_EOL,       15, 1, 0, 0, lister_bad,     lister_bad,     exec_bad,       check_nop
+token_data TOKEN_VARREF,    15, 3, 0, 1, lister_varref,  lister_bad,     exec_varref,    check_nop
+token_data TOKEN_INTEGER,   15, 5, 0, 1, lister_integer, lister_bad,     exec_integer,   check_nop
+token_data TOKEN_MUL,       10, 1, 2, 1, lister_infix,   keyword_mul,    exec_mul,       check_nop
+token_data TOKEN_DIV,       10, 1, 2, 1, lister_infix,   keyword_div,    exec_div,       check_nop
+token_data TOKEN_ADD,        9, 1, 2, 1, lister_infix,   keyword_add,    exec_add,       check_nop
+token_data TOKEN_SUB,        9, 1, 2, 1, lister_infix,   keyword_sub,    exec_sub,       check_nop
+token_data TOKEN_MOD,       10, 1, 2, 1, lister_infix,   keyword_mod,    exec_mod,       check_nop
+token_data TOKEN_PRINT,      0, 1, 1, 0, lister_print,   lister_bad,     exec_print,     check_nop
+token_data TOKEN_PRINTNL,    0, 1, 0, 0, lister_printnl, lister_bad,     exec_printnl,   check_nop
+token_data TOKEN_ASSIGN,     0, 1, 2, 0, lister_assign,  keyword_assign, exec_assign,    check_nop
+token_data TOKEN_NEG,       14, 1, 1, 1, lister_prefix,  keyword_neg,    exec_neg,       check_nop
+token_data TOKEN_LINEENTRY,  0, 1, 1, 0, lister_nop,     lister_bad,     exec_lineentry, check_nop
+token_data TOKEN_ZERO,      15, 1, 0, 1, lister_simple,  keyword_zero,   exec_zero,      check_nop
+token_data TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,     exec_list,      check_nop
+token_data TOKEN_DEL,        0, 1, 2, 0, lister_nop,     lister_bad,     exec_del,       check_nop
+token_data TOKEN_MONE,      15, 1, 0, 1, lister_simple,  keyword_mone,   exec_mone,      check_nop
+token_data TOKEN_RENUM,      0, 1, 2, 0, lister_nop,     lister_bad,     exec_renum,     check_nop
+token_data TOKEN_RUN,        0, 1, 0, 0, lister_nop,     lister_bad,     exec_run,       check_nop
+token_data TOKEN_STOP,       0, 1, 0, 0, lister_simple,  keyword_stop,   exec_stop,      check_nop
+token_data TOKEN_CON,        0, 1, 0, 0, lister_nop,     lister_bad,     exec_con,       check_nop
+token_data TOKEN_REPEAT,     0, 1, 0, 0, lister_simple,  keyword_repeat, exec_nop,       check_repeat
+token_data TOKEN_UNTIL,      0, 4, 1, 0, lister_simplee, keyword_until,  exec_until,     check_until
+token_data TOKEN_NOT,       14, 1, 1, 1, lister_prefix,  keyword_not,    exec_not,       check_nop
+token_data TOKEN_EQUALS,     3, 1, 2, 1, lister_infix,   keyword_equals, exec_equals,    check_nop
 
 OBJECT_TABLE_SIZE = 256
 
@@ -496,6 +521,10 @@ error_no_such_variable:
     lda #ERROR_NO_SUCH_VARIABLE
     bne throw_error         ; always taken
 
+error_bad_structure:
+    lda #ERROR_BAD_STRUCTURE
+    bne throw_error         ; always taken
+
 ; Produces the error whose number is in A.
 
 zproc throw_error
@@ -561,12 +590,16 @@ no_such_variable_msg:
 stopped_msg:
     .ascii "Stoppe"
     .byte 'd'|0x80
+bad_structure_msg:
+    .ascii "Bad structur"
+    .byte 'e'|0x80
 
 ERROR_CANT_CONTINUE = cant_continue_msg - message_table
 ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
 ERROR_SILLY = silly_msg - message_table
 ERROR_NO_SUCH_VARIABLE = no_such_variable_msg - message_table
 ERROR_STOPPED = stopped_msg - message_table
+ERROR_BAD_STRUCTURE = bad_structure_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -626,6 +659,16 @@ zproc find_line
     rts
 zendproc
 
+zproc goto_first_line
+    lda progbase+0
+    sta execlineptr+0
+    lda progbase+1
+    sta execlineptr+1
+    lda #LINE_DATA
+    sta execbyteptr
+    rts
+zendproc
+
 zproc goto_next_line
     ldy #LINE_SIZE
     lda (execlineptr), y
@@ -666,23 +709,15 @@ zproc exec
     pha
     lda token_exec_lo, x
     pha
+exec_nop:
     rts
 zendproc
 
 zproc exec_run
     ; TODO: clear variable storage
 
-    ; Start at the beginning.
-
-    lda progbase+0
-    sta execlineptr+0
-    lda progbase+1
-    sta execlineptr+1
-    lda #LINE_DATA
-    sta execbyteptr
-
-    ; Keep going until the end.
-
+    jsr check_structure
+    jsr goto_first_line
 exec_loop:
     jmp 1f
     zrepeat
@@ -750,6 +785,36 @@ zendproc
 zproc exec_printnl
     jsr buffer_print_nl
     jmp print_buffer
+zendproc
+
+zproc exec_until
+    jsr deref_i0
+    jsr test_i0_for_truth
+    zif_eq
+        ldy execbyteptr
+        lda (execlineptr), y
+        pha
+        iny
+        lda (execlineptr), y
+        pha
+        iny
+        lda (execlineptr), y
+        sta execbyteptr
+        pla
+        sta execlineptr+1
+        pla
+        sta execlineptr+0
+        
+        inc execbyteptr
+        rts
+    zendif
+
+    clc
+    lda execbyteptr
+    adc #3
+    sta execbyteptr
+
+    jmp pop_i0
 zendproc
 
 zproc exec_varref
@@ -887,13 +952,27 @@ zendproc
 
 zproc exec_neg
     jsr deref_i0
-    jsr pop_and_deref_i1 ; LHS
 
     ldx #-4 & 0xff
     sec
     zrepeat
         lda #0
         sbc i0+4, x
+        sta i0+4, x
+        inx
+    zuntil_eq
+
+    rts
+zendproc
+
+zproc exec_not
+    jsr deref_i0
+
+    ldx #-4 & 0xff
+    sec
+    zrepeat
+        lda i0+4, x
+        eor #0xff
         sta i0+4, x
         inx
     zuntil_eq
@@ -925,8 +1004,32 @@ zproc exec_mod
     jmp i1_to_i0
 zendproc
 
+zproc exec_equals
+    jsr exec_sub
+
+    ldx #0
+    jsr test_i0_for_truth
+    zif_eq
+        inx
+    zendif
+    stx i0+0
+    lda #0
+    sta i0+1
+    sta i0+2
+    sta i0+3
+    rts
+zendproc
+
 zproc exec_bad
     brk
+zendproc
+
+zproc test_i0_for_truth
+    lda i0+0
+    ora i0+1
+    ora i0+2
+    ora i0+3
+    rts
 zendproc
 
 zproc push_i2
@@ -1303,7 +1406,17 @@ zproc exec_list
 
         jsr reset_buffer
         jsr buffer_print_current_line_number
-        jsr buffer_print_space
+
+        ldy #LINE_INDENT
+        lda (execlineptr), y
+        asl a
+        tay
+        iny
+        zrepeat
+            jsr buffer_print_space
+            dey
+        zuntil_eq
+
         jsr list_line
         jsr print_buffer
         jsr print_nl
@@ -1448,6 +1561,160 @@ zproc exec_renum
     zuntil_eq
 
     jmp stack_destroyed
+zendproc
+
+; --- Structural analysis ---------------------------------------------------
+
+zproc check_structure
+    lda #0
+    sta checkindent
+    sta checklooplineptr+0
+    sta checklooplineptr+1
+    sta checkloopbyteptr
+    sta checklooptype
+    jsr goto_first_line
+
+    jmp 1f
+    zrepeat
+        jsr check_line
+        jsr goto_next_line
+    1:
+        ldy #LINE_INDENT
+        lda checkindent
+        sta (execlineptr), y
+
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+    zuntil_eq
+    rts
+zendproc
+
+zproc check_line
+    zloop
+        ldy execbyteptr
+        lda (execlineptr), y
+        zbreakif_eq             ; TOKEN_EOL?
+        tax
+        
+        ; Push return address.
+
+        lda #>(1f-1)
+        pha
+        lda #<(1f-1)
+        pha
+
+        lda token_check_hi, x   ; get structure check routine
+        pha
+        lda token_check_lo, x
+        pha
+    check_nop:
+        rts
+
+        ; Go to next bytecode.
+    1:
+        ldy execbyteptr
+        lda (execlineptr), y
+        tax
+        lda token_size_table, x
+        and #0x0f
+        clc
+        adc execbyteptr
+        sta execbyteptr
+    zendloop
+    rts
+zendproc
+
+zproc check_push_loop
+    pha
+    lda #5
+    jsr extend_stack
+
+    ldy #0
+    lda checkindent
+    sta (stackptr), y
+    iny
+    lda checklooplineptr+0
+    sta (stackptr), y
+    iny
+    lda checklooplineptr+1
+    sta (stackptr), y
+    iny
+    lda checkloopbyteptr
+    sta (stackptr), y
+    iny
+    lda checklooptype
+    sta (stackptr), y
+
+    pla
+    sta checklooptype
+    lda execlineptr+0
+    sta checklooplineptr+0
+    lda execlineptr+1
+    sta checklooplineptr+1
+    lda execbyteptr
+    sta checkloopbyteptr
+    inc checkindent
+    rts
+zendproc
+
+zproc check_pop_loop
+    lda checkindent
+    zif_eq
+        jmp error_bad_structure
+    zendif
+
+    ldy #0
+    lda (stackptr), y
+    sta checkindent
+    iny
+    lda (stackptr), y
+    sta checklooplineptr+0
+    iny
+    lda (stackptr), y
+    sta checklooplineptr+1
+    iny
+    lda (stackptr), y
+    sta checkloopbyteptr
+    iny
+    lda (stackptr), y
+
+    ; Adjust the indentation of the current line (which we don't want to be
+    ; part of the loop).
+
+    ldy #LINE_INDENT
+    lda (execlineptr), y
+    sec
+    sbc #1
+    sta (execlineptr), y
+
+    lda #5
+    jmp retract_stack
+zendproc
+
+zproc check_repeat
+    lda #TOKEN_REPEAT
+    jmp check_push_loop
+zendproc
+
+zproc check_until
+    lda checklooptype
+    cmp #TOKEN_REPEAT
+    zif_ne
+        jmp error_bad_structure
+    zendif
+
+    ldy execbyteptr
+    iny
+    lda checklooplineptr+0
+    sta (execlineptr), y
+    iny
+    lda checklooplineptr+1
+    sta (execlineptr), y
+    iny
+    lda checkloopbyteptr
+    sta (execlineptr), y 
+
+    jmp check_pop_loop
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -2239,6 +2506,12 @@ zproc lister_simple
     jmp buffer_print_string
 zendproc
 
+zproc lister_simplee
+    jsr lister_simple
+    jsr buffer_print_space
+    jmp list_first_clause
+zendproc
+
 zproc lister_print
     lda #<keyword_print
     ldx #>keyword_print
@@ -2253,6 +2526,7 @@ zproc lister_print
     ora #LISTERFLAG_COMMA
     sta listerflags
 
+list_first_clause:
     ldy listerroot
     ldx operator_stack+1, y
     jmp list_clause
@@ -2391,10 +2665,16 @@ zproc lister_prefix
     lda operator_stack, x       ; get bytecode address
     tay
     lda (execlineptr), y        ; get bytecode
+    pha
     tay
     ldx token_aux_hi, y
     lda token_aux_lo, y
     jsr buffer_print_string
+    pla
+    cmp #TOKEN_NEG
+    zif_ne
+        jsr buffer_print_space
+    zendif
 
     pla
     tax                         ; recover current node tree address
@@ -2451,6 +2731,7 @@ zproc parse_state_machine
 zendproc
 
 ; Adds A to parsecmd.
+; Preserves X and Y.
 zproc parse_advance
     clc
     adc parsecmd+0
@@ -2920,6 +3201,27 @@ zproc pop_emit
     jmp parse_state_machine
 zendproc
 
+zproc pop_emitn
+    ldy #2
+    lda (parsecmd), y
+    sta p0+0
+
+    lda #3
+    jsr parse_advance
+
+    zrepeat
+        ldy #0
+        lda (parsecmd), y
+        jsr queue_bytecode
+
+        lda #1
+        jsr parse_advance
+
+        dec p0+0
+    zuntil_eq
+    jmp parse_state_machine
+zendproc
+        
 zproc pop_word
     jsr parser_fetch_word
 
@@ -3106,6 +3408,11 @@ zendproc
     .byte \token
 .endm
 
+.macro P_EMITN count, bytes:vararg
+    .word pop_emitn
+    .byte \count, \bytes
+.endm
+
 .macro P_SHUNT token
     .word pop_shunt
     .byte \token
@@ -3142,6 +3449,8 @@ statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
     P_TRY stop_rule
+    P_TRY repeat_rule
+    P_TRY until_rule
 ;    P_TRY for_rule
 ;    P_TRY if_rule
 ;    P_TRY proc_rule
@@ -3231,22 +3540,42 @@ eol_line_range_rule:
 run_rule:
     P_TOKEN 'R', 'U', 'N'|0x80
     P_EMIT TOKEN_RUN
+    P_EOL
     P_RETURN
 
 stop_rule:
 keyword_stop = . + 2
     P_TOKEN 'S', 'T', 'O', 'P'|0x80
     P_EMIT TOKEN_STOP
+    P_EOL
     P_RETURN
 
 con_rule:
     P_TOKEN 'C', 'O', 'N'|0x80
     P_EMIT TOKEN_CON
+    P_EOL
+    P_RETURN
+
+repeat_rule:
+keyword_repeat = . + 2
+    P_TOKEN 'R', 'E', 'P', 'E', 'A', 'T'|0x80
+    P_EMIT TOKEN_REPEAT
+    P_EOL
+    P_RETURN
+
+until_rule:
+keyword_until = . + 2
+    P_TOKEN 'U', 'N', 'T', 'I', 'L'|0x80
+    P_COMMIT
+    P_JSR expr_rule
+    P_FLUSH
+    P_EMITN 4, TOKEN_UNTIL, 0, 0, 0
+    P_EOL
     P_RETURN
 
 assignment_rule:
     P_JSR lvalue_rule
-    P_EAGER_TOKEN '='|0x80
+    P_JSR assignment_operator_rule
     P_SHUNT TOKEN_ASSIGN
     P_COMMIT
     P_JSR expr_rule
@@ -3262,6 +3591,7 @@ keyword_assign = . + 2
     P_RETURN
 
 equals_rule:
+keyword_equals = . + 2
     P_EAGER_TOKEN '='|0x80
     P_RETURN
 
@@ -3327,6 +3657,7 @@ expr_rule:
     P_TRY multiplication_rule
     P_TRY division_rule
     P_TRY modulus_rule
+    P_TRY compare_equals_rule
     P_RETURN
 
 addition_rule:
@@ -3359,8 +3690,15 @@ keyword_mod = . + 2
     P_SHUNT TOKEN_MOD
     P_JMP compulsory_expr_rule
 
+compare_equals_rule:
+keyword_equals = . + 2
+    P_EAGER_TOKEN '='|0x80
+    P_SHUNT TOKEN_EQUALS
+    P_JMP compulsory_expr_rule
+
 leaf_rule:
     P_TRY parenthesised_rvalue_rule
+    P_TRY not_rvalue_rule
     P_TRY varref_rvalue_rule
     P_TRY number_rvalue_rule
     P_TRY negate_rvalue_rule
@@ -3388,8 +3726,14 @@ keyword_neg = . + 2
     P_EAGER_TOKEN '-'|0x80
     P_COMMIT
     P_SHUNT TOKEN_NEG
-    P_JSR leaf_rule
-    P_RETURN
+    P_JMP leaf_rule
+
+not_rvalue_rule:
+keyword_not = . + 2
+    P_TOKEN 'N', 'O', 'T'|0x80
+    P_COMMIT
+    P_SHUNT TOKEN_NOT
+    P_JMP leaf_rule
 
 keyword_zero:
     .byte '0'|0x80
