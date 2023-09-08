@@ -119,8 +119,9 @@ checklooplineptr:   .word 0 ; start of the current loop
 checkloopbyteptr:   .byte 0 ; likewise
 checklooptype:      .byte 0 ; loop type (token)
 
-LISTERFLAG_NOTSTART = 1<<7
-LISTERFLAG_COMMA    = 1<<6
+LISTERFLAG_NOTSTART   = 1<<7 ; set after every lister is called, is !RESETSTART
+LISTERFLAG_COMMA      = 1<<6 ; a comma is intended before the next clause
+LISTERFLAG_RESETSTART = 1<<5 ; causes NOTSTART to be reset
 
 TOKEN_EOL       = 0x00 ; end of line
 TOKEN_VARREF    = 0x01 ; +2 bytes for the ID
@@ -201,33 +202,33 @@ token_check_lo:
     .set tokenvalue, tokenvalue+1
 .endm
         
-deftok TOKEN_EOL,       15, 1, 0, 0, lister_bad,     lister_bad,       exec_bad,       check_nop
-deftok TOKEN_VARREF,    15, 3, 0, 1, lister_varref,  lister_bad,       exec_varref,    check_nop
-deftok TOKEN_INTEGER,   15, 5, 0, 1, lister_integer, lister_bad,       exec_integer,   check_nop
-deftok TOKEN_MUL,       10, 1, 2, 1, lister_infix,   keyword_mul,      exec_mul,       check_nop
-deftok TOKEN_DIV,       10, 1, 2, 1, lister_infix,   keyword_div,      exec_div,       check_nop
-deftok TOKEN_ADD,        9, 1, 2, 1, lister_infix,   keyword_add,      exec_add,       check_nop
-deftok TOKEN_SUB,        9, 1, 2, 1, lister_infix,   keyword_sub,      exec_sub,       check_nop
-deftok TOKEN_MOD,       10, 1, 2, 1, lister_infix,   keyword_mod,      exec_mod,       check_nop
-deftok TOKEN_PRINT,      0, 1, 1, 0, lister_print,   lister_bad,       exec_print,     check_nop
-deftok TOKEN_PRINTNL,    0, 1, 0, 0, lister_printnl, lister_bad,       exec_printnl,   check_nop
-deftok TOKEN_ASSIGN,     0, 1, 2, 0, lister_assign,  keyword_assign,   exec_assign,    check_nop
-deftok TOKEN_NEG,       14, 1, 1, 1, lister_prefix,  keyword_neg,      exec_neg,       check_nop
-deftok TOKEN_LINEENTRY,  0, 1, 1, 0, lister_nop,     lister_bad,       exec_lineentry, check_nop
-deftok TOKEN_ZERO,      15, 1, 0, 1, lister_simple,  keyword_zero,     exec_zero,      check_nop
-deftok TOKEN_LIST,       0, 1, 2, 0, lister_nop,     lister_bad,       exec_list,      check_nop
-deftok TOKEN_DEL,        0, 1, 2, 0, lister_nop,     lister_bad,       exec_del,       check_nop
-deftok TOKEN_MONE,      15, 1, 0, 1, lister_simple,  keyword_mone,     exec_mone,      check_nop
-deftok TOKEN_RENUM,      0, 1, 2, 0, lister_nop,     lister_bad,       exec_renum,     check_nop
-deftok TOKEN_RUN,        0, 1, 0, 0, lister_nop,     lister_bad,       exec_run,       check_nop
-deftok TOKEN_STOP,       0, 1, 0, 0, lister_simple,  keyword_stop,     exec_stop,      check_nop
-deftok TOKEN_CON,        0, 1, 0, 0, lister_nop,     lister_bad,       exec_con,       check_nop
-deftok TOKEN_REPEAT,     0, 1, 0, 0, lister_simple,  keyword_repeat,   exec_nop,       check_repeat
-deftok TOKEN_UNTIL,      0, 4, 1, 0, lister_simplee, keyword_until,    exec_until,     check_until
-deftok TOKEN_NOT,       14, 1, 1, 1, lister_prefix,  keyword_not,      exec_not,       check_nop
-deftok TOKEN_EQUALS,     3, 1, 2, 1, lister_infix,   keyword_equals,   exec_equals,    check_nop
-deftok TOKEN_WHILE,      0, 4, 1, 0, lister_while,   keyword_while,    exec_while,     check_while
-deftok TOKEN_ENDWHILE,   0, 4, 0, 0, lister_simple,  keyword_endwhile, exec_goto,      check_endwhile
+deftok TOKEN_EOL,      15, 1, 0, 0, lister_bad,      lister_bad,       exec_bad,       check_nop
+deftok TOKEN_VARREF,   15, 3, 0, 1, lister_varref,   lister_bad,       exec_varref,    check_nop
+deftok TOKEN_INTEGER,  15, 5, 0, 1, lister_integer,  lister_bad,       exec_integer,   check_nop
+deftok TOKEN_MUL,      10, 1, 2, 1, lister_infix,    keyword_mul,      exec_mul,       check_nop
+deftok TOKEN_DIV,      10, 1, 2, 1, lister_infix,    keyword_div,      exec_div,       check_nop
+deftok TOKEN_ADD,       9, 1, 2, 1, lister_infix,    keyword_add,      exec_add,       check_nop
+deftok TOKEN_SUB,       9, 1, 2, 1, lister_infix,    keyword_sub,      exec_sub,       check_nop
+deftok TOKEN_MOD,      10, 1, 2, 1, lister_infix,    keyword_mod,      exec_mod,       check_nop
+deftok TOKEN_PRINT,     0, 1, 1, 0, lister_print,    lister_bad,       exec_print,     check_nop
+deftok TOKEN_PRINTNL,   0, 1, 0, 0, lister_printnl,  lister_bad,       exec_printnl,   check_nop
+deftok TOKEN_ASSIGN,    0, 1, 2, 0, lister_assign,   keyword_assign,   exec_assign,    check_nop
+deftok TOKEN_NEG,      14, 1, 1, 1, lister_prefix,   keyword_neg,      exec_neg,       check_nop
+deftok TOKEN_LINEENTRY, 0, 1, 1, 0, lister_nop,      lister_bad,       exec_lineentry, check_nop
+deftok TOKEN_ZERO,     15, 1, 0, 1, lister_simple,   keyword_zero,     exec_zero,      check_nop
+deftok TOKEN_LIST,      0, 1, 2, 0, lister_nop,      lister_bad,       exec_list,      check_nop
+deftok TOKEN_DEL,       0, 1, 2, 0, lister_nop,      lister_bad,       exec_del,       check_nop
+deftok TOKEN_MONE,     15, 1, 0, 1, lister_simple,   keyword_mone,     exec_mone,      check_nop
+deftok TOKEN_RENUM,     0, 1, 2, 0, lister_nop,      lister_bad,       exec_renum,     check_nop
+deftok TOKEN_RUN,       0, 1, 0, 0, lister_nop,      lister_bad,       exec_run,       check_nop
+deftok TOKEN_STOP,      0, 1, 0, 0, lister_simple,   keyword_stop,     exec_stop,      check_nop
+deftok TOKEN_CON,       0, 1, 0, 0, lister_nop,      lister_bad,       exec_con,       check_nop
+deftok TOKEN_REPEAT,    0, 1, 0, 0, lister_simple,   keyword_repeat,   exec_nop,       check_repeat
+deftok TOKEN_UNTIL,     0, 4, 1, 0, lister_simplee,  keyword_until,    exec_until,     check_until
+deftok TOKEN_NOT,      14, 1, 1, 1, lister_prefix,   keyword_not,      exec_not,       check_nop
+deftok TOKEN_EQUALS,    3, 1, 2, 1, lister_infix,    keyword_equals,   exec_equals,    check_nop
+deftok TOKEN_WHILE,     0, 4, 1, 0, lister_while,    keyword_while,    exec_while,     check_while
+deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endwhile, keyword_endwhile, exec_goto,      check_endwhile
 
 OBJECT_TABLE_SIZE = 256
 
@@ -1760,6 +1761,20 @@ zproc check_endwhile
         jmp error_bad_structure
     zendif
 
+    ; Is this an inline ENDWHILE?
+
+    lda execbyteptr
+    cmp #LINE_DATA
+    zif_ne
+        ; Yes; therefore we need to adjust the indentation of the current line.
+
+        ldy #LINE_INDENT
+        lda (execlineptr), y
+        clc
+        adc #1
+        sta (execlineptr), y
+    zendif
+
     ; Patch the ENDWHILE.
 
     jsr patch_terminating_goto
@@ -2512,8 +2527,17 @@ zproc list_line
 
             lda #0
             sta opstackptr
+
             lda listerflags
-            ora #LISTERFLAG_NOTSTART
+            rol a
+            rol a
+            rol a               ; LISTERFLAG_RESETSTART -> C
+            lda listerflags
+            zif_cs
+                and #~(LISTERFLAG_NOTSTART|LISTERFLAG_RESETSTART) & 0xff
+            zelse
+                ora #LISTERFLAG_NOTSTART
+            zendif
             sta listerflags
         zendif
 
@@ -2582,10 +2606,24 @@ zendproc
 zproc lister_while
     jsr lister_simplee
 
+    ; Print any additional code as if it were the first statement on the line.
+
+    lda listerflags
+    ora #LISTERFLAG_RESETSTART
+    sta listerflags
+
     jsr buffer_print_space
     lda #<keyword_do
     ldx #>keyword_do
-    jmp buffer_print_string
+    jmp buffer_print_separated_string
+zendproc
+
+zproc lister_endwhile
+    bit listerflags
+    zif_mi                      ; if LISTERFLAG_NOTSTART
+        rts
+    zendif
+    jmp lister_simple
 zendproc
 
 zproc lister_print
@@ -3522,13 +3560,14 @@ immediate_statement_rule:
     P_TRY run_rule
     P_TRY con_rule
 statement_rule:
-    P_TRY print_rule
-    P_TRY assignment_rule
-    P_TRY stop_rule
     P_TRY repeat_rule
     P_TRY until_rule
     P_TRY while_rule
     P_TRY endwhile_rule
+simple_statement_rule:
+    P_TRY print_rule
+    P_TRY assignment_rule
+    P_TRY stop_rule
     P_PANIC
 
 lineentry_rule:
@@ -3656,12 +3695,16 @@ keyword_while = . + 2
     P_FLUSH
     P_EMITN 4, TOKEN_WHILE, 0, 0, 0
     P_JSR optional_do_rule
-    P_EOL
-    P_RETURN
+    P_TRY eol_rule
+    P_COMMIT
+    P_JSR simple_statement_rule
+    P_FLUSH
+    P_JMP 1f
 
 endwhile_rule:
 keyword_endwhile = . + 2
     P_TOKEN 'E', 'N', 'D', 'W', 'H', 'I', 'L', 'E'|0x80
+1:
     P_EMITN 4, TOKEN_ENDWHILE, 0, 0, 0
     P_EOL
     P_RETURN
