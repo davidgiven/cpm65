@@ -689,30 +689,45 @@ zproc goto_next_line
     rts
 zendproc
 
+zproc goto_next_instruction
+    ldy execbyteptr
+    lda (execlineptr), y
+    tax
+    lda token_size_table, x
+    and #0x0f
+    clc
+    adc execbyteptr
+    sta execbyteptr
+    rts
+zendproc
+
 zproc exec_line
     jsr reset_buffer
 zendproc
     ; fall through
 zproc exec
-    ldy execbyteptr
-    lda (execlineptr), y
-    zif_eq                  ; TOKEN_EOL?
+    zrepeat
+        ldy execbyteptr
+        lda (execlineptr), y
+        zbreakif_eq             ; TOKEN_EOL?
+        tax
+        
+        ; Push return address.
+
+        lda #>(1f-1)
+        pha
+        lda #<(1f-1)
+        pha
+
+        lda token_exec_hi, x     ; get execution routine
+        pha
+        lda token_exec_lo, x
+        pha
         rts
-    zendif
-    tax
-    
-    ; Push return address.
 
-    lda #>(exec-1)
-    pha
-    lda #<(exec-1)
-    pha
-
-    inc execbyteptr
-    lda token_exec_hi, x     ; get execution routine
-    pha
-    lda token_exec_lo, x
-    pha
+    1:
+        jsr goto_next_instruction
+    zendloop
 exec_nop:
     rts
 zendproc
@@ -793,6 +808,7 @@ zendproc
 
 zproc exec_goto
     ldy execbyteptr
+    iny
     lda (execlineptr), y
     pha
     iny
@@ -805,35 +821,33 @@ zproc exec_goto
     sta execlineptr+1
     pla
     sta execlineptr+0
-    
-    inc execbyteptr
-    rts
+
+    ; Don't do the rest of this instruction; immediately start execution from
+    ; the new location.
+
+    pla
+    pla
+    jmp exec
 zendproc
 
 zproc exec_until
     jsr deref_i0
     jsr test_i0_for_truth
+    php
+    jsr pop_i0
+    plp
     beq exec_goto
-
-    clc
-    lda execbyteptr
-    adc #3
-    sta execbyteptr
-
-    jmp pop_i0
+    rts
 zendproc
 
 zproc exec_while
     jsr deref_i0
     jsr test_i0_for_truth
+    php
+    jsr pop_i0
+    plp
     beq exec_goto
-
-    clc
-    lda execbyteptr
-    adc #3
-    sta execbyteptr
-
-    jmp pop_i0
+    rts
 zendproc
 
 zproc exec_varref
@@ -874,27 +888,22 @@ zendproc
 
 zproc push_value_from_bytecode
     pha
-    txa
-    pha
+    stx p0+0
 
     jsr push_i0
 
     pla
-    tax
-    pla
     sta v0
 
-    clc
-    txa
-    adc execbyteptr         ; advance execbyteptr
-    sta execbyteptr
-    tay
-
+    ldy execbyteptr
+    iny                         ; point at first payload byte
+    ldx #0
     zrepeat
-        dey
         lda (execlineptr), y
-        sta i0-1, x         ; offset for postdecrement
-        dex
+        sta i0, x
+        iny
+        inx
+        cpx p0+0
     zuntil_eq
 
     rts
@@ -1258,6 +1267,7 @@ zproc exec_lineentry
 
     ; Calculate the size of the new line.
 
+    inc execbyteptr             ; skip over line entry opcode
     lda bytecode_buffer+0       ; length of bytecode in buffer
     sec
     sbc execbyteptr             ; position in buffer
@@ -1634,14 +1644,7 @@ zproc check_line
 
         ; Go to next bytecode.
     1:
-        ldy execbyteptr
-        lda (execlineptr), y
-        tax
-        lda token_size_table, x
-        and #0x0f
-        clc
-        adc execbyteptr
-        sta execbyteptr
+        jsr goto_next_instruction
     zendloop
     rts
 zendproc
@@ -1760,7 +1763,7 @@ zproc check_endwhile
     ; Patch the ENDWHILE.
 
     jsr patch_terminating_goto
-    lda #LINE_DATA-1
+    lda #LINE_DATA
     sta (execlineptr), y
 
     ; Patch the WHILE.
