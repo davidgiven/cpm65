@@ -150,6 +150,9 @@ TOKEN_NOT       = 0x17
 TOKEN_EQUALS    = 0x18
 TOKEN_WHILE     = 0x19
 TOKEN_ENDWHILE  = 0x1a
+TOKEN_ONE       = 0x1b
+TOKEN_FOR       = 0x1c
+TOKEN_ENDFOR    = 0x1d
 
 .set tokenvalue, 0
 
@@ -228,7 +231,10 @@ deftok TOKEN_UNTIL,     0, 4, 1, 0, lister_simplee,  keyword_until,    exec_unti
 deftok TOKEN_NOT,      14, 1, 1, 1, lister_prefix,   keyword_not,      exec_not,       check_nop
 deftok TOKEN_EQUALS,    3, 1, 2, 1, lister_infix,    keyword_equals,   exec_equals,    check_nop
 deftok TOKEN_WHILE,     0, 4, 1, 0, lister_while,    keyword_while,    exec_while,     check_while
-deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endwhile, keyword_endwhile, exec_goto,      check_endwhile
+deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endloop,  keyword_endwhile, exec_goto,      check_endwhile
+deftok TOKEN_ONE,      15, 1, 0, 1, lister_simple,   keyword_one,      exec_one,       check_nop
+deftok TOKEN_FOR,       0, 4, 4, 0, lister_for,      keyword_for,      exec_for,       check_for
+deftok TOKEN_ENDFOR,    0, 4, 0, 0, lister_endloop,  keyword_endfor,   exec_endfor,    check_endfor
 
 OBJECT_TABLE_SIZE = 256
 
@@ -807,7 +813,7 @@ zproc exec_printnl
     jmp print_buffer
 zendproc
 
-zproc exec_goto
+zproc exec_goto_next
     ldy execbyteptr
     iny
     lda (execlineptr), y
@@ -822,6 +828,11 @@ zproc exec_goto
     sta execlineptr+1
     pla
     sta execlineptr+0
+    rts
+zendproc
+
+zproc exec_goto
+    jsr exec_goto_next
 
     ; Don't do the rest of this instruction; immediately start execution from
     ; the new location.
@@ -851,6 +862,106 @@ zproc exec_while
     rts
 zendproc
 
+; On entry, the stack looks like this:
+; (varref initvalue terminatorvalue stepvalue=i0 -- )
+
+zproc exec_for
+    jsr deref_i0
+    jsr i0_to_i2                    ; (varref initvalue terminatorvalue stepvalue=i2 -- )
+    jsr pop_and_deref_i1            ; (varref initvalue terminatorvalue=i1 stepvalue=i2 -- )
+    jsr pop_and_deref_i0            ; (varref initvalue=i0 terminatorvalue=i1 stepvalue=i2 -- )
+    jsr push_i2                     ; (varref stepvalue initvalue=i0 terminatorvalue=i1 -- )
+    jsr push_i1                     ; (varref stepvalue terminatorvalue initvalue=i0 -- )
+
+    ; (varref stepvalue terminatorvalue --)
+    ; i0 = initvalue
+
+    ldy #2*5                        ; fetch varref
+    jsr peek_i1
+    jsr exec_assign_i0_to_i1
+    
+    jsr do_for_test
+    zif_cs
+        jsr pop_i0                  ; (varref stepvalue terminatorvalue=i0 -- )
+        jsr pop_i0                  ; (varref stepvalue=i0 -- )
+        jsr pop_i0                  ; (varref=i0 -- )
+        jsr pop_i0                  ; previous stack value in i0
+        jmp exec_goto_next
+    zendif
+
+    jmp pop_i0                      ; (varref stepvalue terminatorvalue=i0 -- )
+zendproc
+
+; Expects (stepvalue terminatorvalue counter=i0 -- )
+; This expects the counter value to be in i0.
+; Sets C if the loop has terminated.
+
+zproc do_for_test
+    ldy #0*5
+    jsr peek_i1
+    jsr exec_sub_i1_minus_i0        ; i0 is terminator minus counter
+    ldy #1*5                        ; fetch step value
+    jsr peek_i1
+    lda i1+3                        ; get high byte of step variable
+    clc
+    zif_pl
+        lda i0+3                    ; test for counter > terminator
+        zif_mi
+            sec
+        zendif
+        rts
+    zendif
+
+    lda i0+3                    ; test for counter < terminator
+    zif_pl
+        ; Also need to check for zero!
+
+        ora i0+2
+        ora i0+1
+        ora i0+0
+        zif_ne
+            sec
+        zendif
+    zendif
+    rts
+zendproc
+
+; fec5
+; feca
+; febb
+
+; On entry, the stack looks like this:
+; (varref stepvalue terminatorvalue=i0 --)
+
+zproc exec_endfor
+    jsr push_i0                     ; (varref stepvalue terminatorvalue --)
+
+    ldy #2*5                        ; get loop counter
+    jsr peek_i0
+    jsr deref_i0                    ; get value
+
+    ldy #1*5                        ; get step value
+    jsr peek_i1
+
+    jsr exec_add_i1_plus_i0
+
+    ldy #2*5                        ; get loop counter again
+    jsr peek_i1
+    jsr exec_assign_i0_to_i1
+
+
+    jsr do_for_test
+    zif_cc
+        jsr pop_i0                  ; (varref stepvalue terminatorvalue=i0 -- )
+        jmp exec_goto_next
+    zendif
+
+    jsr pop_i0                      ; (varref stepvalue terminatorvalue=i0 -- )
+    jsr pop_i0                      ; (varref stepvalue=i0 -- )
+    jsr pop_i0                      ; (varref=i0 -- )
+    jmp pop_i0                      ; previous value on stack in i0
+zendproc
+
 zproc exec_varref
     ldx #2
     lda #OTYPE_VAR
@@ -876,6 +987,15 @@ zproc exec_mone
 
     lda #0xff
     jmp set_4x_constant
+zendproc
+
+zproc exec_one
+    jsr push_i0
+
+    lda #0
+    jsr set_4x_constant
+    inc i0+0
+    rts
 zendproc
 
 zproc exec_integer
@@ -913,7 +1033,11 @@ zendproc
 zproc exec_assign
     jsr deref_i0            ; value to assign
     jsr pop_i1              ; lvalue (variable reference)
+    jsr exec_assign_i0_to_i1
+    jmp pop_i0
+zendproc
 
+zproc exec_assign_i0_to_i1
     ; Find the hash node.
 
     lda i1+0                ; object ID -> p1
@@ -943,14 +1067,14 @@ zproc exec_assign
         iny
         inx
     zuntil_eq
-
-    jmp pop_i0
+    rts
 zendproc
 
 zproc exec_add
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
 
+exec_add_i1_plus_i0:
     ldx #-4 & 0xff
     clc
     zrepeat
@@ -967,6 +1091,7 @@ zproc exec_sub
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
 
+exec_sub_i1_minus_i0:
     ldx #-4 & 0xff
     sec
     zrepeat
@@ -1125,20 +1250,57 @@ zendproc
 
     ; Returns A=object type
 zproc pop_ix
-    ldy #4
-    zrepeat
-        lda (stackptr), y
-        sta +3, x
-        dex
-        dey
-    zuntil_eq
-
-    lda (stackptr), y       ; type field, at y=0
+    ldy #0
+    jsr peek_ix             ; returns object type
     pha
 
     lda #STACKVALUE_SIZE
     jsr retract_stack
 
+    pla
+    rts
+zendproc
+
+zproc peek_i2
+    ldx #i2
+    jsr peek_ix
+    sta v2
+    rts
+zendproc
+
+zproc peek_i1
+    ldx #i1
+    jsr peek_ix
+    sta v1
+    rts
+zendproc
+
+zproc peek_i0
+    ldx #i0
+    jsr peek_ix
+    sta v0
+    rts
+zendproc
+
+; On entry:
+;    x = address of i register
+;    y = stack offset
+; Returns a=object type
+zproc peek_ix
+    lda (stackptr), y
+    pha
+    iny
+    lda (stackptr), y
+    sta +0, x
+    iny
+    lda (stackptr), y
+    sta +1, x
+    iny
+    lda (stackptr), y
+    sta +2, x
+    iny
+    lda (stackptr), y
+    sta +3, x
     pla
     rts
 zendproc
@@ -1755,8 +1917,24 @@ zproc check_while
 zendproc
 
 zproc check_endwhile
-    lda checklooptype
-    cmp #TOKEN_WHILE
+    lda #TOKEN_WHILE
+    jsr check_end_complex_loop
+
+    ; ENDWHILE needs to jump to the beginning of the WHILE line to reexecute
+    ; the condition.
+
+    lda #LINE_DATA
+    ldy execbyteptr
+    iny
+    iny
+    iny
+    sta (execlineptr), y
+    rts
+zendproc
+
+    ; On entry the loop type is in A.
+zproc check_end_complex_loop
+    cmp checklooptype
     zif_ne
         jmp error_bad_structure
     zendif
@@ -1778,8 +1956,6 @@ zproc check_endwhile
     ; Patch the ENDWHILE.
 
     jsr patch_terminating_goto
-    lda #LINE_DATA
-    sta (execlineptr), y
 
     ; Patch the WHILE.
 
@@ -1799,6 +1975,16 @@ zproc check_endwhile
     jmp check_pop_loop
 zendproc
     
+zproc check_for
+    lda #TOKEN_FOR
+    jmp check_push_loop
+zendproc
+
+zproc check_endfor
+    lda #TOKEN_FOR
+    jmp check_end_complex_loop
+zendproc
+
 ; --- Buffer output ---------------------------------------------------------
 
 ; Prints the decimal number in i0.
@@ -2618,7 +2804,7 @@ zproc lister_while
     jmp buffer_print_separated_string
 zendproc
 
-zproc lister_endwhile
+zproc lister_endloop
     bit listerflags
     zif_mi                      ; if LISTERFLAG_NOTSTART
         rts
@@ -2626,6 +2812,56 @@ zproc lister_endwhile
     jmp lister_simple
 zendproc
 
+zproc lister_for
+    jsr lister_simple           ; prints the FOR
+    jsr buffer_print_space
+
+    ldy listerroot
+    ldx operator_stack+4, y     ; get first parameter tree address; the variable
+    jsr list_clause
+    jsr buffer_print_space
+
+    lda #<keyword_assign
+    ldx #>keyword_assign
+    jsr buffer_print_separated_string
+
+    ldy listerroot
+    ldx operator_stack+3, y     ; get second parameter tree address; the initial value
+    jsr list_clause
+    jsr buffer_print_space
+
+    lda #<keyword_to
+    ldx #>keyword_to
+    jsr buffer_print_separated_string
+
+    ldy listerroot
+    ldx operator_stack+2, y     ; get third parameter tree address; the final value
+    jsr list_clause
+    jsr buffer_print_space
+
+    ldy listerroot
+    ldx operator_stack+1, y     ; get fourth parameter tree address; the step value
+    ldy operator_stack, x       ; get bytecode address
+    lda (execlineptr), y        ; get bytecode
+    cmp #TOKEN_ONE
+    zif_ne
+        ; It's not STEP 1, so print the step clause.
+
+        lda #<keyword_step
+        ldx #>keyword_step
+        jsr buffer_print_separated_string
+
+        ldy listerroot
+        ldx operator_stack+1, y     ; get fourth parameter tree address; the step value
+        jsr list_clause
+        jsr buffer_print_space
+    zendif
+
+    lda #<keyword_do
+    ldx #>keyword_do
+    jmp buffer_print_separated_string
+zendproc
+    
 zproc lister_print
     lda #<keyword_print
     ldx #>keyword_print
@@ -2872,7 +3108,6 @@ zproc shunt_operator
 
     jmp 1f
     zrepeat
-        ldx opstackptr
         lda operator_stack, x
         zbreakif_eq ; if TOS is 0, it's a parenthesis
         tax
@@ -2910,7 +3145,7 @@ zproc unstack_operators
         zendif
 
         lda operator_stack, x
-        zif_eq
+        zif_eq                  ; parenthesis marker
             dec opstackptr
             rts
         zendif
@@ -3367,6 +3602,47 @@ zproc pop_eol
     jmp parse_state_machine
 zendproc
 
+zproc emit_i0
+    lda i0+1
+    ora i0+2
+    ora i0+3
+    zif_eq
+        ; Top three bytes are zero.
+
+        lda i0+0
+        zif_eq
+            lda #TOKEN_ZERO
+            jmp queue_bytecode
+        zendif
+        cmp #1
+        zif_eq
+            lda #TOKEN_ONE
+            jmp queue_bytecode
+        zendif
+    zendif
+
+    lda i0+0
+    and i0+1
+    and i0+2
+    and i0+3
+    cmp #0xff
+    zif_eq          ; is the number minus one?
+        lda #TOKEN_MONE
+        jmp queue_bytecode
+    zendif
+
+    lda #TOKEN_INTEGER
+    jsr queue_bytecode
+    lda i0+0
+    jsr queue_bytecode
+    lda i0+1
+    jsr queue_bytecode
+    lda i0+2
+    jsr queue_bytecode
+    lda i0+3
+    jmp queue_bytecode
+zendproc
+
 zproc pop_number
     jsr parser_skip_whitespace
 
@@ -3437,34 +3713,7 @@ zproc pop_number
     zif_eq
         jsr negi0
     zendif
-
-    lda i0+0
-    ora i0+1
-    ora i0+2
-    ora i0+3
-    zif_eq              ; is the number zero?
-        lda #TOKEN_ZERO
-    zelse
-        lda i0+0
-        and i0+1
-        and i0+2
-        and i0+3
-        cmp #0xff
-        zif_eq          ; is the number minus one?
-            lda #TOKEN_MONE
-        zelse
-            lda #TOKEN_INTEGER
-            jsr queue_bytecode
-            lda i0+0
-            jsr queue_bytecode
-            lda i0+1
-            jsr queue_bytecode
-            lda i0+2
-            jsr queue_bytecode
-            lda i0+3
-        zendif
-    zendif
-    jsr queue_bytecode
+    jsr emit_i0
 
     lda bufferend
     sta bufferpos
@@ -3564,6 +3813,8 @@ statement_rule:
     P_TRY until_rule
     P_TRY while_rule
     P_TRY endwhile_rule
+    P_TRY for_rule
+    P_TRY endfor_rule
 simple_statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -3707,6 +3958,46 @@ keyword_endwhile = . + 2
 1:
     P_EMITN 4, TOKEN_ENDWHILE, 0, 0, 0
     P_EOL
+    P_RETURN
+
+for_rule:
+keyword_for = . + 2
+    P_TOKEN 'F', 'O', 'R'|0x80
+    P_WORD
+    P_JSR assignment_operator_rule
+    P_JSR expr_rule
+keyword_to = . + 2
+    P_TOKEN 'T', 'O'|0x80
+    P_JSR expr_rule
+    P_JSR optional_step_rule
+    P_FLUSH
+    P_EMITN 4, TOKEN_FOR, 0, 0, 0
+    P_JMP optional_do_rule
+
+optional_step_rule:
+    P_TRY step_rule
+    P_FLUSH
+    P_EMIT TOKEN_ONE
+    P_RETURN
+
+step_rule:
+keyword_step = . + 2
+    P_TOKEN 'S', 'T', 'E', 'P'|0x80
+    P_JMP expr_rule
+
+endfor_rule:
+    P_JSR endfor_or_next_rule
+    P_EMITN 4, TOKEN_ENDFOR, 0, 0, 0
+    P_RETURN
+
+endfor_or_next_rule:
+    P_TRY endfor_token_rule
+    P_TOKEN 'N', 'E', 'X', 'T'|0x80
+    P_RETURN
+
+endfor_token_rule:
+keyword_endfor = . + 2
+    P_TOKEN 'E', 'N', 'D', 'F', 'O', 'R'|0x80
     P_RETURN
 
 optional_do_rule:
@@ -3883,7 +4174,9 @@ keyword_not = . + 2
 keyword_zero:
     .byte '0'|0x80
 keyword_mone:
-    .byte '-', '1'|0x80
+    .byte '-'
+keyword_one:
+    .byte '1'|0x80
 
 .data
 
