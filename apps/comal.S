@@ -161,6 +161,10 @@ TOKEN_LT        = 0x20
 TOKEN_LTE       = 0x21
 TOKEN_GT        = 0x22
 TOKEN_GTE       = 0x23
+TOKEN_IF        = 0x24
+TOKEN_ELSE      = 0x25
+TOKEN_ENDIF     = 0x26
+TOKEN_ELIF      = 0x27
 
 .set tokenvalue, 0
 
@@ -235,10 +239,10 @@ deftok TOKEN_RUN,       0, 1, 0, 0, lister_nop,      lister_bad,       exec_run,
 deftok TOKEN_STOP,      0, 1, 0, 0, lister_simple,   keyword_stop,     exec_stop,      check_nop
 deftok TOKEN_CON,       0, 1, 0, 0, lister_nop,      lister_bad,       exec_con,       check_nop
 deftok TOKEN_REPEAT,    0, 1, 0, 0, lister_simple,   keyword_repeat,   exec_nop,       check_repeat
-deftok TOKEN_UNTIL,     0, 4, 1, 0, lister_simplee,  keyword_until,    exec_until,     check_until
+deftok TOKEN_UNTIL,     0, 4, 1, 0, lister_simplee,  keyword_until,    exec_if,        check_until
 deftok TOKEN_NOT,      14, 1, 1, 1, lister_prefix,   keyword_not,      exec_not,       check_nop
 deftok TOKEN_EQ,        3, 1, 2, 1, lister_infix,    keyword_eq,       exec_eq,        check_nop
-deftok TOKEN_WHILE,     0, 4, 1, 0, lister_while,    keyword_while,    exec_while,     check_while
+deftok TOKEN_WHILE,     0, 4, 1, 0, lister_while,    keyword_while,    exec_if,        check_while
 deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endloop,  keyword_endwhile, exec_goto,      check_endwhile
 deftok TOKEN_ONE,      15, 1, 0, 1, lister_simple,   keyword_one,      exec_one,       check_nop
 deftok TOKEN_FOR,       0, 4, 4, 0, lister_for,      keyword_for,      exec_for,       check_for
@@ -249,6 +253,10 @@ deftok TOKEN_LT,        3, 1, 2, 1, lister_infix,    keyword_lt,       exec_lt, 
 deftok TOKEN_LTE,       3, 1, 2, 1, lister_infix,    keyword_lte,      exec_lte,       check_nop
 deftok TOKEN_GT,        3, 1, 2, 1, lister_infix,    keyword_gt,       exec_gt,        check_nop
 deftok TOKEN_GTE,       3, 1, 2, 1, lister_infix,    keyword_gte,      exec_gte,       check_nop
+deftok TOKEN_IF,        0, 4, 1, 0, lister_if,       keyword_if,       exec_if,        check_if
+deftok TOKEN_ELSE,      0, 4, 0, 0, lister_simple,   keyword_else,     exec_goto,      check_else
+deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_simple,   keyword_endif,    exec_nop,       check_endif
+deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if,        check_elif
 
 OBJECT_TABLE_SIZE = 256
 
@@ -856,23 +864,13 @@ zproc exec_goto
     jmp exec
 zendproc
 
-zproc exec_until
-    jsr deref_i0
-    jsr test_i0_for_truth
+zproc exec_if
+    jsr exec_sgn
+    lda i0+0
     php
     jsr pop_i0
     plp
-    beq exec_goto
-    rts
-zendproc
-
-zproc exec_while
-    jsr deref_i0
-    jsr test_i0_for_truth
-    php
-    jsr pop_i0
-    plp
-    beq exec_goto
+    beq exec_goto_next
     rts
 zendproc
 
@@ -1904,6 +1902,7 @@ zproc check_pop_loop
     sta checkloopbyteptr
     iny
     lda (stackptr), y
+    sta checklooptype
 
     ; Adjust the indentation of the current line (which we don't want to be
     ; part of the loop).
@@ -1936,6 +1935,42 @@ zproc patch_terminating_goto
     iny
     lda checkloopbyteptr
     sta (execlineptr), y 
+    rts
+zendproc
+
+; Fixes up a GOTO-style opening instruction to jump forwards to the current location.
+
+zproc patch_opening_goto
+    ldy checkloopbyteptr
+    iny
+    lda execlineptr+0
+    sta (checklooplineptr), y
+    iny
+    lda execlineptr+1
+    sta (checklooplineptr), y
+    iny
+    lda execbyteptr
+    sta (checklooplineptr), y
+    rts
+zendproc
+
+; For short-form structures, we need to change the indentation.
+
+zproc adjust_indentation_for_inline
+    lda execbyteptr
+    cmp #LINE_DATA
+    zif_eq  
+        rts
+    zendif
+    ; Yes; therefore we need to adjust the indentation of the current line.
+    lda #1
+zendproc
+    ; fall through
+zproc adjust_line_indentation
+    clc
+    ldy #LINE_INDENT
+    adc (execlineptr), y
+    sta (execlineptr), y
     rts
 zendproc
 
@@ -1978,39 +2013,9 @@ zproc check_end_complex_loop
         jmp error_bad_structure
     zendif
 
-    ; Is this an inline ENDWHILE?
-
-    lda execbyteptr
-    cmp #LINE_DATA
-    zif_ne
-        ; Yes; therefore we need to adjust the indentation of the current line.
-
-        ldy #LINE_INDENT
-        lda (execlineptr), y
-        clc
-        adc #1
-        sta (execlineptr), y
-    zendif
-
-    ; Patch the ENDWHILE.
-
+    jsr adjust_indentation_for_inline
     jsr patch_terminating_goto
-
-    ; Patch the WHILE.
-
-    ldy checkloopbyteptr
-    iny
-    lda execlineptr+0
-    sta (checklooplineptr), y
-    iny
-    lda execlineptr+1
-    sta (checklooplineptr), y
-    iny
-    lda execbyteptr
-    clc
-    adc #4
-    sta (checklooplineptr), y
-    
+    jsr patch_opening_goto
     jmp check_pop_loop
 zendproc
     
@@ -2022,6 +2027,81 @@ zendproc
 zproc check_endfor
     lda #TOKEN_FOR
     jmp check_end_complex_loop
+zendproc
+
+zproc check_if
+    lda #TOKEN_IF
+    jmp check_push_loop
+zendproc
+
+zproc check_else
+    lda checklooptype
+    cmp #TOKEN_IF
+    zif_ne
+        jmp error_bad_structure
+    zendif
+
+    lda #-1 & 0xff
+    jsr adjust_line_indentation
+    jsr patch_opening_goto
+
+    lda execlineptr+0
+    sta checklooplineptr+0
+    lda execlineptr+1
+    sta checklooplineptr+1
+    lda execbyteptr
+    sta checkloopbyteptr
+
+    lda #TOKEN_ELSE
+    sta checklooptype
+    rts
+zendproc
+
+zproc check_endif
+    lda checklooptype
+    cmp #TOKEN_IF
+    zif_ne
+        cmp #TOKEN_ELSE
+        zif_ne
+            jmp error_bad_structure
+        zendif
+    zendif
+
+    jsr adjust_indentation_for_inline
+    jsr patch_opening_goto
+    jmp check_pop_loop
+zendproc
+
+zproc check_elif
+    lda checklooptype
+    cmp #TOKEN_IF
+    zif_ne
+        jmp error_bad_structure
+    zendif
+
+    lda #-1 & 0xff
+    jsr adjust_line_indentation
+    jsr patch_opening_goto
+
+    ; IF needs to jump to the beginning of the ELIF line to execute
+    ; the condition.
+
+    lda #LINE_DATA
+    ldy checkloopbyteptr
+    iny
+    iny
+    iny
+    sta (checklooplineptr), y
+
+    ; Change the loop start to the current instruction.
+
+    lda execlineptr+0
+    sta checklooplineptr+0
+    lda execlineptr+1
+    sta checklooplineptr+1
+    lda execbyteptr
+    sta checkloopbyteptr
+    rts
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -2901,6 +2981,21 @@ zproc lister_for
     jmp buffer_print_separated_string
 zendproc
     
+zproc lister_if
+    jsr lister_simplee
+
+    ; Print any additional code as if it were the first statement on the line.
+
+    lda listerflags
+    ora #LISTERFLAG_RESETSTART
+    sta listerflags
+
+    jsr buffer_print_space
+    lda #<keyword_then
+    ldx #>keyword_then
+    jmp buffer_print_separated_string
+zendproc
+
 zproc lister_print
     lda #<keyword_print
     ldx #>keyword_print
@@ -3854,6 +3949,10 @@ statement_rule:
     P_TRY endwhile_rule
     P_TRY for_rule
     P_TRY endfor_rule
+    P_TRY if_rule
+    P_TRY else_rule
+    P_TRY elif_rule
+    P_TRY endif_rule
 simple_statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -4037,6 +4136,53 @@ endfor_or_next_rule:
 endfor_token_rule:
 keyword_endfor = . + 2
     P_TOKEN 'E', 'N', 'D', 'F', 'O', 'R'|0x80
+    P_RETURN
+
+if_rule:
+keyword_if = . + 2
+    P_TOKEN 'I', 'F'|0x80
+    P_COMMIT
+    P_JSR expr_rule
+    P_FLUSH
+    P_EMITN 4, TOKEN_IF, 0, 0, 0
+    P_JSR optional_then_rule
+    P_TRY eol_rule
+    P_COMMIT
+    P_JSR simple_statement_rule
+    P_FLUSH
+    P_JMP 1f
+
+endif_rule:
+keyword_endif = . + 2
+    P_TOKEN 'E', 'N', 'D', 'I', 'F'|0x80
+1:
+    P_EMIT TOKEN_ENDIF
+    P_EOL
+    P_RETURN
+
+else_rule:
+keyword_else = . + 2
+    P_TOKEN 'E', 'L', 'S', 'E'|0x80
+    P_EMITN 4, TOKEN_ELSE, 0, 0, 0
+    P_JMP eol_rule
+
+elif_rule:
+keyword_elif = . + 2
+    P_TOKEN 'E', 'L', 'I', 'F'|0x80
+    P_COMMIT
+    P_JSR expr_rule
+    P_FLUSH
+    P_EMITN 4, TOKEN_ELIF, 0, 0, 0
+    P_JSR optional_then_rule
+    P_JMP eol_rule
+
+optional_then_rule:
+    P_TRY then_rule
+    P_RETURN
+
+then_rule:
+keyword_then = . + 2
+    P_TOKEN 'T', 'H', 'E', 'N'|0x80
     P_RETURN
 
 optional_do_rule:
