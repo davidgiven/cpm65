@@ -149,13 +149,18 @@ TOKEN_CON       = 0x14
 TOKEN_REPEAT    = 0x15
 TOKEN_UNTIL     = 0x16
 TOKEN_NOT       = 0x17
-TOKEN_EQUALS    = 0x18
+TOKEN_EQ        = 0x18
 TOKEN_WHILE     = 0x19
 TOKEN_ENDWHILE  = 0x1a
 TOKEN_ONE       = 0x1b
 TOKEN_FOR       = 0x1c
 TOKEN_ENDFOR    = 0x1d
 TOKEN_SGN       = 0x1e
+TOKEN_NOTEQ     = 0x1f
+TOKEN_LT        = 0x20
+TOKEN_LTE       = 0x21
+TOKEN_GT        = 0x22
+TOKEN_GTE       = 0x23
 
 .set tokenvalue, 0
 
@@ -232,13 +237,18 @@ deftok TOKEN_CON,       0, 1, 0, 0, lister_nop,      lister_bad,       exec_con,
 deftok TOKEN_REPEAT,    0, 1, 0, 0, lister_simple,   keyword_repeat,   exec_nop,       check_repeat
 deftok TOKEN_UNTIL,     0, 4, 1, 0, lister_simplee,  keyword_until,    exec_until,     check_until
 deftok TOKEN_NOT,      14, 1, 1, 1, lister_prefix,   keyword_not,      exec_not,       check_nop
-deftok TOKEN_EQUALS,    3, 1, 2, 1, lister_infix,    keyword_equals,   exec_equals,    check_nop
+deftok TOKEN_EQ,        3, 1, 2, 1, lister_infix,    keyword_eq,       exec_eq,        check_nop
 deftok TOKEN_WHILE,     0, 4, 1, 0, lister_while,    keyword_while,    exec_while,     check_while
 deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endloop,  keyword_endwhile, exec_goto,      check_endwhile
 deftok TOKEN_ONE,      15, 1, 0, 1, lister_simple,   keyword_one,      exec_one,       check_nop
 deftok TOKEN_FOR,       0, 4, 4, 0, lister_for,      keyword_for,      exec_for,       check_for
 deftok TOKEN_ENDFOR,    0, 4, 0, 0, lister_endloop,  keyword_endfor,   exec_endfor,    check_endfor
 deftok TOKEN_SGN,      14, 1, 1, 1, lister_prefix,   keyword_sgn,      exec_sgn,       check_nop
+deftok TOKEN_NOTEQ,     3, 1, 2, 1, lister_infix,    keyword_noteq,    exec_noteq,     check_nop
+deftok TOKEN_LT,        3, 1, 2, 1, lister_infix,    keyword_lt,       exec_lt,        check_nop
+deftok TOKEN_LTE,       3, 1, 2, 1, lister_infix,    keyword_lte,      exec_lte,       check_nop
+deftok TOKEN_GT,        3, 1, 2, 1, lister_infix,    keyword_gt,       exec_gt,        check_nop
+deftok TOKEN_GTE,       3, 1, 2, 1, lister_infix,    keyword_gte,      exec_gte,       check_nop
 
 OBJECT_TABLE_SIZE = 256
 
@@ -895,8 +905,7 @@ zproc do_for_test
     jsr peek                        ; (varref initvalue terminatorvalue stepvalue varref --)
     lda #2*5
     jsr peek                        ; (v i t s varref terminatorvalue --)
-    jsr exec_sub                    ; (v i t s difference --); diff is counter-terminator
-    jsr exec_sgn                    ; (v i t s sign --)
+    jsr exec_compare                ; (v i t s sign --); diff is counter-terminator
 
     lda #1*5
     jsr peek
@@ -989,6 +998,75 @@ set_i0_to_one:
     rts
 zendproc
 
+zproc exec_eq
+    jsr exec_compare
+
+    lda i0+0
+    beq set_i0_to_one
+    bne set_i0_to_zero
+zendproc
+
+zproc exec_noteq
+    jsr exec_compare
+
+    lda i0+0
+    bne set_i0_to_one
+    beq set_i0_to_zero
+zendproc
+
+zproc exec_lt
+    jsr exec_compare
+
+    lda i0+0
+    bmi set_i0_to_one
+    bpl set_i0_to_zero
+zendproc
+
+zproc exec_lte
+    jsr exec_compare
+
+    lda i0+0
+    bmi set_i0_to_one
+    beq set_i0_to_one
+    bpl set_i0_to_zero
+zendproc
+
+zproc exec_gt
+    jsr exec_compare
+
+    lda i0+0
+    beq set_i0_to_zero
+    bpl set_i0_to_one
+    bmi set_i0_to_zero
+zendproc
+
+zproc exec_gte
+    jsr exec_compare
+
+    lda i0+0
+    bpl set_i0_to_one
+    bmi set_i0_to_zero
+zendproc
+
+; Computes LHS - RHS and turns the result into a sign value.
+zproc exec_compare
+    jsr exec_sub
+zendproc
+    ; fall through
+; Converts TOS to -1, 0, 1
+zproc exec_sgn
+    jsr deref_i0
+    lda i0+3                ; check top byte
+    bmi set_i0_to_mone
+
+    lda i0+0
+    ora i0+1
+    ora i0+2
+    ora i0+3
+    beq set_i0_to_zero
+    bne set_i0_to_one
+zendproc
+        
 zproc exec_integer
     ldx #4
     lda #OTYPE_INTEGER
@@ -1058,20 +1136,6 @@ zproc exec_assign
     jmp pop_i0
 zendproc
 
-; Converts TOS to -1, 0, 1
-zproc exec_sgn
-    jsr deref_i0
-    lda i0+3                ; check top byte
-    bmi set_i0_to_mone
-
-    lda i0+0
-    ora i0+1
-    ora i0+2
-    ora i0+3
-    beq set_i0_to_zero
-    bne set_i0_to_one
-zendproc
-        
 zproc exec_add
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
@@ -1159,22 +1223,6 @@ zproc exec_mod
 
     jsr divs4
     jmp i1_to_i0
-zendproc
-
-zproc exec_equals
-    jsr exec_sub
-
-    ldx #0
-    jsr test_i0_for_truth
-    zif_eq
-        inx
-    zendif
-    stx i0+0
-    lda #0
-    sta i0+1
-    sta i0+2
-    sta i0+3
-    rts
 zendproc
 
 zproc exec_bad
@@ -4084,7 +4132,12 @@ expr_rule:
     P_TRY multiplication_rule
     P_TRY division_rule
     P_TRY modulus_rule
-    P_TRY compare_equals_rule
+    P_TRY compare_eq_rule           ; =
+    P_TRY compare_noteq_rule        ; <>
+    P_TRY compare_lte_rule          ; <=
+    P_TRY compare_lt_rule           ; <
+    P_TRY compare_gte_rule          ; >=
+    P_TRY compare_gt_rule           ; >
     P_RETURN
 
 addition_rule:
@@ -4117,10 +4170,40 @@ keyword_mod = . + 2
     P_SHUNT TOKEN_MOD
     P_JMP compulsory_expr_rule
 
-compare_equals_rule:
-keyword_equals = . + 2
+compare_eq_rule:
+keyword_eq = . + 2
     P_EAGER_TOKEN '='|0x80
-    P_SHUNT TOKEN_EQUALS
+    P_SHUNT TOKEN_EQ
+    P_JMP compulsory_expr_rule
+
+compare_noteq_rule:
+keyword_noteq = . + 2
+    P_EAGER_TOKEN '<', '>'|0x80
+    P_SHUNT TOKEN_NOTEQ
+    P_JMP compulsory_expr_rule
+
+compare_lt_rule:
+keyword_lt = . + 2
+    P_EAGER_TOKEN '<'|0x80
+    P_SHUNT TOKEN_LT
+    P_JMP compulsory_expr_rule
+
+compare_lte_rule:
+keyword_lte = . + 2
+    P_EAGER_TOKEN '<', '='|0x80
+    P_SHUNT TOKEN_LTE
+    P_JMP compulsory_expr_rule
+
+compare_gt_rule:
+keyword_gt = . + 2
+    P_EAGER_TOKEN '>'|0x80
+    P_SHUNT TOKEN_GT
+    P_JMP compulsory_expr_rule
+
+compare_gte_rule:
+keyword_gte = . + 2
+    P_EAGER_TOKEN '>', '='|0x80
+    P_SHUNT TOKEN_GTE
     P_JMP compulsory_expr_rule
 
 leaf_rule:
