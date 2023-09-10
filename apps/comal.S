@@ -19,6 +19,8 @@
 ;             <-- heapbase
 ;    interpreter and workspace
 ; lo TPABASE
+
+
 ; IMPORTANT --- remember how comparisons work!
 ;
 ; lda A
@@ -153,6 +155,7 @@ TOKEN_ENDWHILE  = 0x1a
 TOKEN_ONE       = 0x1b
 TOKEN_FOR       = 0x1c
 TOKEN_ENDFOR    = 0x1d
+TOKEN_SGN       = 0x1e
 
 .set tokenvalue, 0
 
@@ -235,6 +238,7 @@ deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endloop,  keyword_endwhile, exec_goto
 deftok TOKEN_ONE,      15, 1, 0, 1, lister_simple,   keyword_one,      exec_one,       check_nop
 deftok TOKEN_FOR,       0, 4, 4, 0, lister_for,      keyword_for,      exec_for,       check_for
 deftok TOKEN_ENDFOR,    0, 4, 0, 0, lister_endloop,  keyword_endfor,   exec_endfor,    check_endfor
+deftok TOKEN_SGN,      14, 1, 1, 1, lister_prefix,   keyword_sgn,      exec_sgn,       check_nop
 
 OBJECT_TABLE_SIZE = 256
 
@@ -866,20 +870,12 @@ zendproc
 ; (varref initvalue terminatorvalue stepvalue=i0 -- )
 
 zproc exec_for
-    jsr deref_i0
-    jsr i0_to_i2                    ; (varref initvalue terminatorvalue stepvalue=i2 -- )
-    jsr pop_and_deref_i1            ; (varref initvalue terminatorvalue=i1 stepvalue=i2 -- )
-    jsr pop_and_deref_i0            ; (varref initvalue=i0 terminatorvalue=i1 stepvalue=i2 -- )
-    jsr push_i2                     ; (varref stepvalue initvalue=i0 terminatorvalue=i1 -- )
-    jsr push_i1                     ; (varref stepvalue terminatorvalue initvalue=i0 -- )
+    lda #3*5
+    jsr peek                        ; (varref initvalue terminatorvalue stepvalue varref --)
+    lda #3*5
+    jsr peek                        ; (...varref initvalue --)
+    jsr exec_assign                 ; (varref initvalue terminatorvalue stepvalue --)
 
-    ; (varref stepvalue terminatorvalue --)
-    ; i0 = initvalue
-
-    ldy #2*5                        ; fetch varref
-    jsr peek_i1
-    jsr exec_assign_i0_to_i1
-    
     jsr do_for_test
     zif_cs
         jsr pop_i0                  ; (varref stepvalue terminatorvalue=i0 -- )
@@ -888,78 +884,70 @@ zproc exec_for
         jsr pop_i0                  ; previous stack value in i0
         jmp exec_goto_next
     zendif
-
-    jmp pop_i0                      ; (varref stepvalue terminatorvalue=i0 -- )
+    rts
 zendproc
 
-; Expects (stepvalue terminatorvalue counter=i0 -- )
-; This expects the counter value to be in i0.
+; Expects (varref initvalue terminatorvalue stepvalue --)
 ; Sets C if the loop has terminated.
 
 zproc do_for_test
-    ldy #0*5
-    jsr peek_i1
-    jsr exec_sub_i1_minus_i0        ; i0 is terminator minus counter
-    ldy #1*5                        ; fetch step value
-    jsr peek_i1
-    lda i1+3                        ; get high byte of step variable
+    lda #3*5
+    jsr peek                        ; (varref initvalue terminatorvalue stepvalue varref --)
+    lda #2*5
+    jsr peek                        ; (v i t s varref terminatorvalue --)
+    jsr exec_sub                    ; (v i t s difference --); diff is counter-terminator
+    jsr exec_sgn                    ; (v i t s sign --)
+
+    lda #1*5
+    jsr peek
+    jsr exec_sgn                    ; (v i t s resultsign stepsign=i0 --)
+    lda i0+3                        ; get high byte of step variable
+    php
+    jsr pop_i1                      ; (v i t s resultsign=i1 --)
+    jsr pop_i0                      ; (v i t s=i0 --)
+
+    plp                             ; result flags from step variable
     clc
     zif_pl
-        lda i0+3                    ; test for counter > terminator
-        zif_mi
-            sec
+        lda i1+0                    ; test for counter > terminator
+        zif_pl
+            ; Also need to check for zero!
+
+            zif_ne
+                sec
+            zendif
         zendif
         rts
     zendif
 
-    lda i0+3                    ; test for counter < terminator
-    zif_pl
-        ; Also need to check for zero!
-
-        ora i0+2
-        ora i0+1
-        ora i0+0
-        zif_ne
-            sec
-        zendif
+    lda i1+0                        ; test for counter < terminator
+    zif_mi
+        sec
     zendif
     rts
 zendproc
 
-; fec5
-; feca
-; febb
-
 ; On entry, the stack looks like this:
-; (varref stepvalue terminatorvalue=i0 --)
+; (varref initvalue terminatorvalue stepvalue --)
 
 zproc exec_endfor
-    jsr push_i0                     ; (varref stepvalue terminatorvalue --)
-
-    ldy #2*5                        ; get loop counter
-    jsr peek_i0
-    jsr deref_i0                    ; get value
-
-    ldy #1*5                        ; get step value
-    jsr peek_i1
-
-    jsr exec_add_i1_plus_i0
-
-    ldy #2*5                        ; get loop counter again
-    jsr peek_i1
-    jsr exec_assign_i0_to_i1
-
+    lda #3*5
+    jsr peek                        ; (v i t s varref --)
+    jsr push_i0                     ; (v i t s varref varref --)
+    lda #2*5
+    jsr peek                        ; (v i t s varref varref stepvalue --)
+    jsr exec_add                    ; (v i t s varref newcounter --)
+    jsr exec_assign                 ; (v i t s --)
 
     jsr do_for_test
     zif_cc
-        jsr pop_i0                  ; (varref stepvalue terminatorvalue=i0 -- )
         jmp exec_goto_next
     zendif
 
-    jsr pop_i0                      ; (varref stepvalue terminatorvalue=i0 -- )
-    jsr pop_i0                      ; (varref stepvalue=i0 -- )
-    jsr pop_i0                      ; (varref=i0 -- )
-    jmp pop_i0                      ; previous value on stack in i0
+    jsr pop_i0                      ; (v i t --)
+    jsr pop_i0                      ; (v i --)
+    jsr pop_i0                      ; (v --)
+    jmp pop_i0                      ; ()
 zendproc
 
 zproc exec_varref
@@ -971,6 +959,7 @@ zendproc
 zproc exec_zero
     jsr push_i0
 
+set_i0_to_zero:
     lda #0
 set_4x_constant:
     sta i0+0
@@ -985,6 +974,7 @@ zendproc
 zproc exec_mone
     jsr push_i0
 
+set_i0_to_mone:
     lda #0xff
     jmp set_4x_constant
 zendproc
@@ -992,6 +982,7 @@ zendproc
 zproc exec_one
     jsr push_i0
 
+set_i0_to_one:
     lda #0
     jsr set_4x_constant
     inc i0+0
@@ -1033,11 +1024,7 @@ zendproc
 zproc exec_assign
     jsr deref_i0            ; value to assign
     jsr pop_i1              ; lvalue (variable reference)
-    jsr exec_assign_i0_to_i1
-    jmp pop_i0
-zendproc
 
-zproc exec_assign_i0_to_i1
     ; Find the hash node.
 
     lda i1+0                ; object ID -> p1
@@ -1067,14 +1054,28 @@ zproc exec_assign_i0_to_i1
         iny
         inx
     zuntil_eq
-    rts
+
+    jmp pop_i0
 zendproc
 
+; Converts TOS to -1, 0, 1
+zproc exec_sgn
+    jsr deref_i0
+    lda i0+3                ; check top byte
+    bmi set_i0_to_mone
+
+    lda i0+0
+    ora i0+1
+    ora i0+2
+    ora i0+3
+    beq set_i0_to_zero
+    bne set_i0_to_one
+zendproc
+        
 zproc exec_add
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
 
-exec_add_i1_plus_i0:
     ldx #-4 & 0xff
     clc
     zrepeat
@@ -1091,7 +1092,6 @@ zproc exec_sub
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
 
-exec_sub_i1_minus_i0:
     ldx #-4 & 0xff
     sec
     zrepeat
@@ -1250,8 +1250,15 @@ zendproc
 
     ; Returns A=object type
 zproc pop_ix
-    ldy #0
-    jsr peek_ix             ; returns object type
+    ldy #4
+    zrepeat
+        lda (stackptr), y
+        sta +3, x
+        dex
+        dey
+    zuntil_eq
+
+    lda (stackptr), y       ; type field, at y=0
     pha
 
     lda #STACKVALUE_SIZE
@@ -1261,47 +1268,31 @@ zproc pop_ix
     rts
 zendproc
 
-zproc peek_i2
-    ldx #i2
-    jsr peek_ix
-    sta v2
-    rts
-zendproc
-
-zproc peek_i1
-    ldx #i1
-    jsr peek_ix
-    sta v1
-    rts
-zendproc
-
-zproc peek_i0
-    ldx #i0
-    jsr peek_ix
-    sta v0
-    rts
-zendproc
-
+; Peeks a value from the stack and then pushes it.
+;
 ; On entry:
-;    x = address of i register
-;    y = stack offset
+;    a = stack offset (without the push) (including TOS)
 ; Returns a=object type
-zproc peek_ix
-    lda (stackptr), y
+zproc peek
     pha
-    iny
-    lda (stackptr), y
-    sta +0, x
-    iny
-    lda (stackptr), y
-    sta +1, x
-    iny
-    lda (stackptr), y
-    sta +2, x
-    iny
-    lda (stackptr), y
-    sta +3, x
+    jsr push_i0
     pla
+    tay
+
+    lda (stackptr), y
+    sta v0
+    iny
+    lda (stackptr), y
+    sta i0+0
+    iny
+    lda (stackptr), y
+    sta i0+1
+    iny
+    lda (stackptr), y
+    sta i0+2
+    iny
+    lda (stackptr), y
+    sta i0+3
     rts
 zendproc
 
@@ -4135,6 +4126,7 @@ keyword_equals = . + 2
 leaf_rule:
     P_TRY parenthesised_rvalue_rule
     P_TRY not_rvalue_rule
+    P_TRY sgn_rvalue_rule
     P_TRY varref_rvalue_rule
     P_TRY number_rvalue_rule
     P_TRY negate_rvalue_rule
@@ -4169,6 +4161,13 @@ keyword_not = . + 2
     P_TOKEN 'N', 'O', 'T'|0x80
     P_COMMIT
     P_SHUNT TOKEN_NOT
+    P_JMP leaf_rule
+
+sgn_rvalue_rule:
+keyword_sgn = . + 2
+    P_TOKEN 'S', 'G', 'N'|0x80
+    P_COMMIT
+    P_SHUNT TOKEN_SGN
     P_JMP leaf_rule
 
 keyword_zero:
