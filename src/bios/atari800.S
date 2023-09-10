@@ -516,8 +516,8 @@ zproc screen_getchar
         cpy RTCLOK
         zif_eq
             iny
-            dec ptr
-            zif_cs
+            lda ptr
+            zif_eq
                 dec ptr+1
                 ldx ptr+1
                 cpx #$ff
@@ -526,6 +526,7 @@ zproc screen_getchar
                     rts
                 zendif
             zendif
+            dec ptr
         zendif
     zendloop
 
