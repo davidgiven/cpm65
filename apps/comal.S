@@ -72,6 +72,15 @@ LINE_NUMBER     = 1
 LINE_INDENT     = 3
 LINE_DATA       = 4
 
+.macro copystruct n, src, dest
+    ldx #(\n)-1
+    zrepeat
+        lda \src, x
+        sta \dest, x
+        dex
+    zuntil_mi
+.endm
+
 ZEROPAGE
 
 heapptr:   .word 0
@@ -116,10 +125,14 @@ savedexecbyteptr:   .byte 0 ; offset into the line of code; 0 if no saved state
 
 ; Structure checker temporaries
 
+check_start:
 checkindent:        .byte 0 ; current indent level
 checklooplineptr:   .word 0 ; start of the current loop
 checkloopbyteptr:   .byte 0 ; likewise
+checkendlineptr:    .word 0 ; address of previous reference to the end of the structure
+checkendbyteptr:    .byte 0 ; likewise
 checklooptype:      .byte 0 ; loop type (token)
+check_end:
 
 LISTERFLAG_NOTSTART   = 1<<7 ; set after every lister is called, is !RESETSTART
 LISTERFLAG_COMMA      = 1<<6 ; a comma is intended before the next clause
@@ -165,6 +178,7 @@ TOKEN_IF        = 0x24
 TOKEN_ELSE      = 0x25
 TOKEN_ENDIF     = 0x26
 TOKEN_ELIF      = 0x27
+TOKEN_ELIFGOTO  = 0x28
 
 .set tokenvalue, 0
 
@@ -257,6 +271,7 @@ deftok TOKEN_IF,        0, 4, 1, 0, lister_if,       keyword_if,       exec_if, 
 deftok TOKEN_ELSE,      0, 4, 0, 0, lister_simple,   keyword_else,     exec_goto,      check_else
 deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_simple,   keyword_endif,    exec_nop,       check_endif
 deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if,        check_elif
+deftok TOKEN_ELIFGOTO,  0, 4, 0, 0, lister_nop,      lister_bad,       exec_goto,      check_elifgoto
 
 OBJECT_TABLE_SIZE = 256
 
@@ -1799,11 +1814,11 @@ zendproc
 
 zproc check_structure
     lda #0
-    sta checkindent
-    sta checklooplineptr+0
-    sta checklooplineptr+1
-    sta checkloopbyteptr
-    sta checklooptype
+    ldx #check_end - check_start - 1
+    zrepeat
+        sta check_start, x
+        dex
+    zuntil_mi
     jsr goto_first_line
 
     jmp 1f
@@ -1851,24 +1866,18 @@ zendproc
 
 zproc check_push_loop
     pha
-    lda #5
+    lda #check_end - check_start
     jsr extend_stack
 
     ldy #0
-    lda checkindent
-    sta (stackptr), y
-    iny
-    lda checklooplineptr+0
-    sta (stackptr), y
-    iny
-    lda checklooplineptr+1
-    sta (stackptr), y
-    iny
-    lda checkloopbyteptr
-    sta (stackptr), y
-    iny
-    lda checklooptype
-    sta (stackptr), y
+    ldx #check_start
+    zrepeat
+        lda 0, x
+        sta (stackptr), y
+        iny
+        inx
+        cpx #check_end
+    zuntil_eq
 
     pla
     sta checklooptype
@@ -1878,6 +1887,10 @@ zproc check_push_loop
     sta checklooplineptr+1
     lda execbyteptr
     sta checkloopbyteptr
+    lda #0
+    sta checkendlineptr+0
+    sta checkendlineptr+1
+    sta checkendbyteptr
     inc checkindent
     rts
 zendproc
@@ -1889,20 +1902,14 @@ zproc check_pop_loop
     zendif
 
     ldy #0
-    lda (stackptr), y
-    sta checkindent
-    iny
-    lda (stackptr), y
-    sta checklooplineptr+0
-    iny
-    lda (stackptr), y
-    sta checklooplineptr+1
-    iny
-    lda (stackptr), y
-    sta checkloopbyteptr
-    iny
-    lda (stackptr), y
-    sta checklooptype
+    ldx #check_start
+    zrepeat
+        lda (stackptr), y
+        sta 0, x
+        iny
+        inx
+        cpx #check_end
+    zuntil_eq
 
     ; Adjust the indentation of the current line (which we don't want to be
     ; part of the loop).
@@ -1913,7 +1920,7 @@ zproc check_pop_loop
     sbc #1
     sta (execlineptr), y
 
-    lda #5
+    lda #check_end - check_start
     jmp retract_stack
 zendproc
 
@@ -1953,6 +1960,60 @@ zproc patch_opening_goto
     sta (checklooplineptr), y
     rts
 zendproc
+
+; Copies the current end pointer to the GOTO instruction at the current
+; location; updates the end pointer to the current location.
+
+zproc update_end_ptr
+    ldy execbyteptr
+    iny
+    lda checkendlineptr+0
+    sta (execlineptr), y
+    iny
+    lda checkendlineptr+1
+    sta (execlineptr), y
+    iny
+    lda checkendbyteptr
+    sta (execlineptr), y
+
+    ldx #2
+    zrepeat
+        lda execlineptr, x
+        sta checkendlineptr, x
+        dex
+    zuntil_mi
+
+    rts
+zendproc
+
+; Resolves the list of end ptrs to all point at the current location.
+
+    zrepeat
+        ; Copy the next pointer out of the instruction.
+
+        copystruct 3, checkendlineptr, p0
+
+        ldx #0
+        ldy p1+0
+        iny
+        zrepeat
+            lda (p0), y
+            sta checkendlineptr+0, x
+            lda execlineptr+0, x
+            sta (p0), y
+            iny
+            inx
+            cpx #3
+        zuntil_eq
+
+        ; Check for the end of the list.
+
+patch_end_ptr:
+        lda checkendlineptr+0
+        ora checkendlineptr+1
+        ora checkendbyteptr
+    zuntil_eq
+    rts
 
 ; For short-form structures, we need to change the indentation.
 
@@ -2029,6 +2090,22 @@ zproc check_endfor
     jmp check_end_complex_loop
 zendproc
 
+; IF...ENDIF processing:
+;
+; IF expr              <expr> CONDITIONAL-GOTO <elselabel>
+;   ...
+; ELSE                 GOTO <endlabel>; elselabel:
+;   ...
+; ENDIF                endlabel:
+
+; IF expr              <expr> CONDITIONAL-GOTO <elselabel>
+;   ...
+; ELIF expr            ELIFGOTO <endlabel>; elselabel: <expr> CONDITIONAL-GOTO <nextelselabel>
+;  ...
+; ELSE                 ELSEGOTO <endlabel>; nextelselabel:
+;   ...
+; ENDIF                endlabel:
+
 zproc check_if
     lda #TOKEN_IF
     jmp check_push_loop
@@ -2045,12 +2122,7 @@ zproc check_else
     jsr adjust_line_indentation
     jsr patch_opening_goto
 
-    lda execlineptr+0
-    sta checklooplineptr+0
-    lda execlineptr+1
-    sta checklooplineptr+1
-    lda execbyteptr
-    sta checkloopbyteptr
+    copystruct 3, execlineptr, checklooplineptr
 
     lda #TOKEN_ELSE
     sta checklooptype
@@ -2069,7 +2141,18 @@ zproc check_endif
 
     jsr adjust_indentation_for_inline
     jsr patch_opening_goto
+    jsr patch_end_ptr
     jmp check_pop_loop
+zendproc
+
+zproc check_elifgoto
+    lda checklooptype
+    cmp #TOKEN_IF
+    zif_ne
+        jmp error_bad_structure
+    zendif
+
+    jmp update_end_ptr
 zendproc
 
 zproc check_elif
@@ -2083,8 +2166,8 @@ zproc check_elif
     jsr adjust_line_indentation
     jsr patch_opening_goto
 
-    ; IF needs to jump to the beginning of the ELIF line to execute
-    ; the condition.
+    ; IF needs to jump to the beginning of the ELIF line; exec_if will
+    ; skip the ELIFGOTO.
 
     lda #LINE_DATA
     ldy checkloopbyteptr
@@ -2095,12 +2178,7 @@ zproc check_elif
 
     ; Change the loop start to the current instruction.
 
-    lda execlineptr+0
-    sta checklooplineptr+0
-    lda execlineptr+1
-    sta checklooplineptr+1
-    lda execbyteptr
-    sta checkloopbyteptr
+    copystruct 3, execlineptr, checklooplineptr
     rts
 zendproc
 
@@ -4170,6 +4248,7 @@ elif_rule:
 keyword_elif = . + 2
     P_TOKEN 'E', 'L', 'I', 'F'|0x80
     P_COMMIT
+    P_EMITN 4, TOKEN_ELIFGOTO, 0, 0, 0
     P_JSR expr_rule
     P_FLUSH
     P_EMITN 4, TOKEN_ELIF, 0, 0, 0
