@@ -180,6 +180,25 @@ TOKEN_ENDIF     = 0x26
 TOKEN_ELIF      = 0x27
 TOKEN_ELIFGOTO  = 0x28
 
+P_TRY_OP         = 0
+P_JSR_OP         = 1
+P_JMP_OP         = 2
+P_FAIL_OP        = 3
+P_PANIC_OP       = 4
+P_RETURN_OP      = 5
+P_COMMIT_OP      = 6
+P_TOKEN_OP       = 7
+P_EAGER_TOKEN_OP = 8
+P_EMIT_OP        = 9
+P_EMIT4_OP       = 10
+P_SHUNT_OP       = 11
+P_FLUSH_OP       = 12
+P_WORD_OP        = 13
+P_NUMBER_OP      = 14
+P_EOL_OP         = 15
+P_PAREN_OP       = 16
+P_SUCCEED_OP     = 17
+
 .set tokenvalue, 0
 
 .data 1
@@ -231,6 +250,18 @@ token_check_lo:
     .set tokenvalue, tokenvalue+1
 .endm
         
+.data 11
+pop_exec_hi:
+.data 12
+pop_exec_lo:
+
+.macro defpop exec
+    .data 11
+    .byte (\exec-1)@mos16hi
+    .data 12
+    .byte (\exec-1)@mos16lo
+.endm
+
 deftok TOKEN_EOL,      15, 1, 0, 0, lister_bad,      lister_bad,       exec_bad,       check_nop
 deftok TOKEN_VARREF,   15, 3, 0, 1, lister_varref,   lister_bad,       exec_varref,    check_nop
 deftok TOKEN_INTEGER,  15, 5, 0, 1, lister_integer,  lister_bad,       exec_integer,   check_nop
@@ -272,6 +303,25 @@ deftok TOKEN_ELSE,      0, 4, 0, 0, lister_simple,   keyword_else,     exec_goto
 deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_endloop,  keyword_endif,    exec_nop,       check_endif
 deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if,        check_elif
 deftok TOKEN_ELIFGOTO,  0, 4, 0, 0, lister_nop,      lister_bad,       exec_goto,      check_elifgoto
+
+defpop pop_try
+defpop pop_jsr
+defpop pop_jmp
+defpop pop_fail
+defpop pop_panic
+defpop pop_return
+defpop pop_commit
+defpop pop_token
+defpop pop_eager_token
+defpop pop_emit
+defpop pop_emit4
+defpop pop_shunt
+defpop pop_flush
+defpop pop_word
+defpop pop_number
+defpop pop_eol
+defpop pop_paren
+defpop pop_succeed
 
 OBJECT_TABLE_SIZE = 256
 
@@ -3279,10 +3329,11 @@ zendproc
 zproc parse_state_machine
     ldy #0
     lda (parsecmd), y
-    sta p0+0
-    iny
-    lda (parsecmd), y
-    sta p0+1
+    tax
+    lda pop_exec_hi, x
+    pha
+    lda pop_exec_lo, x
+    pha
 
 #if 0
     tsx
@@ -3295,11 +3346,19 @@ zproc parse_state_machine
     jsr print_nl
 #endif
 
-    jmp (p0)
+    rts
 zendproc
 
 ; Adds A to parsecmd.
 ; Preserves X and Y.
+parse_advance_3:
+    lda #3
+    bne parse_advance           ; always taken
+parse_advance_2:
+    lda #2
+    bne parse_advance           ; always taken
+parse_advance_1:
+    lda #1
 zproc parse_advance
     clc
     adc parsecmd+0
@@ -3308,6 +3367,16 @@ zproc parse_advance
         inc parsecmd+1
     zendif
     rts
+zendproc
+
+parse_next_2:
+    lda #2
+    bne parse_next              ; always taken
+parse_next_1:
+    lda #1
+zproc parse_next
+    jsr parse_advance
+    jmp parse_state_machine
 zendproc
 
 ; Pushes A onto the bytecode queue.
@@ -3374,7 +3443,7 @@ zproc unstack_operators
 zendproc
     
 pop_succeed_ptr:
-    .word pop_succeed
+    .byte P_SUCCEED_OP
 
 zproc pop_succeed
     jsr unstack_operators
@@ -3435,7 +3504,7 @@ zendproc
 zproc pop_try
     ; Read parameter into p0.
 
-    ldy #2
+    ldy #1
     lda (parsecmd), y
     sta p0+0
     iny
@@ -3444,8 +3513,7 @@ zproc pop_try
 
     ; Advance.
 
-    lda #4
-    jsr parse_advance
+    jsr parse_advance_3
 
 #if 0
     lda #'>'
@@ -3517,13 +3585,11 @@ zproc pop_commit
     pha
     pha
 
-    lda #2
-    jsr parse_advance
-    jmp parse_state_machine
+    jmp parse_next_1
 zendproc
 
 pop_panic_ptr:
-    .word pop_panic
+    .byte P_PANIC_OP
 
 ; Revert to a backtracking state.
 
@@ -3558,7 +3624,7 @@ zendproc
 zproc pop_jsr
     ; Read parameter into p0.
 
-    ldy #2
+    ldy #1
     lda (parsecmd), y
     sta p0+0
     iny
@@ -3567,8 +3633,7 @@ zproc pop_jsr
 
     ; Advance.
 
-    lda #4
-    jsr parse_advance
+    jsr parse_advance_3
 
     ; Push return point.
 
@@ -3590,7 +3655,7 @@ zendproc
 zproc pop_jmp
     ; Read parameter into parsecmd.
 
-    ldy #2
+    ldy #1
     lda (parsecmd), y
     tax
     iny
@@ -3631,23 +3696,18 @@ zproc pop_return
 zendproc
 
 zproc pop_shunt
-    ldy #2
+    ldy #1
     lda (parsecmd), y
 
     jsr shunt_operator
 
-    lda #3
-    jsr parse_advance
-    jmp parse_state_machine
+    jmp parse_next_2
 zendproc
 
 zproc pop_paren
     ldy #0
     jsr stack_operator
-
-    lda #2
-    jsr parse_advance
-    jmp parse_state_machine
+    jmp parse_next_1
 zendproc
 
 zproc pop_endparen
@@ -3655,10 +3715,7 @@ zendproc
 
 zproc pop_flush
     jsr unstack_operators
-
-    lda #2
-    jsr parse_advance
-    jmp parse_state_machine
+    jmp parse_next_1
 zendproc
 
 zproc parser_skip_whitespace
@@ -3713,7 +3770,7 @@ zproc skip_token
 
     ldx bufferpos
     dex
-    ldy #1 ; 2 - 1
+    ldy #0 ; 1 - 1
     zrepeat
         inx
         iny
@@ -3759,34 +3816,25 @@ zproc pop_eager_token
 zendproc
 
 zproc pop_emit
-    ldy #2
+    ldy #1
     lda (parsecmd), y
     jsr queue_bytecode
-
-    lda #3
-    jsr parse_advance
-    jmp parse_state_machine
+    jmp parse_next_2
 zendproc
 
-zproc pop_emitn
-    ldy #2
+zproc pop_emit4
+    ldy #1
     lda (parsecmd), y
-    sta p0+0
-
-    lda #3
-    jsr parse_advance
-
+    jsr queue_bytecode
+    
+    ldy #3
     zrepeat
-        ldy #0
-        lda (parsecmd), y
+        lda #0
         jsr queue_bytecode
-
-        lda #1
-        jsr parse_advance
-
-        dec p0+0
+        dey
     zuntil_eq
-    jmp parse_state_machine
+    
+    jmp parse_next_2
 zendproc
         
 zproc pop_word
@@ -3800,10 +3848,7 @@ zproc pop_word
     lda p1+1
     jsr queue_bytecode
 
-    lda #2
-    jsr parse_advance
-
-    jmp parse_state_machine
+    jmp parse_next_1
 zendproc
 
 zproc pop_eol
@@ -3815,9 +3860,7 @@ zproc pop_eol
         jmp pop_fail
     zendif
 
-    lda #2
-    jsr parse_advance
-    jmp parse_state_machine
+    jmp parse_next_1
 zendproc
 
 zproc emit_i0
@@ -3936,87 +3979,85 @@ zproc pop_number
     lda bufferend
     sta bufferpos
 
-    lda #2
-    jsr parse_advance
-    jmp parse_state_machine
+    jmp parse_next_1
 1:
     jmp pop_fail
 zendproc
 
 .macro P_TRY rule
-    .word pop_try
+    .byte P_TRY_OP
     .word \rule
 .endm
 
 .macro P_JSR rule
-    .word pop_jsr
+    .byte P_JSR_OP
     .word \rule
 .endm
 
 .macro P_JMP rule
-    .word pop_jmp
+    .byte P_JMP_OP
     .word \rule
 .endm
 
 .macro P_FAIL
-    .word pop_fail
+    .byte P_FAIL_OP
 .endm
 
 .macro P_PANIC
-    .word pop_panic
+    .byte P_PANIC_OP
 .endm
 
 .macro P_RETURN
-    .word pop_return
+    .byte P_RETURN_OP
 .endm
 
 .macro P_COMMIT
-    .word pop_commit
+    .byte P_COMMIT_OP
 .endm
 
 .macro P_TOKEN bytes:vararg
-    .word pop_token
+    .byte P_TOKEN_OP
     .byte \bytes
 .endm
 
 .macro P_EAGER_TOKEN bytes:vararg
-    .word pop_eager_token
+    .byte P_EAGER_TOKEN_OP
     .byte \bytes
 .endm
 
 .macro P_EMIT token
-    .word pop_emit
+    .byte P_EMIT_OP
     .byte \token
 .endm
 
-.macro P_EMITN count, bytes:vararg
-    .word pop_emitn
-    .byte \count, \bytes
+.macro P_EMIT4 token
+    .byte P_EMIT4_OP
+    .byte \token
 .endm
 
 .macro P_SHUNT token
-    .word pop_shunt
+    .byte P_SHUNT_OP
     .byte \token
 .endm
 
 .macro P_FLUSH
-    .word pop_flush
+    .byte P_FLUSH_OP
 .endm
 
 .macro P_WORD
-    .word pop_word
+    .byte P_WORD_OP
 .endm
 
 .macro P_NUMBER
-    .word pop_number
+    .byte P_NUMBER_OP
 .endm
 
 .macro P_EOL
-    .word pop_eol
+    .byte P_EOL_OP
 .endm
 
 .macro P_PAREN
-    .word pop_paren
+    .byte P_PAREN_OP
 .endm
 
 immediate_statement_rule:
@@ -4131,7 +4172,7 @@ run_rule:
     P_RETURN
 
 stop_rule:
-keyword_stop = . + 2
+keyword_stop = . + 1
     P_TOKEN 'S', 'T', 'O', 'P'|0x80
     P_EMIT TOKEN_STOP
     P_EOL
@@ -4144,29 +4185,29 @@ con_rule:
     P_RETURN
 
 repeat_rule:
-keyword_repeat = . + 2
+keyword_repeat = . + 1
     P_TOKEN 'R', 'E', 'P', 'E', 'A', 'T'|0x80
     P_EMIT TOKEN_REPEAT
     P_EOL
     P_RETURN
 
 until_rule:
-keyword_until = . + 2
+keyword_until = . + 1
     P_TOKEN 'U', 'N', 'T', 'I', 'L'|0x80
     P_COMMIT
     P_JSR expr_rule
     P_FLUSH
-    P_EMITN 4, TOKEN_UNTIL, 0, 0, 0
+    P_EMIT4 TOKEN_UNTIL
     P_EOL
     P_RETURN
 
 while_rule:
-keyword_while = . + 2
+keyword_while = . + 1
     P_TOKEN 'W', 'H', 'I', 'L', 'E'|0x80
     P_COMMIT
     P_JSR expr_rule
     P_FLUSH
-    P_EMITN 4, TOKEN_WHILE, 0, 0, 0
+    P_EMIT4 TOKEN_WHILE
     P_JSR optional_do_rule
     P_TRY eol_rule
     P_COMMIT
@@ -4175,25 +4216,25 @@ keyword_while = . + 2
     P_JMP 1f
 
 endwhile_rule:
-keyword_endwhile = . + 2
+keyword_endwhile = . + 1
     P_TOKEN 'E', 'N', 'D', 'W', 'H', 'I', 'L', 'E'|0x80
 1:
-    P_EMITN 4, TOKEN_ENDWHILE, 0, 0, 0
+    P_EMIT4 TOKEN_ENDWHILE
     P_EOL
     P_RETURN
 
 for_rule:
-keyword_for = . + 2
+keyword_for = . + 1
     P_TOKEN 'F', 'O', 'R'|0x80
     P_WORD
     P_JSR assignment_operator_rule
     P_JSR expr_rule
-keyword_to = . + 2
+keyword_to = . + 1
     P_TOKEN 'T', 'O'|0x80
     P_JSR expr_rule
     P_JSR optional_step_rule
     P_FLUSH
-    P_EMITN 4, TOKEN_FOR, 0, 0, 0
+    P_EMIT4 TOKEN_FOR
     P_JSR optional_do_rule
     P_TRY eol_rule
     P_COMMIT
@@ -4204,7 +4245,7 @@ keyword_to = . + 2
 endfor_rule:
     P_JSR endfor_or_next_rule
 1:
-    P_EMITN 4, TOKEN_ENDFOR, 0, 0, 0
+    P_EMIT4 TOKEN_ENDFOR
     P_RETURN
 
 endfor_or_next_rule:
@@ -4213,7 +4254,7 @@ endfor_or_next_rule:
     P_RETURN
 
 endfor_token_rule:
-keyword_endfor = . + 2
+keyword_endfor = . + 1
     P_TOKEN 'E', 'N', 'D', 'F', 'O', 'R'|0x80
     P_RETURN
 
@@ -4224,17 +4265,17 @@ optional_step_rule:
     P_RETURN
 
 step_rule:
-keyword_step = . + 2
+keyword_step = . + 1
     P_TOKEN 'S', 'T', 'E', 'P'|0x80
     P_JMP expr_rule
 
 if_rule:
-keyword_if = . + 2
+keyword_if = . + 1
     P_TOKEN 'I', 'F'|0x80
     P_COMMIT
     P_JSR expr_rule
     P_FLUSH
-    P_EMITN 4, TOKEN_IF, 0, 0, 0
+    P_EMIT4 TOKEN_IF
     P_JSR optional_then_rule
     P_TRY eol_rule
     P_COMMIT
@@ -4243,7 +4284,7 @@ keyword_if = . + 2
     P_JMP 1f
 
 endif_rule:
-keyword_endif = . + 2
+keyword_endif = . + 1
     P_TOKEN 'E', 'N', 'D', 'I', 'F'|0x80
 1:
     P_EMIT TOKEN_ENDIF
@@ -4251,19 +4292,19 @@ keyword_endif = . + 2
     P_RETURN
 
 else_rule:
-keyword_else = . + 2
+keyword_else = . + 1
     P_TOKEN 'E', 'L', 'S', 'E'|0x80
-    P_EMITN 4, TOKEN_ELSE, 0, 0, 0
+    P_EMIT4 TOKEN_ELSE
     P_JMP eol_rule
 
 elif_rule:
-keyword_elif = . + 2
+keyword_elif = . + 1
     P_TOKEN 'E', 'L', 'I', 'F'|0x80
     P_COMMIT
-    P_EMITN 4, TOKEN_ELIFGOTO, 0, 0, 0
+    P_EMIT4 TOKEN_ELIFGOTO
     P_JSR expr_rule
     P_FLUSH
-    P_EMITN 4, TOKEN_ELIF, 0, 0, 0
+    P_EMIT4 TOKEN_ELIF
     P_JSR optional_then_rule
     P_JMP eol_rule
 
@@ -4272,7 +4313,7 @@ optional_then_rule:
     P_RETURN
 
 then_rule:
-keyword_then = . + 2
+keyword_then = . + 1
     P_TOKEN 'T', 'H', 'E', 'N'|0x80
     P_RETURN
 
@@ -4281,7 +4322,7 @@ optional_do_rule:
     P_RETURN
 
 do_rule:
-keyword_do = . + 2
+keyword_do = . + 1
     P_TOKEN 'D', 'O'|0x80
     P_RETURN
 
@@ -4298,12 +4339,12 @@ assignment_rule:
 
 assignment_operator_rule:
     P_TRY equals_rule
-keyword_assign = . + 2
+keyword_assign = . + 1
     P_EAGER_TOKEN ':', '='|0x80
     P_RETURN
 
 equals_rule:
-keyword_equals = . + 2
+keyword_equals = . + 1
     P_EAGER_TOKEN '='|0x80
     P_RETURN
 
@@ -4312,7 +4353,7 @@ eol_rule:
     P_RETURN
 
 print_rule:
-keyword_print = . + 2
+keyword_print = . + 1
     P_TOKEN 'P', 'R', 'I', 'N', 'T'|0x80
     P_COMMIT
     P_TRY print_no_terminator_rule
@@ -4333,14 +4374,14 @@ print_terminator_rule:
     P_RETURN
 
 comma_rule:
-keyword_comma = . + 2
+keyword_comma = . + 1
     P_EAGER_TOKEN ','|0x80
     P_RETURN
 
 print_separator_rule:
     P_TRY comma_rule
 semicolon_rule:
-keyword_semicolon = . + 2
+keyword_semicolon = . + 1
     P_EAGER_TOKEN ';'|0x80
     P_RETURN
 
@@ -4378,67 +4419,67 @@ expr_rule:
     P_RETURN
 
 addition_rule:
-keyword_add = . + 2
+keyword_add = . + 1
     P_EAGER_TOKEN '+'|0x80
     P_SHUNT TOKEN_ADD
     P_JMP compulsory_expr_rule
 
 subtraction_rule:
-keyword_sub = . + 2
+keyword_sub = . + 1
     P_EAGER_TOKEN '-'|0x80
     P_SHUNT TOKEN_SUB
     P_JMP compulsory_expr_rule
 
 multiplication_rule:
-keyword_mul = . + 2
+keyword_mul = . + 1
     P_EAGER_TOKEN '*'|0x80
     P_SHUNT TOKEN_MUL
     P_JMP compulsory_expr_rule
 
 division_rule:
-keyword_div = . + 2
+keyword_div = . + 1
     P_EAGER_TOKEN '/'|0x80
     P_SHUNT TOKEN_DIV
     P_JMP compulsory_expr_rule
 
 modulus_rule:
-keyword_mod = . + 2
+keyword_mod = . + 1
     P_TOKEN 'M', 'O', 'D'|0x80
     P_SHUNT TOKEN_MOD
     P_JMP compulsory_expr_rule
 
 compare_eq_rule:
-keyword_eq = . + 2
+keyword_eq = . + 1
     P_EAGER_TOKEN '='|0x80
     P_SHUNT TOKEN_EQ
     P_JMP compulsory_expr_rule
 
 compare_noteq_rule:
-keyword_noteq = . + 2
+keyword_noteq = . + 1
     P_EAGER_TOKEN '<', '>'|0x80
     P_SHUNT TOKEN_NOTEQ
     P_JMP compulsory_expr_rule
 
 compare_lt_rule:
-keyword_lt = . + 2
+keyword_lt = . + 1
     P_EAGER_TOKEN '<'|0x80
     P_SHUNT TOKEN_LT
     P_JMP compulsory_expr_rule
 
 compare_lte_rule:
-keyword_lte = . + 2
+keyword_lte = . + 1
     P_EAGER_TOKEN '<', '='|0x80
     P_SHUNT TOKEN_LTE
     P_JMP compulsory_expr_rule
 
 compare_gt_rule:
-keyword_gt = . + 2
+keyword_gt = . + 1
     P_EAGER_TOKEN '>'|0x80
     P_SHUNT TOKEN_GT
     P_JMP compulsory_expr_rule
 
 compare_gte_rule:
-keyword_gte = . + 2
+keyword_gte = . + 1
     P_EAGER_TOKEN '>', '='|0x80
     P_SHUNT TOKEN_GTE
     P_JMP compulsory_expr_rule
@@ -4470,21 +4511,21 @@ number_rvalue_rule:
     P_RETURN
 
 negate_rvalue_rule:
-keyword_neg = . + 2
+keyword_neg = . + 1
     P_EAGER_TOKEN '-'|0x80
     P_COMMIT
     P_SHUNT TOKEN_NEG
     P_JMP leaf_rule
 
 not_rvalue_rule:
-keyword_not = . + 2
+keyword_not = . + 1
     P_TOKEN 'N', 'O', 'T'|0x80
     P_COMMIT
     P_SHUNT TOKEN_NOT
     P_JMP leaf_rule
 
 sgn_rvalue_rule:
-keyword_sgn = . + 2
+keyword_sgn = . + 1
     P_TOKEN 'S', 'G', 'N'|0x80
     P_COMMIT
     P_SHUNT TOKEN_SGN
