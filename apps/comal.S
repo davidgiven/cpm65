@@ -269,7 +269,7 @@ deftok TOKEN_GT,        3, 1, 2, 1, lister_infix,    keyword_gt,       exec_gt, 
 deftok TOKEN_GTE,       3, 1, 2, 1, lister_infix,    keyword_gte,      exec_gte,       check_nop
 deftok TOKEN_IF,        0, 4, 1, 0, lister_if,       keyword_if,       exec_if,        check_if
 deftok TOKEN_ELSE,      0, 4, 0, 0, lister_simple,   keyword_else,     exec_goto,      check_else
-deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_simple,   keyword_endif,    exec_nop,       check_endif
+deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_endloop,  keyword_endif,    exec_nop,       check_endif
 deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if,        check_elif
 deftok TOKEN_ELIFGOTO,  0, 4, 0, 0, lister_nop,      lister_bad,       exec_goto,      check_elifgoto
 
