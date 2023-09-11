@@ -3054,6 +3054,12 @@ zproc lister_for
         jsr buffer_print_space
     zendif
 
+    ; Print any additional code as if it were the first statement on the line.
+
+    lda listerflags
+    ora #LISTERFLAG_RESETSTART
+    sta listerflags
+
     lda #<keyword_do
     ldx #>keyword_do
     jmp buffer_print_separated_string
@@ -4188,21 +4194,16 @@ keyword_to = . + 2
     P_JSR optional_step_rule
     P_FLUSH
     P_EMITN 4, TOKEN_FOR, 0, 0, 0
-    P_JMP optional_do_rule
-
-optional_step_rule:
-    P_TRY step_rule
+    P_JSR optional_do_rule
+    P_TRY eol_rule
+    P_COMMIT
+    P_JSR simple_statement_rule
     P_FLUSH
-    P_EMIT TOKEN_ONE
-    P_RETURN
-
-step_rule:
-keyword_step = . + 2
-    P_TOKEN 'S', 'T', 'E', 'P'|0x80
-    P_JMP expr_rule
+    P_JMP 1f
 
 endfor_rule:
     P_JSR endfor_or_next_rule
+1:
     P_EMITN 4, TOKEN_ENDFOR, 0, 0, 0
     P_RETURN
 
@@ -4215,6 +4216,17 @@ endfor_token_rule:
 keyword_endfor = . + 2
     P_TOKEN 'E', 'N', 'D', 'F', 'O', 'R'|0x80
     P_RETURN
+
+optional_step_rule:
+    P_TRY step_rule
+    P_FLUSH
+    P_EMIT TOKEN_ONE
+    P_RETURN
+
+step_rule:
+keyword_step = . + 2
+    P_TOKEN 'S', 'T', 'E', 'P'|0x80
+    P_JMP expr_rule
 
 if_rule:
 keyword_if = . + 2
