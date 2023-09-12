@@ -1,19 +1,15 @@
 #include "../include/cpm65.inc"
 #include "zif.inc"
 
-; 1. Program storage
-; 2. Editor
-; 3. Interpreter
-; 4. Variable storage
-; 5. Correctness
-
+; Memory map:
+;
 ; hi TPAEND
 ;             <-- progtop
 ;    comal bytecode
 ;             <-- progbase
 ;    stack
 ;             <-- stackptr
-;
+;    (free space)
 ;             <-- heapptr
 ;    heap
 ;             <-- heapbase
@@ -91,11 +87,14 @@ progtop:   .word 0
 p0:        .word 0
 p1:        .word 0
 p2:        .word 0
+
 v0:        .byte 0
-v1:        .byte 0
-v2:        .byte 0
 i0:        .word 0, 0 ; also, TOS when executing
+
+v1:        .byte 0
 i1:        .word 0, 0
+
+v2:        .byte 0
 i2:        .word 0, 0
 
 bufferpos: .byte 0 ; current beginning of token in input buffer
@@ -1182,15 +1181,11 @@ zproc exec_assign
 
     ; Copy value into node.
 
+    ldx #-5 & 0xff
     ldy #OBJECT_TYPE
-    lda v0
-    sta (p0), y
-    iny
-
-    ldx #-4 & 0xff
     clc
     zrepeat
-        lda i0+4, x
+        lda v0+5, x
         sta (p0), y
         iny
         inx
@@ -1273,7 +1268,7 @@ zendproc
 
 zproc exec_div
     jsr deref_i0        ; RHS
-    jsr i0_to_i2
+    copystruct STACKVALUE_SIZE, i0, i2
     jsr pop_and_deref_i0 ; LHS
 
     jmp divs4
@@ -1281,11 +1276,12 @@ zendproc
 
 zproc exec_mod
     jsr deref_i0        ; RHS
-    jsr i0_to_i2
+    copystruct STACKVALUE_SIZE, i0, i2
     jsr pop_and_deref_i0 ; LHS
 
     jsr divs4
-    jmp i1_to_i0
+    copystruct STACKVALUE_SIZE, i1, i0
+    rts
 zendproc
 
 zproc exec_bad
@@ -1301,82 +1297,64 @@ zproc test_i0_for_truth
 zendproc
 
 zproc push_i2
-    ldy v2
-    ldx #i2
+    ldx #v2
     bne push_ix
 zendproc
 
 zproc push_i1
-    ldy v1
-    ldx #i1
+    ldx #v1
     bne push_ix
 zendproc
 
 zproc push_i0
-    ldy v0
-    ldx #i0
+    ldx #v0
 zendproc
     ; fall through
     ; On entry:
-    ;   x = address of i register
-    ;   y = value byte
+    ;   x = address of v register
 zproc push_ix
     lda #STACKVALUE_SIZE
     jsr extend_stack
 
-    tya
     ldy #STACKVALUE_TYPE
-    sta (stackptr), y
-
     zrepeat
-        iny
         lda 0, x
         sta (stackptr), y
         inx
-        cpy #4
+        iny
+        cpy #STACKVALUE_SIZE
     zuntil_eq
     rts
 zendproc
 
 zproc pop_i2
-    ldx #i2
-    jsr pop_ix
-    sta v2
-    rts
+    ldx #v2
+    bne pop_ix              ; always taken
 zendproc
 
 zproc pop_i1
-    ldx #i1
-    jsr pop_ix
-    sta v1
-    rts
+    ldx #v1
+    bne pop_ix              ; always taken
 zendproc
 
 zproc pop_i0
-    ldx #i0
-    jsr pop_ix
-    sta v0
-    rts
+    ldx #v0
+    bne pop_ix              ; always taken
 zendproc
 
-    ; Returns A=object type
+; On entry:
+;   x = address of v register
 zproc pop_ix
-    ldy #4
+    ldy #STACKVALUE_SIZE-1
     zrepeat
         lda (stackptr), y
-        sta +3, x
+        sta +(STACKVALUE_SIZE-1), x
         dex
         dey
-    zuntil_eq
-
-    lda (stackptr), y       ; type field, at y=0
-    pha
+    zuntil_mi
 
     lda #STACKVALUE_SIZE
-    jsr retract_stack
-
-    pla
-    rts
+    jmp retract_stack
 zendproc
 
 ; Peeks a value from the stack and then pushes it.
@@ -1390,20 +1368,14 @@ zproc peek
     pla
     tay
 
-    lda (stackptr), y
-    sta v0
-    iny
-    lda (stackptr), y
-    sta i0+0
-    iny
-    lda (stackptr), y
-    sta i0+1
-    iny
-    lda (stackptr), y
-    sta i0+2
-    iny
-    lda (stackptr), y
-    sta i0+3
+    ldx #0
+    zrepeat
+        lda (stackptr), y
+        sta v0, x
+        iny
+        inx
+        cpx #STACKVALUE_SIZE
+    zuntil_eq
     rts
 zendproc
 
@@ -1412,8 +1384,7 @@ zproc pop_and_deref_i1
 zendproc
     ; falls through
 zproc deref_i1
-    ldx #i1
-    ldy #v1
+    ldx #v1
     jmp deref_ix
 zendproc
 
@@ -1422,8 +1393,7 @@ zproc pop_and_deref_i2
 zendproc
     ; falls through
 zproc deref_i2
-    ldx #i2
-    ldy #v2
+    ldx #v2
     jmp deref_ix
 zendproc
 
@@ -1432,24 +1402,19 @@ zproc pop_and_deref_i0
 zendproc
     ; falls through
 zproc deref_i0
-    ldx #i0
-    ldy #v0
+    ldx #v0
 zendproc
     ; falls through
 
 ; On entry:
-;   X - address of i register
-;   Y - address of type byte
+;   X - address of v register
 zproc deref_ix
-    lda 0, y
+    lda STACKVALUE_TYPE, x
     cmp #OTYPE_VAR      ; is the object a variable reference?
     zif_eq
-        tya
-        pha
-
-        lda 0, x            ; object ID -> p1
+        lda STACKVALUE_DATA+0, x ; object ID -> p1
         sta p1+0
-        lda 1, x
+        lda STACKVALUE_DATA+1, x
         sta p1+1
 
         txa
@@ -1470,21 +1435,14 @@ zproc deref_ix
 
         ; Copy the value to register.
 
-        ldy #OBJECT_DATA
+        ldy #OBJECT_TYPE
         zrepeat
             lda (p0), y         ; get byte from object
             sta 0, x            ; write to register
             inx
             iny
-            cpy #OBJECT_DATA+4
+            cpy #OBJECT_DATA+5
         zuntil_eq
-
-        ; Write the type byte.
-
-        pla
-        tax
-        lda (p0), y
-        sta 0, x
     zendif
     rts
 zendproc
@@ -1769,7 +1727,7 @@ zendproc
 
 zproc adjust_line_range
     ; end line in i0
-    jsr i0_to_i2        ; end line in i2
+    copystruct STACKVALUE_SIZE, i0, i2 ; end line in i2
     jsr pop_i0          ; start line in i0
 
     ; Turn list 0, 0 to list 0, 0xffff
@@ -2339,38 +2297,6 @@ zendproc
 
 ; --- Maths -----------------------------------------------------------------
 
-zproc i0_to_i2
-    lda v0
-    sta v2
-
-    ldx #i0
-    ldy #i2
-    bne i_to_i      ; always taken
-zendproc
-
-zproc i1_to_i0
-    lda v1
-    sta v0
-
-    ldx #i1
-    ldy #i0
-    bne i_to_i      ; always taken
-zendproc
-
-; Copies four bytes from x to y.
-
-zproc i_to_i
-    lda 0, x
-    sta 0, y
-    lda 1, x
-    sta 1, y
-    lda 2, x
-    sta 2, y
-    lda 3, x
-    sta 3, y
-    rts
-zendproc
-
 ; Computes i1i0 := i0 * i2.
 
 zproc mul4
@@ -2384,11 +2310,14 @@ zproc mul4
     ldy #$21            ; bit counter
 
     zrepeat
-        ldx #8              ; shift right result and lhs
-        zrepeat
-            ror i0-1, x
-            dex
-        zuntil_eq
+        ror i1+3            ; shift right result and lhs
+        ror i1+2
+        ror i1+1
+        ror i1+0
+        ror i0+3
+        ror i0+2
+        ror i0+1
+        ror i0+0
         zif_cs
             ldx #-4 & 0xff      ; add rhs to low half of result
             clc
@@ -2417,12 +2346,14 @@ zproc divu4
 
     ldy #32             ; bit counter
     zrepeat
-        ldx #-8 & 0xff      ; left shift result and remainder
-        clc
-        zrepeat
-            rol i0+8, x
-            inx
-        zuntil_eq
+        asl i0+0            ; left shift result and remainder
+        rol i0+1
+        rol i0+2
+        rol i0+3
+        rol i1+0
+        rol i1+1
+        rol i1+2
+        rol i1+3
 
         sec                 ; if remainder < rhs
         ldx #-4 & 0xff
