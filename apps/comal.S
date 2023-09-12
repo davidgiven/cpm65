@@ -38,6 +38,15 @@ OTYPE_STRINGLIT = 4
 
 HASH_SLOTS      = 16
 
+; Atom structure:
+;  0..1 - object size
+;  2    - object type
+;  3    - atom type (OTYPE)
+;  4... - text
+
+ATOM_TYPE       = OBJECT_DATA + 0
+ATOM_DATA       = OBJECT_DATA + 1
+
 ; Hash node structure:
 ;  0..1 - object size
 ;  2    - object type
@@ -1229,6 +1238,21 @@ zendproc
 zproc exec_assign
     jsr deref_i0            ; value to assign
     jsr pop_i1              ; lvalue (variable reference)
+
+    ; Check type of variable.
+
+    lda i1+0                ; object ID -> p0
+    sta p0+0
+    lda i1+1
+    sta p0+1
+    jsr deref_object
+
+    ldy #ATOM_TYPE
+    lda (p0), y             ; get the atom type
+    cmp v0
+    zif_ne
+        jmp error_invalid_parameter
+    zendif
 
     ; Find the hash node.
 
@@ -2831,7 +2855,7 @@ zproc get_atom
             zif_eq
                 ; Compare the text.
 
-                ldy #OBJECT_DATA
+                ldy #ATOM_DATA
                 ldx bufferpos
                 zloop
                     lda (p0), y
@@ -2863,9 +2887,9 @@ zproc get_atom
 
     sec
     lda bufferend
-    sbc bufferpos           ; get length of atom
+    sbc bufferpos           ; get length of atom text
     clc
-    adc #OBJECT_DATA        ; add on the header
+    adc #ATOM_DATA          ; add on the header
 
     sta p1+0
     lda #0
@@ -2876,7 +2900,7 @@ zproc get_atom
 
     ; Copy the word into the heap object.
 
-    ldy #OBJECT_DATA-1      ; -1 to compensate for predecrement later
+    ldy #ATOM_DATA-1        ; -1 to compensate for predecrement later
     ldx bufferpos
     zrepeat
         iny
@@ -2890,6 +2914,12 @@ zproc get_atom
 
     lda #0x80
     ora (p0), y
+    sta (p0), y
+
+    ; Set the atom data type.
+
+    ldy #ATOM_TYPE
+    lda #OTYPE_INTEGER
     sta (p0), y
 
     ; Return the ID in p1.
@@ -3771,6 +3801,15 @@ zproc parser_fetch_word
             lda text_buffer, x
             jsr is_subsequent_letter_of_word
         zuntil_cc
+
+        lda text_buffer, x
+        cmp #'#'
+        beq 1f
+        cmp #'$'
+        zif_eq
+        1:
+            inc bufferend
+        zendif
     zendif
 
     lda bufferpos
