@@ -1157,6 +1157,7 @@ zendproc
 ; Converts TOS to -1, 0, 1
 zproc exec_sgn
     jsr deref_i0
+    jsr check_i0_is_integer
     lda i0+3                ; check top byte
     bmi set_i0_to_mone
 
@@ -1261,6 +1262,7 @@ zendproc
 zproc exec_add
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
+    jsr coerce_i0_and_i1_to_numeric
 
     ldx #-4 & 0xff
     clc
@@ -1277,6 +1279,7 @@ zendproc
 zproc exec_sub
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
+    jsr coerce_i0_and_i1_to_numeric
 
     ldx #-4 & 0xff
     sec
@@ -1290,8 +1293,19 @@ zproc exec_sub
     rts
 zendproc
 
+zproc exec_not
+    jsr exec_sgn
+
+    lda i0+0
+    zif_eq
+        jmp set_i0_to_one
+    zendif
+    jmp set_i0_to_zero
+zendproc
+
 zproc exec_neg
     jsr deref_i0
+    jsr check_i0_is_integer
 
     ldx #-4 & 0xff
     sec
@@ -1305,27 +1319,10 @@ zproc exec_neg
     rts
 zendproc
 
-zproc exec_not
-    jsr deref_i0
-
-    ldx #1
-    jsr test_i0_for_truth
-    zif_ne
-        dex
-    zendif
-
-    stx i0+0
-    lda #0
-    sta i0+1
-    sta i0+2
-    sta i0+3
-
-    rts
-zendproc
-
 zproc exec_mul
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i2 ; LHS
+    jsr coerce_i0_and_i2_to_numeric
 
     jmp mul4
 zendproc
@@ -1334,6 +1331,7 @@ zproc exec_div
     jsr deref_i0        ; RHS
     copystruct STACKVALUE_SIZE, i0, i2
     jsr pop_and_deref_i0 ; LHS
+    jsr coerce_i0_and_i2_to_numeric
 
     jmp divs4
 zendproc
@@ -1342,6 +1340,7 @@ zproc exec_mod
     jsr deref_i0        ; RHS
     copystruct STACKVALUE_SIZE, i0, i2
     jsr pop_and_deref_i0 ; LHS
+    jsr coerce_i0_and_i2_to_numeric
 
     jsr divs4
     copystruct STACKVALUE_SIZE, i1, i0
@@ -1350,14 +1349,6 @@ zendproc
 
 zproc exec_bad
     brk
-zendproc
-
-zproc test_i0_for_truth
-    lda i0+0
-    ora i0+1
-    ora i0+2
-    ora i0+3
-    rts
 zendproc
 
 zproc push_i2
@@ -1528,6 +1519,29 @@ zproc retract_stack
     sta stackptr+0
     zif_cs
         inc stackptr+1
+    zendif
+    rts
+zendproc
+
+zproc coerce_i0_and_i1_to_numeric
+    lda v0
+    cmp v1
+    beq check_i0_is_integer
+    jmp error_invalid_parameter
+zendproc
+
+zproc coerce_i0_and_i2_to_numeric
+    lda v0
+    cmp v2
+    beq check_i0_is_integer
+    jmp error_invalid_parameter
+zendproc
+
+zproc check_i0_is_integer
+    lda v0
+    cmp #OTYPE_INTEGER
+    zif_ne
+        jmp error_invalid_parameter
     zendif
     rts
 zendproc
