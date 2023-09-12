@@ -909,7 +909,26 @@ zendproc
 
 zproc exec_print
     jsr deref_i0
-    jsr buffer_print_i0
+
+    lda v0
+    cmp #OTYPE_INTEGER
+    zif_eq
+        jsr buffer_print_i0
+    zelse
+        cmp #OTYPE_STRINGLIT
+        zif_eq
+            ldy i0+2            ; offset
+            zrepeat
+                lda (i0+0), y
+                jsr buffer_print_char
+                iny
+                dec i0+3
+            zuntil_eq
+        zelse
+            jmp error_invalid_parameter
+        zendif
+    zendif
+
     jsr pop_i0
     jmp print_buffer
 zendproc
@@ -1194,14 +1213,6 @@ zproc exec_string
     lda execlineptr+1
     adc #0
     sta i0+1
-
-    clc
-    lda i0+0
-    adc #2
-    sta i0+0
-    zif_cs
-        inc i0+1
-    zendif
 
     lda #2
     sta i0+2
