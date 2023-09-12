@@ -34,6 +34,7 @@ OTYPE_FREE      = 0
 OTYPE_ATOM      = 1
 OTYPE_INTEGER   = 2
 OTYPE_VAR       = 3
+OTYPE_STRINGLIT = 4
 
 HASH_SLOTS      = 16
 
@@ -55,6 +56,12 @@ HASHNODE_SIZE   = 0xb
 STACKVALUE_TYPE = 0
 STACKVALUE_DATA = 1
 STACKVALUE_SIZE = 5
+
+; String stack value structure:
+
+STACKVALUE_STRING_ID     = STACKVALUE_DATA + 0
+STACKVALUE_STRING_OFFSET = STACKVALUE_DATA + 2
+STACKVALUE_STRING_LENGTH = STACKVALUE_DATA + 3
 
 ; Program storage: a flat list of lines, each of which looks like:
 ;   0    - line size
@@ -178,6 +185,7 @@ TOKEN_ELSE      = 0x25
 TOKEN_ENDIF     = 0x26
 TOKEN_ELIF      = 0x27
 TOKEN_ELIFGOTO  = 0x28
+TOKEN_STRING    = 0x29
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -197,6 +205,7 @@ P_NUMBER_OP      = 14
 P_EOL_OP         = 15
 P_PAREN_OP       = 16
 P_SUCCEED_OP     = 17
+P_STRING_OP      = 18
 
 .set tokenvalue, 0
 
@@ -302,6 +311,7 @@ deftok TOKEN_ELSE,      0, 4, 0, 0, lister_simple,   keyword_else,     exec_goto
 deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_endloop,  keyword_endif,    exec_nop,       check_endif
 deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if,        check_elif
 deftok TOKEN_ELIFGOTO,  0, 4, 0, 0, lister_nop,      lister_bad,       exec_goto,      check_elifgoto
+deftok TOKEN_STRING,   15, 0, 0, 1, lister_string,   lister_bad,       exec_string,    check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -321,6 +331,7 @@ defpop pop_number
 defpop pop_eol
 defpop pop_paren
 defpop pop_succeed
+defpop pop_string
 
 OBJECT_TABLE_SIZE = 256
 
@@ -788,6 +799,15 @@ zproc goto_next_instruction
     tax
     lda token_size_table, x
     and #0x0f
+    zif_eq
+        ; If the token size is zero, the real size is in the bytecode
+        ; (and doesn't include the opcode and size bytes!).
+
+        iny
+        lda (execlineptr), y
+        clc
+        adc #2
+    zendif
     clc
     adc execbyteptr
     sta execbyteptr
@@ -1157,6 +1177,39 @@ zproc push_value_from_bytecode
         inx
         cpx p0+0
     zuntil_eq
+
+    rts
+zendproc
+
+zproc exec_string
+    jsr push_i0
+
+    lda #OTYPE_STRINGLIT
+    sta v0
+
+    clc
+    lda execlineptr+0
+    adc execbyteptr
+    sta i0+0
+    lda execlineptr+1
+    adc #0
+    sta i0+1
+
+    clc
+    lda i0+0
+    adc #2
+    sta i0+0
+    zif_cs
+        inc i0+1
+    zendif
+
+    lda #2
+    sta i0+2
+
+    ldy execbyteptr
+    iny
+    lda (execlineptr), y
+    sta i0+3
 
     rts
 zendproc
@@ -2828,7 +2881,6 @@ zendproc
 
 zproc list_line
     ldx execbyteptr
-    stx bytecodeptr
     ldx #0
     stx opstackptr
     stx listerflags
@@ -2838,18 +2890,18 @@ zproc list_line
     zloop
         ; Create the first byte of the tree node.
 
-        ldy bytecodeptr
+        ldy execbyteptr
         lda (execlineptr), y            ; read opcode
         zbreakif_eq                     ; TOKEN_EOL
         ldy opstackptr
         sty listerroot
-        lda bytecodeptr
+        lda execbyteptr
         sta operator_stack, y
         inc opstackptr
 
         ; Pop consumed stack items.
 
-        ldy bytecodeptr
+        ldy execbyteptr
         lda (execlineptr), y            ; read opcode
         tax
         lda token_size_table, x
@@ -2872,7 +2924,7 @@ zproc list_line
         
         ; Push produced stack items.
 
-        ldy bytecodeptr
+        ldy execbyteptr
         lda (execlineptr), y            ; read opcode
         tay
         lda token_size_table, y
@@ -2907,14 +2959,7 @@ zproc list_line
 
         ; Move to next bytecode.
 
-        ldy bytecodeptr
-        lda (execlineptr), y            ; read opcode
-        tay
-        lda token_size_table, y
-        and #0b00001111
-        clc
-        adc bytecodeptr
-        sta bytecodeptr
+        jsr goto_next_instruction
     zendloop
     
     ; Assert that the stack is empty.
@@ -3132,6 +3177,28 @@ zproc lister_integer
     jmp buffer_print_i0
 zendproc
 
+zproc lister_string
+    lda operator_stack, x       ; get bytecode address
+    tay
+    iny
+    lda (execlineptr), y        ; get the string length
+    sta p0+0
+
+    lda #'"'
+    jsr buffer_print_char
+
+    iny
+    zrepeat
+        lda (execlineptr), y
+        jsr buffer_print_char
+        iny
+        dec p0+0
+    zuntil_eq
+
+    lda #'"'
+    jmp buffer_print_char
+zendproc
+    
 zproc lister_assign
     bit listerflags
     zif_mi
@@ -3915,6 +3982,54 @@ zproc pop_number
     jmp pop_fail
 zendproc
 
+zproc pop_string
+    jsr parser_skip_whitespace
+    
+    ; Check for the leading double quote.
+
+    ldx bufferpos
+    lda text_buffer, x
+    cmp #'"'
+    bne 1b              ; fail
+
+    ; Find the bounds of the string in the text buffer.
+
+    zrepeat
+        inx
+        lda text_buffer, x
+        zif_eq
+            jmp pop_panic
+        zendif
+        cmp #'"'
+    zuntil_eq
+    stx bufferend
+    
+    ; Emit the bytecode.
+
+    lda #TOKEN_STRING
+    jsr queue_bytecode
+
+    inc bufferpos
+    lda bufferend
+    sec
+    sbc bufferpos
+    jsr queue_bytecode
+    
+    zloop
+        ldx bufferpos
+        cpx bufferend
+        zbreakif_eq
+
+        lda text_buffer, x
+        jsr queue_bytecode
+
+        inc bufferpos
+    zendloop
+
+    inc bufferpos               ; skip over trailing double quota
+    jmp parse_next_1
+zendproc
+
 .macro P_TRY rule
     .byte P_TRY_OP
     .word \rule
@@ -3989,6 +4104,10 @@ zendproc
 
 .macro P_PAREN
     .byte P_PAREN_OP
+.endm
+
+.macro P_STRING
+    .byte P_STRING_OP
 .endm
 
 immediate_statement_rule:
@@ -4422,6 +4541,7 @@ leaf_rule:
     P_TRY varref_rvalue_rule
     P_TRY number_rvalue_rule
     P_TRY negate_rvalue_rule
+    P_TRY string_rvalue_rule
     P_FAIL
 
 parenthesised_rvalue_rule:
@@ -4439,6 +4559,10 @@ varref_rvalue_rule:
 
 number_rvalue_rule:
     P_NUMBER
+    P_RETURN
+
+string_rvalue_rule:
+    P_STRING
     P_RETURN
 
 negate_rvalue_rule:
