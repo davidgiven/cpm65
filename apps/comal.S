@@ -30,12 +30,13 @@ OBJECT_SIZE     = 0
 OBJECT_TYPE     = 2
 OBJECT_DATA     = 3
 
-OTYPE_FREE      = 0
-OTYPE_ATOM      = 1
-OTYPE_INTEGER   = 2
-OTYPE_VAR       = 3
-OTYPE_STRINGLIT = 4
-OTYPE_STRING    = 5
+OTYPE_FREE       = 0
+OTYPE_ATOM       = 1
+OTYPE_INTEGER    = 2
+OTYPE_VAR        = 3
+OTYPE_STRINGLIT  = 4
+OTYPE_STRING     = 5
+OTYPE_STRINGDATA = 6
 
 HASH_SLOTS      = 16
 
@@ -62,11 +63,9 @@ HASHNODE_SIZE   = 0xb
 ; String structure:
 ;  0..1 - object size
 ;  2    - object type
-;  3    - reference count
-;  4... - string data
+;  3... - string data
 
-STRING_REFCOUNT = OBJECT_DATA + 0
-STRING_DATA     = OBJECT_DATA + 1
+STRING_DATA     = OBJECT_DATA + 0
 
 ; Stack value structure:
 ;  0    - object type
@@ -205,6 +204,7 @@ TOKEN_ENDIF     = 0x26
 TOKEN_ELIF      = 0x27
 TOKEN_ELIFGOTO  = 0x28
 TOKEN_STRING    = 0x29
+TOKEN_FREE      = 0x2a
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -331,6 +331,7 @@ deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_endloop,  keyword_endif,    exec_nop,
 deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if,        check_elif
 deftok TOKEN_ELIFGOTO,  0, 4, 0, 0, lister_nop,      lister_bad,       exec_goto,      check_elifgoto
 deftok TOKEN_STRING,   15, 0, 0, 1, lister_string,   lister_bad,       exec_string,    check_nop
+deftok TOKEN_FREE,     15, 1, 0, 1, lister_simple,   keyword_free,     exec_free,      check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1259,6 +1260,26 @@ zproc exec_string
     rts
 zendproc
 
+zproc exec_free
+    jsr push_i0
+    jsr collect_garbage
+
+    sec
+    lda stackptr+0
+    sbc heapptr+0
+    sta i0+0
+    lda stackptr+1
+    sbc heapptr+1
+    sta i0+1
+    lda #0
+    sta i0+2
+    sta i0+3
+
+    lda #OTYPE_INTEGER
+    sta v0
+    rts
+zendproc
+
 zproc exec_assign
     jsr deref_i0            ; value to assign
     jsr pop_i1              ; lvalue (variable reference)
@@ -1313,11 +1334,6 @@ zproc exec_assign
         iny
         inx
     zuntil_eq
-
-    ldx #v0
-    jsr raise_ref_count
-    ldx #v2
-    jsr lower_ref_count
 
     ; Copy value into node.
 
@@ -1446,8 +1462,6 @@ zproc push_ix
     lda #STACKVALUE_SIZE
     jsr extend_stack
 
-    jsr raise_ref_count
-
     ldy #STACKVALUE_TYPE
     zrepeat
         lda 0, x
@@ -1477,8 +1491,6 @@ zendproc
 ; On entry:
 ;   x = address of v register
 zproc pop_ix
-    jsr lower_ref_count
-        
     ldy #STACKVALUE_SIZE-1
     zrepeat
         lda (stackptr), y
@@ -1510,9 +1522,6 @@ zproc peek
         inx
         cpx #STACKVALUE_SIZE
     zuntil_eq
-
-    ldx #v0
-    jsr raise_ref_count
     rts
 zendproc
 
@@ -1584,88 +1593,6 @@ zproc deref_ix
             iny
             cpy #OBJECT_DATA+5
         zuntil_eq
-
-        pla
-        tax
-        jsr raise_ref_count
-    zendif
-    rts
-zendproc
-
-; On entry:
-;   X - points at v register
-; On exit:
-;   X - preserved
-;   Y - corrupted
-
-zproc raise_ref_count
-    lda STACKVALUE_SIZE, x
-    cmp #OTYPE_STRING
-    zif_eq
-        txa
-        pha
-
-        lda STACKVALUE_STRING_ID+0, x
-        sta p0+0
-        lda STACKVALUE_STRING_ID+1, x
-        sta p0+1
-        jsr deref_object
-
-        ldy #STRING_REFCOUNT
-        lda (p0), y
-        clc
-        adc #1
-        sta (p0), y
-        
-        ; If zero, the reference count has overflowed.  We treat these as
-        ; having an infinite lifetime (leaking the memory).
-
-        pla
-        tax
-    zendif
-    rts
-zendproc
-
-; On entry:
-;   X - points at v register
-
-zproc lower_ref_count
-    lda STACKVALUE_TYPE, x
-    cmp #OTYPE_STRING
-    zif_eq
-        txa
-        pha
-
-        lda STACKVALUE_STRING_ID+0, x
-        sta p0+0
-        lda STACKVALUE_STRING_ID+1, x
-        sta p0+1
-        ldx #p0
-        jsr deref_object
-
-        ldy #STRING_REFCOUNT
-        lda (p0), y
-        zif_ne                  ; reference of zero means infinite lifetime
-            sec
-            sbc #1
-            sta (p0), y
-            
-            zif_eq                  ; reference count dropped to 0!
-                pla
-                pha
-                tax
-
-                lda #OTYPE_FREE
-                sta STACKVALUE_TYPE, x
-
-                lda STACKVALUE_STRING_ID+0, x
-                sta p0+0
-                lda STACKVALUE_STRING_ID+1, x
-                sta p0+1
-
-                jsr heap_free
-            zendif
-        zendif
 
         pla
         tax
@@ -2984,6 +2911,7 @@ zendproc
 ; Frees an object whose ID is in p0.
 
 zproc heap_free
+    ldx #p0
     jsr find_object_slot
 
     ; Read and clear the value in the object slot.
@@ -3171,7 +3099,7 @@ zproc materialise_string
     sta p1+0
     lda #0
     sta p1+1
-    lda #OTYPE_STRING
+    lda #OTYPE_STRINGDATA
     jsr heap_alloc              ; pointer in p0, ID in p1
 
     pla
@@ -3179,14 +3107,10 @@ zproc materialise_string
 
     ; Initialise it.
 
-    lda #1
-    ldy #STRING_REFCOUNT
-    sta (p0), y
-    
+    ; Copy the string data.
+
     ldy #p2
     jsr get_string_pointer      ; old data in p2
-
-    ; Copy the string data.
 
     clc                         ; get absolute pointer to source data
     lda p2+0
@@ -3222,6 +3146,169 @@ zproc materialise_string
     sta STACKVALUE_STRING_ID+1, x
     lda #STRING_DATA
     sta STACKVALUE_STRING_OFFSET, x
+    rts
+zendproc
+
+; --- Garbage collector -----------------------------------------------------
+
+zproc deref_p0
+    ldy #0
+    lda (p0), y
+    tax
+    iny
+    lda (p0), y
+    stx p0+0
+    sta p0+1
+    rts
+zendproc
+
+zproc collect_garbage
+    ; Clear phase: mark all strings as being unused.
+
+    jsr find_first_object
+    zrepeat
+        zif_ne
+            jsr deref_p0
+
+            ldy #0
+            lda (p0), y
+
+            ldy #OBJECT_TYPE
+            lda (p0), y
+            cmp #OTYPE_STRINGDATA
+            zif_eq
+                ora #0x80
+                sta (p0), y
+            zendif
+        zendif
+
+        jsr find_next_object
+    zuntil_cs
+
+    ; Mark phase 1: walk all variables and mark their string data as being
+    ; used.
+
+    jsr find_first_object
+    zrepeat
+        zif_ne
+            jsr deref_p0
+
+            clc
+            lda p0+0
+            adc #OBJECT_TYPE
+            sta p0+0
+            zif_cs
+                inc p0+1
+            zendif
+
+            jsr mark_stackvalue_as_used
+        zendif
+
+        jsr find_next_object
+    zuntil_cs
+
+    ; Mark phase 2: walk the stack and mark any temporary strings as being
+    ; used.
+
+    lda stackptr+0
+    sta p1+0
+    lda stackptr+1
+    sta p1+1
+    zloop
+        lda p1+0
+        cmp progbase+0
+        zif_eq
+            lda p1+1
+            cmp progbase+1
+            zbreakif_eq
+        zendif
+
+        lda p1+0
+        sta p0+0
+        lda p1+1
+        sta p0+1
+        jsr mark_stackvalue_as_used
+
+        clc
+        lda p1+0
+        adc #STACKVALUE_SIZE
+        sta p1+0
+        zif_cs
+            inc p1+1
+        zendif
+    zendloop
+
+    ; Mark phase 3: mark any temporary strings in the three registers as being
+    ; used.
+
+    lda #v0
+    sta p1+0
+    zrepeat
+        lda p1+0
+        sta p0+0
+        lda #0
+        sta p0+1
+        jsr mark_stackvalue_as_used
+
+        clc
+        lda p1+0
+        adc #STACKVALUE_SIZE
+        sta p1+0
+        cmp #v2+STACKVALUE_SIZE
+    zuntil_eq
+
+    ; Sweep phase: free up any unused strings.
+
+    jsr find_first_object
+    zrepeat
+        zif_ne
+            jsr deref_p0
+
+            ldy #OBJECT_TYPE
+            lda (p0), y
+            zif_mi
+                lda p1+0
+                sta p0+0
+                lda p1+1
+                sta p0+1
+                jsr heap_free
+            zendif
+        zendif
+
+        jsr find_next_object
+    zuntil_cs
+
+    ; Do heap compaction here!
+
+    rts
+zendproc
+
+; p0 points at a stack value; if it's a string, mark the
+; string data as used.
+
+zproc mark_stackvalue_as_used
+    ldy #STACKVALUE_TYPE
+    lda (p0), y
+    cmp #OTYPE_STRING
+    zif_eq
+        ; Copy the string ID into p0.
+
+        ldy #STACKVALUE_STRING_ID
+        lda (p0), y
+        tax
+        iny
+        lda (p0), y
+        stx p0+0
+        sta p0+1
+
+        ldx #p0
+        jsr deref_object
+
+        ldy #OBJECT_TYPE
+        lda (p0), y
+        and #0x7f
+        sta (p0), y
+    zendif
     rts
 zendproc
 
@@ -4901,6 +4988,7 @@ leaf_rule:
     P_TRY parenthesised_rvalue_rule
     P_TRY not_rvalue_rule
     P_TRY sgn_rvalue_rule
+    P_TRY free_rvalue_rule
     P_TRY varref_rvalue_rule
     P_TRY number_rvalue_rule
     P_TRY negate_rvalue_rule
@@ -4948,6 +5036,13 @@ keyword_sgn = . + 1
     P_COMMIT
     P_SHUNT TOKEN_SGN
     P_JMP leaf_rule
+
+free_rvalue_rule:
+keyword_free = . + 1
+    P_TOKEN 'F', 'R', 'E', 'E'|0x80
+    P_COMMIT
+    P_EMIT TOKEN_FREE
+    P_RETURN
 
 keyword_zero:
     .byte '0'|0x80
