@@ -35,6 +35,7 @@ OTYPE_ATOM      = 1
 OTYPE_INTEGER   = 2
 OTYPE_VAR       = 3
 OTYPE_STRINGLIT = 4
+OTYPE_STRING    = 5
 
 HASH_SLOTS      = 16
 
@@ -57,6 +58,15 @@ ATOM_DATA       = OBJECT_DATA + 1
 HASHNODE_KEY    = 7
 HASHNODE_NEXT   = 9
 HASHNODE_SIZE   = 0xb
+
+; String structure:
+;  0..1 - object size
+;  2    - object type
+;  3    - reference count
+;  4... - string data
+
+STRING_REFCOUNT = OBJECT_DATA + 0
+STRING_DATA     = OBJECT_DATA + 1
 
 ; Stack value structure:
 ;  0    - object type
@@ -455,6 +465,11 @@ zproc clear
     lda #0
     tay
     sta (progbase), y
+
+    lda #OTYPE_FREE
+    sta v0
+    sta v1
+    sta v2
 
     rts
 zendproc
@@ -925,21 +940,30 @@ zproc exec_print
         jsr buffer_print_i0
     zelse
         cmp #OTYPE_STRINGLIT
-        zif_eq
-            ldy i0+2            ; offset
-            zrepeat
-                lda (i0+0), y
-                jsr buffer_print_char
-                iny
-                dec i0+3
-            zuntil_eq
-        zelse
-            jmp error_invalid_parameter
-        zendif
+        beq exec_print_string
+        cmp #OTYPE_STRING
+        beq exec_print_string
+        jmp error_invalid_parameter
     zendif
 
+1:
     jsr pop_i0
     jmp print_buffer
+zendproc
+
+zproc exec_print_string
+    ldx #v0
+    ldy #p0
+    jsr get_string_pointer
+
+    ldy v0+STACKVALUE_STRING_OFFSET
+    zrepeat
+        lda (p0), y
+        jsr buffer_print_char
+        iny
+        dec v0+STACKVALUE_STRING_LENGTH
+    zuntil_eq
+    bne 1b
 zendproc
 
 zproc exec_printnl
@@ -1239,12 +1263,22 @@ zproc exec_assign
     jsr deref_i0            ; value to assign
     jsr pop_i1              ; lvalue (variable reference)
 
+    ; Does the rvalue need any kind of promotion?
+
+    lda v0
+    cmp #OTYPE_STRINGLIT
+    zif_eq
+        ldx #v0
+        jsr materialise_string
+    zendif
+
     ; Check type of variable.
 
     lda i1+0                ; object ID -> p0
     sta p0+0
     lda i1+1
     sta p0+1
+    ldx #p0
     jsr deref_object
 
     ldy #ATOM_TYPE
@@ -1267,6 +1301,23 @@ zproc exec_assign
     sta p0+1
 
     jsr hash_deref          ; return ptr to node in p0
+
+    ; Copy the old value into p2 so we can lower the reference count.
+
+    ldx #-5 & 0xff
+    ldy #OBJECT_TYPE
+    clc
+    zrepeat
+        lda (p0), y
+        sta v2+5, x
+        iny
+        inx
+    zuntil_eq
+
+    ldx #v0
+    jsr raise_ref_count
+    ldx #v2
+    jsr lower_ref_count
 
     ; Copy value into node.
 
@@ -1395,6 +1446,8 @@ zproc push_ix
     lda #STACKVALUE_SIZE
     jsr extend_stack
 
+    jsr raise_ref_count
+
     ldy #STACKVALUE_TYPE
     zrepeat
         lda 0, x
@@ -1424,6 +1477,8 @@ zendproc
 ; On entry:
 ;   x = address of v register
 zproc pop_ix
+    jsr lower_ref_count
+        
     ldy #STACKVALUE_SIZE-1
     zrepeat
         lda (stackptr), y
@@ -1455,6 +1510,9 @@ zproc peek
         inx
         cpx #STACKVALUE_SIZE
     zuntil_eq
+
+    ldx #v0
+    jsr raise_ref_count
     rts
 zendproc
 
@@ -1491,6 +1549,9 @@ zproc deref_ix
     lda STACKVALUE_TYPE, x
     cmp #OTYPE_VAR      ; is the object a variable reference?
     zif_eq
+        ; Don't need to lower the reference count here because we know that the
+        ; object is not a string (it's a variable reference).
+
         lda STACKVALUE_DATA+0, x ; object ID -> p1
         sta p1+0
         lda STACKVALUE_DATA+1, x
@@ -1510,6 +1571,7 @@ zproc deref_ix
         zendif
 
         pla
+        pha
         tax
 
         ; Copy the value to register.
@@ -1522,6 +1584,91 @@ zproc deref_ix
             iny
             cpy #OBJECT_DATA+5
         zuntil_eq
+
+        pla
+        tax
+        jsr raise_ref_count
+    zendif
+    rts
+zendproc
+
+; On entry:
+;   X - points at v register
+; On exit:
+;   X - preserved
+;   Y - corrupted
+
+zproc raise_ref_count
+    lda STACKVALUE_SIZE, x
+    cmp #OTYPE_STRING
+    zif_eq
+        txa
+        pha
+
+        lda STACKVALUE_STRING_ID+0, x
+        sta p0+0
+        lda STACKVALUE_STRING_ID+1, x
+        sta p0+1
+        jsr deref_object
+
+        ldy #STRING_REFCOUNT
+        lda (p0), y
+        clc
+        adc #1
+        sta (p0), y
+        
+        ; If zero, the reference count has overflowed.  We treat these as
+        ; having an infinite lifetime (leaking the memory).
+
+        pla
+        tax
+    zendif
+    rts
+zendproc
+
+; On entry:
+;   X - points at v register
+
+zproc lower_ref_count
+    lda STACKVALUE_TYPE, x
+    cmp #OTYPE_STRING
+    zif_eq
+        txa
+        pha
+
+        lda STACKVALUE_STRING_ID+0, x
+        sta p0+0
+        lda STACKVALUE_STRING_ID+1, x
+        sta p0+1
+        ldx #p0
+        jsr deref_object
+
+        ldy #STRING_REFCOUNT
+        lda (p0), y
+        zif_ne                  ; reference of zero means infinite lifetime
+            sec
+            sbc #1
+            sta (p0), y
+            
+            zif_eq                  ; reference count dropped to 0!
+                pla
+                pha
+                tax
+
+                lda #OTYPE_FREE
+                sta STACKVALUE_TYPE, x
+
+                lda STACKVALUE_STRING_ID+0, x
+                sta p0+0
+                lda STACKVALUE_STRING_ID+1, x
+                sta p0+1
+
+                jsr heap_free
+            zendif
+        zendif
+
+        pla
+        tax
     zendif
     rts
 zendproc
@@ -2586,6 +2733,7 @@ zproc hash_deref_ro
         sta p0+0
         lda p2+1
         sta p0+1
+        ldx #p0
         jsr deref_object
         
         ; Is this the node we're looking for?
@@ -2686,43 +2834,46 @@ zendproc
 
 ; --- Objects and atoms -----------------------------------------------------
 
-; Given an object ID in p0, returns in p0 the address in the object table of
-; the slot.
+; Given an object ID in (0, x), returns in (0, x) the address in the object
+; table of the slot.
 
 zproc find_object_slot
     ; p0 = object_table + (p0-1)*2
 
-    lda p0+0
+    lda 0, x
     zif_eq
-        dec p0+1
+        dec 1, x
     zendif
-    dec p0+0
+    dec 0, x
 
-    asl p0+0
-    rol p0+1
+    asl 0, x
+    rol 1, x
 
     lda #<object_table
-    adc p0+0
-    sta p0+0
+    adc 0, x
+    sta 0, x
     lda #>object_table
-    adc p0+1
-    sta p0+1
+    adc 1, x
+    sta 1, x
     rts
 zendproc
 
-; Given an object ID in p0, dereferences it (or produces an error). Returns the
-; pointer to the data in p0.
+; Given an object ID in (0, x), dereferences it (or produces an error). Returns the
+; pointer to the data in (0, x).
 
 zproc deref_object
     jsr find_object_slot
 
-    ldy #0
-    lda (p0), y
-    tax
-    iny
-    lda (p0), y
-    sta p0+1
-    stx p0+0
+    lda (0, x)
+    tay
+    inc 0, x
+    zif_eq
+        inc 1, x
+    zendif
+    lda (0, x)
+
+    sty 0, x
+    sta 1, x
     rts
 zendproc
 
@@ -2757,6 +2908,7 @@ not_eof:
     sta p0+0
     lda p1+1
     sta p0+1
+    ldx #p0
     jsr find_object_slot
 
     ldy #0          ; check if value in slot is 0x0000
@@ -2770,7 +2922,7 @@ zendproc
 ; a pointer to the new object in p0. The first byte of the block must be set
 ; to a valid object type.
 ;
-; On entry, A is the new objec type.
+; On entry, A is the new object type.
 
 zproc heap_alloc
     ; Initialise the object header.
@@ -2826,6 +2978,37 @@ zproc heap_alloc
     zuntil_cs
         
     ; TODO: object table is full, error out
+    rts
+zendproc
+
+; Frees an object whose ID is in p0.
+
+zproc heap_free
+    jsr find_object_slot
+
+    ; Read and clear the value in the object slot.
+
+    ldy #0
+    lda (p0), y
+    pha
+    iny
+    lda (p0), y
+    tax
+    lda #0
+    sta (p0), y
+    dey
+    sta (p0), y
+
+    ; Clear the object type.
+
+    stx p0+1
+    pla
+    sta p0+0
+
+    ldy #OBJECT_TYPE
+    lda #OTYPE_FREE
+    sta (p0), y
+
     rts
 zendproc
 
@@ -2919,11 +3102,126 @@ zproc get_atom
     ; Set the atom data type.
 
     ldy #ATOM_TYPE
-    lda #OTYPE_INTEGER
+    ldx #OTYPE_INTEGER
+    cmp #'$'|0x80
+    zif_eq
+        ldx #OTYPE_STRING
+    zendif
+    txa
     sta (p0), y
 
     ; Return the ID in p1.
 
+    rts
+zendproc
+
+; On entry:
+;   X - address of a V register containing a string value
+;   Y - address of a 16-bit value
+; On exit:
+;   (0, Y) - pointer to string data
+;   X - preserved
+;   Y - preserved
+;   A - length
+
+zproc get_string_pointer
+    lda STACKVALUE_STRING_ID+0, x ; copy ID into p0
+    sta 0, y
+    lda STACKVALUE_STRING_ID+1, x
+    sta 1, y
+
+    lda 0, x
+    cmp #OTYPE_STRING
+    zif_eq
+        ; p0 is the ID of the string data, so it needs to be
+        ; dereferenced.
+
+        txa
+        pha
+
+        tya
+        pha
+        tax
+        jsr deref_object
+
+        pla
+        tay
+        pla
+        tax
+    zendif
+    rts
+zendproc
+
+; Creates a new string heap object containing the supplied string's data.
+; On entry:
+;    X - address of a V register containing a string value
+; On exit:
+;    X - preserved
+
+zproc materialise_string
+    txa
+    pha
+
+    ; Allocate a new string object.
+
+    lda STACKVALUE_STRING_LENGTH, x
+    clc
+    adc #STRING_DATA
+    
+    sta p1+0
+    lda #0
+    sta p1+1
+    lda #OTYPE_STRING
+    jsr heap_alloc              ; pointer in p0, ID in p1
+
+    pla
+    tax
+
+    ; Initialise it.
+
+    lda #1
+    ldy #STRING_REFCOUNT
+    sta (p0), y
+    
+    ldy #p2
+    jsr get_string_pointer      ; old data in p2
+
+    ; Copy the string data.
+
+    clc                         ; get absolute pointer to source data
+    lda p2+0
+    adc STACKVALUE_STRING_OFFSET, x
+    sta p2+0
+    zif_cs
+        inc p2+1
+    zendif
+
+    clc                         ; get absolute pointer to destination
+    lda p0+0
+    adc #STRING_DATA
+    sta p0+0
+    zif_cs
+        inc p0+1
+    zendif
+
+    ldy STACKVALUE_STRING_LENGTH, x
+    zrepeat
+        dey
+        lda (p2), y
+        sta (p0), y
+        tya
+    zuntil_eq
+
+    ; Update the stack object.
+
+    lda #OTYPE_STRING
+    sta STACKVALUE_TYPE, x
+    lda p1+0
+    sta STACKVALUE_STRING_ID+0, x
+    lda p1+1
+    sta STACKVALUE_STRING_ID+1, x
+    lda #STRING_DATA
+    sta STACKVALUE_STRING_OFFSET, x
     rts
 zendproc
 
@@ -3204,6 +3502,7 @@ zproc lister_varref
     iny
     lda (execlineptr), y
     sta p0+1
+    ldx #p0
     jsr deref_object
 
     ldx p0+1
