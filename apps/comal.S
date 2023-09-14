@@ -30,13 +30,13 @@ OBJECT_SIZE     = 0
 OBJECT_TYPE     = 2
 OBJECT_DATA     = 3
 
-OTYPE_FREE       = 0
-OTYPE_ATOM       = 1
-OTYPE_INTEGER    = 2
-OTYPE_VAR        = 3
-OTYPE_STRINGLIT  = 4
-OTYPE_STRING     = 5
-OTYPE_STRINGDATA = 6
+OTYPE_FREE       = 0x00
+OTYPE_ATOM       = 0x01
+OTYPE_INTEGER    = 0x02
+OTYPE_VAR        = 0x03
+OTYPE_STRINGDATA = 0x04
+OTYPE_STRING     = 0x10
+OTYPE_STRINGLIT  = 0x11
 
 HASH_SLOTS      = 16
 
@@ -964,7 +964,7 @@ zproc exec_print_string
         iny
         dec v0+STACKVALUE_STRING_LENGTH
     zuntil_eq
-    bne 1b
+    beq 1b
 zendproc
 
 zproc exec_printnl
@@ -1289,8 +1289,20 @@ zproc exec_assign
     lda v0
     cmp #OTYPE_STRINGLIT
     zif_eq
+        copystruct STACKVALUE_SIZE, v0, v2
+
+        lda v2+STACKVALUE_STRING_LENGTH
         ldx #v0
-        jsr materialise_string
+        jsr create_string
+
+        lda #v2
+        sta p2+0
+        lda #v0
+        sta p2+1
+        lda v2+STACKVALUE_STRING_LENGTH
+        ldx v2+STACKVALUE_STRING_OFFSET
+        ldy v0+STACKVALUE_STRING_OFFSET
+        jsr copy_to_string
     zendif
 
     ; Check type of variable.
@@ -1353,8 +1365,43 @@ zendproc
 zproc exec_add
     jsr deref_i0        ; RHS
     jsr pop_and_deref_i1 ; LHS
-    jsr coerce_i0_and_i1_to_numeric
 
+    lda v0
+    and v1
+    and #OTYPE_STRING       ; check for any string type
+    zif_ne
+        ; We are adding two strings --- do a concatenation.
+
+        clc
+        lda v0+STACKVALUE_STRING_LENGTH
+        adc v1+STACKVALUE_STRING_LENGTH
+        ldx #v2
+        jsr create_string   ; create the new string object
+
+        lda #v1
+        sta p2+0
+        lda #v2
+        sta p2+1
+        lda v1+STACKVALUE_STRING_LENGTH
+        ldx v1+STACKVALUE_STRING_OFFSET
+        ldy v2+STACKVALUE_STRING_OFFSET
+        jsr copy_to_string
+
+        lda #v0
+        sta p2+0
+        clc
+        lda v2+STACKVALUE_STRING_OFFSET
+        adc v1+STACKVALUE_STRING_LENGTH
+        tay
+        lda v0+STACKVALUE_STRING_LENGTH
+        ldx v0+STACKVALUE_STRING_OFFSET
+        jsr copy_to_string
+
+        copystruct STACKVALUE_SIZE, v2, v0
+        rts
+    zendif
+
+    jsr coerce_i0_and_i1_to_numeric
     ldx #-4 & 0xff
     clc
     zrepeat
@@ -1558,9 +1605,6 @@ zproc deref_ix
     lda STACKVALUE_TYPE, x
     cmp #OTYPE_VAR      ; is the object a variable reference?
     zif_eq
-        ; Don't need to lower the reference count here because we know that the
-        ; object is not a string (it's a variable reference).
-
         lda STACKVALUE_DATA+0, x ; object ID -> p1
         sta p1+0
         lda STACKVALUE_DATA+1, x
@@ -1625,21 +1669,21 @@ zproc coerce_i0_and_i1_to_numeric
     lda v0
     cmp v1
     beq check_i0_is_integer
-    jmp error_invalid_parameter
+    jsr error_invalid_parameter
 zendproc
 
 zproc coerce_i0_and_i2_to_numeric
     lda v0
     cmp v2
     beq check_i0_is_integer
-    jmp error_invalid_parameter
+    jsr error_invalid_parameter
 zendproc
 
 zproc check_i0_is_integer
     lda v0
     cmp #OTYPE_INTEGER
     zif_ne
-        jmp error_invalid_parameter
+        jsr error_invalid_parameter
     zendif
     rts
 zendproc
@@ -3080,22 +3124,30 @@ zproc get_string_pointer
     rts
 zendproc
 
-; Creates a new string heap object containing the supplied string's data.
+; Creates a new string heap object of size A. The string is uninitialised (i.e.
+; contains garbage).
 ; On entry:
-;    X - address of a V register containing a string value
+;   A - length of data (not including string header)
+;   X - pointer to v register
 ; On exit:
-;    X - preserved
+;   X - preserved
+;   p0 - pointer to string object
+;   p1 - object ID
+;   (0,x) - stack value
 
-zproc materialise_string
+zproc create_string
+    ; Write the size into the stack value (we're about to reuse that register).
+
+    sta STACKVALUE_STRING_LENGTH, x
+
+    ; Create the heap object.
+
     txa
     pha
-
-    ; Allocate a new string object.
-
-    lda STACKVALUE_STRING_LENGTH, x
-    clc
-    adc #STRING_DATA
     
+    clc
+    lda STACKVALUE_STRING_LENGTH, x
+    adc #STRING_DATA
     sta p1+0
     lda #0
     sta p1+1
@@ -3104,37 +3156,6 @@ zproc materialise_string
 
     pla
     tax
-
-    ; Initialise it.
-
-    ; Copy the string data.
-
-    ldy #p2
-    jsr get_string_pointer      ; old data in p2
-
-    clc                         ; get absolute pointer to source data
-    lda p2+0
-    adc STACKVALUE_STRING_OFFSET, x
-    sta p2+0
-    zif_cs
-        inc p2+1
-    zendif
-
-    clc                         ; get absolute pointer to destination
-    lda p0+0
-    adc #STRING_DATA
-    sta p0+0
-    zif_cs
-        inc p0+1
-    zendif
-
-    ldy STACKVALUE_STRING_LENGTH, x
-    zrepeat
-        dey
-        lda (p2), y
-        sta (p0), y
-        tya
-    zuntil_eq
 
     ; Update the stack object.
 
@@ -3146,6 +3167,62 @@ zproc materialise_string
     sta STACKVALUE_STRING_ID+1, x
     lda #STRING_DATA
     sta STACKVALUE_STRING_OFFSET, x
+    rts
+zendproc
+
+; Creates a new string heap object containing the supplied string's data.
+; On entry:
+;    p2+0 - address of source string value
+;    p2+1 - address of destination string value
+;    A - length
+;    X - source offset
+;    Y - destination offset
+
+zproc copy_to_string
+    pha                         ; push length
+    tya
+    pha                         ; push destination offset
+    txa
+    pha                         ; push source offset
+
+    ; Set up the pointers.
+
+    ldx p2+0
+    ldy #p0
+    jsr get_string_pointer      ; source data in p0
+
+    clc                         ; get absolute pointer to source data
+    pla                         ; pop source offset
+    adc p0+0
+    sta p0+0
+    zif_cs
+        inc p0+1
+    zendif
+
+    ldx p2+1
+    ldy #p1
+    jsr get_string_pointer      ; destination data in p1
+
+    clc                         ; get absolute pointer to destination data
+    pla                         ; pop destination offset
+    adc p1+0
+    sta p1+0
+    zif_cs
+        inc p1+1
+    zendif
+
+    ; Copy the data.
+
+    pla                         ; pop length
+    tay
+    zloop
+        tya                     ; test Y
+        zbreakif_eq
+        dey
+
+        lda (p0), y
+        sta (p1), y
+    zendloop
     rts
 zendproc
 
@@ -5071,4 +5148,5 @@ operator_stack:
 heapbase:
 
 ; vim: ts=4 sw=4 et:
+
 
