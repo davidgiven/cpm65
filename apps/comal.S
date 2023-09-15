@@ -2127,15 +2127,13 @@ zendproc
 
 zproc patch_terminating_goto
     ldy execbyteptr
-    iny
-    lda checklooplineptr+0
-    sta (execlineptr), y
-    iny
-    lda checklooplineptr+1
-    sta (execlineptr), y
-    iny
-    lda checkloopbyteptr
-    sta (execlineptr), y 
+    ldx #-3 & 0xff
+    zrepeat
+        iny
+        lda checklooplineptr+3, x
+        sta (execlineptr), y
+        inx
+    zuntil_eq
     rts
 zendproc
 
@@ -2143,15 +2141,13 @@ zendproc
 
 zproc patch_opening_goto
     ldy checkloopbyteptr
-    iny
-    lda execlineptr+0
-    sta (checklooplineptr), y
-    iny
-    lda execlineptr+1
-    sta (checklooplineptr), y
-    iny
-    lda execbyteptr
-    sta (checklooplineptr), y
+    ldx #-3 & 0xff
+    zrepeat
+        iny
+        lda execlineptr+3, x
+        sta (checklooplineptr), y
+        inx
+    zuntil_eq
     rts
 zendproc
 
