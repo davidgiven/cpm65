@@ -102,6 +102,13 @@ LINE_DATA       = 4
     zuntil_mi
 .endm
 
+.macro copy16 src, dest
+    lda \src+0
+    sta \dest+0
+    lda \src+1
+    sta \dest+1
+.endm
+
 ZEROPAGE
 
 heapptr:   .word 0
@@ -353,10 +360,7 @@ zproc main
 zendproc
     ; fall through
 zproc stack_destroyed
-    lda progbase+0
-    sta stackptr+0
-    lda progbase+1
-    sta stackptr+1
+    copy16 progbase, stackptr
 
     lda #0
     sta savedexecbyteptr
@@ -730,7 +734,7 @@ ERROR_BAD_STRUCTURE = bad_structure_msg - message_table
 ; --- Interpreter -----------------------------------------------------------
 
 ; Searches for line i0, and sets execlineptr to the address of the first line
-; which is not less than that line number.
+; which is not less than that line number. Only used by the editor.
 ;
 ; Returns Z if the line was found, !Z if it wasn't (and the new line needs to
 ; be inserted).
@@ -738,10 +742,7 @@ ERROR_BAD_STRUCTURE = bad_structure_msg - message_table
 zproc find_line
     ; Initialise search.
 
-    lda progbase+0
-    sta execlineptr+0
-    lda progbase+1
-    sta execlineptr+1
+    copy16 progbase, execlineptr
 
     ; Do a linear search through the program text.
 
@@ -786,10 +787,7 @@ zproc find_line
 zendproc
 
 zproc goto_first_line
-    lda progbase+0
-    sta execlineptr+0
-    lda progbase+1
-    sta execlineptr+1
+    copy16 progbase, execlineptr
     lda #LINE_DATA
     sta execbyteptr
     rts
@@ -904,12 +902,7 @@ zproc exec_stop
         jmp error_cant_continue
     zendif
 
-    lda execlineptr+0
-    sta savedexeclineptr+0
-    lda execlineptr+1
-    sta savedexeclineptr+1
-    lda execbyteptr+0
-    sta savedexecbyteptr+0
+    copystruct 3, execlineptr, savedexeclineptr
 
     lda #ERROR_STOPPED
     jmp throw_nonfatal_error
@@ -921,12 +914,7 @@ zproc exec_con
         jmp error_cant_continue
     zendif
 
-    lda savedexeclineptr+0
-    sta execlineptr+0
-    lda savedexeclineptr+1
-    sta execlineptr+1
-    lda savedexecbyteptr+0
-    sta execbyteptr+0
+    copystruct 3, savedexeclineptr, execlineptr
 
     lda #0
     sta savedexecbyteptr
@@ -1305,10 +1293,7 @@ zproc exec_assign
 
     ; Check type of variable.
 
-    lda i1+0                ; object ID -> p0
-    sta p0+0
-    lda i1+1
-    sta p0+1
+    copy16 i1, p0           ; object ID -> p0
     ldx #p0
     jsr deref_object
 
@@ -1321,10 +1306,7 @@ zproc exec_assign
 
     ; Find the hash node.
 
-    lda i1+0                ; object ID -> p1
-    sta p1+0
-    lda i1+1
-    sta p1+1
+    copy16 i1, p1           ; object ID -> p1
 
     lda #<global_variables
     sta p0+0
@@ -1955,10 +1937,7 @@ zproc adjust_line_range
     lda i2+0
     ora i2+1
     zif_eq
-        lda i0+0
-        sta i2+0
-        lda i0+1
-        sta i2+1
+        copy16 i0, i2
     zendif
 
     rts
@@ -1996,10 +1975,7 @@ zproc exec_renum
 
     ; Iterate through each line.
 
-    lda progbase+0
-    sta execlineptr+0
-    lda progbase+1
-    sta execlineptr+1
+    copy16 progbase, execlineptr
     jmp 1f
     zrepeat
         ldy #LINE_NUMBER
@@ -2075,12 +2051,7 @@ zproc check_push_loop
 
     pla
     sta checklooptype
-    lda execlineptr+0
-    sta checklooplineptr+0
-    lda execlineptr+1
-    sta checklooplineptr+1
-    lda execbyteptr
-    sta checkloopbyteptr
+    copystruct 3, execlineptr, checklooplineptr
     lda #0
     sta checkendlineptr+0
     sta checkendlineptr+1
@@ -2156,23 +2127,15 @@ zendproc
 
 zproc update_end_ptr
     ldy execbyteptr
-    iny
-    lda checkendlineptr+0
-    sta (execlineptr), y
-    iny
-    lda checkendlineptr+1
-    sta (execlineptr), y
-    iny
-    lda checkendbyteptr
-    sta (execlineptr), y
-
-    ldx #2
+    ldx #-3 & 0xff
     zrepeat
-        lda execlineptr, x
-        sta checkendlineptr, x
-        dex
-    zuntil_mi
+        iny
+        lda checkendlineptr+3
+        sta (execlineptr), y
+        inx
+    zuntil_eq
 
+    copystruct 3, execlineptr, checkendlineptr
     rts
 zendproc
 
@@ -2840,10 +2803,7 @@ zproc find_next_object
     rts
 
 not_eof:
-    lda p1+0
-    sta p0+0
-    lda p1+1
-    sta p0+1
+    copy16 p1, p0
     ldx #p0
     jsr find_object_slot
 
@@ -3241,10 +3201,7 @@ zproc collect_garbage
     ; Mark phase 2: walk the stack and mark any temporary strings as being
     ; used.
 
-    lda stackptr+0
-    sta p1+0
-    lda stackptr+1
-    sta p1+1
+    copy16 stackptr, p1
     zloop
         lda p1+0
         cmp progbase+0
@@ -3254,10 +3211,7 @@ zproc collect_garbage
             zbreakif_eq
         zendif
 
-        lda p1+0
-        sta p0+0
-        lda p1+1
-        sta p0+1
+        copy16 p1, p0
         jsr mark_stackvalue_as_used
 
         clc
@@ -3298,10 +3252,7 @@ zproc collect_garbage
             ldy #OBJECT_TYPE
             lda (p0), y
             zif_mi
-                lda p1+0
-                sta p0+0
-                lda p1+1
-                sta p0+1
+                copy16 p1, p0
                 jsr heap_free
             zendif
         zendif
@@ -3854,8 +3805,7 @@ zendproc
 zproc queue_bytecode
     ldx bytecodeptr
     sta bytecode_buffer, x
-    inx
-    stx bytecodeptr
+    inc bytecodeptr
     rts
 zendproc
 
@@ -4380,7 +4330,8 @@ zproc emit_i0
     lda i0+2
     jsr queue_bytecode
     lda i0+3
-    jmp queue_bytecode
+    jsr queue_bytecode
+    rts
 zendproc
 
 zproc pop_number
