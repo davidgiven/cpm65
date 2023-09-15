@@ -127,6 +127,7 @@ bufferend: .byte 0 ; current end of token in input buffer
 
 bytecodeptr:        .byte 0 ; used by parser and lister and editor
 opstackptr:         .byte 0 ; operator stack pointer
+terpjumptable:      .word 0 ; bytecode jump table used for dispatch
 
 ; Parser temporaries
 
@@ -241,13 +242,9 @@ token_aux_hi:
 .data 6
 token_aux_lo:
 .data 7
-token_exec_hi:
-.data 8
-token_exec_lo:
+token_exec_table:
 .data 9
-token_check_hi:
-.data 10
-token_check_lo:
+token_check_table:
 
 .macro deftok token, precedence, tokensize, pops, pushes, lister, aux, exec, check
     .if \token != tokenvalue
@@ -266,13 +263,9 @@ token_check_lo:
     .data 6
     .byte \aux@mos16lo
     .data 7
-    .byte (\exec-1)@mos16hi
-    .data 8
-    .byte (\exec-1)@mos16lo
+    .word (\exec)-1
     .data 9
-    .byte (\check-1)@mos16hi
-    .data 10
-    .byte (\check-1)@mos16lo
+    .word (\check)-1
 
     .set tokenvalue, tokenvalue+1
 .endm
@@ -840,10 +833,14 @@ zproc goto_next_instruction
 zendproc
 
 zproc exec_line
+    lda #<token_exec_table
+    sta terpjumptable+0
+    lda #>token_exec_table
+    sta terpjumptable+1
     jsr reset_buffer
 zendproc
     ; fall through
-zproc exec
+zproc dispatch_bytecode
     zrepeat
         ldy execbyteptr
         lda (execlineptr), y
@@ -857,9 +854,14 @@ zproc exec
         lda #<(1f-1)
         pha
 
-        lda token_exec_hi, x     ; get execution routine
+        txa
+        asl a
+        tay
+        iny
+        lda (terpjumptable), y  ; get handler routine
         pha
-        lda token_exec_lo, x
+        dey
+        lda (terpjumptable), y
         pha
         rts
 
@@ -867,6 +869,7 @@ zproc exec
         jsr goto_next_instruction
     zendloop
 exec_nop:
+check_nop:
     rts
 zendproc
 
@@ -998,7 +1001,7 @@ zproc exec_goto
 
     pla
     pla
-    jmp exec
+    jmp dispatch_bytecode
 zendproc
 
 zproc exec_if
@@ -2049,9 +2052,14 @@ zproc check_structure
     zuntil_mi
     jsr goto_first_line
 
+    lda #<token_check_table
+    sta terpjumptable+0
+    lda #>token_check_table
+    sta terpjumptable+1
+
     jmp 1f
     zrepeat
-        jsr check_line
+        jsr dispatch_bytecode
         jsr goto_next_line
     1:
         ldy #LINE_INDENT
@@ -2061,34 +2069,6 @@ zproc check_structure
         ldy #LINE_SIZE
         lda (execlineptr), y
     zuntil_eq
-    rts
-zendproc
-
-zproc check_line
-    zloop
-        ldy execbyteptr
-        lda (execlineptr), y
-        zbreakif_eq             ; TOKEN_EOL?
-        tax
-        
-        ; Push return address.
-
-        lda #>(1f-1)
-        pha
-        lda #<(1f-1)
-        pha
-
-        lda token_check_hi, x   ; get structure check routine
-        pha
-        lda token_check_lo, x
-        pha
-    check_nop:
-        rts
-
-        ; Go to next bytecode.
-    1:
-        jsr goto_next_instruction
-    zendloop
     rts
 zendproc
 
