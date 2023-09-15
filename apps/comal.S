@@ -864,7 +864,6 @@ zproc dispatch_bytecode
         lda (terpjumptable), y
         pha
         rts
-
     1:
         jsr goto_next_instruction
     zendloop
@@ -956,8 +955,8 @@ zproc exec_print
 zendproc
 
 zproc exec_print_string
-    ldx #v0
-    ldy #p0
+    ldy #v0
+    ldx #p0
     jsr get_string_pointer
 
     ldy v0+STACKVALUE_STRING_OFFSET
@@ -2787,6 +2786,7 @@ zendproc
 
 ; Given an object ID in (0, x), returns in (0, x) the address in the object
 ; table of the slot.
+; Preserves X and Y.
 
 zproc find_object_slot
     ; p0 = object_table + (p0-1)*2
@@ -2811,20 +2811,22 @@ zendproc
 
 ; Given an object ID in (0, x), dereferences it (or produces an error). Returns the
 ; pointer to the data in (0, x).
+; Preserves X and Y.
 
 zproc deref_object
     jsr find_object_slot
 
     lda (0, x)
-    tay
+    pha
     inc 0, x
     zif_eq
         inc 1, x
     zendif
     lda (0, x)
 
-    sty 0, x
     sta 1, x
+    pla
+    sta 0, x
     rts
 zendproc
 
@@ -3068,8 +3070,8 @@ zproc get_atom
 zendproc
 
 ; On entry:
-;   X - address of a V register containing a string value
-;   Y - address of a 16-bit value
+;   X - address of a 16-bit value
+;   Y - address of a V register containing a string value
 ; On exit:
 ;   (0, Y) - pointer to string data
 ;   X - preserved
@@ -3077,29 +3079,18 @@ zendproc
 ;   A - length
 
 zproc get_string_pointer
-    lda STACKVALUE_STRING_ID+0, x ; copy ID into p0
-    sta 0, y
-    lda STACKVALUE_STRING_ID+1, x
-    sta 1, y
+    lda STACKVALUE_STRING_ID+0, y ; copy ID into p0
+    sta 0, x
+    lda STACKVALUE_STRING_ID+1, y
+    sta 1, x
 
-    lda 0, x
+    lda 0, y
     cmp #OTYPE_STRING
     zif_eq
         ; p0 is the ID of the string data, so it needs to be
         ; dereferenced.
 
-        txa
-        pha
-
-        tya
-        pha
-        tax
         jsr deref_object
-
-        pla
-        tay
-        pla
-        tax
     zendif
     rts
 zendproc
@@ -3167,8 +3158,8 @@ zproc copy_to_string
 
     ; Set up the pointers.
 
-    ldx p2+0
-    ldy #p0
+    ldy p2+0
+    ldx #p0
     jsr get_string_pointer      ; source data in p0
 
     clc                         ; get absolute pointer to source data
@@ -3179,8 +3170,8 @@ zproc copy_to_string
         inc p0+1
     zendif
 
-    ldx p2+1
-    ldy #p1
+    ldy p2+1
+    ldx #p1
     jsr get_string_pointer      ; destination data in p1
 
     clc                         ; get absolute pointer to destination data
