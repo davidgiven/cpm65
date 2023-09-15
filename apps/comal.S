@@ -959,7 +959,7 @@ zproc exec_print_string
     ldx #p0
     jsr get_string_pointer
 
-    ldy v0+STACKVALUE_STRING_OFFSET
+    ldy #0
     zrepeat
         lda (p0), y
         jsr buffer_print_char
@@ -1297,13 +1297,9 @@ zproc exec_assign
         ldx #v0
         jsr create_string
 
-        lda #v2
-        sta p2+0
-        lda #v0
-        sta p2+1
-        lda v2+STACKVALUE_STRING_LENGTH
-        ldx v2+STACKVALUE_STRING_OFFSET
-        ldy v0+STACKVALUE_STRING_OFFSET
+        ldy #v2             ; source
+        ;ldx #v0            ; destination (preserved above)
+        lda #0              ; destination offset
         jsr copy_to_string
     zendif
 
@@ -1380,23 +1376,14 @@ zproc exec_add
         ldx #v2
         jsr create_string   ; create the new string object
 
-        lda #v1
-        sta p2+0
-        lda #v2
-        sta p2+1
-        lda v1+STACKVALUE_STRING_LENGTH
-        ldx v1+STACKVALUE_STRING_OFFSET
-        ldy v2+STACKVALUE_STRING_OFFSET
+        ldy #v1             ; source
+        ;ldx #v2            ; destination (preserved above)
+        lda #0              ; destination offset
         jsr copy_to_string
 
-        lda #v0
-        sta p2+0
-        clc
-        lda v2+STACKVALUE_STRING_OFFSET
-        adc v1+STACKVALUE_STRING_LENGTH
-        tay
-        lda v0+STACKVALUE_STRING_LENGTH
-        ldx v0+STACKVALUE_STRING_OFFSET
+        ldy #v0             ; source
+        ldx #v2             ; destination
+        lda v1+STACKVALUE_STRING_LENGTH ; destination offset
         jsr copy_to_string
 
         copystruct STACKVALUE_SIZE, v2, v0
@@ -3092,6 +3079,16 @@ zproc get_string_pointer
 
         jsr deref_object
     zendif
+
+    ; Add on the string offset.
+
+    clc
+    lda STACKVALUE_STRING_OFFSET, y
+    adc 0, x
+    sta 0, x
+    zif_cs
+        inc 1, x
+    zendif
     rts
 zendproc
 
@@ -3141,36 +3138,27 @@ zproc create_string
     rts
 zendproc
 
-; Creates a new string heap object containing the supplied string's data.
+; Copies the contents of one string into another.
 ; On entry:
-;    p2+0 - address of source string value
-;    p2+1 - address of destination string value
-;    A - length
-;    X - source offset
-;    Y - destination offset
+;    X - pointer to destination string v register
+;    Y - pointer to source string v register
+;    A - destination offset
 
 zproc copy_to_string
-    pha                         ; push length
-    tya
     pha                         ; push destination offset
     txa
-    pha                         ; push source offset
+    pha
 
     ; Set up the pointers.
 
-    ldy p2+0
+    ; source string pointer already in Y
+    ldx STACKVALUE_STRING_LENGTH, y
+    sta p2+0                    ; save source string length
     ldx #p0
     jsr get_string_pointer      ; source data in p0
 
-    clc                         ; get absolute pointer to source data
-    pla                         ; pop source offset
-    adc p0+0
-    sta p0+0
-    zif_cs
-        inc p0+1
-    zendif
-
-    ldy p2+1
+    pla
+    tay                         ; get destination pointer
     ldx #p1
     jsr get_string_pointer      ; destination data in p1
 
@@ -3184,8 +3172,7 @@ zproc copy_to_string
 
     ; Copy the data.
 
-    pla                         ; pop length
-    tay
+    ldy p2+0                    ; get source length
     zloop
         tya                     ; test Y
         zbreakif_eq
