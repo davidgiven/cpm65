@@ -213,6 +213,8 @@ TOKEN_ELIF      = 0x27
 TOKEN_ELIFGOTO  = 0x28
 TOKEN_STRING    = 0x29
 TOKEN_FREE      = 0x2a
+TOKEN_TRUE      = 0x2b
+TOKEN_FALSE     = 0x2c
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -332,6 +334,8 @@ deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if, 
 deftok TOKEN_ELIFGOTO,  0, 4, 0, 0, lister_nop,      lister_bad,       exec_goto,      check_elifgoto
 deftok TOKEN_STRING,   15, 0, 0, 1, lister_string,   lister_bad,       exec_string,    check_nop
 deftok TOKEN_FREE,     15, 1, 0, 1, lister_simple,   keyword_free,     exec_free,      check_nop
+deftok TOKEN_TRUE,     15, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
+deftok TOKEN_FALSE,    15, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -4971,6 +4975,8 @@ leaf_rule:
     P_TRY not_rvalue_rule
     P_TRY sgn_rvalue_rule
     P_TRY free_rvalue_rule
+    P_TRY true_rvalue_rule
+    P_TRY false_rvalue_rule
     P_TRY varref_rvalue_rule
     P_TRY number_rvalue_rule
     P_TRY negate_rvalue_rule
@@ -5024,6 +5030,20 @@ keyword_free = . + 1
     P_TOKEN 'F', 'R', 'E', 'E'|0x80
     P_COMMIT
     P_EMIT TOKEN_FREE
+    P_RETURN
+
+true_rvalue_rule:
+keyword_true = . + 1
+    P_TOKEN 'T', 'R', 'U', 'E'|0x80
+    P_COMMIT
+    P_EMIT TOKEN_TRUE
+    P_RETURN
+
+false_rvalue_rule:
+keyword_false = . + 1
+    P_TOKEN 'F', 'A', 'L', 'S', 'E'|0x80
+    P_COMMIT
+    P_EMIT TOKEN_FALSE
     P_RETURN
 
 keyword_zero:
