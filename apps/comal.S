@@ -35,6 +35,7 @@ OTYPE_ATOM       = 0x01
 OTYPE_INTEGER    = 0x02
 OTYPE_VAR        = 0x03
 OTYPE_STRINGDATA = 0x04
+OTYPE_RANGE      = 0x05
 OTYPE_STRING     = 0x10
 OTYPE_STRINGLIT  = 0x11
 
@@ -80,6 +81,11 @@ STACKVALUE_SIZE = 5
 STACKVALUE_STRING_ID     = STACKVALUE_DATA + 0
 STACKVALUE_STRING_OFFSET = STACKVALUE_DATA + 2
 STACKVALUE_STRING_LENGTH = STACKVALUE_DATA + 3
+
+; Range stack value structure:
+
+STACKVALUE_RANGE_OFFSET  = STACKVALUE_DATA + 0
+STACKVALUE_RANGE_LENGTH  = STACKVALUE_DATA + 2
 
 ; Program storage: a flat list of lines, each of which looks like:
 ;   0    - line size
@@ -216,6 +222,8 @@ TOKEN_FREE      = 0x2a
 TOKEN_TRUE      = 0x2b
 TOKEN_FALSE     = 0x2c
 TOKEN_LEN       = 0x2d
+TOKEN_SLICE     = 0x2e
+TOKEN_MKRANGE   = 0x2f
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -338,6 +346,8 @@ deftok TOKEN_FREE,     15, 1, 0, 1, lister_simple,   keyword_free,     exec_free
 deftok TOKEN_TRUE,     15, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
 deftok TOKEN_FALSE,    15, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
 deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,       check_nop
+deftok TOKEN_SLICE,    14, 1, 2, 1, lister_slice,    lister_bad,       exec_slice,     check_nop
+deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1464,17 +1474,138 @@ zendproc
 
 zproc exec_len
     jsr deref_i0
-    lda v0
-    and #OTYPE_STRING
-    zif_eq
-        jmp error_invalid_parameter
-    zendif
+    jsr check_v0_for_string
 
     lda v0+STACKVALUE_STRING_LENGTH
     pha
     jsr set_i0_to_zero
     pla
     sta i0+0
+    rts
+zendproc
+
+zproc exec_slice
+    jsr deref_i0                ; RHS - slice object
+    jsr pop_and_deref_i1        ; LHS - string
+    ldx #v0
+    jsr coerce_to_range
+    ldx #v1
+    jsr check_for_string
+
+    dec v0+STACKVALUE_RANGE_OFFSET      ; strings are 1-based
+    lda v0+STACKVALUE_RANGE_OFFSET
+    zif_mi
+    1:
+        jmp error_invalid_parameter
+    zendif
+    clc
+    adc v1+STACKVALUE_STRING_OFFSET     ; new string offset
+    pha
+
+    clc
+    lda v0+STACKVALUE_RANGE_OFFSET
+    adc v0+STACKVALUE_RANGE_LENGTH
+    cmp v1+STACKVALUE_STRING_LENGTH
+    zif_cs
+        bne 1b
+    zendif
+
+    ldy v0+STACKVALUE_RANGE_LENGTH
+    copystruct STACKVALUE_SIZE, v1, v0
+    sty v0+STACKVALUE_STRING_LENGTH
+    pla
+    sta v0+STACKVALUE_STRING_OFFSET
+    rts
+zendproc
+
+zproc exec_mkrange
+    jsr deref_i0                ; RHS
+    jsr pop_and_deref_i1        ; LHS
+    jsr coerce_i0_and_i1_to_integer
+
+    ; Check for non-16-bit values.
+
+    ldx #v0
+    jsr check_for_16bit_integer
+
+    ldx #v1
+    jsr check_for_16bit_integer
+
+    ; Set up the new range object.
+
+    sec
+    lda i0+0
+    sbc i1+0
+    pha
+    lda i0+1
+    sbc i1+1
+    zif_mi
+        jmp error_invalid_parameter
+    zendif
+    pha
+
+    copy16 i1, v0+STACKVALUE_RANGE_OFFSET
+    pla
+    sta v0+STACKVALUE_RANGE_LENGTH+1
+    pla
+    sta v0+STACKVALUE_RANGE_LENGTH+0
+
+    inc v0+STACKVALUE_RANGE_LENGTH+0
+    zif_eq
+        inc v0+STACKVALUE_RANGE_LENGTH+1
+    zendif
+
+    lda #OTYPE_RANGE
+    sta v0
+    rts
+zendproc
+
+; On entry:
+;   X - pointer to v register
+zproc check_for_16bit_integer
+    lda 3, x
+    ora 4, x
+    beq 1f
+
+    lda 3, x
+    and 4, x
+    cmp #0xff
+    beq 1f
+
+2:
+    jmp error_invalid_parameter
+1:
+    rts
+zendproc
+
+zproc check_v0_for_string
+    ldx #v0
+zendproc
+    ; fall through
+; On entry:
+;   X - pointer to v register
+zproc check_for_string
+    lda 0, x
+    and #OTYPE_STRING
+    beq 2b
+    rts
+zendproc
+
+; On entry:
+;   X - pointer to v register
+zproc coerce_to_range
+    lda 0, x
+    cmp #OTYPE_RANGE
+    beq 1f
+    jsr coerce_to_integer
+
+    ldy #1
+    sty 3, x
+    dey
+    sty 4, x
+    ldy #OTYPE_RANGE
+    sty 0, x
+1:
     rts
 zendproc
 
@@ -1659,6 +1790,7 @@ zproc retract_stack
 zendproc
 
 zproc coerce_i0_and_i1_to_numeric
+coerce_i0_and_i1_to_integer:
     lda v0
     cmp v1
     beq check_i0_is_integer
@@ -1672,6 +1804,7 @@ zproc coerce_i0_and_i2_to_numeric
     jsr error_invalid_parameter
 zendproc
 
+coerce_to_integer:
 zproc check_i0_is_integer
     lda v0
     cmp #OTYPE_INTEGER
@@ -2458,6 +2591,9 @@ zproc buffer_print_current_line_number
     iny
     lda (execlineptr), y
     sta i0+1
+    lda #0
+    sta i0+2
+    sta i0+3
         
     jmp buffer_print_i0
 zendproc
@@ -3743,6 +3879,19 @@ zproc lister_prefix
     jmp list_parenthesised_clause
 zendproc
 
+zproc lister_slice
+    txa
+    pha
+
+    ldy operator_stack+2, x     ; get first parameter tree address
+    jsr list_parenthesised_clause
+
+    pla
+    tax                         ; recover current node tree address
+    ldy operator_stack+1, x     ; get second parameter tree address
+    jmp list_parenthesised_clause
+zendproc
+    
 ; --- Parser ----------------------------------------------------------------
 
 zproc parse_line
@@ -4909,6 +5058,7 @@ compulsory_expr_rule:
 expr_rule:
     P_JSR leaf_rule
     P_COMMIT
+    P_TRY stringslice_rule
     P_TRY addition_rule
     P_TRY subtraction_rule
     P_TRY multiplication_rule
@@ -4920,6 +5070,27 @@ expr_rule:
     P_TRY compare_lt_rule           ; <
     P_TRY compare_gte_rule          ; >=
     P_TRY compare_gt_rule           ; >
+    P_RETURN
+
+stringslice_rule:
+    P_EAGER_TOKEN '('|0x80
+    P_PAREN
+    P_JSR range_rule
+    P_EAGER_TOKEN ')'|0x80
+    P_FLUSH
+    P_SHUNT TOKEN_SLICE
+    P_RETURN
+
+range_rule:
+    P_JSR expr_rule
+    P_TRY range_rhs_rule
+    P_RETURN
+
+range_rhs_rule:
+keyword_colon = . + 1
+    P_EAGER_TOKEN ':'|0x80
+    P_SHUNT TOKEN_MKRANGE
+    P_JSR expr_rule
     P_RETURN
 
 addition_rule:
