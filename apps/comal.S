@@ -215,6 +215,7 @@ TOKEN_STRING    = 0x29
 TOKEN_FREE      = 0x2a
 TOKEN_TRUE      = 0x2b
 TOKEN_FALSE     = 0x2c
+TOKEN_LEN       = 0x2d
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -336,6 +337,7 @@ deftok TOKEN_STRING,   15, 0, 0, 1, lister_string,   lister_bad,       exec_stri
 deftok TOKEN_FREE,     15, 1, 0, 1, lister_simple,   keyword_free,     exec_free,      check_nop
 deftok TOKEN_TRUE,     15, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
 deftok TOKEN_FALSE,    15, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
+deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,       check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1457,6 +1459,22 @@ zproc exec_mod
 
     jsr divs4
     copystruct STACKVALUE_SIZE, i1, i0
+    rts
+zendproc
+
+zproc exec_len
+    jsr deref_i0
+    lda v0
+    and #OTYPE_STRING
+    zif_eq
+        jmp error_invalid_parameter
+    zendif
+
+    lda v0+STACKVALUE_STRING_LENGTH
+    pha
+    jsr set_i0_to_zero
+    pla
+    sta i0+0
     rts
 zendproc
 
@@ -4974,6 +4992,7 @@ leaf_rule:
     P_TRY parenthesised_rvalue_rule
     P_TRY not_rvalue_rule
     P_TRY sgn_rvalue_rule
+    P_TRY len_rvalue_rule
     P_TRY free_rvalue_rule
     P_TRY true_rvalue_rule
     P_TRY false_rvalue_rule
@@ -5023,6 +5042,13 @@ keyword_sgn = . + 1
     P_TOKEN 'S', 'G', 'N'|0x80
     P_COMMIT
     P_SHUNT TOKEN_SGN
+    P_JMP leaf_rule
+
+len_rvalue_rule:
+keyword_len = . + 1
+    P_TOKEN 'L', 'E', 'N'|0x80
+    P_COMMIT
+    P_SHUNT TOKEN_LEN
     P_JMP leaf_rule
 
 free_rvalue_rule:
