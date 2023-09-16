@@ -224,6 +224,7 @@ TOKEN_FALSE     = 0x2c
 TOKEN_LEN       = 0x2d
 TOKEN_SLICE     = 0x2e
 TOKEN_MKRANGE   = 0x2f
+TOKEN_SLASSIGN  = 0x30
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -348,6 +349,7 @@ deftok TOKEN_FALSE,    15, 1, 0, 1, lister_simple,   keyword_false,    exec_zero
 deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,       check_nop
 deftok TOKEN_SLICE,    14, 1, 2, 1, lister_slice,    lister_bad,       exec_slice,     check_nop
 deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
+deftok TOKEN_SLASSIGN, 14, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -851,7 +853,6 @@ zproc exec_line
     sta terpjumptable+0
     lda #>token_exec_table
     sta terpjumptable+1
-    jsr reset_buffer
 zendproc
     ; fall through
 zproc dispatch_bytecode
@@ -940,6 +941,7 @@ zendproc
 
 zproc exec_print
     jsr deref_i0
+    jsr reset_buffer
 
     lda v0
     cmp #OTYPE_INTEGER
@@ -962,6 +964,7 @@ zproc exec_print_string
     ldy #v0
     ldx #p0
     jsr get_string_pointer
+    jsr reset_buffer
 
     ldy #0
     zrepeat
@@ -974,6 +977,7 @@ zproc exec_print_string
 zendproc
 
 zproc exec_printnl
+    jsr reset_buffer
     jsr buffer_print_nl
     jmp print_buffer
 zendproc
@@ -1356,6 +1360,130 @@ zproc exec_assign
     zuntil_eq
 
     jmp pop_i0
+zendproc
+
+zproc exec_slassign
+    jsr deref_i0            ; value to assign
+    jsr pop_and_deref_i1    ; range
+    jsr pop_i2              ; string lvalue
+
+    ldx #v0
+    jsr check_for_string
+    ldx #v1
+    jsr coerce_to_range
+    
+    ; Get the hash node.
+
+    copy16 i2, p1           ; object ID -> p1
+
+    lda #<global_variables
+    sta p0+0
+    lda #>global_variables
+    sta p0+1
+    jsr hash_deref_ro       ; return ptr to node in p0
+    zif_cs
+        jmp error_no_such_variable
+    zendif
+
+    lda p0+0                ; save p0 (pointer to the hash node)
+    pha
+    lda p0+1
+    pha
+
+    ; Dereference the destination string (because we're going to need to read
+    ; from it).
+
+    jsr deref_i2
+
+    ; Copy bytes from the source string into the text buffer.
+
+    jsr reset_buffer
+    ldx #p0
+    ldy #v2
+    jsr get_string_pointer
+
+    dec v1+STACKVALUE_RANGE_OFFSET ; string ranges are 1-based
+    ldy #0
+    zloop
+        cpy v1+STACKVALUE_RANGE_OFFSET
+        zbreakif_eq
+
+        lda (p0), y
+        jsr buffer_print_char
+        iny
+    zendloop
+
+    ; Now the replacement string.
+
+    ldx #p1
+    ldy #v0
+    jsr get_string_pointer
+
+    ldy #0
+    zloop
+        cpy v0+STACKVALUE_STRING_LENGTH
+        zbreakif_eq
+
+        lda (p1), y
+        jsr buffer_print_char
+        iny
+    zendloop
+
+    ; And now the tail of the source string.
+
+    clc
+    lda v1+STACKVALUE_RANGE_OFFSET
+    adc v1+STACKVALUE_RANGE_LENGTH
+    tay
+    zloop
+        cpy v2+STACKVALUE_STRING_LENGTH
+        zbreakif_eq
+
+        lda (p0), y
+        jsr buffer_print_char
+        iny
+    zendloop
+
+    ; Create the new string.
+
+    ldx #v0
+    lda bufferend
+    jsr create_string
+    
+    ldx #p0
+    ldy #v0
+    jsr get_string_pointer
+
+    ldy #0
+    zloop
+        cpy bufferend
+        zbreakif_eq
+
+        lda text_buffer, y
+        sta (p0), y
+        iny
+    zendloop
+
+    ; Restore the pointer to the hash node.
+
+    pla
+    sta p0+1
+    pla
+    sta p0+0
+
+    ; Update it.
+
+    ldx #0
+    ldy #OBJECT_TYPE
+    zrepeat
+        lda v0, x
+        sta (p0), y
+
+        iny
+        inx
+        cpx #STACKVALUE_SIZE
+    zuntil_eq
+    rts
 zendproc
 
 zproc exec_add
@@ -3780,7 +3908,7 @@ zproc lister_string
     jmp buffer_print_char
 zendproc
     
-zproc lister_assign
+zproc lister_setup_for_multiassign
     bit listerflags
     zif_mi
         txa
@@ -3793,7 +3921,39 @@ zproc lister_assign
         pla
         tax
     zendif
+    rts
 zendproc
+
+zproc lister_slassign
+    jsr lister_setup_for_multiassign
+
+    txa
+    pha
+
+    ldy operator_stack+3, x     ; get first parameter tree address; the variable
+    jsr list_parenthesised_clause
+
+    pla
+    pha
+    tax
+    ldy operator_stack+2, x     ; get second parameter tree address; the range
+    jsr list_parenthesised_clause
+    jsr buffer_print_space
+
+    ldx #>keyword_assign
+    lda #<keyword_assign
+    jsr buffer_print_separated_string
+    
+    pla
+    tax                         ; recover current node tree address
+    ldy operator_stack+1, x     ; get second parameter tree address
+    jmp list_parenthesised_clause
+zendproc
+
+zproc lister_assign
+    jsr lister_setup_for_multiassign
+zendproc
+
     ; fall through
 zproc lister_infix
     txa
@@ -4980,15 +5140,33 @@ keyword_do = . + 1
     P_RETURN
 
 assignment_rule:
-    P_JSR lvalue_rule
-    P_JSR assignment_operator_rule
-    P_SHUNT TOKEN_ASSIGN
+    P_JSR assignment_kind_rule
     P_COMMIT
     P_JSR expr_rule
     P_TRY eol_rule
     P_FLUSH
     P_EAGER_TOKEN ';'|0x80
     P_JMP assignment_rule
+
+assignment_kind_rule:
+    P_TRY simple_assignment_kind_rule
+    P_TRY slice_assignment_kind_rule
+    P_FAIL
+
+simple_assignment_kind_rule:
+    P_WORD
+    P_SHUNT TOKEN_ASSIGN
+    P_JMP assignment_operator_rule
+
+slice_assignment_kind_rule:
+    P_WORD
+    P_EAGER_TOKEN '('|0x80
+    P_PAREN
+    P_JSR range_rule
+    P_EAGER_TOKEN ')'|0x80
+    P_FLUSH
+    P_SHUNT TOKEN_SLASSIGN
+    P_JMP assignment_operator_rule
 
 assignment_operator_rule:
     P_TRY equals_rule
@@ -5041,10 +5219,6 @@ keyword_semicolon = . + 1
 print_no_terminator_rule:
     P_EOL
     P_SHUNT TOKEN_PRINTNL
-    P_RETURN
-
-lvalue_rule:
-    P_WORD
     P_RETURN
 
 optional_expr_rule:
