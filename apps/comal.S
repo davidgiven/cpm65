@@ -117,6 +117,8 @@ LINE_DATA       = 4
 
 ZEROPAGE
 
+enteroffset: .byte 0
+
 heapptr:   .word 0
 stackptr:  .word 0
 progbase:  .word 0
@@ -225,6 +227,7 @@ TOKEN_LEN       = 0x2d
 TOKEN_SLICE     = 0x2e
 TOKEN_MKRANGE   = 0x2f
 TOKEN_SLASSIGN  = 0x30
+TOKEN_ENTER     = 0x31
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -350,6 +353,7 @@ deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,
 deftok TOKEN_SLICE,    14, 1, 2, 1, lister_slice,    lister_bad,       exec_slice,     check_nop
 deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
 deftok TOKEN_SLASSIGN, 14, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
+deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -375,9 +379,12 @@ OBJECT_TABLE_SIZE = 256
 
 zproc main
     jsr clear
-zendproc
-    ; fall through
-zproc stack_destroyed
+error_return:
+    ; Read characters from the console.
+
+    lda #0xff
+    sta enteroffset
+destroy_stack:
     copy16 progbase, stackptr
 
     lda #0
@@ -389,25 +396,57 @@ zproc mainloop
     txs
 
     zloop
-        ; Read a line from the console.
+        lda enteroffset
+        cmp #0xff
+        zif_eq
+            ; Read a line from the console.
 
-        lda #'$'
-        jsr bdos_CONOUT
-        jsr print_space
-        
-        lda #255
-        sta text_buffer+0
-        lda #<text_buffer
-        ldx #>text_buffer
-        ldy #BDOS_READ_LINE
-        jsr BDOS
-        jsr print_nl
+            lda #'$'
+            jsr bdos_CONOUT
+            jsr print_space
+            
+            lda #255
+            sta text_buffer+0
+            lda #<text_buffer
+            ldx #>text_buffer
+            ldy #BDOS_READ_LINE
+            jsr BDOS
+            jsr print_nl
+
+            ; Parse it.
+
+            ldx text_buffer+1
+            lda #0
+            sta text_buffer+2, x
+        zelse
+            ; Read characters from a file.
+
+            jsr reset_buffer
+            inc bufferend
+            inc bufferend
+            zloop
+                jsr read_character_from_enter_file
+                cmp #0x1a ; ^Z
+                zbreakif_eq
+                cmp #0x0a ; LF
+                zbreakif_eq
+                cmp #0x0d ; CR
+                zcontinueif_eq
+
+                jsr buffer_print_char
+            zendloop
+
+            ; Parse it.
+
+            ldx bufferend
+            lda #0
+            sta text_buffer, x
+            dex
+            dex
+            stx text_buffer+1
+        zendif
 
         ; Parse it.
-
-        ldx text_buffer+1
-        lda #0
-        sta text_buffer+2, x
 
         lda #2
         sta bufferpos
@@ -673,6 +712,10 @@ error_bad_structure:
     lda #ERROR_BAD_STRUCTURE
     bne throw_error         ; always taken
 
+error_file_not_found:
+    lda #ERROR_FILE_NOT_FOUND
+    bne throw_error         ; always taken
+
 ; Produces the error whose number is in A.
 
 zproc throw_error
@@ -715,7 +758,7 @@ zproc throw_nonfatal_error
     jsr buffer_print_nl
     jsr print_buffer
 
-    jmp mainloop
+    jmp error_return
 
 1:
     .ascii " at line"
@@ -741,6 +784,9 @@ stopped_msg:
 bad_structure_msg:
     .ascii "Bad structur"
     .byte 'e'|0x80
+file_not_found_msg:
+    .ascii "File not foun"
+    .byte 'd'|0x80
 
 ERROR_CANT_CONTINUE = cant_continue_msg - message_table
 ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
@@ -748,6 +794,7 @@ ERROR_SILLY = silly_msg - message_table
 ERROR_NO_SUCH_VARIABLE = no_such_variable_msg - message_table
 ERROR_STOPPED = stopped_msg - message_table
 ERROR_BAD_STRUCTURE = bad_structure_msg - message_table
+ERROR_FILE_NOT_FOUND = file_not_found_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -1841,6 +1888,83 @@ zproc check_i0_is_integer
     rts
 zendproc
 
+; --- File handline ---------------------------------------------------------
+
+zproc exec_enter
+    jsr deref_i0
+    ldx #v0
+    jsr check_for_string
+
+    ; Open file.
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_SET_DMA_ADDRESS
+    jsr BDOS
+
+    jsr reset_buffer
+    ldx #v0
+    jsr buffer_print_stringvalue
+
+    ldx bufferend
+    lda #0
+    sta text_buffer, x
+
+    lda #<text_buffer
+    ldx #>text_buffer
+    ldy #BDOS_PARSEFILENAME
+    jsr BDOS
+    
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_OPEN_FILE
+    jsr BDOS
+    zif_cs
+        jmp error_file_not_found
+    zendif
+
+    ; Configure to read characters from the file rather than from the console.
+
+    lda #0
+    sta enteroffset
+    rts
+zendproc
+
+zproc read_character_from_enter_file
+    lda enteroffset
+    zif_eq
+        ; Read next sector from the file.
+
+        lda #<cpm_default_dma
+        ldx #>cpm_default_dma
+        ldy #BDOS_SET_DMA_ADDRESS
+        jsr BDOS
+
+        lda #<cpm_fcb
+        ldx #>cpm_fcb
+        ldy #BDOS_READ_SEQUENTIAL
+        jsr BDOS
+        zif_cs
+            ; EOF. Go back to reading from the console.
+
+            lda #0xff
+            sta enteroffset
+            lda #0x1a ; ^Z
+            rts
+        zendif
+    zendif
+
+    ldx enteroffset
+    lda cpm_default_dma, x
+    inx
+    cpx #0x80
+    zif_eq
+        ldx #0
+    zendif
+    stx enteroffset
+    rts
+zendproc
+
 ; --- Editor ----------------------------------------------------------------
 
 zproc exec_lineentry
@@ -1942,7 +2066,7 @@ zproc exec_lineentry
 
     ; Restart the main loop.
 
-    jmp stack_destroyed
+    jmp destroy_stack
 zendproc
 
 zproc delete_current_line
@@ -2095,7 +2219,7 @@ zproc exec_del
         lda (execlineptr), y
     zuntil_eq
 
-    jmp stack_destroyed
+    jmp destroy_stack
 zendproc
 
 zproc adjust_line_range
@@ -2182,7 +2306,7 @@ zproc exec_renum
         lda (execlineptr), y
     zuntil_eq
 
-    jmp stack_destroyed
+    jmp destroy_stack
 zendproc
 
 ; --- Structural analysis ---------------------------------------------------
@@ -4126,34 +4250,37 @@ zproc pop_panic
     ldx #>1f
     jsr print_string
 
-    lda #0
-    sta p0+0
-    zrepeat
-        ldx p0+0
-        lda text_buffer+2, x
+    ldx text_buffer+1
+    zif_ne
+        lda #0
+        sta p0+0
+        zrepeat
+            ldx p0+0
+            lda text_buffer+2, x
+            jsr bdos_CONOUT
+
+            inc p0+0
+            ldx p0+0
+            cpx text_buffer+1
+        zuntil_eq
+        jsr print_nl
+
+        lda #2
+        sta p0+0
+        zloop
+            ldx p0+0
+            cpx bufferpos
+            zbreakif_eq
+
+            jsr print_space
+            inc p0+0
+        zendloop
+        lda #'^'
         jsr bdos_CONOUT
+        jsr print_nl
+    zendif
 
-        inc p0+0
-        ldx p0+0
-        cpx text_buffer+1
-    zuntil_eq
-    jsr print_nl
-
-    lda #2
-    sta p0+0
-    zloop
-        ldx p0+0
-        cpx bufferpos
-        zbreakif_eq
-
-        jsr print_space
-        inc p0+0
-    zendloop
-    lda #'^'
-    jsr bdos_CONOUT
-    jsr print_nl
-
-    jmp mainloop
+    jmp error_return
 1:
     .ascii "\r\nSyntax error\r"
     .byte '\n'|0x80
@@ -4788,6 +4915,7 @@ immediate_statement_rule:
     P_TRY renum_rule
     P_TRY run_rule
     P_TRY con_rule
+    P_TRY enter_rule
 statement_rule:
     P_TRY repeat_rule
     P_TRY until_rule
@@ -4799,6 +4927,7 @@ statement_rule:
     P_TRY else_rule
     P_TRY elif_rule
     P_TRY endif_rule
+    P_TRY eol_rule
 simple_statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
@@ -4902,6 +5031,15 @@ keyword_stop = . + 1
 con_rule:
     P_TOKEN 'C', 'O', 'N'|0x80
     P_EMIT TOKEN_CON
+    P_EOL
+    P_RETURN
+
+enter_rule:
+keyword_enter = . + 1
+    P_TOKEN 'E', 'N', 'T', 'E', 'R'|0x80
+    P_COMMIT
+    P_SHUNT TOKEN_ENTER
+    P_JSR expr_rule
     P_EOL
     P_RETURN
 
@@ -5335,6 +5473,11 @@ keyword_one:
 .data
 
 .bss
+pblock: .ds 165
+cpm_fcb         = pblock
+cpm_fcb2        = pblock+16
+cpm_default_dma = pblock+0x25
+
 object_table:
     .ds OBJECT_TABLE_SIZE * 2
 

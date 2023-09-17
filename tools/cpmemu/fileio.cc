@@ -271,6 +271,8 @@ struct file* file_open(cpm_filename_t* filename)
 {
     struct file* f = find_file(filename);
     reopen(f, O_RDONLY);
+	if (f->fd == -1)
+		return nullptr;
     return f;
 }
 
