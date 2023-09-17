@@ -1418,6 +1418,7 @@ zproc exec_slassign
     jsr reset_buffer
     dec v1+STACKVALUE_RANGE_OFFSET ; string ranges are 1-based
     lda v1+STACKVALUE_RANGE_OFFSET
+    jsr check_valid_v0_offset
     ldx #v0
     ldy #0
     jsr buffer_print_partial_stringvalue
@@ -1432,10 +1433,11 @@ zproc exec_slassign
     clc
     lda v1+STACKVALUE_RANGE_OFFSET
     adc v1+STACKVALUE_RANGE_LENGTH
+    jsr check_valid_v0_offset
     tay
     eor #0xff
     sec
-    adc v0+STACKVALUE_RANGE_LENGTH
+    adc v0+STACKVALUE_STRING_LENGTH
     ldx #v0
     jsr buffer_print_partial_stringvalue
 
@@ -1448,6 +1450,17 @@ zproc exec_slassign
     ; ( lvalue newvalue=i0 -- )
 
     jmp exec_assign
+
+check_valid_v0_offset:
+    bmi 1f
+    cmp v0+STACKVALUE_STRING_LENGTH
+    zif_cs
+        zif_ne
+        1:
+            jmp error_invalid_parameter
+        zendif
+    zendif
+    rts
 zendproc
 
 zproc exec_add
@@ -2770,19 +2783,21 @@ zproc buffer_print_partial_stringvalue
     pla
     tax                         ; pop length
 
-    zrepeat
-        txa
-        pha
+    zif_ne
+        zrepeat
+            txa
+            pha
 
-        lda (p0), y
-        jsr buffer_print_char
+            lda (p0), y
+            jsr buffer_print_char
 
-        pla
-        tax
+            pla
+            tax
 
-        iny
-        dex
-    zuntil_eq
+            iny
+            dex
+        zuntil_eq
+    zendif
     rts
 zendproc
 
