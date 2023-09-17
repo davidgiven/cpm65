@@ -716,6 +716,10 @@ error_file_not_found:
     lda #ERROR_FILE_NOT_FOUND
     bne throw_error         ; always taken
 
+error_string_overflow:
+    lda #ERROR_STRING_OVERFLOW
+    bne throw_error         ; always taken
+
 ; Produces the error whose number is in A.
 
 zproc throw_error
@@ -787,6 +791,9 @@ bad_structure_msg:
 file_not_found_msg:
     .ascii "File not foun"
     .byte 'd'|0x80
+string_overflow_msg:
+    .ascii "String overflo"
+    .byte 'w'|0x80
 
 ERROR_CANT_CONTINUE = cant_continue_msg - message_table
 ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
@@ -795,6 +802,7 @@ ERROR_NO_SUCH_VARIABLE = no_such_variable_msg - message_table
 ERROR_STOPPED = stopped_msg - message_table
 ERROR_BAD_STRUCTURE = bad_structure_msg - message_table
 ERROR_FILE_NOT_FOUND = file_not_found_msg - message_table
+ERROR_STRING_OVERFLOW = string_overflow_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -2723,6 +2731,10 @@ zendproc
     ; fall through
 zproc buffer_print_char
     ldx bufferend
+    cpx #0xff - STRING_DATA
+    zif_eq
+        jmp error_string_overflow
+    zendif
     sta text_buffer, x
     inc bufferend
     rts
