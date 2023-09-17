@@ -948,32 +948,18 @@ zproc exec_print
     zif_eq
         jsr buffer_print_i0
     zelse
-        cmp #OTYPE_STRINGLIT
-        beq exec_print_string
-        cmp #OTYPE_STRING
-        beq exec_print_string
-        jmp error_invalid_parameter
+        and #OTYPE_STRING
+        zif_eq
+            jmp error_invalid_parameter
+        zendif
+
+        ldx #v0
+        jsr buffer_print_stringvalue
     zendif
 
 1:
     jsr pop_i0
     jmp print_buffer
-zendproc
-
-zproc exec_print_string
-    ldy #v0
-    ldx #p0
-    jsr get_string_pointer
-    jsr reset_buffer
-
-    ldy #0
-    zrepeat
-        lda (p0), y
-        jsr buffer_print_char
-        iny
-        dec v0+STACKVALUE_STRING_LENGTH
-    zuntil_eq
-    beq 1b
 zendproc
 
 zproc exec_printnl
@@ -1299,16 +1285,11 @@ zproc exec_assign
     lda v0
     cmp #OTYPE_STRINGLIT
     zif_eq
-        copystruct STACKVALUE_SIZE, v0, v2
-
-        lda v2+STACKVALUE_STRING_LENGTH
+        jsr reset_buffer
+        ldx #v0
+        jsr buffer_print_stringvalue
         ldx #v0
         jsr create_string
-
-        ldy #v2             ; source
-        ;ldx #v0            ; destination (preserved above)
-        lda #0              ; destination offset
-        jsr copy_to_string
     zendif
 
     ; Check type of variable.
@@ -1362,72 +1343,34 @@ zproc exec_assign
     jmp pop_i0
 zendproc
 
+; On entry: ( lvalue range newvalue=i0 -- )
 zproc exec_slassign
-    jsr deref_i0            ; value to assign
-    jsr pop_and_deref_i1    ; range
-    jsr pop_i2              ; string lvalue
+    lda #10
+    jsr peek                ; ( lvalue range newvalue lvalue=i0 -- )
+    jsr deref_i0            ; ( lvalue range newvalue source=i0 -- )
+    jsr pop_and_deref_i2    ; ( lvalue range newvalue=i2 source=i0 --)
+    jsr pop_and_deref_i1    ; ( lvalue range=i1 newvalue=i2 source=i0 --)
 
     ldx #v0
+    jsr check_for_string
+    ldx #v2
     jsr check_for_string
     ldx #v1
     jsr coerce_to_range
     
-    ; Get the hash node.
-
-    copy16 i2, p1           ; object ID -> p1
-
-    lda #<global_variables
-    sta p0+0
-    lda #>global_variables
-    sta p0+1
-    jsr hash_deref_ro       ; return ptr to node in p0
-    zif_cs
-        jmp error_no_such_variable
-    zendif
-
-    lda p0+0                ; save p0 (pointer to the hash node)
-    pha
-    lda p0+1
-    pha
-
-    ; Dereference the destination string (because we're going to need to read
-    ; from it).
-
-    jsr deref_i2
-
     ; Copy bytes from the source string into the text buffer.
 
     jsr reset_buffer
-    ldx #p0
-    ldy #v2
-    jsr get_string_pointer
-
     dec v1+STACKVALUE_RANGE_OFFSET ; string ranges are 1-based
+    lda v1+STACKVALUE_RANGE_OFFSET
+    ldx #v0
     ldy #0
-    zloop
-        cpy v1+STACKVALUE_RANGE_OFFSET
-        zbreakif_eq
-
-        lda (p0), y
-        jsr buffer_print_char
-        iny
-    zendloop
+    jsr buffer_print_partial_stringvalue
 
     ; Now the replacement string.
 
-    ldx #p1
-    ldy #v0
-    jsr get_string_pointer
-
-    ldy #0
-    zloop
-        cpy v0+STACKVALUE_STRING_LENGTH
-        zbreakif_eq
-
-        lda (p1), y
-        jsr buffer_print_char
-        iny
-    zendloop
+    ldx #v2
+    jsr buffer_print_stringvalue
 
     ; And now the tail of the source string.
 
@@ -1435,55 +1378,21 @@ zproc exec_slassign
     lda v1+STACKVALUE_RANGE_OFFSET
     adc v1+STACKVALUE_RANGE_LENGTH
     tay
-    zloop
-        cpy v2+STACKVALUE_STRING_LENGTH
-        zbreakif_eq
-
-        lda (p0), y
-        jsr buffer_print_char
-        iny
-    zendloop
+    eor #0xff
+    sec
+    adc v0+STACKVALUE_RANGE_LENGTH
+    ldx #v0
+    jsr buffer_print_partial_stringvalue
 
     ; Create the new string.
 
     ldx #v0
-    lda bufferend
     jsr create_string
-    
-    ldx #p0
-    ldy #v0
-    jsr get_string_pointer
 
-    ldy #0
-    zloop
-        cpy bufferend
-        zbreakif_eq
+    ; At this point the stack is:
+    ; ( lvalue newvalue=i0 -- )
 
-        lda text_buffer, y
-        sta (p0), y
-        iny
-    zendloop
-
-    ; Restore the pointer to the hash node.
-
-    pla
-    sta p0+1
-    pla
-    sta p0+0
-
-    ; Update it.
-
-    ldx #0
-    ldy #OBJECT_TYPE
-    zrepeat
-        lda v0, x
-        sta (p0), y
-
-        iny
-        inx
-        cpx #STACKVALUE_SIZE
-    zuntil_eq
-    rts
+    jmp exec_assign
 zendproc
 
 zproc exec_add
@@ -1496,23 +1405,13 @@ zproc exec_add
     zif_ne
         ; We are adding two strings --- do a concatenation.
 
-        clc
-        lda v0+STACKVALUE_STRING_LENGTH
-        adc v1+STACKVALUE_STRING_LENGTH
-        ldx #v2
-        jsr create_string   ; create the new string object
-
-        ldy #v1             ; source
-        ;ldx #v2            ; destination (preserved above)
-        lda #0              ; destination offset
-        jsr copy_to_string
-
-        ldy #v0             ; source
-        ldx #v2             ; destination
-        lda v1+STACKVALUE_STRING_LENGTH ; destination offset
-        jsr copy_to_string
-
-        copystruct STACKVALUE_SIZE, v2, v0
+        jsr reset_buffer
+        ldx #v1
+        jsr buffer_print_stringvalue
+        ldx #v0
+        jsr buffer_print_stringvalue
+        ldx #v0
+        jsr create_string
         rts
     zendif
 
@@ -2705,6 +2604,52 @@ zproc buffer_print_char
     rts
 zendproc
 
+; On entry:
+;   X - address of v register
+
+zproc buffer_print_stringvalue
+    ldy #0
+    lda STACKVALUE_STRING_LENGTH, x
+zendproc
+    ; fall through
+    
+; On entry:
+;   Y - offset into string to start printing
+;   A - number of characters to print
+;   X - address of v register
+; Uses p0.
+
+zproc buffer_print_partial_stringvalue
+    pha                         ; push length
+    tya
+    pha                         ; push offset
+
+    txa
+    tay
+    ldx #p0
+    jsr get_string_pointer
+
+    pla 
+    tay                         ; pop offset
+    pla
+    tax                         ; pop length
+
+    zrepeat
+        txa
+        pha
+
+        lda (p0), y
+        jsr buffer_print_char
+
+        pla
+        tax
+
+        iny
+        dex
+    zuntil_eq
+    rts
+zendproc
+
 zproc buffer_print_nl
     lda #0x0d
     jsr buffer_print_char
@@ -3334,10 +3279,9 @@ zproc get_string_pointer
     rts
 zendproc
 
-; Creates a new string heap object of size A. The string is uninitialised (i.e.
-; contains garbage).
+; Copies the contents of the text buffer into a new stringdata and sets a v
+; register to a stackvalue pointing at it.
 ; On entry:
-;   A - length of data (not including string header)
 ;   X - pointer to v register
 ; On exit:
 ;   X - preserved
@@ -3346,23 +3290,31 @@ zendproc
 ;   (0,x) - stack value
 
 zproc create_string
-    ; Write the size into the stack value (we're about to reuse that register).
-
-    sta STACKVALUE_STRING_LENGTH, x
-
     ; Create the heap object.
 
     txa
     pha
     
     clc
-    lda STACKVALUE_STRING_LENGTH, x
+    lda bufferend
     adc #STRING_DATA
     sta p1+0
     lda #0
     sta p1+1
     lda #OTYPE_STRINGDATA
     jsr heap_alloc              ; pointer in p0, ID in p1
+
+    ; Copy the text buffer into the stringdata object.
+
+    ldy #STRING_DATA
+    ldx #0
+    zrepeat
+        lda text_buffer, x
+        sta (p0), y
+        iny
+        inx
+        cpx bufferend
+    zuntil_eq
 
     pla
     tax
@@ -3377,52 +3329,8 @@ zproc create_string
     sta STACKVALUE_STRING_ID+1, x
     lda #STRING_DATA
     sta STACKVALUE_STRING_OFFSET, x
-    rts
-zendproc
-
-; Copies the contents of one string into another.
-; On entry:
-;    X - pointer to destination string v register
-;    Y - pointer to source string v register
-;    A - destination offset
-
-zproc copy_to_string
-    pha                         ; push destination offset
-    txa
-    pha
-
-    ; Set up the pointers.
-
-    ; source string pointer already in Y
-    ldx STACKVALUE_STRING_LENGTH, y
-    sta p2+0                    ; save source string length
-    ldx #p0
-    jsr get_string_pointer      ; source data in p0
-
-    pla
-    tay                         ; get destination pointer
-    ldx #p1
-    jsr get_string_pointer      ; destination data in p1
-
-    clc                         ; get absolute pointer to destination data
-    pla                         ; pop destination offset
-    adc p1+0
-    sta p1+0
-    zif_cs
-        inc p1+1
-    zendif
-
-    ; Copy the data.
-
-    ldy p2+0                    ; get source length
-    zloop
-        tya                     ; test Y
-        zbreakif_eq
-        dey
-
-        lda (p0), y
-        sta (p1), y
-    zendloop
+    lda bufferend
+    sta STACKVALUE_STRING_LENGTH, x
     rts
 zendproc
 
