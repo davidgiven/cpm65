@@ -228,6 +228,7 @@ TOKEN_SLICE     = 0x2e
 TOKEN_MKRANGE   = 0x2f
 TOKEN_SLASSIGN  = 0x30
 TOKEN_ENTER     = 0x31
+TOKEN_STR$      = 0x32
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -354,6 +355,7 @@ deftok TOKEN_SLICE,    14, 1, 2, 1, lister_slice,    lister_bad,       exec_slic
 deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
 deftok TOKEN_SLASSIGN, 14, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
+deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1579,6 +1581,15 @@ zproc exec_len
     rts
 zendproc
 
+zproc exec_str$
+    jsr deref_i0
+    jsr coerce_to_integer
+    jsr reset_buffer
+    jsr buffer_print_i0
+    ldx #v0
+    jmp create_string
+zendproc
+
 zproc exec_slice
     jsr deref_i0                ; RHS - slice object
     jsr pop_and_deref_i1        ; LHS - string
@@ -1601,9 +1612,7 @@ zproc exec_slice
     lda v0+STACKVALUE_RANGE_OFFSET
     adc v0+STACKVALUE_RANGE_LENGTH
     cmp v1+STACKVALUE_STRING_LENGTH
-    zif_cs
-        bne 1b
-    zendif
+    bcs 1b
 
     ldy v0+STACKVALUE_RANGE_LENGTH
     copystruct STACKVALUE_SIZE, v1, v0
@@ -5411,6 +5420,7 @@ leaf_rule:
     P_TRY not_rvalue_rule
     P_TRY sgn_rvalue_rule
     P_TRY len_rvalue_rule
+    P_TRY str$_rvalue_rule
     P_TRY free_rvalue_rule
     P_TRY true_rvalue_rule
     P_TRY false_rvalue_rule
@@ -5467,6 +5477,13 @@ keyword_len = . + 1
     P_TOKEN 'L', 'E', 'N'|0x80
     P_COMMIT
     P_SHUNT TOKEN_LEN
+    P_JMP leaf_rule
+
+str$_rvalue_rule:
+keyword_str$ = . + 1
+    P_TOKEN 'S', 'T', 'R', '$'|0x80
+    P_COMMIT
+    P_SHUNT TOKEN_STR$
     P_JMP leaf_rule
 
 free_rvalue_rule:
