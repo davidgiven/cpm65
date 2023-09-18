@@ -381,6 +381,28 @@ OBJECT_TABLE_SIZE = 256
 
 zproc main
     jsr clear
+    lda cpm_fcb + FCB_F1
+    cmp #' '
+    zif_ne
+        ; The user specified a filename on the command line. Do a ENTER for it.
+        
+        lda #<cpm_fcb
+        ldx #>cpm_fcb
+        ldy #BDOS_OPEN_FILE
+        jsr BDOS
+        zif_cs
+            lda #<file_not_found_msg
+            ldx #>file_not_found_msg
+            jsr print_string
+            jmp print_nl
+        zendif
+
+        ; Configure to read characters from the file rather than from the console.
+
+        lda #0
+        sta enteroffset
+        jmp destroy_stack
+    zendif
 error_return:
     ; Read characters from the console.
 
@@ -5517,10 +5539,6 @@ keyword_one:
 .data
 
 .bss
-pblock: .ds 165
-cpm_fcb         = pblock
-cpm_fcb2        = pblock+16
-cpm_default_dma = pblock+0x25
 
 object_table:
     .ds OBJECT_TABLE_SIZE * 2
