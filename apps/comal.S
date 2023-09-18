@@ -229,6 +229,7 @@ TOKEN_MKRANGE   = 0x2f
 TOKEN_SLASSIGN  = 0x30
 TOKEN_ENTER     = 0x31
 TOKEN_STR$      = 0x32
+TOKEN_BYE       = 0x33
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -356,6 +357,7 @@ deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkra
 deftok TOKEN_SLASSIGN, 14, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
 deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
+deftok TOKEN_BYE,       0, 1, 1, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1941,6 +1943,11 @@ zproc check_i0_is_integer
 zendproc
 
 ; --- File handline ---------------------------------------------------------
+
+zproc exec_bye
+    ldy #BDOS_EXIT_PROGRAM
+    jmp BDOS
+zendproc
 
 zproc exec_enter
     jsr deref_i0
@@ -4990,6 +4997,7 @@ simple_statement_rule:
     P_TRY print_rule
     P_TRY assignment_rule
     P_TRY stop_rule
+    P_TRY bye_rule
     P_PANIC
 
 lineentry_rule:
@@ -5083,6 +5091,13 @@ stop_rule:
 keyword_stop = . + 1
     P_TOKEN 'S', 'T', 'O', 'P'|0x80
     P_EMIT TOKEN_STOP
+    P_EOL
+    P_RETURN
+
+bye_rule:
+keyword_bye = . + 1
+    P_TOKEN 'B', 'Y', 'E'|0x80
+    P_EMIT TOKEN_BYE
     P_EOL
     P_RETURN
 
