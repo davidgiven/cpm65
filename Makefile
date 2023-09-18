@@ -80,7 +80,7 @@ CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/biosbdos.o \
 	$(OBJDIR)/third_party/lib6502/lib6502.o \
 
-all: $(TARGETS)
+all: $(TARGETS) comal-tests
 
 $(OBJDIR)/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)
@@ -400,3 +400,4 @@ clean:
 .DELETE_ON_ERROR:
 .SECONDARY:
 
+include tests/comal/build.mk
