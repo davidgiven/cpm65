@@ -358,7 +358,7 @@ static void debug(void)
     }
 }
 
-static int rts(void)
+static void rts(void)
 {
     uint16_t pc;
     pc = (uint16_t)ram[++cpu->registers->s + 0x100];
