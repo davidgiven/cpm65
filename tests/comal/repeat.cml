@@ -1,0 +1,9 @@
+10i=1
+20repeat
+30i=i+1
+40print i
+50until i=10
+run
+list
+bye
+

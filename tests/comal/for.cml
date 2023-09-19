@@ -1,0 +1,12 @@
+10for i=1 to 10
+20print i
+30next
+40for i=10 to 1 step -1
+50print i
+60next
+70for i=1 to 3 print i
+80for i=3 to 1 print i
+run
+list
+bye
+

@@ -7,5 +7,7 @@
 70 print "1", "2"
 80 print "line1",
 90 print "line2"
-100 bye
 run
+list
+bye
+

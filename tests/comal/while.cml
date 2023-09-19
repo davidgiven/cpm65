@@ -1,0 +1,11 @@
+10i=1
+20while i <> 10
+30i=i+1
+40print i
+50endwhile
+60while i <> 0 i=i-1
+70print i
+run
+list
+bye
+
