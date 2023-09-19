@@ -1315,12 +1315,12 @@ begin
 
   if warning_mes<>warning_old then begin
 
-   TextColor(LIGHTCYAN);
+   //TextColor(LIGHTCYAN);
 
    writeln(warning_mes);
    warning_old:=warning_mes;
 
-   NormVideo;
+   //NormVideo;
   end;
 
  end;
@@ -1481,14 +1481,14 @@ begin
  for a:=0 to High(messages)-1 do
   {if messages[a].pas < pass_max then} begin
 
-   if messages[a].col <> 0 then TextColor(messages[a].col);
+   //if messages[a].col <> 0 then TextColor(messages[a].col);
 
    if a>0 then
     write(#13#10,messages[a].mes)
    else
     write(messages[a].mes);
 
-   NormVideo;
+   //NormVideo;
 
    for b:=High(messages)-1 downto 0 do    // usuwamy powtarzajace sie komunikaty
 //    if messages[b].pas=messages[a].pas then
@@ -15552,12 +15552,12 @@ procedure Syntax;
 (*----------------------------------------------------------------------------*)
 var s: string;
 begin
- TextColor(WHITE);
+ //TextColor(WHITE);
  Writeln(Tab2Space(load_mes(mads_version)));
 
- TextColor(DARKGRAY);
+ //TextColor(DARKGRAY);
  Writeln(Tab2Space(load_mes(mads_version-2)));
- NormVideo;
+ //NormVideo;
 
  halt(3);
 end;

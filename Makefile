@@ -100,7 +100,7 @@ bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
 
 bin/mads: third_party/mads/mads.pas
 	@mkdir -p $(dir $@)
-	$(FPC) -Mdelphi -vh -Os $< -o$@
+	TERM=simple $(FPC) -Mdelphi -vh -Os $< -o$@
 
 $(OBJDIR)/mkcombifs: $(OBJDIR)/tools/mkcombifs.o
 	@mkdir -p $(dir $@)
@@ -134,7 +134,7 @@ $(OBJDIR)/third_party/altirrabasic/%.bin: \
 		$(OBJDIR)/xextobin
 	@mkdir -p $(dir $@)
 	rm -f $(patsubst %.bin,%.xex,$@)
-	bin/mads third_party/altirrabasic/source/atbasic.s \
+	TERM=simple bin/mads third_party/altirrabasic/source/atbasic.s \
 		-c \
 		-o:$(patsubst %.bin,%.xex,$@) \
 		-s \

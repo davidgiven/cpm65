@@ -1,0 +1,14 @@
+10a$="123"
+20if false print a$(1), a$(2), a$(3)
+30if false print a$(1:2), a$(2:3)
+40if false print a$(1:3)
+50a$(1:2)="ab"
+60print a$
+70a$(2:3)="cd"
+80print a$
+90a$(1:3)="replacement"
+100print a$
+run
+list
+bye
+

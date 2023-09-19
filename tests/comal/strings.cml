@@ -1,0 +1,13 @@
+10a$="123"
+20print a$
+30print a$+a$
+40a$="abc"+a$
+50print a$
+60b$=a$
+70print a$,b$
+80b$="zzz"
+90print a$,b$
+run
+list
+bye
+
