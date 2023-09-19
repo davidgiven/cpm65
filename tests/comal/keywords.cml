@@ -1,0 +1,42 @@
+10stop
+20bye
+40repeat
+50until false
+60while true
+70endwhile
+75while true do print
+80for i:=1 to 10 step 1 do print
+90for i=1 to 10 print
+100endfor
+110next
+120if true
+130else
+140endif
+150elif true
+160if true then print
+170a=1
+180a:=1
+190a=1; b=2; c=3
+200print
+210print 1
+220print 1,2,3
+230print 1,2,3,
+240print 1;2;3;
+250a$=a$(1:3)
+260a$=a$(1)
+270a=a+b-c*d/e mod f
+280a=a=b<>c<=d<e>=f>g
+290print (a+b)
+300print not(a)
+310print sgn(a)
+320print len(a)
+330print str$(a)
+340print free
+350print true
+360print false
+370print 9999
+380print -(9999)
+390print "literal"
+list
+bye
+
