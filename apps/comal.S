@@ -1636,7 +1636,9 @@ zproc exec_slice
     lda v0+STACKVALUE_RANGE_OFFSET
     adc v0+STACKVALUE_RANGE_LENGTH
     cmp v1+STACKVALUE_STRING_LENGTH
-    bcs 1b
+    zif_ne
+        bcs 1b
+    zendif
 
     ldy v0+STACKVALUE_RANGE_LENGTH
     copystruct STACKVALUE_SIZE, v1, v0
