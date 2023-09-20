@@ -3959,12 +3959,13 @@ zproc lister_varref
     ldx #p0
     jsr deref_object
 
+    clc
+    lda p0+0
+    adc #ATOM_DATA
     ldx p0+1
-    inc p0+0
-    zif_eq
+    zif_cs
         inx
     zendif
-    lda p0+0
     jmp buffer_print_string
 zendproc
 
