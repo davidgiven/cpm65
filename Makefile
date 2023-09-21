@@ -35,7 +35,6 @@ MINIMAL_APPS = \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
-	$(OBJDIR)/comal.com \
 	apps/dump.asm \
 	apps/ls.asm \
 	apps/cpm65.inc \
@@ -45,6 +44,7 @@ APPS = \
 	$(MINIMAL_APPS) \
 	$(OBJDIR)/third_party/altirrabasic/atbasic.com \
 	$(OBJDIR)/objdump.com \
+	$(OBJDIR)/comal.com \
 	apps/bedit.asm \
 	apps/dinfo.asm \
 	cpmfs/asm.txt \
