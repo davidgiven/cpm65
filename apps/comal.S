@@ -1268,7 +1268,8 @@ zendproc
 ; Converts TOS to -1, 0, 1
 zproc exec_sgn
     jsr deref_i0
-    jsr check_i0_is_integer
+    ldx #v0
+    jsr coerce_to_integer
     lda i0+3                ; check top byte
     bmi set_i0_to_mone
 
@@ -1551,7 +1552,8 @@ zendproc
 
 zproc exec_neg
     jsr deref_i0
-    jsr check_i0_is_integer
+    ldx #v0
+    jsr coerce_to_integer
 
     ldx #-4 & 0xff
     sec
@@ -1921,22 +1923,24 @@ zendproc
 
 zproc coerce_i0_and_i1_to_numeric
 coerce_i0_and_i1_to_integer:
+    ldx #v0
     lda v0
     cmp v1
-    beq check_i0_is_integer
+    beq coerce_to_integer
     jsr error_invalid_parameter
 zendproc
 
 zproc coerce_i0_and_i2_to_numeric
+    ldx #v0
     lda v0
     cmp v2
-    beq check_i0_is_integer
+    beq coerce_to_integer
     jsr error_invalid_parameter
 zendproc
 
 coerce_to_integer:
-zproc check_i0_is_integer
-    lda v0
+zproc check_is_integer
+    lda 0, x
     cmp #OTYPE_INTEGER
     zif_ne
         jsr error_invalid_parameter
