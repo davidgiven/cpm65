@@ -16,7 +16,7 @@ static uint8_t mem_end;
 static uint16_t tpa;
 static _Bool warmboot = false;
 
-int main() {
+void main() {
     if (!*FILDAT) {                                     // first run
         tpa = cpm_bios_gettpa();
         mem_base = tpa & 0xff;
@@ -37,7 +37,8 @@ int main() {
 
             cpm_printstring("first run, reserving low memory\r\n"
                             "run again to change font\r\n");
-            return 0;
+
+            return;
         }
     } 
 
@@ -67,12 +68,9 @@ int main() {
 
     *CHBAS = *FILDAT;                       // set font
 
+errout:
     if (warmboot) {
         cpm_get_set_user(0);                // assure we can read CCP.SYS
         cpm_warmboot();
     }
-    return 0;
-
-errout:
-    return 1;
 }

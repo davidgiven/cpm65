@@ -24,10 +24,9 @@ ZEROPAGE
 ptr = FMSZPG
 ptr1 = FMSZPG+2
 
-save_x = FMSZPG+4
-save_y = FMSZPG+5
+save_y = FMSZPG+4
 
-; 1 byte of FMSZPG left
+; 2 bytes of FMSZPG left
 
 charin = PTEMP      ; temporary on ZP that we don't use
 charout = PTEMP
@@ -41,7 +40,7 @@ cursory = ROWCRS
     .text
 
 ; Boot code and initialization is ran only once. Eventually it is overwritten
-; by the directory buffer/
+; by the directory buffer.
 
 .global _start
 
@@ -54,12 +53,12 @@ _start:
     .byte 0
 
 #ifdef ATARI_XL
-    .byte 16            ; (filesize(atari800xlhd.exe)+127)/128
+    .byte 17            ; (filesize(atari800xlhd.exe)+127)/128
 #else
 #   ifdef ATARI_HD
-        .byte 12        ; (filesize(atari800hd.exe)+127)/128
+        .byte 13        ; (filesize(atari800hd.exe)+127)/128
 #   else
-        .byte 12        ; (filesize(atari800.exe)+127)/128
+        .byte 13        ; (filesize(atari800.exe)+127)/128
 #   endif
 #endif
 
@@ -400,11 +399,11 @@ screen_jmptable_lo:
     jmptablo screen_putchar
     jmptablo screen_putstring
     jmptablo screen_getchar
-    jmptablo fail
+    jmptablo screen_showcursor
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
-    jmptablo fail
+    jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -414,11 +413,11 @@ screen_jmptable_hi:
     jmptabhi screen_putchar
     jmptabhi screen_putstring
     jmptabhi screen_getchar
-    jmptabhi fail
+    jmptabhi screen_showcursor
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-    jmptabhi fail
+    jmptabhi screen_setstyle
 zendproc
 
 zproc fail
@@ -438,22 +437,29 @@ zproc screen_getsize
 zendproc
 
 zproc screen_clear
-    lda #0
-    zrepeat
-        pha
-        jsr calculate_line_address
+    lda SAVMSC
+    sta ptr
+    lda SAVMSC+1
+    sta ptr+1
 
+    ldx #SCREEN_HEIGHT              ; count lines
+    zrepeat
         ldy #SCREEN_WIDTH-1
-        lda #0                      ; screen memory space
+        lda #0                      ; screen memory space character
         zrepeat
             sta (ptr), y
             dey
         zuntil_mi
 
-        pla
+        lda ptr
         clc
-        adc #1
-        cmp #SCREEN_HEIGHT
+        adc #SCREEN_WIDTH
+        sta ptr
+        zif_cs
+            inc ptr+1
+        zendif
+
+        dex
     zuntil_eq
 
     ; SCREEN doesn't specify where the cursor ends up, but this code is used by
@@ -462,16 +468,26 @@ zproc screen_clear
     lda #0
     sta cursorx
     sta cursory
-    jmp show_cursor 
+    rts
 zendproc
 
+; On top of the official specification, we clip (A,X) at the screen edges
+
 zproc screen_setcursor
-    pha
-    jsr hide_cursor
-    pla
+    cmp #SCREEN_WIDTH
+    zif_cs
+        lda #SCREEN_WIDTH-1
+    zendif
     sta cursorx
-    stx cursory
-    jmp show_cursor
+
+    txa
+    cmp #SCREEN_HEIGHT
+    zif_cs
+        lda #SCREEN_HEIGHT-1
+    zendif
+    sta cursory
+
+    rts
 zendproc
 
 zproc screen_getcursor
@@ -480,7 +496,40 @@ zproc screen_getcursor
     rts
 zendproc
 
+; XZ = timeout in cs
+
 zproc screen_getchar
+    sta ptr
+    stx ptr+1
+
+    clc
+    ror ptr+1                       ; divide be two, we can only count
+    ror ptr                         ; two centiseconds at a time
+
+    ldy RTCLOK                      ; incremented every 1/50th of a second
+    iny
+
+    zloop
+        ldx CH
+        inx
+        zbreakif_eq                 ; break if key is pending
+        cpy RTCLOK
+        zif_eq
+            iny
+            lda ptr
+            zif_eq
+                dec ptr+1
+                ldx ptr+1
+                cpx #$ff
+                zif_eq
+                    sec             ; timer expired
+                    rts
+                zendif
+            zendif
+            dec ptr
+        zendif
+    zendloop
+
     jsr tty_conin
     clc
     rts
@@ -491,6 +540,9 @@ zproc screen_putchar
     jsr calculate_cursor_address
     pla
     jsr convert_ascii_to_screencode
+    ldy cursorx
+style=.+1
+    eor #$00
     sta (ptr), y
 
     lda cursorx
@@ -503,8 +555,8 @@ zproc screen_putchar
 zendproc
 
 zproc screen_putstring
-    sta 1f+0
-    stx 1f+1
+    sta 1f+1
+    stx 1f+2
 
     jsr calculate_cursor_address
     ldx #0
@@ -516,24 +568,32 @@ zproc screen_putstring
         jsr convert_ascii_to_screencode
         sta (ptr), y
         iny
+        cpy #SCREEN_WIDTH
+        zbreakif_eq
         inx
     zendloop
+    dey
+    sty cursorx
+
     rts
 zendproc
 
 zproc screen_scrollup
-    jsr hide_cursor
-    ldx #0              ; current line
+    lda SAVMSC
+    sta ptr1
+    lda SAVMSC+1
+    sta ptr1+1          ; ptr1 is dest pointer
+    sta ptr+1           ; ptr is source pointer, first source is on same page
+
+    ldx #SCREEN_HEIGHT-1              ; count lines
     zrepeat
-        txa
-        jsr calculate_line_address
-        lda ptr+0
-        sta ptr1+0
-        lda ptr+1
-        sta ptr1+1      ; ptr1 is dest pointer
-        inx
-        txa
-        jsr calculate_line_address ; ptr is source pointer
+        lda ptr1
+        clc
+        adc #SCREEN_WIDTH
+        sta ptr
+        zif_cs
+            inc ptr+1
+        zendif
 
         ldy #SCREEN_WIDTH-1
         zrepeat
@@ -542,7 +602,12 @@ zproc screen_scrollup
             dey
         zuntil_mi
 
-        cpx #SCREEN_HEIGHT-1
+        lda ptr
+        sta ptr1
+        lda ptr+1
+        sta ptr1+1
+
+        dex
     zuntil_eq
 
     ldy #SCREEN_WIDTH-1
@@ -551,24 +616,28 @@ zproc screen_scrollup
         sta (ptr), y
         dey
     zuntil_mi
-    jsr show_cursor
     rts
 zendproc
 
 zproc screen_scrolldown
-    jsr hide_cursor
+    lda SAVMSC
+    clc
+    adc #<((SCREEN_HEIGHT-1)*SCREEN_WIDTH)
+    sta ptr1
+    lda SAVMSC+1
+    adc #>((SCREEN_HEIGHT-1)*SCREEN_WIDTH)
+    sta ptr1+1              ; ptr1 is dest pointer
+    sta ptr+1               ; ptr is source pointer, first time on same page
+
     ldx #SCREEN_HEIGHT-1             ; current line
     zrepeat
-        txa
-        jsr calculate_line_address
-        lda ptr+0
-        sta ptr1+0
-        lda ptr+1
-        sta ptr1+1      ; ptr1 is dest pointer
-
-        dex
-        txa
-        jsr calculate_line_address ; ptr is source pointer
+        lda ptr1
+        sec
+        sbc #SCREEN_WIDTH-1
+        sta ptr
+        zif_cc
+            dec ptr+1
+        zendif
 
         ldy #SCREEN_WIDTH-1
         zrepeat
@@ -577,7 +646,12 @@ zproc screen_scrolldown
             dey
         zuntil_mi
 
-        cpx #0
+        lda ptr1
+        sta ptr
+        lda ptr1+1
+        sta ptr+1
+
+        dex
     zuntil_eq
 
     ldy #SCREEN_WIDTH-1
@@ -586,12 +660,10 @@ zproc screen_scrolldown
         sta (ptr), y
         dey
     zuntil_mi
-    jsr show_cursor
     rts
 zendproc
 
 zproc screen_cleartoeol
-; cursor is overwritten
     jsr calculate_cursor_address
 
     lda #0                          ; screen memory space
@@ -601,7 +673,7 @@ zproc screen_cleartoeol
         cpy #SCREEN_WIDTH
     zuntil_eq
 
-    jmp show_cursor
+    rts
 zendproc
 
 ; --- TTY DRIVER ------------------------------------------------------------
@@ -609,6 +681,8 @@ zendproc
 ; Blocks and waits for the next keypress; returns it in A.
 
 zproc tty_conin
+    jsr toggle_cursor
+
     ldx #1*16
     lda #CGBIN
     sta ICCOM,x
@@ -632,21 +706,24 @@ zproc tty_conin
     cmp #ATARI_EOL
     zif_eq
         lda #13
-        rts
+        bne 1f
     zendif
 
     cmp #ATARI_BS
     zif_eq
         lda #127            ; DEL not BS
-        rts
+        bne 1f
     zendif
 
     cmp #ATARI_TAB
     zif_eq
         lda #9
-;        rts    [[fallthrough]]
-    zendif
+    zendif                  ; fallthrough
 
+1:
+    pha
+    jsr toggle_cursor
+    pla
     rts
 zendproc
 
@@ -666,14 +743,11 @@ zendproc
 ; Output character in A
 
 zproc tty_conout
-    pha
-    jsr hide_cursor
-    pla
     cmp #13
     zif_eq
         lda #0
         sta cursorx
-        jmp show_cursor
+        rts
     zendif
     cmp #127
     zif_eq
@@ -690,8 +764,8 @@ zproc tty_conout
             zendif
         zendif
         jsr calculate_cursor_address
-        lda #$80            ; screen memory inverse space saves show_cursor
-        sta (ptr), y
+        lda #0                        ; cursor overwrites old character
+        sta (ptr),y
         rts
     zendif
     cmp #10
@@ -707,7 +781,7 @@ zproc tty_conout
     cmp #SCREEN_WIDTH-1
     beq write_nl
 
-    jmp show_cursor
+    rts
 zendproc
 
 zproc write_nl
@@ -721,7 +795,7 @@ zproc write_nl
         dec cursory
         jmp screen_scrollup
     zendif
-    jmp show_cursor
+    rts
 zendproc
 
 ; Preserves X and Y.
@@ -742,13 +816,11 @@ zproc convert_ascii_to_screencode
 zendproc
 
 ; Sets (ptr), y to the location of the cursor.
+
 zproc calculate_cursor_address
     ldy cursorx
     lda cursory
-    ; fall through
-zendproc
-; Sets ptr to the address of screen line A.
-zproc calculate_line_address
+
     ; x*40 = x*8 + x*32.
 
     ; We have 24 lines. As 24*8 will fit in a byte, we can do this easily.
@@ -783,22 +855,35 @@ zproc calculate_line_address
     and #3
     adc SAVMSC+1
     sta ptr+1
-
     rts
 
-zproc hide_cursor
+zproc toggle_cursor
     jsr calculate_cursor_address
     lda (ptr),y
-    and #$7f
+    eor #$80
     sta (ptr),y
     rts
 zendproc
 
-zproc show_cursor
-    jsr calculate_cursor_address
-    lda (ptr),y
-    ora #$80
-    sta (ptr),y
+zproc screen_showcursor
+    cmp #0
+    zif_eq
+        lda #$60            ; rts instruction
+    zelse
+        lda #$20            ; jsr instruction
+    zendif
+    sta toggle_cursor
+    rts
+zendproc
+
+zproc screen_setstyle
+    cmp #STYLE_REVERSE
+    zif_eq
+        lda #$80
+    zelse
+        lda #0
+    zendif
+    sta style
     rts
 zendproc
 

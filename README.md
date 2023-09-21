@@ -214,6 +214,10 @@ these Debian packages:
     on the padding needed for alignment), but shows proper glyphs like curly
     braces and tilde.
 
+  - It also contains a loadable software 80 columns driver called
+    ```tty80drv.com```. This will cost you 7kB of TPA for driver code,
+    font data, and screen memory. It has a full SCREEN implementation, too.
+
 ### Oric notes
 
   - This disk image is a MFM_DISK format disk as used by Oricutron. (If you need

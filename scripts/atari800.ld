@@ -19,7 +19,7 @@
 MEMORY {
     zp : ORIGIN = 0x80, LENGTH = 0x80
     ram (rw) : ORIGIN = 0x500, LENGTH = 0x800
-    midram(rw) : ORIGIN = 0x3000, LENGTH = 0x800
+    midram(rw) : ORIGIN = 0x3000, LENGTH = 0xc00
 }
 
 SECTIONS {
