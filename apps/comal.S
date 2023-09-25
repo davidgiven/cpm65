@@ -230,6 +230,9 @@ TOKEN_SLASSIGN  = 0x30
 TOKEN_ENTER     = 0x31
 TOKEN_STR$      = 0x32
 TOKEN_BYE       = 0x33
+TOKEN_PROC      = 0x34
+TOKEN_ENDPROC   = 0x35
+TOKEN_PROCCALL  = 0x36
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -250,12 +253,19 @@ P_EOL_OP         = 15
 P_PAREN_OP       = 16
 P_SUCCEED_OP     = 17
 P_STRING_OP      = 18
+P_PARAM_OP       = 19
+P_FLUSH_AND_EMIT_VARARG_OP = 20
 
 .set tokenvalue, 0
 
 .data 1
 token_precedence_table:
 .data 2
+; Each byte is: pPPPssss
+; where:
+;    p = number of pushes
+;    P = number of pops (7 = special)
+;    s = byte size of token (0 = special)
 token_size_table:
 .data 3
 token_listers_hi:
@@ -358,6 +368,9 @@ deftok TOKEN_SLASSIGN, 15, 1, 3, 0, lister_slassign, lister_bad,       exec_slas
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
 deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
 deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
+deftok TOKEN_PROC,      0, 2, 7, 0, lister_proc,     keyword_proc,     exec_bad,       check_nop
+deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_bad,       check_nop
+deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_bad,       check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -378,6 +391,8 @@ defpop pop_eol
 defpop pop_paren
 defpop pop_succeed
 defpop pop_string
+defpop pop_param
+defpop pop_flush_and_emit_vararg
 
 OBJECT_TABLE_SIZE = 256
 
@@ -3721,6 +3736,11 @@ zproc list_line
         lsr a
         lsr a
         lsr a
+        cmp #7                          ; is this a special size?
+        zif_eq
+            iny
+            lda (execlineptr), y        ; read pop count from next byte
+        zendif
         tax
         jmp 1f
         zrepeat
@@ -3915,6 +3935,61 @@ zproc lister_if
     lda #<keyword_then
     ldx #>keyword_then
     jmp buffer_print_separated_string
+zendproc
+
+zproc lister_proc
+    jsr lister_simple
+    jsr buffer_print_space
+
+lister_proccall:
+    ldx listerroot
+    ldy operator_stack+0, x     ; get bytecode pointer
+    iny
+    lda (execlineptr), y        ; get number of parameters
+    pha
+
+    clc
+    adc listerroot
+    tay
+    ldx operator_stack, y       ; get tree address of last parameter
+    jsr list_clause
+
+    pla
+    cmp #1
+    beq 1f                      ; just the identifier parameter
+
+    pha
+    lda #'('
+    jsr buffer_print_char
+
+    zloop
+        pla
+        sec
+        sbc #1
+        zbreakif_eq
+
+        pha
+        clc
+        adc listerroot
+        tay
+        ldx operator_stack, y   ; get tree address of parameter
+        jsr list_clause
+
+        pha
+        lda #<keyword_comma
+        ldx #>keyword_comma
+        jsr buffer_print_separated_string
+        pla
+    zendloop
+
+    dec bufferend               ; retract over the ", "
+    dec bufferend
+
+    lda #')'
+    jsr buffer_print_char
+    
+1:
+    rts
 zendproc
 
 zproc lister_print
@@ -4278,6 +4353,9 @@ zendproc
 
 ; Unstacks operators down to and including a parenthesis marker (or the stack
 ; is empty).
+;
+; Returns:
+;   A = the parameter count, if this is a parameter list
 
 zproc unstack_operators
     zloop
@@ -4288,6 +4366,8 @@ zproc unstack_operators
 
         lda operator_stack, x
         zif_eq                  ; parenthesis marker
+            lda operator_stack-1, x
+            dec opstackptr
             dec opstackptr
             rts
         zendif
@@ -4565,15 +4645,41 @@ zendproc
 zproc pop_paren
     ldy #0
     jsr stack_operator
+    jsr stack_operator
     jmp parse_next_1
 zendproc
 
-zproc pop_endparen
+zproc pop_param
+    ldx opstackptr
+    lda operator_stack, x
+    zif_ne
+        brk
+    zendif
+
+    inc operator_stack-1, x
+    zif_eq
+        jmp error_invalid_parameter
+    zendif
+    jmp parse_next_1
 zendproc
 
 zproc pop_flush
     jsr unstack_operators
     jmp parse_next_1
+zendproc
+
+zproc pop_flush_and_emit_vararg
+    jsr unstack_operators
+    pha
+
+    ldy #1
+    lda (parsecmd), y
+    jsr queue_bytecode
+    
+    pla
+    jsr queue_bytecode
+
+    jmp parse_next_2
 zendproc
 
 zproc parser_skip_whitespace
@@ -4980,6 +5086,15 @@ zendproc
     .byte P_STRING_OP
 .endm
 
+.macro P_PARAM
+    .byte P_PARAM_OP
+.endm
+
+.macro P_FLUSH_AND_EMIT_VARARG token
+    .byte P_FLUSH_AND_EMIT_VARARG_OP
+    .byte \token
+.endm
+
 immediate_statement_rule:
     P_TRY lineentry_rule
     P_TRY list_rule
@@ -4999,12 +5114,15 @@ statement_rule:
     P_TRY else_rule
     P_TRY elif_rule
     P_TRY endif_rule
+    P_TRY proc_rule
+    P_TRY endproc_rule
     P_TRY eol_rule
 simple_statement_rule:
     P_TRY print_rule
-    P_TRY assignment_rule
     P_TRY stop_rule
     P_TRY bye_rule
+    P_TRY proccall_rule
+    P_TRY assignment_rule
     P_PANIC
 
 lineentry_rule:
@@ -5265,6 +5383,73 @@ keyword_do = . + 1
     P_TOKEN 'D', 'O'|0x80
     P_RETURN
 
+proc_rule:
+keyword_proc = . + 1
+    P_TOKEN 'P', 'R', 'O', 'C'|0x80
+    P_WORD
+    P_PAREN
+    P_PARAM ; counts the procedure name
+    P_JSR optional_parameter_list_rule
+    P_FLUSH_AND_EMIT_VARARG TOKEN_PROC
+    P_EOL
+    P_RETURN
+
+optional_parameter_list_rule:
+    P_TRY eol_rule
+    P_EAGER_TOKEN '('|0x80
+    P_COMMIT
+    P_TRY end_parameter_list_rule
+1:
+    P_COMMIT
+    P_WORD
+    P_PARAM
+    P_TRY end_parameter_list_rule
+    P_EAGER_TOKEN ','|0x80
+    P_JMP 1b
+
+single_parameter_list_rule:
+    P_WORD
+end_parameter_list_rule:
+    P_EAGER_TOKEN ')'|0x80
+    P_RETURN
+
+endproc_rule:
+keyword_endproc = . + 1
+    P_TOKEN 'E', 'N', 'D', 'P', 'R', 'O', 'C'|0x80
+    P_EMIT TOKEN_ENDPROC
+    P_EOL
+    P_RETURN
+
+proccall_rule:
+    P_WORD
+    P_PAREN
+    P_PARAM ; counts the procedure name
+    P_JSR optional_argument_list_rule
+    P_FLUSH_AND_EMIT_VARARG TOKEN_PROCCALL
+    P_EOL
+    P_RETURN
+
+optional_argument_list_rule:
+    P_TRY eol_rule
+    P_EAGER_TOKEN '('|0x80
+    P_TRY end_argument_list_rule
+1:
+    P_PAREN
+    P_JSR expr_rule
+    P_FLUSH
+    P_PARAM
+    P_TRY end_argument_list_rule
+    P_EAGER_TOKEN ','|0x80
+    P_JMP 1b
+
+single_argument_list_rule:
+    P_PAREN
+    P_JSR expr_rule
+    P_FLUSH
+end_argument_list_rule:
+    P_EAGER_TOKEN ')'|0x80
+    P_RETURN
+    
 assignment_rule:
     P_JSR assignment_kind_rule
     P_COMMIT
@@ -5557,6 +5742,8 @@ keyword_mone:
     .byte '-'
 keyword_one:
     .byte '1'|0x80
+keyword_comma:
+    .byte ','|0x80
 
 .data
 
