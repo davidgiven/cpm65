@@ -103,7 +103,7 @@
 230 PRINT 1, 2, 3,
 240 PRINT 1, 2, 3,
 250 a$ := a$(1 : 3)
-260 a$ := a$1
+260 a$ := a$(1)
 270 a := a + b - c * d / e MOD f
 280 a := a = b <> c <= d < e >= f > g
 290 PRINT a + b

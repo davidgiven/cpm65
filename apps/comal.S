@@ -308,7 +308,7 @@ pop_exec_lo:
 
 deftok TOKEN_EOL,      15, 1, 0, 0, lister_bad,      lister_bad,       exec_bad,       check_nop
 deftok TOKEN_VARREF,   15, 3, 0, 1, lister_varref,   lister_bad,       exec_varref,    check_nop
-deftok TOKEN_INTEGER,  15, 5, 0, 1, lister_integer,  lister_bad,       exec_integer,   check_nop
+deftok TOKEN_INTEGER,  14, 5, 0, 1, lister_integer,  lister_bad,       exec_integer,   check_nop
 deftok TOKEN_MUL,      10, 1, 2, 1, lister_infix,    keyword_mul,      exec_mul,       check_nop
 deftok TOKEN_DIV,      10, 1, 2, 1, lister_infix,    keyword_div,      exec_div,       check_nop
 deftok TOKEN_ADD,       9, 1, 2, 1, lister_infix,    keyword_add,      exec_add,       check_nop
@@ -319,10 +319,10 @@ deftok TOKEN_PRINTNL,   0, 1, 0, 0, lister_printnl,  lister_bad,       exec_prin
 deftok TOKEN_ASSIGN,    0, 1, 2, 0, lister_assign,   keyword_assign,   exec_assign,    check_nop
 deftok TOKEN_NEG,      14, 1, 1, 1, lister_prefix,   keyword_neg,      exec_neg,       check_nop
 deftok TOKEN_LINEENTRY, 0, 1, 1, 0, lister_nop,      lister_bad,       exec_lineentry, check_nop
-deftok TOKEN_ZERO,     15, 1, 0, 1, lister_simple,   keyword_zero,     exec_zero,      check_nop
+deftok TOKEN_ZERO,     14, 1, 0, 1, lister_simple,   keyword_zero,     exec_zero,      check_nop
 deftok TOKEN_LIST,      0, 1, 2, 0, lister_nop,      lister_bad,       exec_list,      check_nop
 deftok TOKEN_DEL,       0, 1, 2, 0, lister_nop,      lister_bad,       exec_del,       check_nop
-deftok TOKEN_MONE,     15, 1, 0, 1, lister_simple,   keyword_mone,     exec_mone,      check_nop
+deftok TOKEN_MONE,     14, 1, 0, 1, lister_simple,   keyword_mone,     exec_mone,      check_nop
 deftok TOKEN_RENUM,     0, 1, 2, 0, lister_nop,      lister_bad,       exec_renum,     check_nop
 deftok TOKEN_RUN,       0, 1, 0, 0, lister_nop,      lister_bad,       exec_run,       check_nop
 deftok TOKEN_STOP,      0, 1, 0, 0, lister_simple,   keyword_stop,     exec_stop,      check_nop
@@ -333,7 +333,7 @@ deftok TOKEN_NOT,      14, 1, 1, 1, lister_prefix,   keyword_not,      exec_not,
 deftok TOKEN_EQ,        3, 1, 2, 1, lister_infix,    keyword_eq,       exec_eq,        check_nop
 deftok TOKEN_WHILE,     0, 4, 1, 0, lister_while,    keyword_while,    exec_if,        check_while
 deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endloop,  keyword_endwhile, exec_goto,      check_endwhile
-deftok TOKEN_ONE,      15, 1, 0, 1, lister_simple,   keyword_one,      exec_one,       check_nop
+deftok TOKEN_ONE,      14, 1, 0, 1, lister_simple,   keyword_one,      exec_one,       check_nop
 deftok TOKEN_FOR,       0, 4, 4, 0, lister_for,      keyword_for,      exec_for,       check_for
 deftok TOKEN_ENDFOR,    0, 4, 0, 0, lister_endloop,  keyword_endfor,   exec_endfor,    check_endfor
 deftok TOKEN_SGN,      14, 1, 1, 1, lister_prefix,   keyword_sgn,      exec_sgn,       check_nop
@@ -347,14 +347,14 @@ deftok TOKEN_ELSE,      0, 4, 0, 0, lister_simple,   keyword_else,     exec_goto
 deftok TOKEN_ENDIF,     0, 1, 0, 0, lister_endloop,  keyword_endif,    exec_nop,       check_endif
 deftok TOKEN_ELIF,      0, 4, 1, 0, lister_if,       keyword_elif,     exec_if,        check_elif
 deftok TOKEN_ELIFGOTO,  0, 4, 0, 0, lister_nop,      lister_bad,       exec_goto,      check_elifgoto
-deftok TOKEN_STRING,   15, 0, 0, 1, lister_string,   lister_bad,       exec_string,    check_nop
-deftok TOKEN_FREE,     15, 1, 0, 1, lister_simple,   keyword_free,     exec_free,      check_nop
-deftok TOKEN_TRUE,     15, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
-deftok TOKEN_FALSE,    15, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
+deftok TOKEN_STRING,   14, 0, 0, 1, lister_string,   lister_bad,       exec_string,    check_nop
+deftok TOKEN_FREE,     14, 1, 0, 1, lister_simple,   keyword_free,     exec_free,      check_nop
+deftok TOKEN_TRUE,     14, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
+deftok TOKEN_FALSE,    14, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
 deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,       check_nop
-deftok TOKEN_SLICE,    14, 1, 2, 1, lister_slice,    lister_bad,       exec_slice,     check_nop
+deftok TOKEN_SLICE,    15, 1, 2, 1, lister_slice,    lister_bad,       exec_slice,     check_nop
 deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
-deftok TOKEN_SLASSIGN, 14, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
+deftok TOKEN_SLASSIGN, 15, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
 deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
 deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
@@ -4049,9 +4049,9 @@ zproc lister_slassign
     jsr buffer_print_separated_string
     
     pla
-    tax                         ; recover current node tree address
-    ldy operator_stack+1, x     ; get second parameter tree address
-    jmp list_parenthesised_clause
+    tay                         ; recover current node tree address
+    ldx operator_stack+1, y     ; get second parameter tree address
+    jmp list_clause
 zendproc
 
 zproc lister_assign
