@@ -1,15 +1,12 @@
-10proc noparameters
-20endproc
-30proc noparameters2()
+10print "Start"
+19end
+20proc simpletest
+30print "This is test!"
 40endproc
-50proc oneparameter(a)
-60endproc
-70proc twoparameter(a, b)
-80endproc
-81noparameters
-82noparamerers()
-83oneparameter(1)
-90twoparameter(1, 2)
+50proc biggertest(a, b, c)
+60print "a=", a, " b=", b, " c=", c
+70endproc
+run
 list
 bye
 

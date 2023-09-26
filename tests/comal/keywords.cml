@@ -1,3 +1,4 @@
+9end
 10stop
 20bye
 40repeat
@@ -37,6 +38,15 @@
 370print 9999
 380print -(9999)
 390print "literal"
+400proc noparameters
+410proc noparameters2()
+420proc oneparameter(a)
+430proc twoparameter(a, b)
+440noparameters
+450noparamerers()
+460oneparameter(1)
+470twoparameter(1, 2)
+480endproc
 list
 bye
 

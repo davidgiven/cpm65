@@ -36,6 +36,7 @@ OTYPE_INTEGER    = 0x02
 OTYPE_VAR        = 0x03
 OTYPE_STRINGDATA = 0x04
 OTYPE_RANGE      = 0x05
+OTYPE_PROCEDURE  = 0x06
 OTYPE_STRING     = 0x10
 OTYPE_STRINGLIT  = 0x11
 
@@ -68,6 +69,7 @@ HASHNODE_SIZE   = 0xb
 
 STRING_DATA     = OBJECT_DATA + 0
 
+; 
 ; Stack value structure:
 ;  0    - object type
 ;  1..4 - data
@@ -86,6 +88,11 @@ STACKVALUE_STRING_LENGTH = STACKVALUE_DATA + 3
 
 STACKVALUE_RANGE_OFFSET  = STACKVALUE_DATA + 0
 STACKVALUE_RANGE_LENGTH  = STACKVALUE_DATA + 2
+
+; Procedure stack value structure:
+
+STACKVALUE_PROC_ADDRESS  = STACKVALUE_DATA + 0
+STACKVALUE_PROC_PCOUNT   = STACKVALUE_DATA + 3
 
 ; Program storage: a flat list of lines, each of which looks like:
 ;   0    - line size
@@ -172,6 +179,7 @@ checkloopbyteptr:   .byte 0 ; likewise
 checkendlineptr:    .word 0 ; address of previous reference to the end of the structure
 checkendbyteptr:    .byte 0 ; likewise
 checklooptype:      .byte 0 ; loop type (token)
+checkprocptr:       .word 0 ; address of hash node of currently defined procedure/function
 check_end:
 
 LISTERFLAG_NOTSTART   = 1<<7 ; set after every lister is called, is !RESETSTART
@@ -234,6 +242,7 @@ TOKEN_PROC1     = 0x34
 TOKEN_ENDPROC   = 0x35
 TOKEN_PROCCALL  = 0x36
 TOKEN_PROC2     = 0x37
+TOKEN_END       = 0x38
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -369,10 +378,11 @@ deftok TOKEN_SLASSIGN, 15, 1, 3, 0, lister_slassign, lister_bad,       exec_slas
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
 deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
 deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
-deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_bad,      check_nop
-deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_bad,       check_nop
+deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_bad,       check_proc1
+deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_bad,       check_endproc
 deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_bad,       check_nop
-deftok TOKEN_PROC2,     0, 2, 7, 0, lister_proc2,    lister_bad,       exec_bad,      check_nop
+deftok TOKEN_PROC2,     0, 2, 7, 0, lister_proc2,    lister_bad,       exec_bad,       check_proc2
+deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -763,6 +773,10 @@ error_string_overflow:
     lda #ERROR_STRING_OVERFLOW
     bne throw_error         ; always taken
 
+error_reached_proc:
+    lda #ERROR_REACHED_PROC
+    bne throw_error         ; always taken
+
 ; Produces the error whose number is in A.
 
 zproc throw_error
@@ -837,6 +851,9 @@ file_not_found_msg:
 string_overflow_msg:
     .ascii "String overflo"
     .byte 'w'|0x80
+reached_proc_msg:
+    .ascii "Execution hit PRO"
+    .byte 'C'|0x80
 
 ERROR_CANT_CONTINUE = cant_continue_msg - message_table
 ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
@@ -846,6 +863,7 @@ ERROR_STOPPED = stopped_msg - message_table
 ERROR_BAD_STRUCTURE = bad_structure_msg - message_table
 ERROR_FILE_NOT_FOUND = file_not_found_msg - message_table
 ERROR_STRING_OVERFLOW = string_overflow_msg - message_table
+ERROR_REACHED_PROC = reached_proc_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -2721,6 +2739,75 @@ zproc check_elif
 
     copystruct 3, execlineptr, checklooplineptr
     rts
+zendproc
+
+zproc check_proc1
+    lda checkindent
+    zif_ne
+        jmp error_bad_structure
+    zendif
+
+    lda #TOKEN_PROC1
+    jsr check_push_loop
+
+    ; Find the hash node.
+
+    ldy execbyteptr         ; atom ID -> p1
+    iny
+    lda (execlineptr), y
+    sta p1+0
+    iny
+    lda (execlineptr), y
+    sta p1+1
+
+    lda #<global_variables
+    sta p0+0
+    lda #>global_variables
+    sta p0+1
+
+    jsr hash_deref          ; return ptr to node in p0
+    copy16 p0, checkprocptr
+
+    ; Create a procedure object.
+
+    ldy #OBJECT_TYPE
+    lda #OTYPE_PROCEDURE
+    sta (p0), y
+    iny
+    ldx #-3 & 0xff
+    zrepeat
+        lda execlineptr+3, x
+        sta (p0), y
+        iny
+        inx
+    zuntil_eq
+
+    rts
+zendproc
+
+zproc check_proc2
+    ldy execbyteptr
+    iny
+    lda (execlineptr), y    ; get number of parameters
+
+    ldy #OBJECT_TYPE + STACKVALUE_PROC_PCOUNT
+    sta (checkprocptr), y
+
+    rts
+zendproc
+
+zproc check_endproc
+    lda checklooptype
+    cmp #TOKEN_PROC1
+    zif_ne
+        jmp error_bad_structure
+    zendif
+
+    lda #0
+    sta checkprocptr+0
+    sta checkprocptr+1
+
+    jmp check_pop_loop
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -5163,6 +5250,7 @@ simple_statement_rule:
     P_TRY print_rule
     P_TRY stop_rule
     P_TRY bye_rule
+    P_TRY end_rule
     P_TRY proccall_rule
     P_TRY assignment_rule
     P_PANIC
@@ -5258,6 +5346,13 @@ stop_rule:
 keyword_stop = . + 1
     P_TOKEN 'S', 'T', 'O', 'P'|0x80
     P_EMIT TOKEN_STOP
+    P_EOL
+    P_RETURN
+
+end_rule:
+keyword_end = . + 1
+    P_TOKEN 'E', 'N', 'D'|0x80
+    P_EMIT TOKEN_END
     P_EOL
     P_RETURN
 
