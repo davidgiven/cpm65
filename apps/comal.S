@@ -37,6 +37,7 @@ OTYPE_VAR        = 0x03
 OTYPE_STRINGDATA = 0x04
 OTYPE_RANGE      = 0x05
 OTYPE_PROCEDURE  = 0x06
+OTYPE_CALL       = 0x07
 OTYPE_STRING     = 0x10
 OTYPE_STRINGLIT  = 0x11
 
@@ -93,6 +94,13 @@ STACKVALUE_RANGE_LENGTH  = STACKVALUE_DATA + 2
 
 STACKVALUE_PROC_ADDRESS  = STACKVALUE_DATA + 0
 STACKVALUE_PROC_PCOUNT   = STACKVALUE_DATA + 3
+
+; Special non-standard stack object representing a procedure invocation.
+
+STACKVALUE_CALL_ADDRESS  = STACKVALUE_DATA + 0
+STACKVALUE_CALL_PREVHASHTABLE = STACKVALUE_DATA + 3
+STACKVALUE_CALL_NEWHASHTABLE = STACKVALUE_DATA + 5
+STACKVALUE_CALL__SIZE = STACKVALUE_CALL_NEWHASHTABLE + HASH_SLOTS*2
 
 ; Program storage: a flat list of lines, each of which looks like:
 ;   0    - line size
@@ -165,8 +173,11 @@ listerflags:        .byte 0 ; flags
 
 ; Interpreter temporaries
 
+; (contiguous)
 execlineptr:        .word 0 ; line of code currently being run
 execbyteptr:        .byte 0 ; offset into the line of code
+localhashtableptr:  .word 0 ; pointer to current local hash table
+
 savedexeclineptr:   .word 0 ; line of code to CON to
 savedexecbyteptr:   .byte 0 ; offset into the line of code; 0 if no saved state
 
@@ -378,10 +389,10 @@ deftok TOKEN_SLASSIGN, 15, 1, 3, 0, lister_slassign, lister_bad,       exec_slas
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
 deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
 deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
-deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_bad,       check_proc1
-deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_bad,       check_endproc
-deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_bad,       check_nop
-deftok TOKEN_PROC2,     0, 2, 7, 0, lister_proc2,    lister_bad,       exec_bad,       check_proc2
+deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_proc1,     check_proc1
+deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_endproc,   check_endproc
+deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_proccall,  check_nop
+deftok TOKEN_PROC2,     0, 2, 7, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
 
 defpop pop_try
@@ -442,6 +453,8 @@ destroy_stack:
 
     lda #0
     sta savedexecbyteptr
+    sta localhashtableptr+0
+    sta localhashtableptr+1
 zendproc
     ; fall through
 zproc mainloop
@@ -1206,6 +1219,117 @@ zproc exec_endfor
     jmp pop_i0                      ; ()
 zendproc
 
+; On entry, the stack looks like this:
+; (procref param1 param2 param3... paramX=i0 --)
+
+zproc exec_proccall
+    ldy execbyteptr
+    iny
+    lda (execlineptr), y            ; get number of parameters
+    sec
+    sbc #1
+    pha
+    
+    ; Fetch the procedure reference.
+
+    sta p0
+    asl a
+    asl a
+    clc
+    adc p0
+    jsr peek                        ; (p p1 p2 p3... px p=i0 --)
+    jsr deref_i0
+
+    ; Check number of parameters.
+
+    pla
+    cmp v0+STACKVALUE_PROC_PCOUNT
+    zif_ne
+        jmp error_invalid_parameter
+    zendif
+
+    ; Create space for the CPU state and hash table.
+
+    lda #STACKVALUE_CALL__SIZE
+    jsr extend_stack                ; (p p1 p2 p3... px call p=i0 --)
+
+    ; Save the CPU state.
+
+    ldy #STACKVALUE_CALL_ADDRESS
+    ldx #-5 & 0xff
+    zrepeat
+        lda execlineptr+5, x
+        sta (stackptr), y
+        iny
+        inx
+    zuntil_eq
+
+    ; Initialise the new hash table.
+
+    clc
+    lda stackptr+0
+    adc #STACKVALUE_CALL_NEWHASHTABLE
+    sta localhashtableptr+0
+    sta p0+0
+    ldx stackptr+1
+    zif_cs
+        inx
+    zendif
+    stx localhashtableptr+1
+    stx p0+1
+
+    jsr hash_init
+
+    ; Set the new CPU state.
+
+    copystruct 3, v0+STACKVALUE_PROC_ADDRESS, execlineptr
+    
+    ; Returns with i0 containing the procedure reference.
+    rts
+zendproc
+
+zproc exec_proc1
+    jmp error_reached_proc
+zendproc
+
+; On entry, the stack looks like this:
+; (procref param1 param2 param3... paramX callstruct procref=i0 --)
+
+zproc exec_endproc
+    ; Free up the hash table.
+
+    copy16 localhashtableptr, p0
+    jsr hash_deinit
+
+    ; Reload the CPU state.
+
+    ldy #STACKVALUE_CALL_ADDRESS
+    ldx #-5 & 0xff
+    zrepeat
+        lda (stackptr), y
+        sta execlineptr+5, x
+        iny
+        inx
+    zuntil_eq
+
+    ; Retract over the stack object.
+
+    lda #STACKVALUE_CALL__SIZE
+    jsr retract_stack               ; (p p1 p2 p3... px p=i0 --)
+
+    ; Retract over parameters.
+
+    lda v0+STACKVALUE_PROC_PCOUNT
+    asl a
+    asl a
+    clc
+    adc v0+STACKVALUE_PROC_PCOUNT
+    jsr retract_stack               ; (p p=i0 --)
+
+    jsr pop_i0
+    jmp pop_i0
+zendproc
+
 zproc exec_varref
     ldx #2
     lda #OTYPE_VAR
@@ -1425,13 +1549,7 @@ zproc exec_assign
     ; Find the hash node.
 
     copy16 i1, p1           ; object ID -> p1
-
-    lda #<global_variables
-    sta p0+0
-    lda #>global_variables
-    sta p0+1
-
-    jsr hash_deref          ; return ptr to node in p0
+    jsr get_variable_rw     ; return ptr to node in p0
 
     ; Copy the old value into p2 so we can lower the reference count.
 
@@ -1904,12 +2022,7 @@ zproc deref_ix
         txa
         pha
 
-        lda #<global_variables
-        sta p0+0
-        lda #>global_variables
-        sta p0+1
-
-        jsr hash_deref_ro       ; return ptr to node in p0
+        jsr get_variable_ro     ; return ptr to node in p0
         zif_cs
             jmp error_no_such_variable
         zendif
@@ -2760,12 +2873,7 @@ zproc check_proc1
     lda (execlineptr), y
     sta p1+1
 
-    lda #<global_variables
-    sta p0+0
-    lda #>global_variables
-    sta p0+1
-
-    jsr hash_deref          ; return ptr to node in p0
+    jsr get_variable_rw     ; return ptr to node in p0
     copy16 p0, checkprocptr
 
     ; Create a procedure object.
@@ -3113,7 +3221,77 @@ zproc negi
     rts
 zendproc
 
+; --- Namespace stuff -------------------------------------------------------
+
+; Returns a value node for a given ID.
+; On entry:
+;   p1 - ID
+; On exit:
+;   p0 - pointer to value node
+;   C if the node couldn't be found
+
+zproc get_variable_ro
+    lda localhashtableptr+0
+    ora localhashtableptr+1
+    zif_ne
+        copy16 localhashtableptr, p0
+        jsr hash_deref_ro
+        zif_cs
+            rts
+        zendif
+    zendif
+
+    lda #<global_variables
+    sta p0+0
+    lda #>global_variables
+    sta p0+1
+    jmp hash_deref_ro
+zendproc
+
+zproc get_variable_rw
+    lda localhashtableptr+0
+    ora localhashtableptr+1
+    zif_ne
+        jsr get_variable_ro
+        zif_cs
+            rts
+        zendif
+
+        copy16 localhashtableptr, p0
+        jmp hash_deref
+    zendif
+
+    lda #<global_variables
+    sta p0+0
+    lda #>global_variables
+    sta p0+1
+    jmp hash_deref
+zendproc
+
 ; --- Hashing stuff ---------------------------------------------------------
+
+; Initialises a hash table.
+; On entry:
+;   p0 - pointer to hash table
+
+zproc hash_init
+    ldy #(HASH_SLOTS*2)-1
+    lda #0
+    zrepeat
+        sta (p0), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+; Deinitialises a hash table.
+; On entry:
+;   p0 - pointer to hash table
+
+zproc hash_deinit
+    // TODO: do this
+    rts
+zendproc
 
 ; Returns a value node for a given ID.
 ; On entry:
@@ -3121,6 +3299,7 @@ zendproc
 ;   p1 - ID
 ; On exit:
 ;   p0 - pointer to value node
+;   p1 - preserved
 ;   C if the node couldn't be found
 
 zproc hash_deref_ro
@@ -3707,9 +3886,17 @@ zproc collect_garbage
         copy16 p1, p0
         jsr mark_stackvalue_as_used
 
+        ldy #STACKVALUE_TYPE
+        lda (p1), y
+        cmp #OTYPE_CALL
+        zif_eq
+            lda #STACKVALUE_CALL__SIZE
+        zelse
+            lda #STACKVALUE_SIZE
+        zendif
+
         clc
-        lda p1+0
-        adc #STACKVALUE_SIZE
+        adc p1+0
         sta p1+0
         zif_cs
             inc p1+1

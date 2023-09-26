@@ -1,4 +1,6 @@
 10print "Start"
+11simpletest
+12print "End"
 19end
 20proc simpletest
 30print "This is test!"
