@@ -6,6 +6,9 @@
 60endproc
 70proc twoparameter(a, b)
 80endproc
+81noparameters
+82noparamerers()
+83oneparameter(1)
 90twoparameter(1, 2)
 list
 bye
