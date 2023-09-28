@@ -1,14 +1,22 @@
 5a=1
-10print "Start; a=", a
+10print "checkpoint 1; a=", a
 20simpletest
-30print "End; a=", a
-40end
+30print "checkpoint 2; a=", a
+40returntest
+50print "checkpoint 3; a=", a
+60end
 
 200proc simpletest
 210print "This is test!"
 220a=2
 230print "Now, a=", a
 240endproc
+
+250proc returntest
+260print "Before return"
+270for a=1 to 10 return
+280print "After return"
+290endproc
 
 300proc biggertest(a, b, c)
 310print "a=", a, " b=", b, " c=", c

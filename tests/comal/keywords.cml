@@ -47,6 +47,7 @@
 460oneparameter(1)
 470twoparameter(1, 2)
 480endproc
+490return
 list
 bye
 

@@ -100,7 +100,8 @@ STACKVALUE_PROC_PCOUNT   = STACKVALUE_DATA + 3
 STACKVALUE_CALL_ADDRESS  = STACKVALUE_DATA + 0
 STACKVALUE_CALL_PREVHASHTABLE = STACKVALUE_DATA + 3
 STACKVALUE_CALL_NEWHASHTABLE = STACKVALUE_DATA + 5
-STACKVALUE_CALL__SIZE = STACKVALUE_CALL_NEWHASHTABLE + HASH_SLOTS*2
+STACKVALUE_CALL_PCOUNT   = STACKVALUE_DATA + 7
+STACKVALUE_CALL__SIZE = STACKVALUE_CALL_PCOUNT + HASH_SLOTS*2
 
 ; Program storage: a flat list of lines, each of which looks like:
 ;   0    - line size
@@ -254,6 +255,7 @@ TOKEN_ENDPROC   = 0x35
 TOKEN_PROCCALL  = 0x36
 TOKEN_PROC2     = 0x37
 TOKEN_END       = 0x38
+TOKEN_RETURN    = 0x39
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -394,6 +396,7 @@ deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_endp
 deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_proccall,  check_nop
 deftok TOKEN_PROC2,     0, 2, 7, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
+deftok TOKEN_RETURN,    0, 1, 0, 0, lister_simple,   keyword_return,   exec_endproc,   check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1253,6 +1256,12 @@ zproc exec_proccall
     lda #STACKVALUE_CALL__SIZE
     jsr extend_stack                ; (p p1 p2 p3... px call p=i0 --)
 
+    ; Save the parameter count.
+
+    lda v0+STACKVALUE_PROC_PCOUNT
+    ldy #STACKVALUE_CALL_PCOUNT
+    sta (stackptr), y
+
     ; Save the CPU state.
 
     ldy #STACKVALUE_CALL_ADDRESS
@@ -1283,8 +1292,6 @@ zproc exec_proccall
     ; Set the new CPU state.
 
     copystruct 3, v0+STACKVALUE_PROC_ADDRESS, execlineptr
-    
-    ; Returns with i0 containing the procedure reference.
     rts
 zendproc
 
@@ -1293,13 +1300,23 @@ zproc exec_proc1
 zendproc
 
 ; On entry, the stack looks like this:
-; (procref param1 param2 param3... paramX callstruct procref=i0 --)
+; (procref param1 param2 param3... paramX callstruct ...garbage... --)
 
 zproc exec_endproc
     ; Free up the hash table.
 
     copy16 localhashtableptr, p1
     jsr hash_deinit
+
+    ; Reset the stack pointer.
+
+    sec
+    lda localhashtableptr+0
+    sbc #STACKVALUE_CALL_NEWHASHTABLE
+    sta stackptr+0
+    lda localhashtableptr+1
+    sbc #0
+    sta stackptr+1
 
     ; Reload the CPU state.
 
@@ -1312,22 +1329,28 @@ zproc exec_endproc
         inx
     zuntil_eq
 
+    ; Fetch the parameter count.
+
+    ldy #STACKVALUE_CALL_PCOUNT
+    lda (stackptr), y
+    sta p0
+
     ; Retract over the stack object.
 
     lda #STACKVALUE_CALL__SIZE
-    jsr retract_stack               ; (p p1 p2 p3... px p=i0 --)
+    jsr retract_stack               ; (p p1 p2 p3... px --)
 
     ; Retract over parameters.
 
-    lda v0+STACKVALUE_PROC_PCOUNT
+    lda p0                          ; get parameter count
     asl a
     asl a
     clc
-    adc v0+STACKVALUE_PROC_PCOUNT
-    jsr retract_stack               ; (p p=i0 --)
+    adc p0
+    jsr retract_stack               ; (p --)
 
-    jsr pop_i0
-    jmp pop_i0
+    jsr pop_i0                      ; (p=i0 --)
+    jmp pop_i0                      ; (--)
 zendproc
 
 zproc exec_varref
@@ -3253,7 +3276,7 @@ zproc get_variable_rw
     ora localhashtableptr+1
     zif_ne
         jsr get_variable_ro
-        zif_cs
+        zif_cc
             rts
         zendif
 
@@ -5480,6 +5503,7 @@ simple_statement_rule:
     P_TRY stop_rule
     P_TRY bye_rule
     P_TRY end_rule
+    P_TRY return_rule
     P_TRY proccall_rule
     P_TRY assignment_rule
     P_PANIC
@@ -5595,6 +5619,13 @@ keyword_bye = . + 1
 con_rule:
     P_TOKEN 'C', 'O', 'N'|0x80
     P_EMIT TOKEN_CON
+    P_EOL
+    P_RETURN
+
+return_rule:
+keyword_return = . + 1
+    P_TOKEN 'R', 'E', 'T', 'U', 'R', 'N'|0x80
+    P_EMIT TOKEN_RETURN
     P_EOL
     P_RETURN
 
