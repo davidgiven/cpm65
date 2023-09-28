@@ -3236,7 +3236,7 @@ zproc get_variable_ro
     zif_ne
         copy16 localhashtableptr, p0
         jsr hash_deref_ro
-        zif_cs
+        zif_cc
             rts
         zendif
     zendif

@@ -1,13 +1,18 @@
-10print "Start"
-11simpletest
-12print "End"
-19end
-20proc simpletest
-30print "This is test!"
-40endproc
-50proc biggertest(a, b, c)
-60print "a=", a, " b=", b, " c=", c
-70endproc
+5a=1
+10print "Start; a=", a
+20simpletest
+30print "End; a=", a
+40end
+
+200proc simpletest
+210print "This is test!"
+220a=2
+230print "Now, a=", a
+240endproc
+
+300proc biggertest(a, b, c)
+310print "a=", a, " b=", b, " c=", c
+320endproc
 run
 list
 bye
