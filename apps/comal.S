@@ -1298,7 +1298,7 @@ zendproc
 zproc exec_endproc
     ; Free up the hash table.
 
-    copy16 localhashtableptr, p0
+    copy16 localhashtableptr, p1
     jsr hash_deinit
 
     ; Reload the CPU state.
@@ -3286,10 +3286,51 @@ zendproc
 
 ; Deinitialises a hash table.
 ; On entry:
-;   p0 - pointer to hash table
+;   p1 - pointer to hash table
 
 zproc hash_deinit
-    // TODO: do this
+    ldy #0
+    zrepeat
+        ; Get the head of the chain from the hash table.
+
+        lda (p1), y
+        sta p2+0
+        iny
+        lda (p1), y
+        sta p2+1
+        iny
+
+        zloop
+            lda p2+0
+            ora p2+1
+            zbreakif_eq
+
+            tya
+            pha
+
+            ; If it's non zero, copy to p0.
+
+            copy16 p2, p0
+            
+            ; Free the node and get the pointer to it in p0.
+
+            jsr heap_free
+
+            ; Fetch the next pointer into p2.
+
+            ldy #HASHNODE_NEXT
+            lda (p0), y
+            sta p2+0
+            iny
+            lda (p0), y
+            sta p2+1
+
+            pla
+            tay
+        zendloop
+        
+        cpy #HASH_SLOTS*2
+    zuntil_eq
     rts
 zendproc
 
@@ -3587,6 +3628,7 @@ zproc heap_alloc
 zendproc
 
 ; Frees an object whose ID is in p0.
+; Returns a pointer to the now freed object in p0.
 
 zproc heap_free
     ldx #p0
