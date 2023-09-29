@@ -43,6 +43,19 @@ OTYPE_STRINGLIT  = 0x11
 
 HASH_SLOTS      = 16
 
+.macro startstruct init
+    .set p, \init
+.endm
+
+.macro structmember name, size
+    \name = p
+    .set p, p + (\size)
+.endm
+
+.macro endstruct name
+    .set \name, p
+.endm
+
 ; Atom structure:
 ;  0..1 - object size
 ;  2    - object type
@@ -75,33 +88,40 @@ STRING_DATA     = OBJECT_DATA + 0
 ;  0    - object type
 ;  1..4 - data
 
-STACKVALUE_TYPE = 0
-STACKVALUE_DATA = 1
-STACKVALUE_SIZE = 5
+startstruct 0
+structmember STACKVALUE_TYPE, 1
+structmember STACKVALUE_DATA, 4
+endstruct STACKVALUE_SIZE
 
 ; String stack value structure:
 
-STACKVALUE_STRING_ID     = STACKVALUE_DATA + 0
-STACKVALUE_STRING_OFFSET = STACKVALUE_DATA + 2
-STACKVALUE_STRING_LENGTH = STACKVALUE_DATA + 3
+startstruct STACKVALUE_DATA
+structmember STACKVALUE_STRING_ID, 2
+structmember STACKVALUE_STRING_OFFSET, 1
+structmember STACKVALUE_STRING_LENGTH, 1
+endstruct STACKVALUE_STRING__SIZE
 
 ; Range stack value structure:
 
-STACKVALUE_RANGE_OFFSET  = STACKVALUE_DATA + 0
-STACKVALUE_RANGE_LENGTH  = STACKVALUE_DATA + 2
+startstruct STACKVALUE_DATA
+structmember STACKVALUE_RANGE_OFFSET, 2
+structmember STACKVALUE_RANGE_LENGTH, 2
+endstruct STACKVALUE_RANGE__SIZE
 
 ; Procedure stack value structure:
 
-STACKVALUE_PROC_ADDRESS  = STACKVALUE_DATA + 0
-STACKVALUE_PROC_PCOUNT   = STACKVALUE_DATA + 3
+startstruct STACKVALUE_DATA
+structmember STACKVALUE_PROC_ADDRESS, 3 ; 3-byte bytecode address
+structmember STACKVALUE_PROC_PCOUNT, 1
+endstruct STACKVALUE_PROC__SIZE
 
 ; Special non-standard stack object representing a procedure invocation.
 
-STACKVALUE_CALL_ADDRESS  = STACKVALUE_DATA + 0
-STACKVALUE_CALL_PREVHASHTABLE = STACKVALUE_DATA + 3
-STACKVALUE_CALL_NEWHASHTABLE = STACKVALUE_DATA + 5
-STACKVALUE_CALL_PCOUNT   = STACKVALUE_DATA + 7
-STACKVALUE_CALL__SIZE = STACKVALUE_CALL_PCOUNT + HASH_SLOTS*2
+startstruct STACKVALUE_DATA
+structmember STACKVALUE_CALL_CPUSTATE, 5 ; cpustate__end - cpustate__start
+structmember STACKVALUE_CALL_PCOUNT, 1
+structmember STACKVALUE_CALL_NEWHASHTABLE, HASH_SLOTS*2
+endstruct STACKVALUE_CALL__SIZE
 
 ; Program storage: a flat list of lines, each of which looks like:
 ;   0    - line size
@@ -174,13 +194,15 @@ listerflags:        .byte 0 ; flags
 
 ; Interpreter temporaries
 
-; (contiguous)
+cpustate__start:
 execlineptr:        .word 0 ; line of code currently being run
 execbyteptr:        .byte 0 ; offset into the line of code
 localhashtableptr:  .word 0 ; pointer to current local hash table
+cpustate__end:
 
 savedexeclineptr:   .word 0 ; line of code to CON to
 savedexecbyteptr:   .byte 0 ; offset into the line of code; 0 if no saved state
+currentargument:    .word 0 ; pointer to just after the next subroutine argument
 
 ; Structure checker temporaries
 
@@ -256,6 +278,7 @@ TOKEN_PROCCALL  = 0x36
 TOKEN_PROC2     = 0x37
 TOKEN_END       = 0x38
 TOKEN_RETURN    = 0x39
+TOKEN_SETPARAM  = 0x3a
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -394,9 +417,10 @@ deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,
 deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_proc1,     check_proc1
 deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_endproc,   check_endproc
 deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_proccall,  check_nop
-deftok TOKEN_PROC2,     0, 2, 7, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
+deftok TOKEN_PROC2,     0, 2, 0, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
 deftok TOKEN_RETURN,    0, 1, 0, 0, lister_simple,   keyword_return,   exec_endproc,   check_nop
+deftok TOKEN_SETPARAM,  0, 3, 0, 0, lister_setparam, lister_bad,       exec_setparam,  check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -985,6 +1009,22 @@ zproc exec_line
     sta terpjumptable+0
     lda #>token_exec_table
     sta terpjumptable+1
+
+    .if 0
+        jsr print_nl
+        ldy #2
+        lda (execlineptr), y
+        tax
+        dey
+        lda (execlineptr), y
+        jsr print_hex16_number
+        jsr print_space
+        
+        lda stackptr+0
+        ldx stackptr+1
+        jsr print_hex16_number
+        jsr print_space
+    .endif
 zendproc
     ; fall through
 zproc dispatch_bytecode
@@ -1223,25 +1263,39 @@ zproc exec_endfor
 zendproc
 
 ; On entry, the stack looks like this:
-; (procref param1 param2 param3... paramX=i0 --)
+; ((oldi0) procref arg1 arg2 arg3... argX=i0 --)
 
 zproc exec_proccall
     ldy execbyteptr
     iny
-    lda (execlineptr), y            ; get number of parameters
+    lda (execlineptr), y            ; get number of arguments
     sec
     sbc #1
     pha
     
-    ; Fetch the procedure reference.
+    ; Get the stack offset to the procedure reference.
 
     sta p0
     asl a
     asl a
     clc
     adc p0
-    jsr peek                        ; (p p1 p2 p3... px p=i0 --)
+
+    ; Fetch the procedure reference.
+
+    pha
+    jsr peek                        ; (p a1 a2 a3... ax p=i0 --)
     jsr deref_i0
+    pla
+
+    ; Compute the first argument address.
+
+    clc
+    adc stackptr+0
+    sta currentargument+0
+    lda stackptr+1
+    adc #0
+    sta currentargument+1
 
     ; Check number of parameters.
 
@@ -1254,7 +1308,7 @@ zproc exec_proccall
     ; Create space for the CPU state and hash table.
 
     lda #STACKVALUE_CALL__SIZE
-    jsr extend_stack                ; (p p1 p2 p3... px call p=i0 --)
+    jsr extend_stack                ; (p a1 a2 a3... ax call p=i0 --)
 
     ; Save the parameter count.
 
@@ -1264,10 +1318,10 @@ zproc exec_proccall
 
     ; Save the CPU state.
 
-    ldy #STACKVALUE_CALL_ADDRESS
+    ldy #STACKVALUE_CALL_CPUSTATE
     ldx #-5 & 0xff
     zrepeat
-        lda execlineptr+5, x
+        lda cpustate__start+5, x
         sta (stackptr), y
         iny
         inx
@@ -1291,7 +1345,7 @@ zproc exec_proccall
 
     ; Set the new CPU state.
 
-    copystruct 3, v0+STACKVALUE_PROC_ADDRESS, execlineptr
+    copystruct 3, v0+STACKVALUE_PROC_ADDRESS, cpustate__start
     rts
 zendproc
 
@@ -1299,8 +1353,43 @@ zproc exec_proc1
     jmp error_reached_proc
 zendproc
 
+; Takes as an argument the atom ID to assign.
 ; On entry, the stack looks like this:
-; (procref param1 param2 param3... paramX callstruct ...garbage... --)
+; (procref arg1 arg2 arg3... argX callstruct --)
+
+zproc exec_setparam
+    ; Predecrement the argument pointer.
+
+    sec
+    lda currentargument+0
+    sbc #5
+    sta currentargument+0
+    zif_cc
+        dec currentargument+1
+    zendif
+
+    ; Push the variable reference.
+
+    ldx listerroot
+    jsr exec_varref
+
+    ; Push the argument.
+
+    jsr push_i0
+    ldy #4
+    zrepeat
+        lda (currentargument), y
+        sta v0, y
+        dey
+    zuntil_mi
+
+    ; Do the assign.
+
+    jmp exec_assign
+zendproc
+
+; On entry, the stack looks like this:
+; ((oldi0) procref arg1 arg2 arg3... argX callstruct ...garbage=i0... --)
 
 zproc exec_endproc
     ; Free up the hash table.
@@ -1320,11 +1409,11 @@ zproc exec_endproc
 
     ; Reload the CPU state.
 
-    ldy #STACKVALUE_CALL_ADDRESS
+    ldy #STACKVALUE_CALL_CPUSTATE
     ldx #-5 & 0xff
     zrepeat
         lda (stackptr), y
-        sta execlineptr+5, x
+        sta cpustate__start+5, x
         iny
         inx
     zuntil_eq
@@ -1338,19 +1427,20 @@ zproc exec_endproc
     ; Retract over the stack object.
 
     lda #STACKVALUE_CALL__SIZE
-    jsr retract_stack               ; (p p1 p2 p3... px --)
+    jsr retract_stack               ; (p a1 a2 a3... ax --)
 
     ; Retract over parameters.
 
+    inc p0                          ; one extra parameter for the procref
     lda p0                          ; get parameter count
     asl a
     asl a
     clc
     adc p0
-    jsr retract_stack               ; (p --)
+    jsr retract_stack               ; (--)
 
-    jsr pop_i0                      ; (p=i0 --)
-    jmp pop_i0                      ; (--)
+    jsr pop_i0                      ; load previous item on the stack
+    rts
 zendproc
 
 zproc exec_varref
@@ -1544,6 +1634,7 @@ zproc exec_assign
     jsr deref_i0            ; value to assign
     jsr pop_i1              ; lvalue (variable reference)
 
+exec_assign_i0_to_i1:
     ; Does the rvalue need any kind of promotion?
 
     lda v0
@@ -3275,11 +3366,6 @@ zproc get_variable_rw
     lda localhashtableptr+0
     ora localhashtableptr+1
     zif_ne
-        jsr get_variable_ro
-        zif_cc
-            rts
-        zendif
-
         copy16 localhashtableptr, p0
         jmp hash_deref
     zendif
@@ -4282,6 +4368,10 @@ zproc lister_proc1
     jsr lister_simple
     jsr buffer_print_space
 
+    lda listerflags
+    ora #LISTERFLAG_RESETSTART
+    sta listerflags
+
     ldx listerroot
     jsr lister_varref
     lda #'('
@@ -4294,8 +4384,6 @@ zproc lister_proc2
         dec bufferend           ; retract over the leading "("
         rts
     zendif
-
-    jsr lister_comma_separated_list
 
     lda #')'
     jmp buffer_print_char
@@ -4404,6 +4492,16 @@ zproc lister_printnl
     rts
 zendproc
     
+zproc lister_setparam
+    lda listerflags
+    zif_mi                      ; LISTERFLAG_NOTSTART
+        lda #<keyword_comma
+        ldx #>keyword_comma
+        jsr buffer_print_separated_string
+    zendif
+    ldx listerroot
+zendproc
+    ; falls through
 zproc lister_varref
     lda operator_stack, x       ; get bytecode address
     tay
@@ -5797,14 +5895,12 @@ optional_parameter_list_rule:
     P_TRY end_parameter_list_rule
 1:
     P_COMMIT
-    P_WORD TOKEN_VARREF
+    P_WORD TOKEN_SETPARAM
     P_PARAM
     P_TRY end_parameter_list_rule
     P_EAGER_TOKEN ','|0x80
     P_JMP 1b
 
-single_parameter_list_rule:
-    P_WORD TOKEN_VARREF
 end_parameter_list_rule:
     P_EAGER_TOKEN ')'|0x80
     P_RETURN
@@ -6138,8 +6234,6 @@ keyword_mone:
     .byte '-'
 keyword_one:
     .byte '1'|0x80
-keyword_comma:
-    .byte ','|0x80
 
 .data
 
