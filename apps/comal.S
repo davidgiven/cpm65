@@ -93,6 +93,12 @@ structmember STACKVALUE_TYPE, 1
 structmember STACKVALUE_DATA, 4
 endstruct STACKVALUE_SIZE
 
+; Variable stack value structure:
+
+startstruct STACKVALUE_DATA
+structmember STACKVALUE_VARREF_HASHNODE_ID, 2
+endstruct STACKVALUE_VARREF__SIZE
+
 ; String stack value structure:
 
 startstruct STACKVALUE_DATA
@@ -221,7 +227,7 @@ LISTERFLAG_COMMA      = 1<<6 ; a comma is intended before the next clause
 LISTERFLAG_RESETSTART = 1<<5 ; causes NOTSTART to be reset
 
 TOKEN_EOL       = 0x00 ; end of line
-TOKEN_VARREF    = 0x01 ; +2 bytes for the ID
+TOKEN_VARREFRW  = 0x01 ; +2 bytes for the ID
 TOKEN_INTEGER   = 0x02 ; +4 bytes for the number
 TOKEN_MUL       = 0x03
 TOKEN_DIV       = 0x04
@@ -279,6 +285,7 @@ TOKEN_PROC2     = 0x37
 TOKEN_END       = 0x38
 TOKEN_RETURN    = 0x39
 TOKEN_SETPARAM  = 0x3a
+TOKEN_VARREFRO  = 0x3b ; +2 bytes for the ID
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -363,7 +370,7 @@ pop_exec_lo:
 .endm
 
 deftok TOKEN_EOL,      15, 1, 0, 0, lister_bad,      lister_bad,       exec_bad,       check_nop
-deftok TOKEN_VARREF,   15, 3, 0, 1, lister_varref,   lister_bad,       exec_varref,    check_nop
+deftok TOKEN_VARREFRW, 15, 3, 0, 1, lister_varref,   get_variable_rw,  exec_varref,    check_nop
 deftok TOKEN_INTEGER,  14, 5, 0, 1, lister_integer,  lister_bad,       exec_integer,   check_nop
 deftok TOKEN_MUL,      10, 1, 2, 1, lister_infix,    keyword_mul,      exec_mul,       check_nop
 deftok TOKEN_DIV,      10, 1, 2, 1, lister_infix,    keyword_div,      exec_div,       check_nop
@@ -420,7 +427,8 @@ deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_proc
 deftok TOKEN_PROC2,     0, 2, 0, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
 deftok TOKEN_RETURN,    0, 1, 0, 0, lister_simple,   keyword_return,   exec_endproc,   check_nop
-deftok TOKEN_SETPARAM,  0, 3, 0, 0, lister_setparam, lister_bad,       exec_setparam,  check_nop
+deftok TOKEN_SETPARAM,  0, 3, 0, 0, lister_setparam, get_variable_rw,  exec_setparam,  check_nop
+deftok TOKEN_VARREFRO, 15, 3, 0, 1, lister_varref,   get_variable_ro,  exec_varref,    check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1370,7 +1378,6 @@ zproc exec_setparam
 
     ; Push the variable reference.
 
-    ldx listerroot
     jsr exec_varref
 
     ; Push the argument.
@@ -1444,9 +1451,33 @@ zproc exec_endproc
 zendproc
 
 zproc exec_varref
-    ldx #2
+    jsr push_i0
+
+    ldy execbyteptr
+    iny
+    lda (execlineptr), y
+    sta p1+0
+    iny
+    lda (execlineptr), y
+    sta p1+1
+
+    jsr 1f                          ; call to aux pointer
+
     lda #OTYPE_VAR
-    bne push_value_from_bytecode    ; always taken
+    sta v0
+    copy16 p2, v0+STACKVALUE_VARREF_HASHNODE_ID
+    rts
+
+1:
+    ldy execbyteptr
+    lda (execlineptr), y            ; get bytecode
+    tax
+    lda token_aux_hi, x
+    pha
+    lda token_aux_lo, x
+    pha
+    php
+    rti
 zendproc
 
 zproc exec_zero
@@ -1634,7 +1665,6 @@ zproc exec_assign
     jsr deref_i0            ; value to assign
     jsr pop_i1              ; lvalue (variable reference)
 
-exec_assign_i0_to_i1:
     ; Does the rvalue need any kind of promotion?
 
     lda v0
@@ -1647,25 +1677,22 @@ exec_assign_i0_to_i1:
         jsr create_string
     zendif
 
-    ; Check type of variable.
+    ; Find the hash node.
 
     copy16 i1, p0           ; object ID -> p0
     ldx #p0
     jsr deref_object
 
-    ldy #ATOM_TYPE
-    lda (p0), y             ; get the atom type
+    ; Check the type.
+
+    ldy #OBJECT_TYPE
+    lda (p0), y             ; get the variable type
     cmp v0
     zif_ne
         jmp error_invalid_parameter
     zendif
 
-    ; Find the hash node.
-
-    copy16 i1, p1           ; object ID -> p1
-    jsr get_variable_rw     ; return ptr to node in p0
-
-    ; Copy the old value into p2 so we can lower the reference count.
+    ; Copy the old value into v2 so we can lower the reference count.
 
     ldx #-5 & 0xff
     ldy #OBJECT_TYPE
@@ -2128,18 +2155,16 @@ zproc deref_ix
     lda STACKVALUE_TYPE, x
     cmp #OTYPE_VAR      ; is the object a variable reference?
     zif_eq
-        lda STACKVALUE_DATA+0, x ; object ID -> p1
-        sta p1+0
-        lda STACKVALUE_DATA+1, x
-        sta p1+1
+        lda STACKVALUE_VARREF_HASHNODE_ID+0, x
+        sta p0+0
+        lda STACKVALUE_VARREF_HASHNODE_ID+1, x
+        sta p0+1
 
         txa
         pha
 
-        jsr get_variable_ro     ; return ptr to node in p0
-        zif_cs
-            jmp error_no_such_variable
-        zendif
+        ldx #p0
+        jsr deref_object        ; return ptr to node in p0
 
         pla
         pha
@@ -3337,11 +3362,13 @@ zendproc
 
 ; --- Namespace stuff -------------------------------------------------------
 
-; Returns a value node for a given ID.
+; Returns a hash node for a given ID.
 ; On entry:
-;   p1 - ID
+;   p1 - atom ID
 ; On exit:
-;   p0 - pointer to value node
+;   p0 - pointer to hash node
+;   p1 - preserved
+;   p2 - ID of hash node
 ;   C if the node couldn't be found
 
 zproc get_variable_ro
@@ -3367,14 +3394,14 @@ zproc get_variable_rw
     ora localhashtableptr+1
     zif_ne
         copy16 localhashtableptr, p0
-        jmp hash_deref
+        jmp hash_deref_rw
     zendif
 
     lda #<global_variables
     sta p0+0
     lda #>global_variables
     sta p0+1
-    jmp hash_deref
+    jmp hash_deref_rw
 zendproc
 
 ; --- Hashing stuff ---------------------------------------------------------
@@ -3449,7 +3476,8 @@ zendproc
 ;   p1 - ID
 ; On exit:
 ;   p0 - pointer to value node
-;   p1 - preserved
+;   p1 - hash node pointer
+;   p2 - hash node ID
 ;   C if the node couldn't be found
 
 zproc hash_deref_ro
@@ -3525,7 +3553,7 @@ zproc hash_deref_ro
     rts
 zendproc
 
-zproc hash_deref
+zproc hash_deref_rw
     jsr hash_deref_ro
     zif_cc
         ; The node already exists.
@@ -3563,9 +3591,20 @@ zproc hash_deref
 
     ldy #HASHNODE_KEY+1
     pla
+    sta p2+1
     sta (p0), y
     dey
     pla
+    sta p2+0
+    sta (p0), y
+
+    ; Get the atom type and use it to set the hashnode type.
+
+    ldx #p2
+    jsr deref_object
+    ldy #ATOM_TYPE
+    lda (p2), y
+    ldy #OBJECT_TYPE
     sta (p0), y
 
     ; Add this new node to the chain.
@@ -3584,6 +3623,7 @@ zproc hash_deref
 
     ; Return the new node.
 
+    copy16 p1, p2
     rts
 zendproc
 
@@ -5778,7 +5818,7 @@ keyword_endwhile = . + 1
 for_rule:
 keyword_for = . + 1
     P_TOKEN 'F', 'O', 'R'|0x80
-    P_WORD TOKEN_VARREF
+    P_WORD TOKEN_VARREFRW
     P_JSR assignment_operator_rule
     P_JSR expr_rule
 keyword_to = . + 1
@@ -5913,7 +5953,7 @@ keyword_endproc = . + 1
     P_RETURN
 
 proccall_rule:
-    P_WORD TOKEN_VARREF
+    P_WORD TOKEN_VARREFRO
     P_PAREN
     P_PARAM ; counts the procedure name
     P_JSR optional_argument_list_rule
@@ -5957,12 +5997,12 @@ assignment_kind_rule:
     P_FAIL
 
 simple_assignment_kind_rule:
-    P_WORD TOKEN_VARREF
+    P_WORD TOKEN_VARREFRW
     P_SHUNT TOKEN_ASSIGN
     P_JMP assignment_operator_rule
 
 slice_assignment_kind_rule:
-    P_WORD TOKEN_VARREF
+    P_WORD TOKEN_VARREFRW
     P_EAGER_TOKEN '('|0x80
     P_PAREN
     P_JSR range_rule
@@ -6161,7 +6201,7 @@ parenthesised_rvalue_rule:
     P_RETURN
 
 varref_rvalue_rule:
-    P_WORD TOKEN_VARREF
+    P_WORD TOKEN_VARREFRO
     P_RETURN
 
 number_rvalue_rule:

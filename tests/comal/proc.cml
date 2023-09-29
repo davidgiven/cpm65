@@ -6,7 +6,13 @@
 50print "checkpoint 3; a=", a
 60biggertest(10, 20, 30)
 70print "checkpoint 4; a=", a
-80end
+80biggertest(a, a, a)
+90print "checkpoint 5; a=", a
+100stringtest("Hello, world!")
+110print "checkpoint 6; a=", a
+120recurse(1, 10)
+130print "checkpoint 7; a=", a
+140end
 
 200proc simpletest
 210print "This is test!"
@@ -23,6 +29,19 @@
 300proc biggertest(a, b, c)
 310print "a=", a, " b=", b, " c=", c
 320endproc
+
+400proc stringtest(a$)
+410print "a$=", a$
+420endproc
+
+500proc recurse(count, max)
+510print "count=", count
+520if count = max then
+530return
+540else
+550recurse(count+1, max)
+560endif
+570endproc
 run
 list
 bye
