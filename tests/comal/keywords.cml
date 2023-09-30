@@ -42,6 +42,8 @@
 410proc noparameters2()
 420proc oneparameter(a)
 430proc twoparameter(a, b)
+431proc refparameter(a, ref b, c)
+432proc stringparamter(a$, ref b$)
 440noparameters
 450noparamerers()
 460oneparameter(1)

@@ -12,7 +12,11 @@
 110print "checkpoint 6; a=", a
 120recurse(1, 10)
 130print "checkpoint 7; a=", a
-140end
+140setvalue(a, 99)
+150print "checkpoint 7; a=", a
+160setvalue2(a, 199)
+170print "checkpoint 8; a=", a
+180end
 
 200proc simpletest
 210print "This is test!"
@@ -42,6 +46,19 @@
 550recurse(count+1, max)
 560endif
 570endproc
+
+600proc setvalue(ref var, value)
+610print "1 var=", var, " value=", value
+620var = value
+630print "2 var=", var, " value=", value
+640endproc
+
+700proc setvalue2(ref var, value)
+710print "1.1 var=", var, " value=", value
+720setvalue(var, value)
+730print "2.1 var=", var, " value=", value
+740endproc
+
 run
 list
 bye

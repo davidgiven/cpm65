@@ -33,13 +33,14 @@ OBJECT_DATA     = 3
 OTYPE_FREE       = 0x00
 OTYPE_ATOM       = 0x01
 OTYPE_INTEGER    = 0x02
-OTYPE_VAR        = 0x03
-OTYPE_STRINGDATA = 0x04
-OTYPE_RANGE      = 0x05
-OTYPE_PROCEDURE  = 0x06
-OTYPE_CALL       = 0x07
+OTYPE_STRINGDATA = 0x03
+OTYPE_RANGE      = 0x04
+OTYPE_PROCEDURE  = 0x05
+OTYPE_CALL       = 0x06
 OTYPE_STRING     = 0x10
 OTYPE_STRINGLIT  = 0x11
+OTYPE_VAR        = 0x20 ; pointer to a hashnode
+OTYPE_REF        = 0x21 ; pointer to a hashnode
 
 HASH_SLOTS      = 16
 
@@ -97,6 +98,7 @@ endstruct STACKVALUE_SIZE
 
 startstruct STACKVALUE_DATA
 structmember STACKVALUE_VARREF_HASHNODE_ID, 2
+structmember STACKVALUE_VARREF_TYPE, 1
 endstruct STACKVALUE_VARREF__SIZE
 
 ; String stack value structure:
@@ -226,66 +228,67 @@ LISTERFLAG_NOTSTART   = 1<<7 ; set after every lister is called, is !RESETSTART
 LISTERFLAG_COMMA      = 1<<6 ; a comma is intended before the next clause
 LISTERFLAG_RESETSTART = 1<<5 ; causes NOTSTART to be reset
 
-TOKEN_EOL       = 0x00 ; end of line
-TOKEN_VARREFRW  = 0x01 ; +2 bytes for the ID
-TOKEN_INTEGER   = 0x02 ; +4 bytes for the number
-TOKEN_MUL       = 0x03
-TOKEN_DIV       = 0x04
-TOKEN_ADD       = 0x05
-TOKEN_SUB       = 0x06
-TOKEN_MOD       = 0x07
-TOKEN_PRINT     = 0x08
-TOKEN_PRINTNL   = 0x09
-TOKEN_ASSIGN    = 0x0a
-TOKEN_NEG       = 0x0b
-TOKEN_LINEENTRY = 0x0c
-TOKEN_ZERO      = 0x0d
-TOKEN_LIST      = 0x0e
-TOKEN_DEL       = 0x0f
-TOKEN_MONE      = 0x10
-TOKEN_RENUM     = 0x11
-TOKEN_RUN       = 0x12
-TOKEN_STOP      = 0x13
-TOKEN_CON       = 0x14
-TOKEN_REPEAT    = 0x15
-TOKEN_UNTIL     = 0x16
-TOKEN_NOT       = 0x17
-TOKEN_EQ        = 0x18
-TOKEN_WHILE     = 0x19
-TOKEN_ENDWHILE  = 0x1a
-TOKEN_ONE       = 0x1b
-TOKEN_FOR       = 0x1c
-TOKEN_ENDFOR    = 0x1d
-TOKEN_SGN       = 0x1e
-TOKEN_NOTEQ     = 0x1f
-TOKEN_LT        = 0x20
-TOKEN_LTE       = 0x21
-TOKEN_GT        = 0x22
-TOKEN_GTE       = 0x23
-TOKEN_IF        = 0x24
-TOKEN_ELSE      = 0x25
-TOKEN_ENDIF     = 0x26
-TOKEN_ELIF      = 0x27
-TOKEN_ELIFGOTO  = 0x28
-TOKEN_STRING    = 0x29
-TOKEN_FREE      = 0x2a
-TOKEN_TRUE      = 0x2b
-TOKEN_FALSE     = 0x2c
-TOKEN_LEN       = 0x2d
-TOKEN_SLICE     = 0x2e
-TOKEN_MKRANGE   = 0x2f
-TOKEN_SLASSIGN  = 0x30
-TOKEN_ENTER     = 0x31
-TOKEN_STR$      = 0x32
-TOKEN_BYE       = 0x33
-TOKEN_PROC1     = 0x34
-TOKEN_ENDPROC   = 0x35
-TOKEN_PROCCALL  = 0x36
-TOKEN_PROC2     = 0x37
-TOKEN_END       = 0x38
-TOKEN_RETURN    = 0x39
-TOKEN_SETPARAM  = 0x3a
-TOKEN_VARREFRO  = 0x3b ; +2 bytes for the ID
+TOKEN_EOL        = 0x00 ; end of line
+TOKEN_VARREFRW   = 0x01 ; +2 bytes for the ID
+TOKEN_INTEGER    = 0x02 ; +4 bytes for the number
+TOKEN_MUL        = 0x03
+TOKEN_DIV        = 0x04
+TOKEN_ADD        = 0x05
+TOKEN_SUB        = 0x06
+TOKEN_MOD        = 0x07
+TOKEN_PRINT      = 0x08
+TOKEN_PRINTNL    = 0x09
+TOKEN_ASSIGN     = 0x0a
+TOKEN_NEG        = 0x0b
+TOKEN_LINEENTRY  = 0x0c
+TOKEN_ZERO       = 0x0d
+TOKEN_LIST       = 0x0e
+TOKEN_DEL        = 0x0f
+TOKEN_MONE       = 0x10
+TOKEN_RENUM      = 0x11
+TOKEN_RUN        = 0x12
+TOKEN_STOP       = 0x13
+TOKEN_CON        = 0x14
+TOKEN_REPEAT     = 0x15
+TOKEN_UNTIL      = 0x16
+TOKEN_NOT        = 0x17
+TOKEN_EQ         = 0x18
+TOKEN_WHILE      = 0x19
+TOKEN_ENDWHILE   = 0x1a
+TOKEN_ONE        = 0x1b
+TOKEN_FOR        = 0x1c
+TOKEN_ENDFOR     = 0x1d
+TOKEN_SGN        = 0x1e
+TOKEN_NOTEQ      = 0x1f
+TOKEN_LT         = 0x20
+TOKEN_LTE        = 0x21
+TOKEN_GT         = 0x22
+TOKEN_GTE        = 0x23
+TOKEN_IF         = 0x24
+TOKEN_ELSE       = 0x25
+TOKEN_ENDIF      = 0x26
+TOKEN_ELIF       = 0x27
+TOKEN_ELIFGOTO   = 0x28
+TOKEN_STRING     = 0x29
+TOKEN_FREE       = 0x2a
+TOKEN_TRUE       = 0x2b
+TOKEN_FALSE      = 0x2c
+TOKEN_LEN        = 0x2d
+TOKEN_SLICE      = 0x2e
+TOKEN_MKRANGE    = 0x2f
+TOKEN_SLASSIGN   = 0x30
+TOKEN_ENTER      = 0x31
+TOKEN_STR$       = 0x32
+TOKEN_BYE        = 0x33
+TOKEN_PROC1      = 0x34
+TOKEN_ENDPROC    = 0x35
+TOKEN_PROCCALL   = 0x36
+TOKEN_PROC2      = 0x37
+TOKEN_END        = 0x38
+TOKEN_RETURN     = 0x39
+TOKEN_SETPARAM   = 0x3a ; +2 bytes for the ID
+TOKEN_VARREFRO   = 0x3b ; +2 bytes for the ID
+TOKEN_REFPARAM   = 0x3c ; +2 bytes for the ID
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -429,6 +432,7 @@ deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,
 deftok TOKEN_RETURN,    0, 1, 0, 0, lister_simple,   keyword_return,   exec_endproc,   check_nop
 deftok TOKEN_SETPARAM,  0, 3, 0, 0, lister_setparam, get_variable_rw,  exec_setparam,  check_nop
 deftok TOKEN_VARREFRO, 15, 3, 0, 1, lister_varref,   get_variable_ro,  exec_varref,    check_nop
+deftok TOKEN_REFPARAM,  0, 3, 0, 0, lister_refparam, get_variable_rw,  exec_refparam,  check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -1366,6 +1370,16 @@ zendproc
 ; (procref arg1 arg2 arg3... argX callstruct --)
 
 zproc exec_setparam
+    jsr exec_param
+    jmp exec_assign
+zendproc
+
+zproc exec_refparam
+    jsr exec_param
+    jmp exec_refassign
+zendproc
+
+zproc exec_param
     ; Predecrement the argument pointer.
 
     sec
@@ -1390,9 +1404,7 @@ zproc exec_setparam
         dey
     zuntil_mi
 
-    ; Do the assign.
-
-    jmp exec_assign
+    rts
 zendproc
 
 ; On entry, the stack looks like this:
@@ -1463,9 +1475,26 @@ zproc exec_varref
 
     jsr 1f                          ; call to aux pointer
 
+    ; Pointer to hashnode in p0, atom ID in p1, hashnode id in p2
+
+    ldy #OBJECT_TYPE
+    lda (p0), y
+    sta v0+STACKVALUE_VARREF_TYPE
+
     lda #OTYPE_VAR
     sta v0
     copy16 p2, v0+STACKVALUE_VARREF_HASHNODE_ID
+
+    jsr deref_i0
+    ; Storage hashnode id in p1
+
+    ldy #OBJECT_TYPE
+    lda (p0), y
+    sta v0+STACKVALUE_VARREF_TYPE
+
+    lda #OTYPE_VAR
+    sta v0
+    copy16 p1, v0+STACKVALUE_VARREF_HASHNODE_ID
     rts
 
 1:
@@ -1663,7 +1692,6 @@ zendproc
 
 zproc exec_assign
     jsr deref_i0            ; value to assign
-    jsr pop_i1              ; lvalue (variable reference)
 
     ; Does the rvalue need any kind of promotion?
 
@@ -1679,9 +1707,9 @@ zproc exec_assign
 
     ; Find the hash node.
 
-    copy16 i1, p0           ; object ID -> p0
-    ldx #p0
-    jsr deref_object
+    jsr pop_and_deref_i1    ; lvalue (variable reference)
+    ; p0 points at the variable hash node.
+    ; p1 is the hash node ID.
 
     ; Check the type.
 
@@ -1691,18 +1719,6 @@ zproc exec_assign
     zif_ne
         jmp error_invalid_parameter
     zendif
-
-    ; Copy the old value into v2 so we can lower the reference count.
-
-    ldx #-5 & 0xff
-    ldy #OBJECT_TYPE
-    clc
-    zrepeat
-        lda (p0), y
-        sta v2+5, x
-        iny
-        inx
-    zuntil_eq
 
     ; Copy value into node.
 
@@ -1715,6 +1731,54 @@ zproc exec_assign
         iny
         inx
     zuntil_eq
+
+    jmp pop_i0
+zendproc
+
+; Stores a reference to an lvalue into a variable.
+; Stack: ( parameter lvalue=i0 -- )
+
+zproc exec_refassign
+    jsr pop_i1              ; parameter (variable reference)
+
+    ; Check type.
+
+    lda v0+STACKVALUE_VARREF_TYPE
+    cmp v1+STACKVALUE_VARREF_TYPE
+    bne 1f
+
+    ; Find the parameter's hash node.
+
+    ldx #i1
+    jsr deref_object
+
+    ; Get the ID of the value's hash node.
+
+    jsr deref_i0
+    zif_cs
+    1:
+        jmp error_invalid_parameter
+    zendif
+    ; hash node pointer in p0
+    ; hash node ID in p1
+    ldy #OBJECT_TYPE
+    lda (p0), y
+    pha
+    
+    ; Create the reference object in the hash node.
+
+    lda #OTYPE_REF
+    ldy #OBJECT_TYPE
+    sta (i1), y
+    lda p1+0
+    iny
+    sta (i1), y
+    lda p1+1
+    iny
+    sta (i1), y
+    pla
+    iny
+    sta (i1), y
 
     jmp pop_i0
 zendproc
@@ -2146,44 +2210,66 @@ zendproc
     ; falls through
 zproc deref_i0
     ldx #v0
+    jmp deref_ix
 zendproc
-    ; falls through
 
 ; On entry:
 ;   X - address of v register
+; On exit:
+;   p0 - hashnode of variable
+;   p1 - ID of hashnode
+;   C - set if no dereference done
 zproc deref_ix
     lda STACKVALUE_TYPE, x
-    cmp #OTYPE_VAR      ; is the object a variable reference?
-    zif_eq
-        lda STACKVALUE_VARREF_HASHNODE_ID+0, x
-        sta p0+0
-        lda STACKVALUE_VARREF_HASHNODE_ID+1, x
-        sta p0+1
-
-        txa
-        pha
-
-        ldx #p0
-        jsr deref_object        ; return ptr to node in p0
-
-        pla
-        pha
-        tax
-
-        ; Copy the value to register.
-
-        ldy #OBJECT_TYPE
+    and #OTYPE_VAR      ; is the object a VAR or a REF?
+    sec
+    zif_ne
         zrepeat
-            lda (p0), y         ; get byte from object
-            sta 0, x            ; write to register
-            inx
-            iny
-            cpy #OBJECT_DATA+5
-        zuntil_eq
+            jsr deref_ix_once
 
-        pla
-        tax
+            lda STACKVALUE_TYPE, x
+            and #OTYPE_VAR      ; is the object a VAR or a REF?
+        zuntil_eq
+        clc
     zendif
+    rts
+zendproc
+
+; On entry:
+;   X - address of v register
+; On exit:
+;   p0 - hashnode of variable
+;   p1 - ID of hashnode
+zproc deref_ix_once
+    lda STACKVALUE_VARREF_HASHNODE_ID+0, x
+    sta p1+0
+    lda STACKVALUE_VARREF_HASHNODE_ID+1, x
+    sta p1+1
+
+    txa
+    pha
+
+    copy16 p1, p0
+    ldx #p0
+    jsr deref_object        ; return ptr to node in p0
+
+    pla
+    pha
+    tax
+
+    ; Copy the value to register.
+
+    ldy #OBJECT_TYPE
+    zrepeat
+        lda (p0), y         ; get byte from object
+        sta 0, x            ; write to register
+        inx
+        iny
+        cpy #OBJECT_DATA+5
+    zuntil_eq
+
+    pla
+    tax
     rts
 zendproc
 
@@ -4532,13 +4618,29 @@ zproc lister_printnl
     rts
 zendproc
     
-zproc lister_setparam
+zproc lister_leadingcomma
     lda listerflags
     zif_mi                      ; LISTERFLAG_NOTSTART
         lda #<keyword_comma
         ldx #>keyword_comma
         jsr buffer_print_separated_string
     zendif
+    rts
+zendproc
+
+zproc lister_refparam
+    jsr lister_leadingcomma
+
+    lda #<keyword_ref
+    ldx #>keyword_ref
+    jsr buffer_print_separated_string
+
+    ldx listerroot
+    jmp lister_varref
+zendproc
+
+zproc lister_setparam
+    jsr lister_leadingcomma
     ldx listerroot
 zendproc
     ; falls through
@@ -5935,11 +6037,22 @@ optional_parameter_list_rule:
     P_TRY end_parameter_list_rule
 1:
     P_COMMIT
-    P_WORD TOKEN_SETPARAM
+    P_JSR parameter_rule
     P_PARAM
     P_TRY end_parameter_list_rule
     P_EAGER_TOKEN ','|0x80
     P_JMP 1b
+
+parameter_rule:
+    P_TRY ref_parameter_rule
+    P_WORD TOKEN_SETPARAM
+    P_RETURN
+
+ref_parameter_rule:
+keyword_ref = . + 1
+    P_TOKEN 'R', 'E', 'F'|0x80
+    P_WORD TOKEN_REFPARAM
+    P_RETURN
 
 end_parameter_list_rule:
     P_EAGER_TOKEN ')'|0x80

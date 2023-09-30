@@ -86,9 +86,13 @@
 
 16 00 00 00 02 AE 01 00 00 0C 34 0D 00 3A 02 00 3A 03 00 37 02 
 
+19 00 00 00 02 AF 01 00 00 0C 34 0E 00 3A 02 00 3C 03 00 3A 04 00 37 03 
+
+16 00 00 00 02 B0 01 00 00 0C 34 0F 00 3A 05 00 3C 10 00 37 02 
+
 10 00 00 00 02 B8 01 00 00 0C 3B 0A 00 36 01 
 
-10 00 00 00 02 C2 01 00 00 0C 3B 0E 00 36 01 
+10 00 00 00 02 C2 01 00 00 0C 3B 11 00 36 01 
 
 11 00 00 00 02 CC 01 00 00 0C 3B 0C 00 1B 36 02 
 
@@ -144,6 +148,8 @@
 410 PROC noparameters2
 420 PROC oneparameter(a)
 430 PROC twoparameter(a, b)
+431 PROC refparameter(a, REF b, c)
+432 PROC stringparamter(a$, REF b$)
 440 noparameters
 450 noparamerers
 460 oneparameter(1)
