@@ -199,6 +199,7 @@ parsestartstackptr: .byte 0 ; stack pointer when parse starts
 listerroot:         .byte 0 ; address of topmost node
 listersp:           .byte 0 ; SP when empty
 listerflags:        .byte 0 ; flags
+listernode:         .byte 0 ; current node when listing
 
 ; Interpreter temporaries
 
@@ -274,7 +275,7 @@ TOKEN_FREE       = 0x2a
 TOKEN_TRUE       = 0x2b
 TOKEN_FALSE      = 0x2c
 TOKEN_LEN        = 0x2d
-TOKEN_SLICE      = 0x2e
+TOKEN_XXXXX      = 0x2e
 TOKEN_MKRANGE    = 0x2f
 TOKEN_SLASSIGN   = 0x30
 TOKEN_ENTER      = 0x31
@@ -282,13 +283,17 @@ TOKEN_STR$       = 0x32
 TOKEN_BYE        = 0x33
 TOKEN_PROC1      = 0x34
 TOKEN_ENDPROC    = 0x35
-TOKEN_PROCCALL   = 0x36
+TOKEN_APPLY      = 0x36
 TOKEN_PROC2      = 0x37
 TOKEN_END        = 0x38
-TOKEN_RETURN     = 0x39
+TOKEN_RETURN0    = 0x39
 TOKEN_SETPARAM   = 0x3a ; +2 bytes for the ID
 TOKEN_VARREFRO   = 0x3b ; +2 bytes for the ID
 TOKEN_REFPARAM   = 0x3c ; +2 bytes for the ID
+TOKEN_FUNC1      = 0x3d ; +2 bytes for the ID
+TOKEN_ENDFUNC    = 0x3e
+TOKEN_RETURN1    = 0x3f
+TOKEN_APPLYVOID  = 0x40
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -418,21 +423,25 @@ deftok TOKEN_FREE,     14, 1, 0, 1, lister_simple,   keyword_free,     exec_free
 deftok TOKEN_TRUE,     14, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
 deftok TOKEN_FALSE,    14, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
 deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,       check_nop
-deftok TOKEN_SLICE,    15, 1, 2, 1, lister_slice,    lister_bad,       exec_slice,     check_nop
+deftok TOKEN_XXXXX,    15, 1, 2, 1, lister_bad,      lister_bad,       exec_bad,       check_nop
 deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
 deftok TOKEN_SLASSIGN, 15, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
 deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
 deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
 deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_proc1,     check_proc1
-deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_endproc,   check_endproc
-deftok TOKEN_PROCCALL,  0, 2, 7, 0, lister_proccall, lister_bad,       exec_proccall,  check_nop
+deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_return0,   check_endproc
+deftok TOKEN_APPLY,     0, 2, 7, 1, lister_apply,    lister_bad,       exec_apply,     check_nop
 deftok TOKEN_PROC2,     0, 2, 0, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
-deftok TOKEN_RETURN,    0, 1, 0, 0, lister_simple,   keyword_return,   exec_endproc,   check_nop
+deftok TOKEN_RETURN0,   0, 1, 0, 0, lister_simple,   keyword_return,   exec_return0,   check_nop
 deftok TOKEN_SETPARAM,  0, 3, 0, 0, lister_setparam, get_variable_rw,  exec_setparam,  check_nop
 deftok TOKEN_VARREFRO, 15, 3, 0, 1, lister_varref,   get_variable_ro,  exec_varref,    check_nop
 deftok TOKEN_REFPARAM,  0, 3, 0, 0, lister_refparam, get_variable_rw,  exec_refparam,  check_nop
+deftok TOKEN_FUNC1,     0, 3, 0, 0, lister_proc1,    keyword_func,     exec_proc1,     check_proc1
+deftok TOKEN_ENDFUNC,   0, 1, 0, 0, lister_simple,   keyword_endfunc,  exec_endfunc,   check_endproc
+deftok TOKEN_RETURN1,   0, 1, 1, 0, lister_simplee,  keyword_return,   exec_return1,   check_nop
+deftok TOKEN_APPLYVOID, 0, 2, 7, 0, lister_apply,    lister_bad,       exec_applyvoid, check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -829,6 +838,10 @@ error_reached_proc:
     lda #ERROR_REACHED_PROC
     bne throw_error         ; always taken
 
+error_function_without_return:
+    lda #ERROR_FUNCTION_WITHOUT_RETURN
+    bne throw_error         ; always taken
+
 ; Produces the error whose number is in A.
 
 zproc throw_error
@@ -906,6 +919,9 @@ string_overflow_msg:
 reached_proc_msg:
     .ascii "Execution hit PRO"
     .byte 'C'|0x80
+function_without_return_msg:
+    .ascii "Function without RETUR"
+    .byte 'N'|0x80
 
 ERROR_CANT_CONTINUE = cant_continue_msg - message_table
 ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
@@ -916,6 +932,7 @@ ERROR_BAD_STRUCTURE = bad_structure_msg - message_table
 ERROR_FILE_NOT_FOUND = file_not_found_msg - message_table
 ERROR_STRING_OVERFLOW = string_overflow_msg - message_table
 ERROR_REACHED_PROC = reached_proc_msg - message_table
+ERROR_FUNCTION_WITHOUT_RETURN = function_without_return_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -1274,10 +1291,14 @@ zproc exec_endfor
     jmp pop_i0                      ; ()
 zendproc
 
-; On entry, the stack looks like this:
-; ((oldi0) procref arg1 arg2 arg3... argX=i0 --)
+; For a varargs operation, where the stack looks like this:
+; ((oldi0) something arg1 arg2 arg3... argX=i0 --)
+; ...then peek 'something' and deref it.
+; On exit:
+;   X - the stack offset to the procedure reference
+;   A - the number of arguments
 
-zproc exec_proccall
+zproc exec_decode_varargs
     ldy execbyteptr
     iny
     lda (execlineptr), y            ; get number of arguments
@@ -1300,6 +1321,91 @@ zproc exec_proccall
     jsr deref_i0
     pla
 
+    tax
+    pla
+    rts
+zendproc
+
+; On entry, the stack looks like this:
+; ((oldi0) procref arg1 arg2 arg3... argX=i0 --)
+
+zproc exec_apply
+    jsr exec_decode_varargs
+    ; A - number of arguments
+    ; X - stack offset of first argument
+
+    ldy v0
+    cpy #OTYPE_PROCEDURE
+    beq do_call_procedure
+
+    cmp #1
+    bne 1f
+
+    tya
+    and #OTYPE_STRING
+    bne do_slice
+
+1:
+    jmp error_invalid_parameter
+zendproc
+
+; On entry:
+;   i0 - string object (LHS)
+
+zproc do_slice
+    jsr pop_and_deref_i1        ; RHS - slice object
+
+    ldx #v1
+    jsr coerce_to_range
+
+    dec v1+STACKVALUE_RANGE_OFFSET      ; strings are 1-based
+    lda v1+STACKVALUE_RANGE_OFFSET
+    bmi 1b
+    clc
+    adc v0+STACKVALUE_STRING_OFFSET     ; new string offset
+    pha
+
+    clc
+    lda v1+STACKVALUE_RANGE_OFFSET
+    adc v1+STACKVALUE_RANGE_LENGTH
+    cmp v0+STACKVALUE_STRING_LENGTH
+    zif_ne
+        bcs 1b
+    zendif
+
+    ldy v1+STACKVALUE_RANGE_LENGTH
+    sty v0+STACKVALUE_STRING_LENGTH
+    pla
+    sta v0+STACKVALUE_STRING_OFFSET
+    rts
+zendproc
+
+; On entry, the stack looks like this:
+; ((oldi0) procref arg1 arg2 arg3... argX=i0 --)
+
+zproc exec_applyvoid
+    jsr exec_decode_varargs
+
+    pha
+    lda v0
+    cmp #OTYPE_PROCEDURE
+    zif_ne
+        brk
+        jmp error_invalid_parameter
+    zendif
+    pla
+zendproc
+    ; fall through
+
+; On entry:
+;   i0 - procedure reference to call
+;   A - number of parameters
+;   X - stack offset
+
+zproc do_call_procedure
+    pha                             ; the number of arguments
+    txa                             ; stack offset
+
     ; Compute the first argument address.
 
     clc
@@ -1314,6 +1420,7 @@ zproc exec_proccall
     pla
     cmp v0+STACKVALUE_PROC_PCOUNT
     zif_ne
+        brk
         jmp error_invalid_parameter
     zendif
 
@@ -1410,7 +1517,7 @@ zendproc
 ; On entry, the stack looks like this:
 ; ((oldi0) procref arg1 arg2 arg3... argX callstruct ...garbage=i0... --)
 
-zproc exec_endproc
+zproc exec_return0
     ; Free up the hash table.
 
     copy16 localhashtableptr, p1
@@ -1462,6 +1569,14 @@ zproc exec_endproc
     rts
 zendproc
 
+zproc exec_return1
+    brk
+zendproc
+
+zproc exec_endfunc
+    jmp error_function_without_return
+zendproc
+    
 zproc exec_varref
     jsr push_i0
 
@@ -1972,40 +2087,6 @@ zproc exec_str$
     jsr buffer_print_i0
     ldx #v0
     jmp create_string
-zendproc
-
-zproc exec_slice
-    jsr deref_i0                ; RHS - slice object
-    jsr pop_and_deref_i1        ; LHS - string
-    ldx #v0
-    jsr coerce_to_range
-    ldx #v1
-    jsr check_for_string
-
-    dec v0+STACKVALUE_RANGE_OFFSET      ; strings are 1-based
-    lda v0+STACKVALUE_RANGE_OFFSET
-    zif_mi
-    1:
-        jmp error_invalid_parameter
-    zendif
-    clc
-    adc v1+STACKVALUE_STRING_OFFSET     ; new string offset
-    pha
-
-    clc
-    lda v0+STACKVALUE_RANGE_OFFSET
-    adc v0+STACKVALUE_RANGE_LENGTH
-    cmp v1+STACKVALUE_STRING_LENGTH
-    zif_ne
-        bcs 1b
-    zendif
-
-    ldy v0+STACKVALUE_RANGE_LENGTH
-    copystruct STACKVALUE_SIZE, v1, v0
-    sty v0+STACKVALUE_STRING_LENGTH
-    pla
-    sta v0+STACKVALUE_STRING_OFFSET
-    rts
 zendproc
 
 zproc exec_mkrange
@@ -4364,15 +4445,25 @@ zendproc
 
 ; Takes the tree node address in X.
 zproc list_clause
+    lda listernode              ; save old listernode
+    pha
+    stx listernode
+
     lda operator_stack, x       ; get bytecode address
     tay
     lda (execlineptr), y        ; get bytecode
     tay
+    jsr call_token_lister
+    pla                         ; restore old listernode
+    sta listernode
+lister_nop:
+    rts
+
+call_token_lister:
     lda token_listers_hi, y     ; get lister routine
     pha
     lda token_listers_lo, y
     pha
-lister_nop:
     rts
 zendproc
 
@@ -4423,7 +4514,7 @@ zproc lister_for
     jsr lister_simple           ; prints the FOR
     jsr buffer_print_space
 
-    ldy listerroot
+    ldy listernode
     ldx operator_stack+4, y     ; get first parameter tree address; the variable
     jsr list_clause
     jsr buffer_print_space
@@ -4432,7 +4523,7 @@ zproc lister_for
     ldx #>keyword_assign
     jsr buffer_print_separated_string
 
-    ldy listerroot
+    ldy listernode
     ldx operator_stack+3, y     ; get second parameter tree address; the initial value
     jsr list_clause
     jsr buffer_print_space
@@ -4441,12 +4532,12 @@ zproc lister_for
     ldx #>keyword_to
     jsr buffer_print_separated_string
 
-    ldy listerroot
+    ldy listernode
     ldx operator_stack+2, y     ; get third parameter tree address; the final value
     jsr list_clause
     jsr buffer_print_space
 
-    ldy listerroot
+    ldy listernode
     ldx operator_stack+1, y     ; get fourth parameter tree address; the step value
     ldy operator_stack, x       ; get bytecode address
     lda (execlineptr), y        ; get bytecode
@@ -4458,7 +4549,7 @@ zproc lister_for
         ldx #>keyword_step
         jsr buffer_print_separated_string
 
-        ldy listerroot
+        ldy listernode
         ldx operator_stack+1, y     ; get fourth parameter tree address; the step value
         jsr list_clause
         jsr buffer_print_space
@@ -4498,7 +4589,7 @@ zproc lister_proc1
     ora #LISTERFLAG_RESETSTART
     sta listerflags
 
-    ldx listerroot
+    ldx listernode
     jsr lister_varref
     lda #'('
     jmp buffer_print_char
@@ -4515,28 +4606,25 @@ zproc lister_proc2
     jmp buffer_print_char
 zendproc
 
-zproc lister_proccall
+zproc lister_apply
     jsr lister_get_varargs_parameters
     pha
 
     clc
-    adc listerroot
+    adc listernode
     tay
     ldx operator_stack, y       ; get tree address of last parameter
     jsr list_clause
 
-    pla
-    cmp #1
-    beq 1f                      ; just the identifier parameter
-
-    pha
     lda #'('
     jsr buffer_print_char
     pla
 
     sec
     sbc #1
-    jsr lister_comma_separated_list
+    zif_ne
+        jsr lister_comma_separated_list
+    zendif
 
     lda #')'
     jsr buffer_print_char
@@ -4549,7 +4637,6 @@ zendproc
 ; into A.
 
 zproc lister_get_varargs_parameters
-    ldx listerroot
     ldy operator_stack+0, x     ; get bytecode pointer
     iny
     lda (execlineptr), y        ; get number of parameters
@@ -4565,7 +4652,7 @@ zproc lister_comma_separated_list
 
         pha
         clc
-        adc listerroot
+        adc listernode
         tay
         ldx operator_stack, y   ; get tree address of parameter
         jsr list_clause
@@ -4599,7 +4686,7 @@ zproc lister_print
     sta listerflags
 
 list_first_clause:
-    ldy listerroot
+    ldy listernode
     ldx operator_stack+1, y
     jmp list_clause
 zendproc
@@ -4635,13 +4722,13 @@ zproc lister_refparam
     ldx #>keyword_ref
     jsr buffer_print_separated_string
 
-    ldx listerroot
+    ldx listernode
     jmp lister_varref
 zendproc
 
 zproc lister_setparam
     jsr lister_leadingcomma
-    ldx listerroot
+    ldx listernode
 zendproc
     ; falls through
 zproc lister_varref
@@ -4836,19 +4923,6 @@ zproc lister_prefix
     jmp list_parenthesised_clause
 zendproc
 
-zproc lister_slice
-    txa
-    pha
-
-    ldy operator_stack+2, x     ; get first parameter tree address
-    jsr list_parenthesised_clause
-
-    pla
-    tax                         ; recover current node tree address
-    ldy operator_stack+1, x     ; get second parameter tree address
-    jmp list_parenthesised_clause
-zendproc
-    
 ; --- Parser ----------------------------------------------------------------
 
 zproc parse_line
@@ -5735,15 +5809,17 @@ statement_rule:
     P_TRY else_rule
     P_TRY elif_rule
     P_TRY endif_rule
-    P_TRY proc_rule
+    P_TRY proc_or_func_rule
     P_TRY endproc_rule
+    P_TRY endfunc_rule
     P_TRY eol_rule
 simple_statement_rule:
     P_TRY print_rule
     P_TRY stop_rule
     P_TRY bye_rule
     P_TRY end_rule
-    P_TRY return_rule
+    P_TRY return0_rule
+    P_TRY return1_rule
     P_TRY proccall_rule
     P_TRY assignment_rule
     P_PANIC
@@ -5862,11 +5938,22 @@ con_rule:
     P_EOL
     P_RETURN
 
-return_rule:
+return0_rule:
+    P_JSR return_keyword_rule
+    P_EMIT TOKEN_RETURN0
+    P_EOL
+    P_RETURN
+
+return1_rule:
+    P_JSR return_keyword_rule
+    P_JSR expr_rule
+    P_EMIT TOKEN_RETURN1
+    P_EOL
+    P_RETURN
+
+return_keyword_rule:
 keyword_return = . + 1
     P_TOKEN 'R', 'E', 'T', 'U', 'R', 'N'|0x80
-    P_EMIT TOKEN_RETURN
-    P_EOL
     P_RETURN
 
 enter_rule:
@@ -6020,10 +6107,8 @@ keyword_do = . + 1
     P_TOKEN 'D', 'O'|0x80
     P_RETURN
 
-proc_rule:
-keyword_proc = . + 1
-    P_TOKEN 'P', 'R', 'O', 'C'|0x80
-    P_WORD TOKEN_PROC1
+proc_or_func_rule:
+    P_JSR proc_or_func_keyword_rule
     P_PAREN
     P_JSR optional_parameter_list_rule
     P_FLUSH_AND_EMIT_VARARG TOKEN_PROC2
@@ -6031,7 +6116,6 @@ keyword_proc = . + 1
     P_RETURN
 
 optional_parameter_list_rule:
-    P_TRY eol_rule
     P_EAGER_TOKEN '('|0x80
     P_COMMIT
     P_TRY end_parameter_list_rule
@@ -6058,6 +6142,19 @@ end_parameter_list_rule:
     P_EAGER_TOKEN ')'|0x80
     P_RETURN
 
+proc_or_func_keyword_rule:
+    P_TRY proc_keyword_rule
+keyword_func = . + 1
+    P_TOKEN 'F', 'U', 'N', 'C'|0x80
+    P_WORD TOKEN_FUNC1
+    P_RETURN
+
+proc_keyword_rule:
+keyword_proc = . + 1
+    P_TOKEN 'P', 'R', 'O', 'C'|0x80
+    P_WORD TOKEN_PROC1
+    P_RETURN
+
 endproc_rule:
 keyword_endproc = . + 1
     P_TOKEN 'E', 'N', 'D', 'P', 'R', 'O', 'C'|0x80
@@ -6065,22 +6162,28 @@ keyword_endproc = . + 1
     P_EOL
     P_RETURN
 
+endfunc_rule:
+keyword_endfunc = . + 1
+    P_TOKEN 'E', 'N', 'D', 'F', 'U', 'N', 'C'|0x80
+    P_EMIT TOKEN_ENDFUNC
+    P_EOL
+    P_RETURN
+
 proccall_rule:
     P_WORD TOKEN_VARREFRO
     P_PAREN
     P_PARAM ; counts the procedure name
-    P_JSR optional_argument_list_rule
-    P_FLUSH_AND_EMIT_VARARG TOKEN_PROCCALL
+    P_JSR argument_list_rule
+    P_FLUSH_AND_EMIT_VARARG TOKEN_APPLYVOID
     P_EOL
     P_RETURN
 
-optional_argument_list_rule:
-    P_TRY eol_rule
+argument_list_rule:
     P_EAGER_TOKEN '('|0x80
     P_TRY end_argument_list_rule
 1:
     P_PAREN
-    P_JSR expr_rule
+    P_JSR expr_or_range_rule
     P_FLUSH
     P_PARAM
     P_TRY end_argument_list_rule
@@ -6089,12 +6192,16 @@ optional_argument_list_rule:
 
 single_argument_list_rule:
     P_PAREN
-    P_JSR expr_rule
+    P_JSR expr_or_range_rule
     P_FLUSH
 end_argument_list_rule:
     P_EAGER_TOKEN ')'|0x80
     P_RETURN
     
+expr_or_range_rule:
+    P_TRY range_rule
+    P_JMP expr_rule
+
 assignment_rule:
     P_JSR assignment_kind_rule
     P_COMMIT
@@ -6188,7 +6295,7 @@ compulsory_expr_rule:
 expr_rule:
     P_JSR leaf_rule
     P_COMMIT
-    P_TRY stringslice_rule
+    P_TRY application_rule
     P_TRY addition_rule
     P_TRY subtraction_rule
     P_TRY multiplication_rule
@@ -6202,13 +6309,11 @@ expr_rule:
     P_TRY compare_gt_rule           ; >
     P_RETURN
 
-stringslice_rule:
-    P_EAGER_TOKEN '('|0x80
+application_rule:
     P_PAREN
-    P_JSR range_rule
-    P_EAGER_TOKEN ')'|0x80
-    P_FLUSH
-    P_SHUNT TOKEN_SLICE
+    P_PARAM ; counts the thing being dereferenced
+    P_JSR argument_list_rule
+    P_FLUSH_AND_EMIT_VARARG TOKEN_APPLY
     P_RETURN
 
 range_rule:

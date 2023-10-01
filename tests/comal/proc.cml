@@ -1,8 +1,8 @@
 5a=1
 10print "checkpoint 1; a=", a
-20simpletest
+20simpletest()
 30print "checkpoint 2; a=", a
-40returntest
+40returntest()
 50print "checkpoint 3; a=", a
 60biggertest(10, 20, 30)
 70print "checkpoint 4; a=", a
@@ -18,13 +18,13 @@
 170print "checkpoint 8; a=", a
 180end
 
-200proc simpletest
+200proc simpletest()
 210print "This is test!"
 220a=2
 230print "Now, a=", a
 240endproc
 
-250proc returntest
+250proc returntest()
 260print "Before return"
 270for a=5 to 10 return
 280print "After return"
