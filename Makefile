@@ -4,6 +4,8 @@ FPC = fpc
 LLVM ?= /opt/bin/
 
 CFLAGS = -O0 -g -I.
+CXXFLAGS = $(CFLAGS) \
+	-std=c++17
 CFLAGS65 = -Os -g -I. \
 	-Wno-main-return-type \
 	-Wno-incompatible-library-redeclaration
@@ -83,7 +85,7 @@ all: $(TARGETS)
 
 $(OBJDIR)/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -o $@ $< -lfmt
+	$(CXX) $(CXXFLAGS) -o $@ $< -lfmt
 
 bin/cpmemu: $(CPMEMU_OBJS)
 	@mkdir -p $(dir $@)
@@ -91,7 +93,7 @@ bin/cpmemu: $(CPMEMU_OBJS)
 
 bin/%: $(OBJDIR)/tools/%.o
 	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -o $@ $<
+	$(CXX) $(CXXFLAGS) -o $@ $<
 
 bin/fontconvert: $(OBJDIR)/tools/fontconvert.o $(OBJDIR)/tools/libbdf.o
 	@mkdir -p $(dir $@)
@@ -103,7 +105,7 @@ bin/mads: third_party/mads/mads.pas
 
 $(OBJDIR)/mkcombifs: $(OBJDIR)/tools/mkcombifs.o
 	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -o $@ $^ -lfmt
+	$(CXX) $(CXXFLAGS) -o $@ $^ -lfmt
 
 $(OBJDIR)/third_party/%.o: third_party/%.c
 	@mkdir -p $(dir $@)
@@ -111,7 +113,7 @@ $(OBJDIR)/third_party/%.o: third_party/%.c
 
 $(OBJDIR)/third_party/%.o: third_party/%.cc
 	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJDIR)/tools/%.o: tools/%.c
 	@mkdir -p $(dir $@)
@@ -119,7 +121,7 @@ $(OBJDIR)/tools/%.o: tools/%.c
 
 $(OBJDIR)/tools/%.o: tools/%.cc
 	@mkdir -p $(dir $@)
-	$(CXX) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(OBJDIR)/%.o: %.S include/zif.inc include/mos.inc include/cpm65.inc include/driver.inc
 	@mkdir -p $(dir $@)
