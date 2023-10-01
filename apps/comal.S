@@ -223,6 +223,7 @@ checkendlineptr:    .word 0 ; address of previous reference to the end of the st
 checkendbyteptr:    .byte 0 ; likewise
 checklooptype:      .byte 0 ; loop type (token)
 checkprocptr:       .word 0 ; address of hash node of currently defined procedure/function
+checkproctype:      .byte 0 ; type of currently defined procedure/function
 check_end:
 
 LISTERFLAG_NOTSTART   = 1<<7 ; set after every lister is called, is !RESETSTART
@@ -434,13 +435,13 @@ deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_retu
 deftok TOKEN_APPLY,     0, 2, 7, 1, lister_apply,    lister_bad,       exec_apply,     check_nop
 deftok TOKEN_PROC2,     0, 2, 0, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
-deftok TOKEN_RETURN0,   0, 1, 0, 0, lister_simple,   keyword_return,   exec_return0,   check_nop
+deftok TOKEN_RETURN0,   0, 1, 0, 0, lister_simple,   keyword_return,   exec_return0,   check_return0
 deftok TOKEN_SETPARAM,  0, 3, 0, 0, lister_setparam, get_variable_rw,  exec_setparam,  check_nop
 deftok TOKEN_VARREFRO, 15, 3, 0, 1, lister_varref,   get_variable_ro,  exec_varref,    check_nop
 deftok TOKEN_REFPARAM,  0, 3, 0, 0, lister_refparam, get_variable_rw,  exec_refparam,  check_nop
 deftok TOKEN_FUNC1,     0, 3, 0, 0, lister_proc1,    keyword_func,     exec_proc1,     check_proc1
 deftok TOKEN_ENDFUNC,   0, 1, 0, 0, lister_simple,   keyword_endfunc,  exec_endfunc,   check_endproc
-deftok TOKEN_RETURN1,   0, 1, 1, 0, lister_simplee,  keyword_return,   exec_return1,   check_nop
+deftok TOKEN_RETURN1,   0, 2, 1, 0, lister_simplee,  keyword_return,   exec_return1,   check_return1
 deftok TOKEN_APPLYVOID, 0, 2, 7, 0, lister_apply,    lister_bad,       exec_applyvoid, check_nop
 
 defpop pop_try
@@ -842,6 +843,10 @@ error_function_without_return:
     lda #ERROR_FUNCTION_WITHOUT_RETURN
     bne throw_error         ; always taken
 
+error_type_mismatch:
+    lda #ERROR_TYPE_MISMATCH
+    bne throw_error         ; always taken
+
 ; Produces the error whose number is in A.
 
 zproc throw_error
@@ -922,6 +927,9 @@ reached_proc_msg:
 function_without_return_msg:
     .ascii "Function without RETUR"
     .byte 'N'|0x80
+type_mismatch_msg:
+    .ascii "Type mismatc"
+    .byte 'h'|0x80
 
 ERROR_CANT_CONTINUE = cant_continue_msg - message_table
 ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
@@ -933,6 +941,7 @@ ERROR_FILE_NOT_FOUND = file_not_found_msg - message_table
 ERROR_STRING_OVERFLOW = string_overflow_msg - message_table
 ERROR_REACHED_PROC = reached_proc_msg - message_table
 ERROR_FUNCTION_WITHOUT_RETURN = function_without_return_msg - message_table
+ERROR_TYPE_MISMATCH = type_mismatch_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -1366,7 +1375,7 @@ zproc do_slice
     pha
 
     clc
-    lda v1+STACKVALUE_RANGE_OFFSET
+    lda v1+STACKVALUE_RANGE_OFFSET      ; test end of range
     adc v1+STACKVALUE_RANGE_LENGTH
     cmp v0+STACKVALUE_STRING_LENGTH
     zif_ne
@@ -1377,7 +1386,8 @@ zproc do_slice
     sty v0+STACKVALUE_STRING_LENGTH
     pla
     sta v0+STACKVALUE_STRING_OFFSET
-    rts
+
+    jmp pop_i1                          ; stack cleanup
 zendproc
 
 ; On entry, the stack looks like this:
@@ -1570,13 +1580,32 @@ zproc exec_return0
 zendproc
 
 zproc exec_return1
-    brk
+    jsr deref_i0
+
+    ldy execbyteptr
+    iny
+    lda (execlineptr), y            ; get type of function
+    cmp v0                          ; type check
+    zif_ne
+        ; It might be a string.
+
+        and v0
+        and #OTYPE_STRING
+        zif_eq
+            jmp error_type_mismatch
+        zendif
+    zendif
+
+    copystruct 5, v0, v2
+    jsr exec_return0
+    copystruct 5, v2, v0
+    rts
 zendproc
 
 zproc exec_endfunc
     jmp error_function_without_return
 zendproc
-    
+ 
 zproc exec_varref
     jsr push_i0
 
@@ -3179,6 +3208,24 @@ zproc check_proc1
     lda (execlineptr), y
     sta p1+1
 
+    ; If this is a function, extract the type from the atom.
+
+    ldy execbyteptr
+    lda (execlineptr), y
+    ldx #0
+    cmp #TOKEN_FUNC1
+    zif_eq
+        copy16 p1, p0
+        ldx #p0
+        jsr deref_object
+        ldy #ATOM_TYPE
+        lda (p0), y
+        tax
+    zendif
+    stx checkproctype
+
+    ; Get the procedure's hash node.
+
     jsr get_variable_rw     ; return ptr to node in p0
     copy16 p0, checkprocptr
 
@@ -3214,6 +3261,7 @@ zproc check_endproc
     lda checklooptype
     cmp #TOKEN_PROC1
     zif_ne
+    1:
         jmp error_bad_structure
     zendif
 
@@ -3222,6 +3270,25 @@ zproc check_endproc
     sta checkprocptr+1
 
     jmp check_pop_loop
+zendproc
+
+zproc check_return0
+    lda checkproctype
+    zif_ne
+    1:
+        jmp error_type_mismatch
+    zendif
+    rts
+zendproc
+
+zproc check_return1
+    lda checkproctype
+    beq 1b
+
+    ldy execbyteptr         ; set the type in the opcode
+    iny
+    sta (execlineptr), y
+    rts
 zendproc
 
 ; --- Buffer output ---------------------------------------------------------
@@ -5948,6 +6015,7 @@ return1_rule:
     P_JSR return_keyword_rule
     P_JSR expr_rule
     P_EMIT TOKEN_RETURN1
+    P_EMIT 0
     P_EOL
     P_RETURN
 

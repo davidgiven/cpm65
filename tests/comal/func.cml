@@ -1,0 +1,23 @@
+10print noparameters_num()
+20print noparameters_string$()
+30print backwards$("Hello, world!")
+40end
+
+1000func noparameters_num()
+1010return 1
+1020endfunc
+
+2000func noparameters_string$()
+2010return "fnord"
+2020endfunc
+
+3000func backwards$(a$)
+3010b$=""
+3011length = len(a$)
+3020for i=1 to length do b$ = b$ + a$(length - i + 1)
+3030return b$
+3040endfunc
+
+run
+bye
+
