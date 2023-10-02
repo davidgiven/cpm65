@@ -432,7 +432,7 @@ deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$
 deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
 deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_proc1,     check_proc1
 deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_return0,   check_endproc
-deftok TOKEN_APPLY,     0, 2, 7, 1, lister_apply,    lister_bad,       exec_apply,     check_nop
+deftok TOKEN_APPLY,    14, 2, 7, 1, lister_apply,    lister_bad,       exec_apply,     check_nop
 deftok TOKEN_PROC2,     0, 2, 0, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
 deftok TOKEN_RETURN0,   0, 1, 0, 0, lister_simple,   keyword_return,   exec_return0,   check_return0
