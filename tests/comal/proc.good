@@ -38,7 +38,7 @@
 
 05 00 00 00 
 
-10 00 00 00 02 C8 00 00 00 0C 34 02 00 37 00 
+11 00 00 00 02 C8 00 00 00 0C 34 02 00 37 00 2E 
 
 1C 00 00 00 02 D2 00 00 00 0C 29 0D 54 68 69 73 20 69 73 20 74 65 73 74 21 08 09 
 
@@ -50,7 +50,7 @@
 
 05 00 00 00 
 
-10 00 00 00 02 FA 00 00 00 0C 34 03 00 37 00 
+11 00 00 00 02 FA 00 00 00 0C 34 03 00 37 00 2E 
 
 1C 00 00 00 02 04 01 00 00 0C 29 0D 42 65 66 6F 72 65 20 72 65 74 75 72 6E 08 09 
 
@@ -62,7 +62,7 @@
 
 05 00 00 00 
 
-19 00 00 00 02 2C 01 00 00 0C 34 04 00 3A 01 00 3A 09 00 3A 0A 00 37 03 
+1A 00 00 00 02 2C 01 00 00 0C 34 04 00 3A 01 00 3A 09 00 3A 0A 00 37 03 2E 
 
 29 00 00 00 02 36 01 00 00 0C 29 02 61 3D 08 3B 01 00 08 29 03 20 62 3D 08 3B 09 00 08 29 03 20 63 3D 08 3B 0A 00 08 09 
 
@@ -70,7 +70,7 @@
 
 05 00 00 00 
 
-13 00 00 00 02 90 01 00 00 0C 34 05 00 3A 0B 00 37 01 
+14 00 00 00 02 90 01 00 00 0C 34 05 00 3A 0B 00 37 01 2E 
 
 16 00 00 00 02 9A 01 00 00 0C 29 03 61 24 3D 08 3B 0B 00 08 09 
 
@@ -78,7 +78,7 @@
 
 05 00 00 00 
 
-16 00 00 00 02 F4 01 00 00 0C 34 06 00 3A 0C 00 3A 0D 00 37 02 
+17 00 00 00 02 F4 01 00 00 0C 34 06 00 3A 0C 00 3A 0D 00 37 02 2E 
 
 19 00 00 00 02 FE 01 00 00 0C 29 06 63 6F 75 6E 74 3D 08 3B 0C 00 08 09 
 
@@ -96,7 +96,7 @@
 
 05 00 00 00 
 
-16 00 00 00 02 58 02 00 00 0C 34 07 00 3C 0E 00 3A 0F 00 37 02 
+17 00 00 00 02 58 02 00 00 0C 34 07 00 3C 0E 00 3A 0F 00 37 02 2E 
 
 27 00 00 00 02 62 02 00 00 0C 29 06 31 20 76 61 72 3D 08 3B 0E 00 08 29 07 20 76 61 6C 75 65 3D 08 3B 0F 00 08 09 
 
@@ -108,7 +108,7 @@
 
 05 00 00 00 
 
-16 00 00 00 02 BC 02 00 00 0C 34 08 00 3C 0E 00 3A 0F 00 37 02 
+17 00 00 00 02 BC 02 00 00 0C 34 08 00 3C 0E 00 3A 0F 00 37 02 2E 
 
 29 00 00 00 02 C6 02 00 00 0C 29 08 31 2E 31 20 76 61 72 3D 08 3B 0E 00 08 29 07 20 76 61 6C 75 65 3D 08 3B 0F 00 08 09 
 
@@ -174,23 +174,23 @@ checkpoint 8; a=199
 160 setvalue2(a, 199)
 170 PRINT "checkpoint 8; a=", a
 180 END
-200 PROC simpletest
+200 PROC simpletest() CLOSED
 210   PRINT "This is test!"
 220   a := 2
 230   PRINT "Now, a=", a
 240 ENDPROC
-250 PROC returntest
+250 PROC returntest() CLOSED
 260   PRINT "Before return"
 270   FOR a := 5 TO 10 DO RETURN
 280   PRINT "After return"
 290 ENDPROC
-300 PROC biggertest(a, b, c)
+300 PROC biggertest(a, b, c) CLOSED
 310   PRINT "a=", a, " b=", b, " c=", c
 320 ENDPROC
-400 PROC stringtest(a$)
+400 PROC stringtest(a$) CLOSED
 410   PRINT "a$=", a$
 420 ENDPROC
-500 PROC recurse(count, max)
+500 PROC recurse(count, max) CLOSED
 510   PRINT "count=", count
 520   IF count = max THEN 
 530     RETURN
@@ -198,12 +198,12 @@ checkpoint 8; a=199
 550     recurse(count + 1, max)
 560   ENDIF
 570 ENDPROC
-600 PROC setvalue(REF var, value)
+600 PROC setvalue(REF var, value) CLOSED
 610   PRINT "1 var=", var, " value=", value
 620   var := value
 630   PRINT "2 var=", var, " value=", value
 640 ENDPROC
-700 PROC setvalue2(REF var, value)
+700 PROC setvalue2(REF var, value) CLOSED
 710   PRINT "1.1 var=", var, " value=", value
 720   setvalue(var, value)
 730   PRINT "2.1 var=", var, " value=", value

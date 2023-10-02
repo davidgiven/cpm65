@@ -8,7 +8,7 @@
 
 05 00 00 00 
 
-10 00 00 00 02 E8 03 00 00 0C 3D 01 00 37 00 
+11 00 00 00 02 E8 03 00 00 0C 3D 01 00 37 00 2E 
 
 0E 00 00 00 02 F2 03 00 00 0C 1B 3F 00 
 
@@ -16,7 +16,7 @@
 
 05 00 00 00 
 
-10 00 00 00 02 D0 07 00 00 0C 3D 02 00 37 00 
+11 00 00 00 02 D0 07 00 00 0C 3D 02 00 37 00 2E 
 
 14 00 00 00 02 DA 07 00 00 0C 29 05 66 6E 6F 72 64 3F 00 
 
@@ -24,7 +24,7 @@
 
 05 00 00 00 
 
-13 00 00 00 02 B8 0B 00 00 0C 3D 03 00 3A 04 00 37 01 
+14 00 00 00 02 B8 0B 00 00 0C 3D 03 00 3A 04 00 37 01 2E 
 
 11 00 00 00 02 C2 0B 00 00 0C 01 05 00 29 00 0A 
 
@@ -49,13 +49,13 @@ fnord
 20 PRINT noparameters_string$()
 30 PRINT backwards$("Hello, world!")
 40 END
-1000 FUNC noparameters_num
+1000 FUNC noparameters_num() CLOSED
 1010   RETURN 1
 1020 ENDFUNC
-2000 FUNC noparameters_string$
+2000 FUNC noparameters_string$() CLOSED
 2010   RETURN "fnord"
 2020 ENDFUNC
-3000 FUNC backwards$(a$)
+3000 FUNC backwards$(a$) CLOSED
 3010   b$ := ""
 3011   length := LEN a$
 3020   FOR i := 1 TO length DO b$ := b$ + a$(length - i + 1)

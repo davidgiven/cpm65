@@ -18,27 +18,27 @@
 170print "checkpoint 8; a=", a
 180end
 
-200proc simpletest()
+200proc simpletest() closed
 210print "This is test!"
 220a=2
 230print "Now, a=", a
 240endproc
 
-250proc returntest()
+250proc returntest() closed
 260print "Before return"
 270for a=5 to 10 return
 280print "After return"
 290endproc
 
-300proc biggertest(a, b, c)
+300proc biggertest(a, b, c) closed
 310print "a=", a, " b=", b, " c=", c
 320endproc
 
-400proc stringtest(a$)
+400proc stringtest(a$) closed
 410print "a$=", a$
 420endproc
 
-500proc recurse(count, max)
+500proc recurse(count, max) closed
 510print "count=", count
 520if count = max then
 530return
@@ -47,13 +47,13 @@
 560endif
 570endproc
 
-600proc setvalue(ref var, value)
+600proc setvalue(ref var, value) closed
 610print "1 var=", var, " value=", value
 620var = value
 630print "2 var=", var, " value=", value
 640endproc
 
-700proc setvalue2(ref var, value)
+700proc setvalue2(ref var, value) closed
 710print "1.1 var=", var, " value=", value
 720setvalue(var, value)
 730print "2.1 var=", var, " value=", value

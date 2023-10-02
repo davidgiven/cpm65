@@ -43,6 +43,7 @@
 430proc twoparameter(a, b)
 431proc refparameter(a, ref b, c)
 432proc stringparameter(a$, ref b$)
+433proc closedproc() closed
 450noparameters()
 460oneparameter(1)
 470twoparameter(1, 2)
@@ -50,6 +51,7 @@
 490return
 510func refparameter(a, ref b, c)
 520func stringparameter(a$, ref b$)
+521func closedfunc() closed
 530a=noparameters()
 540a=refparameter(a, b, c)
 550a$=stringparameter(a$, b$)

@@ -88,7 +88,9 @@
 
 16 00 00 00 02 B0 01 00 00 0C 34 0E 00 3A 05 00 3C 0F 00 37 02 
 
-10 00 00 00 02 C2 01 00 00 0C 3B 10 00 40 01 
+11 00 00 00 02 B1 01 00 00 0C 34 10 00 37 00 2E 
+
+10 00 00 00 02 C2 01 00 00 0C 3B 11 00 40 01 
 
 11 00 00 00 02 CC 01 00 00 0C 3B 0B 00 1B 40 02 
 
@@ -102,7 +104,9 @@
 
 16 00 00 00 02 08 02 00 00 0C 3D 0E 00 3A 05 00 3C 0F 00 37 02 
 
-14 00 00 00 02 12 02 00 00 0C 01 02 00 3B 10 00 36 01 0A 
+11 00 00 00 02 09 02 00 00 0C 3D 12 00 37 00 2E 
+
+14 00 00 00 02 12 02 00 00 0C 01 02 00 3B 11 00 36 01 0A 
 
 1D 00 00 00 02 1C 02 00 00 0C 01 02 00 3B 0D 00 3B 02 00 3B 03 00 3B 04 00 36 04 0A 
 
@@ -156,11 +160,12 @@
 370 PRINT 9999
 380 PRINT -9999
 390 PRINT "literal"
-410 PROC noparameters2
+410 PROC noparameters2()
 420 PROC oneparameter(a)
 430 PROC twoparameter(a, b)
 431 PROC refparameter(a, REF b, c)
 432 PROC stringparameter(a$, REF b$)
+433 PROC closedproc() CLOSED
 450 noparameters()
 460 oneparameter(1)
 470 twoparameter(1, 2)
@@ -168,6 +173,7 @@
 490 RETURN
 510 FUNC refparameter(a, REF b, c)
 520 FUNC stringparameter(a$, REF b$)
+521 FUNC closedfunc() CLOSED
 530 a := noparameters()
 540 a := refparameter(a, b, c)
 550 a$ := stringparameter(a$, b$)

@@ -126,7 +126,7 @@ endstruct STACKVALUE_PROC__SIZE
 ; Special non-standard stack object representing a procedure invocation.
 
 startstruct STACKVALUE_DATA
-structmember STACKVALUE_CALL_CPUSTATE, 5 ; cpustate__end - cpustate__start
+structmember STACKVALUE_CALL_CPUSTATE, 6 ; cpustate__end - cpustate__start
 structmember STACKVALUE_CALL_PCOUNT, 1
 structmember STACKVALUE_CALL_NEWHASHTABLE, HASH_SLOTS*2
 endstruct STACKVALUE_CALL__SIZE
@@ -207,6 +207,7 @@ cpustate__start:
 execlineptr:        .word 0 ; line of code currently being run
 execbyteptr:        .byte 0 ; offset into the line of code
 localhashtableptr:  .word 0 ; pointer to current local hash table
+procclosed:         .byte 0 ; 0x80 if the current procedure is closed
 cpustate__end:
 
 savedexeclineptr:   .word 0 ; line of code to CON to
@@ -276,7 +277,7 @@ TOKEN_FREE       = 0x2a
 TOKEN_TRUE       = 0x2b
 TOKEN_FALSE      = 0x2c
 TOKEN_LEN        = 0x2d
-TOKEN_XXXXX      = 0x2e
+TOKEN_CLOSED     = 0x2e
 TOKEN_MKRANGE    = 0x2f
 TOKEN_SLASSIGN   = 0x30
 TOKEN_ENTER      = 0x31
@@ -424,7 +425,7 @@ deftok TOKEN_FREE,     14, 1, 0, 1, lister_simple,   keyword_free,     exec_free
 deftok TOKEN_TRUE,     14, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
 deftok TOKEN_FALSE,    14, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
 deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,       check_nop
-deftok TOKEN_XXXXX,    15, 1, 2, 1, lister_bad,      lister_bad,       exec_bad,       check_nop
+deftok TOKEN_CLOSED,    0, 1, 0, 0, lister_closed,   keyword_closed,   exec_closed,    check_nop
 deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
 deftok TOKEN_SLASSIGN, 15, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
@@ -433,7 +434,7 @@ deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,
 deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_proc1,     check_proc1
 deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_return0,   check_endproc
 deftok TOKEN_APPLY,    14, 2, 7, 1, lister_apply,    lister_bad,       exec_apply,     check_nop
-deftok TOKEN_PROC2,     0, 2, 0, 0, lister_proc2,    lister_bad,       exec_nop,       check_proc2
+deftok TOKEN_PROC2,     0, 2, 0, 0, lister_proc2,    lister_bad,       exec_proc2,     check_proc2
 deftok TOKEN_END,       0, 1, 0, 0, lister_simple,   keyword_end,      mainloop,       check_nop
 deftok TOKEN_RETURN0,   0, 1, 0, 0, lister_simple,   keyword_return,   exec_return0,   check_return0
 deftok TOKEN_SETPARAM,  0, 3, 0, 0, lister_setparam, get_variable_rw,  exec_setparam,  check_nop
@@ -1475,11 +1476,28 @@ zproc do_call_procedure
     ; Set the new CPU state.
 
     copystruct 3, v0+STACKVALUE_PROC_ADDRESS, cpustate__start
+    lda #0xff
+    sta procclosed          ; procedure is closed while initialising parameters
     rts
 zendproc
 
 zproc exec_proc1
     jmp error_reached_proc
+zendproc
+
+zproc exec_proc2
+    ; Once the parameters (which are always local) are set, make the procedure open.
+
+    lda #0
+    sta procclosed
+    rts
+zendproc
+
+zproc exec_closed
+    ; This procedure is closed.
+
+    dec procclosed
+    rts
 zendproc
 
 ; Takes as an argument the atom ID to assign.
@@ -3631,8 +3649,21 @@ zproc get_variable_rw
     lda localhashtableptr+0
     ora localhashtableptr+1
     zif_ne
+        bit procclosed
+        zif_mi              ; procedure is closed
+            copy16 localhashtableptr, p0
+            jmp hash_deref_rw
+        zendif
+
+        ; Procedure is open.
+
         copy16 localhashtableptr, p0
-        jmp hash_deref_rw
+        jsr hash_deref_ro
+        zif_cc
+            ; If a local variable exists, use it.
+
+            rts
+        zendif
     zendif
 
     lda #<global_variables
@@ -4667,14 +4698,14 @@ zproc lister_proc1
 zendproc
 
 zproc lister_proc2
-    jsr lister_get_varargs_parameters
-    zif_eq
-        dec bufferend           ; retract over the leading "("
-        rts
-    zendif
-
     lda #')'
     jmp buffer_print_char
+zendproc
+
+zproc lister_closed
+    jsr buffer_print_space
+    ldx listernode
+    jmp lister_simple
 zendproc
 
 zproc lister_apply
@@ -6185,6 +6216,7 @@ proc_or_func_rule:
     P_PAREN
     P_JSR optional_parameter_list_rule
     P_FLUSH_AND_EMIT_VARARG TOKEN_PROC2
+    P_JSR optional_closed_rule
     P_EOL
     P_RETURN
 
@@ -6213,6 +6245,13 @@ keyword_ref = . + 1
 
 end_parameter_list_rule:
     P_EAGER_TOKEN ')'|0x80
+    P_RETURN
+
+optional_closed_rule:
+    P_TRY eol_rule
+keyword_closed = . + 1
+    P_TOKEN 'C', 'L', 'O', 'S', 'E', 'D'|0x80
+    P_EMIT TOKEN_CLOSED
     P_RETURN
 
 proc_or_func_keyword_rule:
