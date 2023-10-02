@@ -43,5 +43,23 @@
 1
 fnord
 !dlrow ,olleH
+08 00 00 00 0D 0D 0E 
+
+10 PRINT noparameters_num()
+20 PRINT noparameters_string$()
+30 PRINT backwards$("Hello, world!")
+40 END
+1000 FUNC noparameters_num
+1010   RETURN 1
+1020 ENDFUNC
+2000 FUNC noparameters_string$
+2010   RETURN "fnord"
+2020 ENDFUNC
+3000 FUNC backwards$(a$)
+3010   b$ := ""
+3011   length := LEN a$
+3020   FOR i := 1 TO length DO b$ := b$ + (a$(length - i + 1))
+3030   RETURN b$
+3040 ENDFUNC
 06 00 00 00 33 
 

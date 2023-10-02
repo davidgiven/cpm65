@@ -1579,6 +1579,9 @@ zproc exec_return0
     rts
 zendproc
 
+; On entry, the stack looks like this:
+; ((oldi0) procref arg1 arg2 arg3... argX callstruct ...returnvalue=i0... --)
+
 zproc exec_return1
     jsr deref_i0
 
@@ -1598,6 +1601,7 @@ zproc exec_return1
 
     copystruct 5, v0, v2
     jsr exec_return0
+    jsr push_i0
     copystruct 5, v2, v0
     rts
 zendproc
@@ -4848,12 +4852,13 @@ zproc lister_string
     jsr buffer_print_char
 
     iny
-    zrepeat
+    zloop
+        dec p0+0
+        zbreakif_mi
         lda (execlineptr), y
         jsr buffer_print_char
         iny
-        dec p0+0
-    zuntil_eq
+    zendloop
 
     lda #'"'
     jmp buffer_print_char
