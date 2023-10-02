@@ -296,6 +296,9 @@ TOKEN_FUNC1      = 0x3d ; +2 bytes for the ID
 TOKEN_ENDFUNC    = 0x3e
 TOKEN_RETURN1    = 0x3f
 TOKEN_APPLYVOID  = 0x40
+TOKEN_INPUT      = 0x41
+TOKEN_DEFPROMPT  = 0x42
+TOKEN_STRPROMPT  = 0x43
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -444,6 +447,9 @@ deftok TOKEN_FUNC1,     0, 3, 0, 0, lister_proc1,    keyword_func,     exec_proc
 deftok TOKEN_ENDFUNC,   0, 1, 0, 0, lister_simple,   keyword_endfunc,  exec_endfunc,   check_endproc
 deftok TOKEN_RETURN1,   0, 2, 1, 0, lister_simplee,  keyword_return,   exec_return1,   check_return1
 deftok TOKEN_APPLYVOID, 0, 2, 7, 0, lister_apply,    lister_bad,       exec_applyvoid, check_nop
+deftok TOKEN_INPUT,     0, 1, 1, 0, lister_input,    lister_bad,       exec_input,     check_nop
+deftok TOKEN_DEFPROMPT, 0, 1, 0, 0, lister_defprompt, keyword_input,   exec_defprompt, check_nop
+deftok TOKEN_STRPROMPT, 0, 1, 1, 0, lister_strprompt, keyword_input,   exec_print,     check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -517,23 +523,12 @@ zproc mainloop
         zif_eq
             ; Read a line from the console.
 
-            lda #'$'
-            jsr bdos_CONOUT
-            jsr print_space
-            
-            lda #255
-            sta text_buffer+0
-            lda #<text_buffer
-            ldx #>text_buffer
-            ldy #BDOS_READ_LINE
-            jsr BDOS
+            lda #<command_prompt
+            ldx #>command_prompt
+            jsr print_separated_string
+
+            jsr buffer_read_string
             jsr print_nl
-
-            ; Parse it.
-
-            ldx text_buffer+1
-            lda #0
-            sta text_buffer+2, x
         zelse
             ; Read characters from a file.
 
@@ -560,12 +555,13 @@ zproc mainloop
             dex
             dex
             stx text_buffer+1
+
+            lda #2
+            sta bufferpos
         zendif
 
         ; Parse it.
 
-        lda #2
-        sta bufferpos
         jsr parse_line
 
         ; Successful parse.
@@ -1197,6 +1193,12 @@ zproc exec_goto_next
     rts
 zendproc
 
+zproc exec_defprompt
+    lda #<input_prompt
+    ldx #>input_prompt
+    jmp print_separated_string
+zendproc
+
 zproc exec_goto
     jsr exec_goto_next
 
@@ -1218,6 +1220,49 @@ zproc exec_if
     rts
 zendproc
 
+zproc exec_input
+    copystruct STACKVALUE_SIZE, v0, v1
+    jsr deref_i1
+
+    ; Check variable type.
+
+    lda v1
+    cmp #OTYPE_INTEGER
+    zif_eq
+        zloop
+            jsr buffer_read_string
+            jsr push_i0
+            jsr buffer_parse_int
+            zbreakif_cc
+
+            ; The number couldn't be parsed.
+
+            jsr pop_i0
+            lda #<number_parse_fail_msg
+            ldx #>number_parse_fail_msg
+            jsr print_string
+            jsr exec_defprompt
+        zendloop
+        jmp exec_assign
+    zendif
+
+    cmp #OTYPE_STRING
+    zif_eq
+        jsr buffer_read_string
+        jsr push_i0
+        ldx #v0
+        jsr create_string
+        jmp exec_assign
+    zendif
+
+    jmp error_invalid_parameter
+
+number_parse_fail_msg:
+    .byte 13, 10
+    .ascii "Parse failed"
+    .byte 13, 10|0x80
+zendproc
+    
 ; On entry, the stack looks like this:
 ; (varref initvalue terminatorvalue stepvalue=i0 -- )
 
@@ -3313,7 +3358,7 @@ zproc check_return1
     rts
 zendproc
 
-; --- Buffer output ---------------------------------------------------------
+; --- Buffer input/output ---------------------------------------------------
 
 ; Prints the decimal number in i0.
 
@@ -3471,6 +3516,120 @@ zproc buffer_print_current_line_number
     sta i0+3
         
     jmp buffer_print_i0
+zendproc
+
+; Reads a string into the text buffer and sets the pointers.
+
+zproc buffer_read_string
+    lda #255
+    sta text_buffer+0
+    lda #<text_buffer
+    ldx #>text_buffer
+    ldy #BDOS_READ_LINE
+    jsr BDOS
+
+    ; Parse it.
+
+    ldx text_buffer+1
+    lda #0
+    sta text_buffer+2, x
+
+    ; Set up the pointers.
+
+    inx
+    inx
+    stx bufferend
+    lda #2
+    sta bufferpos
+    rts
+zendproc
+
+; Parses an integer from bufferpos and leaves it in i0. Trashes i1 and
+; i2.
+; On exit:
+;   C - set if the parse failed
+
+zproc buffer_parse_int
+    jsr parser_skip_whitespace
+
+    ; Clear i2 and i0.
+
+    ldx #3
+    lda #0
+    zrepeat
+        sta i2, x
+        sta i0, x
+        dex
+    zuntil_mi
+    lda #OTYPE_INTEGER
+    sta v0
+
+    ; Set i2 to 10 for the multiplication.
+
+    lda #10
+    sta i2+0
+
+    lda bufferpos
+    sta bufferend
+
+    ; Is the number negative?
+
+    ldx bufferend
+    lda text_buffer, x
+    cmp #'-'
+    php                 ; save comparison result for later
+    zif_eq
+        inc bufferpos
+        inc bufferend
+    zendif
+
+    zloop
+        ldx bufferend
+        lda text_buffer, x
+        cmp #'0'
+        zbreakif_cc
+        cmp #'9'+1
+        zbreakif_cs
+
+        pha
+        jsr mul4
+        pla
+
+        sec
+        sbc #'0'
+        clc
+        adc i0+0
+        sta i0+0
+        zif_cs
+            inc i0+1
+            zif_eq
+                inc i0+2
+                zif_eq
+                    inc i0+3
+                zendif
+            zendif
+        zendif
+
+        inc bufferend
+    zendloop
+
+    lda bufferpos
+    cmp bufferend
+    zif_eq
+        plp
+        sec
+        rts
+    zendif
+
+    plp                 ; is the number negative?
+    zif_eq
+        jsr negi0
+    zendif
+
+    lda bufferend
+    sta bufferpos
+    clc
+    rts
 zendproc
 
 ; --- Maths -----------------------------------------------------------------
@@ -4233,8 +4392,11 @@ zproc create_string
     txa
     pha
     
-    clc
+    sec
     lda bufferend
+    sbc bufferpos
+    sta STACKVALUE_STRING_LENGTH, x
+    clc
     adc #STRING_DATA
     sta p1+0
     lda #0
@@ -4245,7 +4407,7 @@ zproc create_string
     ; Copy the text buffer into the stringdata object.
 
     ldy #STRING_DATA
-    ldx #0
+    ldx bufferpos
     zrepeat
         lda text_buffer, x
         sta (p0), y
@@ -4267,8 +4429,6 @@ zproc create_string
     sta STACKVALUE_STRING_ID+1, x
     lda #STRING_DATA
     sta STACKVALUE_STRING_OFFSET, x
-    lda bufferend
-    sta STACKVALUE_STRING_LENGTH, x
     rts
 zendproc
 
@@ -4781,8 +4941,10 @@ zproc lister_print
         lda #<keyword_comma
         ldx #>keyword_comma
     zendif
-    jsr buffer_print_separated_string
+    jsr buffer_print_string
 
+lister_input:
+    jsr buffer_print_space
     lda listerflags
     ora #LISTERFLAG_COMMA
     sta listerflags
@@ -4815,6 +4977,24 @@ zproc lister_leadingcomma
         jsr buffer_print_separated_string
     zendif
     rts
+zendproc
+
+zproc lister_defprompt
+    jsr lister_simple
+
+    lda listerflags
+    ora #LISTERFLAG_COMMA
+    sta listerflags
+
+    rts
+zendproc
+
+zproc lister_strprompt
+    jsr lister_defprompt
+    jsr buffer_print_space
+    jsr list_first_clause
+    lda #':'
+    jmp buffer_print_char
 zendproc
 
 zproc lister_refparam
@@ -5676,83 +5856,14 @@ zproc emit_i0
 zendproc
 
 zproc pop_number
-    jsr parser_skip_whitespace
-
-    ; Clear i2 and i0.
-
-    ldx #3
-    lda #0
-    zrepeat
-        sta i2, x
-        sta i0, x
-        dex
-    zuntil_mi
-
-    ; Set i2 to 10 for the multiplication.
-
-    lda #10
-    sta i2+0
-
-    lda bufferpos
-    sta bufferend
-
-    ; Is the number negative?
-
-    ldx bufferend
-    lda text_buffer, x
-    cmp #'-'
-    php                 ; save comparison result for later
-    zif_eq
-        inc bufferpos
-        inc bufferend
+    jsr buffer_parse_int
+    zif_cs
+    1:
+        jmp pop_fail
     zendif
 
-    zloop
-        ldx bufferend
-        lda text_buffer, x
-        cmp #'0'
-        zbreakif_cc
-        cmp #'9'+1
-        zbreakif_cs
-
-        pha
-        jsr mul4
-        pla
-
-        sec
-        sbc #'0'
-        clc
-        adc i0+0
-        sta i0+0
-        zif_cs
-            inc i0+1
-            zif_eq
-                inc i0+2
-                zif_eq
-                    inc i0+3
-                zendif
-            zendif
-        zendif
-
-        inc bufferend
-    zendloop
-
-    lda bufferpos
-    cmp bufferend
-    beq 1f
-
-    plp                 ; is the number negative?
-    zif_eq
-        jsr negi0
-    zendif
     jsr emit_i0
-
-    lda bufferend
-    sta bufferpos
-
     jmp parse_next_1
-1:
-    jmp pop_fail
 zendproc
 
 zproc pop_string
@@ -5918,6 +6029,7 @@ statement_rule:
     P_TRY eol_rule
 simple_statement_rule:
     P_TRY print_rule
+    P_TRY input_rule
     P_TRY stop_rule
     P_TRY bye_rule
     P_TRY end_rule
@@ -6404,6 +6516,30 @@ compulsory_expr_rule:
     P_TRY expr_rule
     P_PANIC
 
+input_rule:
+keyword_input = . + 1
+    P_TOKEN 'I', 'N', 'P', 'U', 'T'|0x80
+    P_JSR optional_input_prompt_rule
+    P_COMMIT
+    P_WORD TOKEN_VARREFRW
+    P_EMIT TOKEN_INPUT
+    P_COMMIT
+    P_TRY print_no_terminator_rule
+    P_JSR print_separator_rule
+    P_EOL
+    P_RETURN
+
+optional_input_prompt_rule:
+    P_TRY input_prompt_rule
+    P_EMIT TOKEN_DEFPROMPT
+    P_RETURN
+
+input_prompt_rule:
+    P_STRING
+    P_EAGER_TOKEN ':'|0x80
+    P_EMIT TOKEN_STRPROMPT
+    P_RETURN
+
 expr_rule:
     P_JSR leaf_rule
     P_COMMIT
@@ -6604,6 +6740,10 @@ keyword_mone:
     .byte '-'
 keyword_one:
     .byte '1'|0x80
+command_prompt:
+    .byte '$'|0x80
+input_prompt:
+    .byte '?'|0x80
 
 .data
 

@@ -1,0 +1,8 @@
+10input a
+20input "prompt! ": a
+30input a,
+40input "prompt! ": a,
+
+list
+bye
+
