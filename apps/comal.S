@@ -300,6 +300,7 @@ TOKEN_INPUT      = 0x41
 TOKEN_DEFPROMPT  = 0x42
 TOKEN_STRPROMPT  = 0x43
 TOKEN_RND        = 0x44
+TOKEN_RANDZ      = 0x45
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -452,6 +453,7 @@ deftok TOKEN_INPUT,     0, 1, 1, 0, lister_input,    lister_bad,       exec_inpu
 deftok TOKEN_DEFPROMPT, 0, 1, 0, 0, lister_defprompt, keyword_input,   exec_defprompt, check_nop
 deftok TOKEN_STRPROMPT, 0, 1, 1, 0, lister_strprompt, keyword_input,   exec_print,     check_nop
 deftok TOKEN_RND,      14, 2, 7, 1, lister_prefixv,  keyword_rnd,      exec_rnd,       check_nop
+deftok TOKEN_RANDZ,     0, 1, 1, 0, lister_simplee,  keyword_randomize, exec_randomize, check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -2197,8 +2199,20 @@ zproc exec_str$
 zendproc
 
 ; On entry, the stack is:
+; (seed --)
+
+zproc exec_randomize
+    jsr deref_i0
+    jsr coerce_to_integer
+
+    copystruct 4, i0, random_number
+    rts
+zendproc
+
+; On entry, the stack is:
 ; (start end --)
 ; or (end --)
+
 zproc exec_rnd
     jsr exec_get_opcode_parameter_count
     cmp #1
@@ -6134,6 +6148,7 @@ simple_statement_rule:
     P_TRY end_rule
     P_TRY return0_rule
     P_TRY return1_rule
+    P_TRY randomize_rule
     P_TRY proccall_rule
     P_TRY assignment_rule
     P_PANIC
@@ -6263,6 +6278,14 @@ return1_rule:
     P_JSR expr_rule
     P_EMIT TOKEN_RETURN1
     P_EMIT 0
+    P_EOL
+    P_RETURN
+
+randomize_rule:
+keyword_randomize = . + 1
+    P_TOKEN 'R', 'A', 'N', 'D', 'O', 'M', 'I', 'Z', 'E'|0x80
+    P_SHUNT TOKEN_RANDZ
+    P_JSR expr_rule
     P_EOL
     P_RETURN
 

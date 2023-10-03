@@ -1,0 +1,10 @@
+8print "RND"
+9randomize 1234
+10for i=1 to 10
+20print rnd(5, 10)
+30endfor
+
+run
+list
+bye
+
