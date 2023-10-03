@@ -1,0 +1,26 @@
+10if 1=2 print "10"
+
+20if 1=2
+30print "30"
+40else
+50print "50"
+60endif
+
+100if 1=1
+110print "110"
+120elif 2=2
+130print "130"
+140endif
+
+200if i=1
+210print "210"
+220elif 2=2
+230print "230"
+240else
+250print "250"
+260endif
+
+run
+list
+bye
+
