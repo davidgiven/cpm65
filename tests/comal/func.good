@@ -57,7 +57,7 @@ fnord
 2020 ENDFUNC
 3000 FUNC backwards$(a$) CLOSED
 3010   b$ := ""
-3011   length := LEN a$
+3011   length := LEN(a$)
 3020   FOR i := 1 TO length DO b$ := b$ + a$(length - i + 1)
 3030   RETURN b$
 3040 ENDFUNC

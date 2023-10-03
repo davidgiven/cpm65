@@ -299,6 +299,7 @@ TOKEN_APPLYVOID  = 0x40
 TOKEN_INPUT      = 0x41
 TOKEN_DEFPROMPT  = 0x42
 TOKEN_STRPROMPT  = 0x43
+TOKEN_RND        = 0x44
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -393,7 +394,7 @@ deftok TOKEN_MOD,      10, 1, 2, 1, lister_infix,    keyword_mod,      exec_mod,
 deftok TOKEN_PRINT,     0, 1, 1, 0, lister_print,    lister_bad,       exec_print,     check_nop
 deftok TOKEN_PRINTNL,   0, 1, 0, 0, lister_printnl,  lister_bad,       exec_printnl,   check_nop
 deftok TOKEN_ASSIGN,    0, 1, 2, 0, lister_assign,   keyword_assign,   exec_assign,    check_nop
-deftok TOKEN_NEG,      14, 1, 1, 1, lister_prefix,   keyword_neg,      exec_neg,       check_nop
+deftok TOKEN_NEG,      14, 1, 1, 1, lister_prefixo,  keyword_neg,      exec_neg,       check_nop
 deftok TOKEN_LINEENTRY, 0, 1, 1, 0, lister_nop,      lister_bad,       exec_lineentry, check_nop
 deftok TOKEN_ZERO,     14, 1, 0, 1, lister_simple,   keyword_zero,     exec_zero,      check_nop
 deftok TOKEN_LIST,      0, 1, 2, 0, lister_nop,      lister_bad,       exec_list,      check_nop
@@ -412,7 +413,7 @@ deftok TOKEN_ENDWHILE,  0, 4, 0, 0, lister_endloop,  keyword_endwhile, exec_goto
 deftok TOKEN_ONE,      14, 1, 0, 1, lister_simple,   keyword_one,      exec_one,       check_nop
 deftok TOKEN_FOR,       0, 4, 4, 0, lister_for,      keyword_for,      exec_for,       check_for
 deftok TOKEN_ENDFOR,    0, 4, 0, 0, lister_endloop,  keyword_endfor,   exec_endfor,    check_endfor
-deftok TOKEN_SGN,      14, 1, 1, 1, lister_prefix,   keyword_sgn,      exec_sgn,       check_nop
+deftok TOKEN_SGN,      14, 1, 1, 1, lister_prefixv,  keyword_sgn,      exec_sgn,       check_nop
 deftok TOKEN_NOTEQ,     3, 1, 2, 1, lister_infix,    keyword_noteq,    exec_noteq,     check_nop
 deftok TOKEN_LT,        3, 1, 2, 1, lister_infix,    keyword_lt,       exec_lt,        check_nop
 deftok TOKEN_LTE,       3, 1, 2, 1, lister_infix,    keyword_lte,      exec_lte,       check_nop
@@ -427,12 +428,12 @@ deftok TOKEN_STRING,   14, 0, 0, 1, lister_string,   lister_bad,       exec_stri
 deftok TOKEN_FREE,     14, 1, 0, 1, lister_simple,   keyword_free,     exec_free,      check_nop
 deftok TOKEN_TRUE,     14, 1, 0, 1, lister_simple,   keyword_true,     exec_one,       check_nop
 deftok TOKEN_FALSE,    14, 1, 0, 1, lister_simple,   keyword_false,    exec_zero,      check_nop
-deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefix,   keyword_len,      exec_len,       check_nop
+deftok TOKEN_LEN,      14, 1, 1, 1, lister_prefixv,  keyword_len,      exec_len,       check_nop
 deftok TOKEN_CLOSED,    0, 1, 0, 0, lister_closed,   keyword_closed,   exec_closed,    check_nop
 deftok TOKEN_MKRANGE,   3, 1, 2, 1, lister_infix,    keyword_colon,    exec_mkrange,   check_nop
 deftok TOKEN_SLASSIGN, 15, 1, 3, 0, lister_slassign, lister_bad,       exec_slassign,  check_nop
 deftok TOKEN_ENTER,     0, 1, 1, 0, lister_simple,   keyword_enter,    exec_enter,     check_nop
-deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefix,   keyword_str$,     exec_str$,      check_nop
+deftok TOKEN_STR$,     14, 1, 1, 1, lister_prefixv,  keyword_str$,     exec_str$,      check_nop
 deftok TOKEN_BYE,       0, 1, 0, 0, lister_simple,   keyword_bye,      exec_bye,       check_nop
 deftok TOKEN_PROC1,     0, 3, 0, 0, lister_proc1,    keyword_proc,     exec_proc1,     check_proc1
 deftok TOKEN_ENDPROC,   0, 1, 0, 0, lister_simple,   keyword_endproc,  exec_return0,   check_endproc
@@ -450,6 +451,7 @@ deftok TOKEN_APPLYVOID, 0, 2, 7, 0, lister_apply,    lister_bad,       exec_appl
 deftok TOKEN_INPUT,     0, 1, 1, 0, lister_input,    lister_bad,       exec_input,     check_nop
 deftok TOKEN_DEFPROMPT, 0, 1, 0, 0, lister_defprompt, keyword_input,   exec_defprompt, check_nop
 deftok TOKEN_STRPROMPT, 0, 1, 1, 0, lister_strprompt, keyword_input,   exec_print,     check_nop
+deftok TOKEN_RND,      14, 2, 7, 1, lister_prefixv,  keyword_rnd,      exec_rnd,       check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -632,6 +634,13 @@ zproc clear
     lda #0
     tay
     sta (progbase), y
+
+    ldx #3
+    lda #0x55
+    zrepeat
+        sta random_number, x
+        dex
+    zuntil_mi
 
     lda #OTYPE_FREE
     sta v0
@@ -1725,13 +1734,15 @@ zproc exec_zero
 
 set_i0_to_zero:
     lda #0
+set_i0_to_4x_constant:
+    ldx #v0
 set_4x_constant:
-    sta i0+0
-    sta i0+1
-    sta i0+2
-    sta i0+3
-    lda #OTYPE_INTEGER
-    sta v0
+    ldy #OTYPE_INTEGER
+    sty 0, x
+    sta 1, x
+    sta 2, x
+    sta 3, x
+    sta 4, x
     rts
 zendproc
 
@@ -1740,7 +1751,7 @@ zproc exec_mone
 
 set_i0_to_mone:
     lda #0xff
-    jmp set_4x_constant
+    jmp set_i0_to_4x_constant
 zendproc
 
 zproc exec_one
@@ -1748,7 +1759,7 @@ zproc exec_one
 
 set_i0_to_one:
     lda #0
-    jsr set_4x_constant
+    jsr set_i0_to_4x_constant
     inc i0+0
     rts
 zendproc
@@ -2146,7 +2157,7 @@ zendproc
 
 zproc exec_div
     jsr deref_i0        ; RHS
-    copystruct STACKVALUE_SIZE, i0, i2
+    copystruct STACKVALUE_SIZE, v0, v2
     jsr pop_and_deref_i0 ; LHS
     jsr coerce_i0_and_i2_to_numeric
 
@@ -2155,12 +2166,12 @@ zendproc
 
 zproc exec_mod
     jsr deref_i0        ; RHS
-    copystruct STACKVALUE_SIZE, i0, i2
+    copystruct STACKVALUE_SIZE, v0, v2
     jsr pop_and_deref_i0 ; LHS
     jsr coerce_i0_and_i2_to_numeric
 
     jsr divs4
-    copystruct STACKVALUE_SIZE, i1, i0
+    copystruct STACKVALUE_SIZE, v1, v0
     rts
 zendproc
 
@@ -2183,6 +2194,67 @@ zproc exec_str$
     jsr buffer_print_i0
     ldx #v0
     jmp create_string
+zendproc
+
+; On entry, the stack is:
+; (start end --)
+; or (end --)
+zproc exec_rnd
+    jsr exec_get_opcode_parameter_count
+    cmp #1
+    zif_eq                      ; only one parameter (the RHS)
+        ldx #v1
+        lda #0
+        jsr set_4x_constant
+        inc i1
+        jsr push_i1             ; set LHS to 1
+    zelse
+        cmp #2
+        zif_ne
+            jmp error_invalid_parameter
+        zendif
+    zendif
+
+    ; Stack is: (start end=i0 --)
+
+    lda #5
+    jsr peek                    ; (start end start=i0 --)
+    jsr exec_sub                ; (start range=i0 --)
+    jsr push_i0
+    jsr set_i0_to_one
+    jsr exec_add                ; (start range+1=i0 --)
+
+    ; Calculate the random number.
+
+	ldy #8
+	lda random_number+0
+    zrepeat
+        asl a
+        rol random_number+1
+        rol random_number+2
+        rol random_number+3
+        zif_cs
+            eor #$C5
+        zendif
+        dey
+    zuntil_eq
+	sta random_number+0
+
+    ; Construct the result.
+
+    jsr deref_i0                ; range
+    copystruct STACKVALUE_SIZE, v0, v2
+
+    copystruct 4, random_number, i0
+    lda #OTYPE_INTEGER
+    sta v0                      ; (start range=i2 raw=i0 --)
+    jsr coerce_i0_and_i2_to_numeric
+
+    ; Do an unsigned modulus.
+
+    jsr divu4
+    copystruct STACKVALUE_SIZE, v1, v0 ; (start result=i0 --)
+    jmp exec_add                ; (result=i0 --)
 zendproc
 
 zproc exec_mkrange
@@ -2839,7 +2911,7 @@ zendproc
 
 zproc adjust_line_range
     ; end line in i0
-    copystruct STACKVALUE_SIZE, i0, i2 ; end line in i2
+    copystruct STACKVALUE_SIZE, v0, v2 ; end line in i2
     jsr pop_i0          ; start line in i0
 
     ; Turn list 0, 0 to list 0, 0xffff
@@ -3672,6 +3744,7 @@ zproc mul4
 zendproc
 
 ; Computes i0 rem i1 := i0 / i2, unsigned.
+; i2 is unmodified.
 
 zproc divu4
     lda #0              ; clear remainder
@@ -3716,6 +3789,7 @@ zproc divu4
 zendproc
 
 ; Computes i0 rem i1 := i0 / i2, signed.
+; i2 is unmodified.
 
 zproc divs4
     lda i0+3            ; high byte of LHS
@@ -4869,7 +4943,7 @@ zproc lister_closed
 zendproc
 
 zproc lister_apply
-    jsr lister_get_varargs_parameters
+    jsr lister_get_opcode_parameter_count
     pha
 
     clc
@@ -4895,13 +4969,34 @@ zproc lister_apply
     rts
 zendproc
 
-; Given a varargs node, fetches the number of parameters pushed onto the stack
+; Given any node, fetches the number of parameters pushed onto the stack
 ; into A.
 
-zproc lister_get_varargs_parameters
+zproc lister_get_opcode_parameter_count
+    ldx listernode
     ldy operator_stack+0, x     ; get bytecode pointer
-    iny
-    lda (execlineptr), y        ; get number of parameters
+    jmp 1f
+zendproc
+
+zproc exec_get_opcode_parameter_count
+    ldy execbyteptr
+1:
+    lda (execlineptr), y        ; get bytecode
+    tax
+
+    lda token_size_table, x
+    and #0b01110000
+    cmp #0b01110000             ; is this varargs?
+    zif_eq
+        iny
+        lda (execlineptr), y    ; get number of parameters
+        rts
+    zendif
+        
+    lsr a
+    lsr a
+    lsr a
+    lsr a
     rts
 zendproc
 
@@ -4909,27 +5004,29 @@ zendproc
 
 zproc lister_comma_separated_list
     tax                         ; set flags
-    zloop
-        zbreakif_eq
+    zif_ne
+        zloop
+            zbreakif_eq
 
-        pha
-        clc
-        adc listernode
-        tay
-        ldx operator_stack, y   ; get tree address of parameter
-        jsr list_clause
+            pha
+            clc
+            adc listernode
+            tay
+            ldx operator_stack, y   ; get tree address of parameter
+            jsr list_clause
 
-        lda #<keyword_comma
-        ldx #>keyword_comma
-        jsr buffer_print_separated_string
+            lda #<keyword_comma
+            ldx #>keyword_comma
+            jsr buffer_print_separated_string
 
-        pla
-        sec
-        sbc #1
-    zendloop
+            pla
+            sec
+            sbc #1
+        zendloop
 
-    dec bufferend               ; retract over the trailing ", "
-    dec bufferend
+        dec bufferend               ; retract over the trailing ", "
+        dec bufferend
+    zendif
     rts
 zendproc
 
@@ -5183,27 +5280,29 @@ zproc list_parenthesised_clause
 zendproc
 
 zproc lister_prefix
-    txa
-    pha
+    jsr lister_simple
+    jsr buffer_print_space
+    jmp 1f
+zendproc
 
-    lda operator_stack, x       ; get bytecode address
-    tay
-    lda (execlineptr), y        ; get bytecode
-    pha
-    tay
-    ldx token_aux_hi, y
-    lda token_aux_lo, y
-    jsr buffer_print_string
-    pla
-    cmp #TOKEN_NEG
-    zif_ne
-        jsr buffer_print_space
-    zendif
+zproc lister_prefixo
+    jsr lister_simple
+1:
+    lda #1
+    jmp lister_comma_separated_list
+zendproc
 
+zproc lister_prefixv
+    jsr lister_simple
+    jsr lister_get_opcode_parameter_count
+
+    pha
+    lda #'('
+    jsr buffer_print_char
     pla
-    tax                         ; recover current node tree address
-    ldy operator_stack+1, x     ; get second parameter tree address
-    jmp list_parenthesised_clause
+    jsr lister_comma_separated_list
+    lda #')'
+    jmp buffer_print_char
 zendproc
 
 ; --- Parser ----------------------------------------------------------------
@@ -6648,6 +6747,7 @@ leaf_rule:
     P_TRY sgn_rvalue_rule
     P_TRY len_rvalue_rule
     P_TRY str$_rvalue_rule
+    P_TRY rnd_rvalue_rule
     P_TRY free_rvalue_rule
     P_TRY true_rvalue_rule
     P_TRY false_rvalue_rule
@@ -6713,6 +6813,15 @@ keyword_str$ = . + 1
     P_SHUNT TOKEN_STR$
     P_JMP leaf_rule
 
+rnd_rvalue_rule:
+keyword_rnd = . + 1
+    P_TOKEN 'R', 'N', 'D'|0x80
+    P_COMMIT
+    P_PAREN
+    P_JSR argument_list_rule
+    P_FLUSH_AND_EMIT_VARARG TOKEN_RND
+    P_RETURN
+
 free_rvalue_rule:
 keyword_free = . + 1
     P_TOKEN 'F', 'R', 'E', 'E'|0x80
@@ -6760,6 +6869,8 @@ bytecode_buffer:
     .ds 256
 operator_stack:
     .ds 256
+random_number:
+    .ds 4
 
 ; This must be last --- it's the beginning of the program workspace.
 

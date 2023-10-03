@@ -28,14 +28,19 @@
 270a=a+b-c*d/e mod f
 280a=a=b<>c<=d<e>=f>g
 290print (a+b)
+291print -a
 300print not(a)
 310print sgn(a)
 320print len(a)
 330print str$(a)
+331print rnd()
+332print rnd(a)
+333print rnd(a, b)
 340print free
 350print true
 360print false
 370print 9999
+375print -9999
 380print -(9999)
 390print "literal"
 410proc noparameters2()
