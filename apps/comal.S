@@ -171,6 +171,8 @@ progtop:   .word 0
 p0:        .word 0
 p1:        .word 0
 p2:        .word 0
+p3:        .word 0
+p4:        .word 0
 
 v0:        .byte 0
 i0:        .word 0, 0 ; also, TOS when executing
@@ -855,6 +857,10 @@ error_type_mismatch:
     lda #ERROR_TYPE_MISMATCH
     bne throw_error         ; always taken
 
+error_out_of_memory:
+    lda #ERROR_OUT_OF_MEMORY
+    bne throw_error         ; always taken
+
 ; Produces the error whose number is in A.
 
 zproc throw_error
@@ -938,6 +944,9 @@ function_without_return_msg:
 type_mismatch_msg:
     .ascii "Type mismatc"
     .byte 'h'|0x80
+out_of_memory_msg:
+    .ascii "Out of memor"
+    .byte 'y'|0x80
 
 ERROR_CANT_CONTINUE = cant_continue_msg - message_table
 ERROR_INVALID_PARAMETER = invalid_parameter_msg - message_table
@@ -950,6 +959,7 @@ ERROR_STRING_OVERFLOW = string_overflow_msg - message_table
 ERROR_REACHED_PROC = reached_proc_msg - message_table
 ERROR_FUNCTION_WITHOUT_RETURN = function_without_return_msg - message_table
 ERROR_TYPE_MISMATCH = type_mismatch_msg - message_table
+ERROR_OUT_OF_MEMORY = out_of_memory_msg - message_table
 
 ; --- Interpreter -----------------------------------------------------------
 
@@ -4239,59 +4249,101 @@ zendproc
 ; On entry, A is the new object type.
 
 zproc heap_alloc
+    pha                 ; save object type
+    copy16 p1, p4
+
+    ; Assign a slot for the object.
+
+    jsr find_object_table_slot
+    zif_cs
+        ; Object table is full!
+
+        jsr collect_garbage
+        jsr find_object_table_slot
+    zendif
+    zif_cs
+        jmp error_out_of_memory
+    zendif
+    ; leaves object slot in p0 and id in p1.
+    copy16 p0, p2       ; slot -> p2
+
+    ; Get the new heapptr.
+
+    jsr allocate_heap_memory
+    zif_cs
+        jsr collect_garbage
+        jsr allocate_heap_memory
+        zif_cs
+            jmp error_out_of_memory
+        zendif
+    zendif
+    ; leaves p0=new object; p3=new heapptr.
+
+    copy16 p3, heapptr
+
     ; Initialise the object header.
 
+    pla                 ; get object type
     ldy #OBJECT_TYPE
-    sta (heapptr), y
+    sta (p0), y
     dey
-    lda p1+1
-    sta (heapptr), y
+    lda p4+1
+    sta (p0), y
     dey
-    lda p1+0
-    sta (heapptr), y
+    lda p4+0
+    sta (p0), y
 
-    ; Allocate the object itself.
+    ; Update the slot in the object table.
 
-    clc
-    lda heapptr+0
-    sta p2+0            ; put the object pointer into p2
-    adc p1+0
-    sta heapptr+0
-    lda heapptr+1
-    sta p2+1
-    adc p1+1
-    sta heapptr+1
+    ldy #0
+    lda p0+0
+    sta (p2), y
+    iny
+    lda p0+1
+    sta (p2), y
 
-    ; TODO: check for running out of memory here.
+    rts
 
     ; Find a free slot in the object table.
+    ; Returns C if the allocation failed.
+    ; Corrupts p0 and p1.
 
+find_object_table_slot:
     jsr find_first_object
     zrepeat
         zif_eq
-            ; Found a free slot (and copy the pointer into XA).
+            ; Found a free slot.
 
-            lda p2+1
-            sta (p0), y
-            tax
-            dey
-            lda p2+0
-            sta (p0), y
-
-            ; Return the object pointer in p0.
-
-            sta p0+0
-            stx p0+1
-
-            ; ID is returned in p1.
-
+            clc
             rts
         zendif
 
         jsr find_next_object
     zuntil_cs
-        
-    ; TODO: object table is full, error out
+    rts
+
+; Computes p0=heapptr; p3=heapptr+p4; returns C if we are out of memory.
+
+allocate_heap_memory:
+    clc
+    lda heapptr+0
+    sta p0+0            ; return pointer
+    adc p4+0            ; size
+    sta p3+0            ; new heapptr
+    lda heapptr+1
+    sta p0+1
+    adc p4+1
+    sta p3+1
+
+    ; Have we run out of memory?
+
+    cmp stackptr+1
+    zif_cs
+        zif_eq
+            lda p3+0
+            cmp stackptr+0
+        zendif
+    zendif
     rts
 zendproc
 
@@ -4499,11 +4551,13 @@ zproc create_string
 
     ldy #STRING_DATA
     ldx bufferpos
-    zrepeat
+    jmp 1f
+    zloop
         lda text_buffer, x
         sta (p0), y
         iny
         inx
+    1:
         cpx bufferend
     zuntil_eq
 
@@ -4537,6 +4591,13 @@ zproc deref_p0
 zendproc
 
 zproc collect_garbage
+    ldx #-10 & 0xff
+    zrepeat
+        lda p0+10, x
+        pha
+        inx
+    zuntil_eq
+
     ; Clear phase: mark all strings as being unused.
 
     jsr find_first_object
@@ -4651,10 +4712,142 @@ zproc collect_garbage
         jsr find_next_object
     zuntil_cs
 
-    ; Do heap compaction here!
+    ; Perform the heap compaction.
 
+    lda #<heapbase
+    sta p2+0
+    sta p3+0
+    lda #>heapbase
+    sta p2+1                ; read pointer
+    sta p3+1                ; write pointer
+
+    zloop
+        ; Reached the end of the heap?
+
+        lda p2+0
+        cmp heapptr+0
+        zif_eq
+            lda p2+1
+            cmp heapptr+1
+            zbreakif_eq
+        zendif
+
+        ; Look at this object.
+
+        ldy #OBJECT_SIZE
+        lda (p2), y
+        sta p4+0
+        iny
+        lda (p2), y
+        sta p4+1        ; object size -> p4
+
+        iny             ; y = OBJECT_TYPE
+        lda (p2), y
+        zif_ne
+            ; Check that we're not copying an object onto itself.
+
+            lda p2+0
+            cmp p3+0
+            zif_eq
+                lda p2+1
+                cmp p3+1
+                zif_eq
+                    ; No copy required; p3 (p2 is advanced later).
+
+                    clc
+                    lda p3+0
+                    adc p4+0
+                    sta p3+0
+                    lda p3+1
+                    adc p4+1
+                    sta p3+1
+
+                    jmp 1f
+                zendif
+            zendif
+
+            ; We actually need to do a physical copy. But first, update the
+            ; pointer in the object table.
+
+            jsr update_object_table_pointer
+
+            ; Perform the actual copy.
+
+            ldy #0
+            zrepeat
+                lda (p2), y
+                sta (p3), y
+
+                inc p2+0
+                zif_eq
+                    inc p2+1
+                zendif
+
+                inc p3+0
+                zif_eq
+                    inc p3+1
+                zendif
+
+                lda p4+0
+                zif_eq
+                    dec p4+1
+                zendif
+                dec p4+0
+
+                lda p4+0
+                ora p4+1
+            zuntil_eq
+        zelse
+            ; Skip a free object; just advance the read pointer.
+
+        1:  
+            clc
+            lda p2+0
+            adc p4+0
+            sta p2+0
+            lda p2+1
+            adc p4+1
+            sta p2+1
+        zendif
+    zendloop
+    copy16 p3, heapptr
+
+    ldx #10-1
+    zrepeat
+        pla
+        sta p0, x
+        dex
+    zuntil_mi
     rts
 zendproc
+
+; Replace any pointers in the object table which are p2 with p3.
+
+zproc update_object_table_pointer
+    jsr find_first_object
+    zrepeat
+        ldy #0
+        lda (p0), y
+        cmp p2+0
+        zif_eq
+            iny
+            lda (p0), y
+            cmp p2+1
+            zif_eq
+                lda p3+1
+                sta (p0), y
+                dey
+                lda p3+0
+                sta (p0), y
+                rts
+            zendif
+        zendif
+
+        jsr find_next_object
+    zuntil_cs
+    rts
+zendproc
+
 
 ; p0 points at a stack value; if it's a string, mark the
 ; string data as used.

@@ -1,0 +1,13 @@
+10print "Start"
+20for i=1 to 5
+25print i
+30a$=""
+40for j=1 to 200 a$=a$+str$(i)
+41print a$
+60next
+70print "End"
+
+run
+list
+bye
+
