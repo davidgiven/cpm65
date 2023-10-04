@@ -1696,6 +1696,9 @@ zproc exec_varref
     sta p1+1
 
     jsr 1f                          ; call to aux pointer
+    zif_cs
+        jmp error_no_such_variable
+    zendif
 
     ; Pointer to hashnode in p0, atom ID in p1, hashnode id in p2
 
