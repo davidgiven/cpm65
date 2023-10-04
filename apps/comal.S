@@ -3137,7 +3137,7 @@ zproc update_end_ptr
     ldx #-3 & 0xff
     zrepeat
         iny
-        lda checkendlineptr+3
+        lda checkendlineptr+3, x
         sta (execlineptr), y
         inx
     zuntil_eq

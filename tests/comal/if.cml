@@ -3,19 +3,19 @@
 20if 1=2
 30print "30"
 40else
-50print "50"
+50print "50 (right)"
 60endif
 
 100if 1=1
-110print "110"
+110print "110 (right)"
 120elif 2=2
 130print "130"
 140endif
 
-200if i=1
+200if 1=2
 210print "210"
 220elif 2=2
-230print "230"
+230print "230 (right)"
 240else
 250print "250"
 260endif
