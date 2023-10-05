@@ -1,0 +1,66 @@
+10print "1< 2 = ", 1< 2
+20print "1<=2 = ", 1<=2
+30print "1= 2 = ", 1= 2
+35print "1<>2 = ", 1<>2
+40print "1> 2 = ", 1> 2
+50print "1>=2 = ", 1>=2
+55print
+60print "2< 2 = ", 2< 2
+70print "2<=2 = ", 2<=2
+80print "2= 2 = ", 2= 2
+85print "2<>2 = ", 2<>2
+90print "2> 2 = ", 2> 2
+100print "2>=2 = ", 2>=2
+105print
+110print "2< 1 = ", 2< 1
+120print "2<=1 = ", 2<=1
+130print "2= 1 = ", 2= 1
+135print "2<>1 = ", 2<>1
+140print "2> 1 = ", 2> 1
+150print "2>=1 = ", 2>=1
+160print
+200print "a< b = ", "a"< "b"
+210print "a<=b = ", "a"<="b"
+220print "a= b = ", "a"= "b"
+225print "a<>b = ", "a"<>"b"
+230print "a> b = ", "a"> "b"
+240print "a>=b = ", "a">="b"
+250print
+260print "b< b = ", "b"< "b"
+270print "b<=b = ", "b"<="b"
+280print "b= b = ", "b"= "b"
+285print "b<>b = ", "b"<>"b"
+290print "b> b = ", "b"> "b"
+300print "b>=b = ", "b">="b"
+310print
+320print "b< a = ", "b"< "a"
+330print "b<=a = ", "b"<="a"
+340print "b= a = ", "b"= "a"
+345print "b<>a = ", "b"<>"a"
+350print "b> a = ", "b"> "a"
+360print "b>=a = ", "b">="a"
+400print
+410print "a< aa = ", "a"< "aa"
+420print "a<=aa = ", "a"<="aa"
+430print "a= aa = ", "a"= "aa"
+435print "a<>aa = ", "a"<>"aa"
+440print "a> aa = ", "a"> "aa"
+450print "a>=aa = ", "a">="aa"
+460print
+470print "aa< aa = ", "aa"< "aa"
+480print "aa<=aa = ", "aa"<="aa"
+490print "aa= aa = ", "aa"= "aa"
+495print "aa<>aa = ", "aa"<>"aa"
+500print "aa> aa = ", "aa"> "aa"
+510print "aa>=aa = ", "aa">="aa"
+520print
+530print "aa< a = ", "aa"< "a"
+540print "aa<=a = ", "aa"<="a"
+550print "aa= a = ", "aa"= "a"
+555print "aa<>a = ", "aa"<>"a"
+560print "aa> a = ", "aa"> "a"
+570print "aa>=a = ", "aa">="a"
+run
+list
+bye
+

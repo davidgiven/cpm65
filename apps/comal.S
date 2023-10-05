@@ -1829,11 +1829,6 @@ zproc exec_gte
     bmi set_i0_to_zero
 zendproc
 
-; Computes LHS - RHS and turns the result into a sign value.
-zproc exec_compare
-    jsr exec_sub
-zendproc
-    ; fall through
 ; Converts TOS to -1, 0, 1
 zproc exec_sgn
     jsr deref_i0
@@ -1880,6 +1875,68 @@ zproc push_value_from_bytecode
     zuntil_eq
 
     rts
+zendproc
+
+; Computes LHS - RHS and turns the result into a sign value.
+zproc exec_compare
+    jsr deref_i0
+    lda v0
+    cmp #OTYPE_INTEGER
+    zif_eq
+        jsr exec_sub
+        jmp exec_sgn
+    zendif
+
+    jsr pop_and_deref_i1
+
+    lda v0
+    and v1
+    and #OTYPE_STRING
+    zif_eq
+        jmp error_type_mismatch
+    zendif
+
+    ; At this point we know that i0 and i1 are both strings.
+
+    ldx #p0
+    ldy #v0
+    jsr get_string_pointer
+    sta p2+0                ; length of RHS
+
+    ldx #p1
+    ldy #v1
+    jsr get_string_pointer
+    sta p2+1                ; length of LHS
+
+    ldy #0
+    zloop
+        lda p2+0
+        ora p2+1
+        zif_eq
+            jmp set_i0_to_zero ; both strings are the same length
+        zendif
+
+        lda p2+0
+        beq 2f                  ; LHS bigger
+        
+        lda p2+1
+        zif_eq
+        1:
+            jmp set_i0_to_mone  ; RHS bigger
+        zendif
+
+        lda (p0), y
+        cmp (p1), y
+        zif_ne
+            bcs 1b              ; RHS bigger
+        2:
+            jmp set_i0_to_one   ; LHS bigger
+        zendif
+    
+        iny
+        dec p2+0
+        dec p2+1
+    zendloop
 zendproc
 
 zproc exec_string
@@ -4516,6 +4573,8 @@ zproc get_string_pointer
     zif_cs
         inc 1, x
     zendif
+
+    lda STACKVALUE_STRING_LENGTH, y
     rts
 zendproc
 
