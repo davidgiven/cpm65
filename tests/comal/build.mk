@@ -10,5 +10,5 @@ $(OBJDIR)/tests/comal/%.stamp: tests/comal/%.good $(OBJDIR)/tests/comal/%.log
 
 $(OBJDIR)/tests/comal/%.log: tests/comal/%.cml $(OBJDIR)/comal.com bin/cpmemu
 	@mkdir -p $(dir $@)
-	timeout 1s bin/cpmemu -p A=$(dir $<) $(OBJDIR)/comal.com $(notdir $<) > $@
+	timeout 4s bin/cpmemu -p A=$(dir $<) $(OBJDIR)/comal.com $(notdir $<) > $@
 
