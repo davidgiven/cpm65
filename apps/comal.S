@@ -16,6 +16,8 @@
 ;    interpreter and workspace
 ; lo TPABASE
 
+DEBUG_DUMP_BYTECODE = 0
+DEBUG_TRACE_LINES = 0
 
 ; IMPORTANT --- remember how comparisons work!
 ;
@@ -572,23 +574,24 @@ zproc mainloop
 
         jsr parse_line
 
-        ; Successful parse.
+        ; Dump bytecode after parsing each line.
 
-        lda #0
-        sta p0+0
-        zloop
-            ldx p0+0
-            cpx bytecodeptr
-            zbreakif_eq
+        .if DEBUG_DUMP_BYTECODE
+            lda #0
+            sta p0+0
+            zloop
+                ldx p0+0
+                cpx bytecodeptr
+                zbreakif_eq
 
-            lda bytecode_buffer, x
-            jsr print_hex8_number
-            jsr print_space
+                lda bytecode_buffer, x
+                jsr print_hex8_number
+                jsr print_space
 
-            inc p0+0
-        zendloop
-        jsr print_nl
-        jsr print_nl
+                inc p0+0
+            zendloop
+            jsr print_nl
+        .endif
 
         ; Run it.
 
@@ -645,6 +648,8 @@ zendproc
 
 ; --- Debugging routines ----------------------------------------------------
 
+.if DEBUG_TRACE_LINES || DEBUG_DUMP_BYTECODE
+
 ; Prints a 16-bit hex number in XA.
 zproc print_hex16_number
     pha
@@ -675,6 +680,8 @@ print_hex4_number:
     pla
     rts
 zendproc
+
+.endif
 
 ; --- Output ----------------------------------------------------------------
 
@@ -1055,7 +1062,7 @@ zproc exec_line
     lda #>token_exec_table
     sta terpjumptable+1
 
-    .if 0
+    .if DEBUG_TRACE_LINES
         jsr print_nl
         ldy #2
         lda (execlineptr), y
