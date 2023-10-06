@@ -84,7 +84,6 @@ HASHNODE_SIZE   = 0xb
 
 STRING_DATA     = OBJECT_DATA + 0
 
-; 
 ; Stack value structure:
 ;  0    - object type
 ;  1..4 - data
@@ -161,7 +160,8 @@ LINE_DATA       = 4
 
 ZEROPAGE
 
-enteroffset: .byte 0
+enteroffset:  .byte 0
+listeroffset: .byte 0
 
 heapptr:   .word 0
 stackptr:  .word 0
@@ -303,6 +303,7 @@ TOKEN_DEFPROMPT  = 0x42
 TOKEN_STRPROMPT  = 0x43
 TOKEN_RND        = 0x44
 TOKEN_RANDZ      = 0x45
+TOKEN_LISTTOF    = 0x46
 
 P_TRY_OP         = 0
 P_JSR_OP         = 1
@@ -456,6 +457,7 @@ deftok TOKEN_DEFPROMPT, 0, 1, 0, 0, lister_defprompt, keyword_input,   exec_defp
 deftok TOKEN_STRPROMPT, 0, 1, 1, 0, lister_strprompt, keyword_input,   exec_print,     check_nop
 deftok TOKEN_RND,      14, 2, 7, 1, lister_prefixv,  keyword_rnd,      exec_rnd,       check_nop
 deftok TOKEN_RANDZ,     0, 1, 1, 0, lister_simplee,  keyword_randomize, exec_randomize, check_nop
+deftok TOKEN_LISTTOF,   0, 1, 1, 0, lister_simplee,  keyword_list,     exec_list_to_f, check_nop
 
 defpop pop_try
 defpop pop_jsr
@@ -586,19 +588,6 @@ zproc mainloop
             inc p0+0
         zendloop
         jsr print_nl
-
-        ; Print line back again.
-
-        jsr reset_buffer
-
-        lda #<bytecode_buffer
-        sta execlineptr+0
-        lda #>bytecode_buffer
-        sta execlineptr+1
-        lda #1
-        sta execbyteptr
-        jsr list_line
-        jsr print_buffer
         jsr print_nl
 
         ; Run it.
@@ -2715,24 +2704,32 @@ zproc read_character_from_enter_file
         ldx #>cpm_fcb
         ldy #BDOS_READ_SEQUENTIAL
         jsr BDOS
-        zif_cs
-            ; EOF. Go back to reading from the console.
-
-            lda #0xff
-            sta enteroffset
-            lda #0x1a ; ^Z
-            rts
-        zendif
+        bcs 1f
     zendif
 
     ldx enteroffset
     lda cpm_default_dma, x
+    cmp #0x1a
+    beq 1f
     inx
     cpx #0x80
     zif_eq
         ldx #0
     zendif
     stx enteroffset
+    rts
+
+1:
+    ; EOF. Go back to reading from the console.
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_CLOSE_FILE
+    jsr BDOS
+
+    lda #0xff
+    sta enteroffset
+    lda #0x1a ; ^Z
     rts
 zendproc
 
@@ -2916,29 +2913,11 @@ zproc exec_list
         zif_ne
             zbreakif_cs
         zendif
-            
-        ; Do the printing.
-
-        lda #LINE_DATA
-        sta execbyteptr
-
+        
         lda i2+0
         pha
         lda i2+1
         pha
-
-        jsr reset_buffer
-        jsr buffer_print_current_line_number
-
-        ldy #LINE_INDENT
-        lda (execlineptr), y
-        asl a
-        tay
-        iny
-        zrepeat
-            jsr buffer_print_space
-            dey
-        zuntil_eq
 
         jsr list_line
         jsr print_buffer
@@ -2960,8 +2939,125 @@ zproc exec_list
 
     ; Don't continue execution.
 
-    pla
-    pla
+    jmp mainloop
+zendproc
+
+zproc exec_list_to_f
+    jsr deref_i0
+    ldx #v0
+    jsr check_for_string
+
+    jsr reset_buffer
+    ldx #v0
+    jsr buffer_print_stringvalue
+    lda #0
+    jsr buffer_print_char
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_SET_DMA_ADDRESS
+    jsr BDOS
+
+    lda #<text_buffer
+    ldx #>text_buffer
+    ldy #BDOS_PARSEFILENAME
+    jsr BDOS
+    
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_DELETE_FILE
+    jsr BDOS
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_CREATE_FILE
+    jsr BDOS
+    zif_cs
+        jmp error_file_not_found
+    zendif
+
+    lda #0
+    sta listeroffset
+
+    lda #<cpm_default_dma
+    ldx #>cpm_default_dma
+    ldy #BDOS_SET_DMA_ADDRESS
+    jsr BDOS
+
+    jsr goto_first_line
+    jmp 1f
+    zrepeat
+        jsr list_line
+        jsr buffer_print_nl
+
+        zloop
+            ldx bufferpos
+            cpx bufferend
+            zbreakif_eq
+
+            lda text_buffer, x
+            jsr write_char
+
+            inc bufferpos
+        zendloop
+
+        jsr goto_next_line
+
+        ; Check for end of program.
+
+    1:
+        ldy #LINE_SIZE
+        lda (execlineptr), y
+    zuntil_eq
+    
+    ; Write the end of file character.
+
+    lda #0x1a ; ^Z
+    jsr write_char
+
+    ; Flush the buffer and close the file.
+
+    lda listeroffset
+    zif_ne
+        zrepeat
+            lda #0x1a ; ^Z
+            jsr write_char
+            lda listeroffset
+        zuntil_eq
+    zendif
+
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_CLOSE_FILE
+    jsr BDOS
+    zif_cs
+        jmp error_file_not_found
+    zendif
+
+    ; Don't continue execution.
+
+    jmp mainloop
+
+write_char:
+    ldy listeroffset
+    sta cpm_default_dma, y
+    iny
+    cpy #0x80
+    zif_eq
+        jsr write_record
+        ldy #0
+    zendif
+    sty listeroffset
+    rts
+
+write_record:
+    lda #<cpm_fcb
+    ldx #>cpm_fcb
+    ldy #BDOS_WRITE_SEQUENTIAL
+    jsr BDOS
+    zif_cs
+        jmp error_file_not_found
+    zendif
     rts
 zendproc
 
@@ -4945,6 +5041,24 @@ zendproc
 ; <bytecode address> {<child tree nodes>}*
 
 zproc list_line
+    ; Do the printing.
+
+    lda #LINE_DATA
+    sta execbyteptr
+
+    jsr reset_buffer
+    jsr buffer_print_current_line_number
+
+    ldy #LINE_INDENT
+    lda (execlineptr), y
+    asl a
+    tay
+    iny
+    zrepeat
+        jsr buffer_print_space
+        dey
+    zuntil_eq
+
     ldx execbyteptr
     ldx #0
     stx opstackptr
@@ -6415,11 +6529,19 @@ lineentry_rule:
     P_JMP statement_rule
 
 list_rule:
+keyword_list = . + 1
     P_TOKEN 'L', 'I', 'S', 'T'|0x80
     P_COMMIT
+    P_TRY list_to_file_rule
     P_TRY empty_list_rule
     P_JSR line_range_rule
     P_EMIT TOKEN_LIST
+    P_EOL
+    P_RETURN
+
+list_to_file_rule:
+    P_STRING
+    P_EMIT TOKEN_LISTTOF
     P_EOL
     P_RETURN
 
