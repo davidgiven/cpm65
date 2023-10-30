@@ -190,7 +190,8 @@ zendproc
 zproc entry_SETTPA
     ldy current_bank
     sta mem_base, y
-    stx mem_end, y
+    txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
+    sta mem_end, y
     clc
     rts
 zendproc
@@ -942,7 +943,7 @@ zendproc
 
         ldx #DISK_SLOT
         lda DISK_LOAD, x    ; prime drive
-        lda DISK_READ, x   
+        lda DISK_READ, x
         zif_mi
             sec             ; write protected
             rts
@@ -989,7 +990,7 @@ zendproc
 
 /*  6 */    tya                           ; 2
 /*  8 */    ldy #0x56                     ; 2
-            zrepeat  
+            zrepeat
 /* 10 */        eor disk_twos_buffer-1, y ; 5 (always crosses page boundary)
 /* 15 */        tax                       ; 2
 /* 17 */        lda encode_tab, x         ; 4

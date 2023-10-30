@@ -230,7 +230,8 @@ zendproc
 zproc entry_SETTPA
     ldy current_bank
     sta mem_base, y
-    stx mem_end, y
+    txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
+    sta mem_end, y
     clc
     rts
 zendproc
