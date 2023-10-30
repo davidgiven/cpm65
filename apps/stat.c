@@ -1,7 +1,7 @@
 /* dump © 2019 David Given
  * This program is distributable under the terms of the 2-clause BSD license.
  * See COPYING.cpmish in the distribution root directory for more information.
- * 
+ *
  * A traditional CP/M stat.com clone. This implements the unbelievably baroque
  * and poorly-thought-out stat user interface as closely as possible, because
  * traditions.
@@ -16,6 +16,10 @@
 #include "lib/printi.h"
 
 #define FCB_COUNT 256
+
+// output lines are overlapped with crlf
+// #define EOL "\r\n"
+#define EOL "\n"
 
 uint8_t accumulator[4];
 uint8_t ibp = 0;
@@ -61,7 +65,7 @@ void print(const char* s)
 
 void crlf(void)
 {
-    print("\r\n");
+    print(EOL);
 }
 
 void printx(const char* s)
@@ -273,7 +277,7 @@ void file_manipulation(void)
     select_fcb_disk();
     cpm_fcb.ex = '?'; /* find all extents, not just the first */
     count = 0;
-	cpm_set_dma(cpm_default_dma);
+    cpm_set_dma(cpm_default_dma);
     uint8_t r = cpm_findfirst(&cpm_fcb);
     while (r != 0xff)
     {
@@ -308,12 +312,12 @@ void file_manipulation(void)
             }
         }
 
-		uint16_t extents = de->s2*32 + de->ex;
-		if (extents >= fe->extents)
-		{
-			fe->extents = extents + 1;
-			fe->records = (extents * 128) + de->rc;
-		}
+        uint16_t extents = de->s2*32 + de->ex;
+        if (extents >= fe->extents)
+        {
+            fe->extents = extents + 1;
+            fe->records = (extents * 128) + de->rc;
+        }
 
         if (dpb->dsm < 256)
         {
@@ -345,7 +349,7 @@ void file_manipulation(void)
             uint8_t current_drive;
             struct fe** fep;
 
-			//qsort(findex, count, sizeof(void*), index_sort_cb);
+            //qsort(findex, count, sizeof(void*), index_sort_cb);
 
             current_drive = 'A' + cpm_get_current_drive();
             if (command == LIST_WITH_SIZE)
@@ -489,10 +493,10 @@ bool change_device_assignment(uint8_t logical)
         physical <<= 2;
     }
 
-	uint8_t iobyte = cpm_get_iobyte();
+    uint8_t iobyte = cpm_get_iobyte();
     iobyte &= ~b;
     iobyte |= physical;
-	cpm_set_iobyte(iobyte);
+    cpm_set_iobyte(iobyte);
     return false;
 }
 
@@ -523,11 +527,11 @@ void show_help(void)
     uint8_t j;
 
     printx(
-        "Set disk to read only:  stat d:=R/O\r\n"
-        "Set file attributes:    stat d:filename.typ $R/O / $R/W / $SYS / $DIR\r\n"
-        "Get file attributes:    stat d:filename.typ [ $S ]\r\n"
-        "Show disk info:         stat DSK: / d: DSK:\r\n"
-        "Show user number usage: stat USR:\r\n"
+        "Set disk to read only:  stat d:=R/O"EOL
+        "Set file attributes:    stat d:filename.typ $R/O / $R/W / $SYS / $DIR"EOL
+        "Get file attributes:    stat d:filename.typ [ $S ]"EOL
+        "Show disk info:         stat DSK: / d: DSK:"EOL
+        "Show user number usage: stat USR:"EOL
         "Show device mapping:    stat DEV:"
     );
 
