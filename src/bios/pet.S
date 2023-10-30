@@ -130,7 +130,7 @@ cursory:          .fill 1
         lda ptr1+1
         cmp #>init_end_addr
     zuntil_eq
-    
+
     jmp _start
 
 zproc _start, .init
@@ -162,7 +162,7 @@ zproc _start, .init
         lda store+2
         cmp #>bios_end_addr
     zuntil_eq
-    
+
     ; Initialise the screen.
 
     jsr screen_clear
@@ -200,7 +200,7 @@ zproc _start, .init
     zuntil_mi
 
     ; Set up sector IO.
-    
+
     lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
     jsr ieee_listen
     ldx #allocate_cmd_end - allocate_cmd
@@ -223,7 +223,7 @@ zproc _start, .init
     lda #>__TPA_START__
     ldx #__ZEROPAGE_START__
     jsr entry_RELOCATE
-	
+
     ; Go!
 
     lda #<biosentry
@@ -696,7 +696,7 @@ zproc scan_keyboard
                     pla
                     tay
                 zendif
-    
+
                 iny
                 asl ptr1+1
                 asl ptr1+0
@@ -838,41 +838,41 @@ zproc convert_ascii_to_screencode
 
     ; This is from https://codebase64.org/doku.php?id=base:petscii_to_screencode&s[]=screencodes
 
-	cmp #0x20		; if A<32 then...
-	bcc ddRev
+    cmp #0x20       ; if A<32 then...
+    bcc ddRev
 
-	cmp #0x60		; if A<96 then...
-	bcc dd1
+    cmp #0x60       ; if A<96 then...
+    bcc dd1
 
-	cmp #0x80		; if A<128 then...
-	bcc dd2
+    cmp #0x80       ; if A<128 then...
+    bcc dd2
 
-	cmp #0xa0		; if A<160 then...
-	bcc dd3
+    cmp #0xa0       ; if A<160 then...
+    bcc dd3
 
-	cmp #0xc0		; if A<192 then...
-	bcc dd4
+    cmp #0xc0       ; if A<192 then...
+    bcc dd4
 
-	cmp #0xff		; if A<255 then...
-	bcc ddRev
+    cmp #0xff       ; if A<255 then...
+    bcc ddRev
 
-	lda #0x7e		; A=255, then A=126
-	bne ddEnd
+    lda #0x7e       ; A=255, then A=126
+    bne ddEnd
 
 dd2:
-    and #0x5f		; if A=96..127 then strip bits 5 and 7
-	bne ddEnd
+    and #0x5f       ; if A=96..127 then strip bits 5 and 7
+    bne ddEnd
 dd3:
-    ora #0x40		; if A=128..159, then set bit 6
-	bne ddEnd
+    ora #0x40       ; if A=128..159, then set bit 6
+    bne ddEnd
 dd4:
-    eor #0xc0		; if A=160..191 then flip bits 6 and 7
-	bne ddEnd
+    eor #0xc0       ; if A=160..191 then flip bits 6 and 7
+    bne ddEnd
 dd1:
-    and #0x3f		; if A=32..95 then strip bits 6 and 7
-	bpl ddEnd		; <- you could also do .byte 0x0c here
+    and #0x3f       ; if A=32..95 then strip bits 6 and 7
+    bpl ddEnd       ; <- you could also do .byte 0x0c here
 ddRev:
-    eor #0x80		; flip bit 7 (reverse on when off and vice versa)
+    eor #0x80       ; flip bit 7 (reverse on when off and vice versa)
 ddEnd:
 
     rts
@@ -1042,7 +1042,7 @@ zproc ieee_getb
     ; Not ready for data.
 
     set0 VIA_PB, VIA_PB_NRFD_OUT
-    
+
     ; Get the data.
 
     lda PIA2_PA
@@ -1077,7 +1077,7 @@ zproc ieee_getb
     pla
     rts
 zendproc
-    
+
 .data
 
 zp_base:    .byte __ZEROPAGE_START__

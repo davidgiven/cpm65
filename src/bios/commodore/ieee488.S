@@ -16,10 +16,10 @@ ieee_buffered_char:     .fill 1
 ; Initialises the IEEE488 library.
 
 zproc ieee_init, ".init"
-	lda #0
-	sta ieee_has_buffered_char
-	sta ieee_buffered_char
-	sta buffer_dirty
+    lda #0
+    sta ieee_has_buffered_char
+    sta ieee_buffered_char
+    sta buffer_dirty
 
     ldy #3
     zrepeat
@@ -30,7 +30,7 @@ zproc ieee_init, ".init"
         dey
     zuntil_eq
 
-	rts
+    rts
 zendproc
 
 ; Writes a single character in A with buffering.
@@ -73,41 +73,41 @@ zendproc
 
 zproc ieee_talk
     pha
-	jsr ieee_mode_atn
+    jsr ieee_mode_atn
     lda #0x48               ; TALK device 8
     jsr ieee_putb
     pla
     ora #0x60               ; SECOND
     jsr ieee_putb
-	jmp ieee_mode_listen
+    jmp ieee_mode_listen
 zendproc
 
 zproc ieee_untalk
-	jsr ieee_mode_atn
+    jsr ieee_mode_atn
     lda #0x5f               ; UNTALK
     jsr ieee_putb
-	jmp ieee_mode_talk
+    jmp ieee_mode_talk
 zendproc
 
 ; A is the secondary address.
 
 zproc ieee_listen
     pha
-	jsr ieee_mode_atn
+    jsr ieee_mode_atn
     lda #0x28               ; LISTEN device 8
     jsr ieee_putb
     pla
     ora #0x60               ; SECOND
     jsr ieee_putb
-	jmp ieee_mode_talk
+    jmp ieee_mode_talk
 zendproc
 
 zproc ieee_unlisten
     jsr ieee_flush
-	jsr ieee_mode_atn
+    jsr ieee_mode_atn
     lda #0x3f               ; UNLISTEN
     jsr ieee_putb
-	jmp ieee_mode_talk
+    jmp ieee_mode_talk
 zendproc
 
 ; Sets the current DMA address.
@@ -374,7 +374,7 @@ zproc getstatus
         zbreakif_cs
         jsr entry_CONOUT
     zendloop
-   
+
     lda #0x0d
     jsr entry_CONOUT
     lda #0x0a

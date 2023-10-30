@@ -97,7 +97,7 @@ MAINLOOP:
         jsr skip_whitespace         ; leaves cmdoffset in X
         lda cmdline, x
         zcontinueif_eq
-    
+
         ; Parse it.
 
         lda #<cmdfcb
@@ -356,7 +356,7 @@ zproc entry_DIR
             lda #':'
             jsr bdos_CONOUT
             jsr space
-            
+
             ; Print the filename.
 
             lda #8
@@ -413,7 +413,7 @@ zendproc
 
 zproc entry_TYPE
     jsr parse_valid_userfcb
-    
+
     ; Open the FCB.
 
     lda #<userfcb
@@ -422,7 +422,7 @@ zproc entry_TYPE
     zif_cs
         jmp cannot_open
     zendif
-    
+
     ; Read and print it.
 
     zloop
@@ -488,7 +488,7 @@ zproc entry_FREE
     lda #<main
     ldx #>main
     jsr print_hex16_number
-    
+
     jsr printi
     .ascii ".\r\x8a"
 
@@ -808,7 +808,7 @@ zproc decode_command
         clc
         adc #4
         tax
-    
+
         lda cmdtable, x
     zuntil_eq
 decode_command_exit:
@@ -863,7 +863,7 @@ zproc parse_number
         clc
         adc temp+0
         sta temp+0
-    
+
         inx
     zendloop
 

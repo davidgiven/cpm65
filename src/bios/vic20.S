@@ -188,7 +188,7 @@ zproc _init, .init
     lda #>__HIGHTPA_START__
     ldx #__ZEROPAGE_START__
     jsr entry_RELOCATE
-	
+
     ; Go!
 
     lda #<biosentry
@@ -220,7 +220,7 @@ zendproc
 ; --- BIOS entrypoints ------------------------------------------------------
 
 zproc entry_GETTPA
-	ldy current_bank
+    ldy current_bank
     lda mem_base, y
     ldx mem_end, y
     clc
@@ -228,7 +228,7 @@ zproc entry_GETTPA
 zendproc
 
 zproc entry_SETTPA
-	ldy current_bank
+    ldy current_bank
     sta mem_base, y
     stx mem_end, y
     clc
@@ -250,7 +250,7 @@ zproc entry_SETZP
 zendproc
 
 zproc entry_SETBANK
-	sta current_bank
+    sta current_bank
     rts
 zendproc
 
@@ -370,7 +370,7 @@ zproc scan_keyboard
                     pla
                     tay
                 zendif
-    
+
                 iny
                 asl ptr1+1
                 asl ptr1+0
@@ -646,7 +646,7 @@ zproc calculate_line_address
     rol a
     asl ptr+0
     rol a
-    
+
     ; Add on the actual framebuffer address.
 
     clc
@@ -855,10 +855,10 @@ zproc ieee_getb
 
     txa
     pha
-	ldx #8
+    ldx #8
     zrepeat
         jsr wait_for_iec_clock_release
-        ror	ieee_byte
+        ror ieee_byte
         jsr wait_for_iec_clock_assert
 
         dex
@@ -872,7 +872,7 @@ zproc ieee_getb
 
     lda ieee_eoi        ; bottom bit set on EOI
     ror a               ; move into C
-	lda	ieee_byte
+    lda ieee_byte
     rts
 zendproc
 

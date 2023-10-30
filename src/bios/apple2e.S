@@ -162,7 +162,7 @@ _start:
     lda #>__TPA1_START__
     ldx #__ZEROPAGE_START__
     jsr entry_RELOCATE
-	
+
     ; Go!
 
     lda #<biosentry
@@ -180,7 +180,7 @@ banner_end:
 ; --- BIOS entrypoints ------------------------------------------------------
 
 zproc entry_GETTPA
-	ldy current_bank
+    ldy current_bank
     lda mem_base, y
     ldx mem_end, y
     clc
@@ -188,7 +188,7 @@ zproc entry_GETTPA
 zendproc
 
 zproc entry_SETTPA
-	ldy current_bank
+    ldy current_bank
     sta mem_base, y
     stx mem_end, y
     clc
@@ -210,7 +210,7 @@ zproc entry_SETZP
 zendproc
 
 zproc entry_SETBANK
-	sta current_bank
+    sta current_bank
     rts
 zendproc
 
@@ -496,8 +496,8 @@ zendproc
 ; XA is a pointer to a three-byte sector number.
 
 zproc entry_SETSEC
-	sta ptr+0
-	stx ptr+1
+    sta ptr+0
+    stx ptr+1
 
     ; The bottom five bits need to become bits 12..7 of the
     ; offset into the track address.
@@ -641,7 +641,7 @@ zproc read_track
                     jsr read_gcr44
                     jsr read_gcr44
                     jsr read_gcr44
-                    
+
                     ; Found a sector. Has it already been read?
                     ; Remember to undo the ProDOS sector skew.
 
@@ -921,7 +921,7 @@ zendproc
             jsr read_gcr44
             jsr read_gcr44
             jsr read_gcr44
-            
+
             ; Found a sector. Has it already been read?
             ; Remember to undo the ProDOS sector skew.
 
@@ -939,7 +939,7 @@ zendproc
             WAIT3           ; 3
             dey             ; 2
         zuntil_eq           ; 3 for every iteration
-            
+
         ldx #DISK_SLOT
         lda DISK_LOAD, x    ; prime drive
         lda DISK_READ, x   

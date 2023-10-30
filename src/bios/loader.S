@@ -189,7 +189,7 @@ found:
             jsr gotonextsector
             dec sector_count
         zuntil_eq
-            
+
         ldx directory_offset
         cpx #16
     zuntil_eq
