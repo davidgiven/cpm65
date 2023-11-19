@@ -106,6 +106,7 @@ entry_EXIT:
     sta user_dma+0
     lda directory_buffer+1
     sta user_dma+1
+ 
     jsr internal_READSEQUENTIAL ; load one record
 
     ; Compute the load address.
@@ -212,7 +213,8 @@ zproc ENTRY
     pha
     tya
     pha
-
+    lda #'P'
+    jsr $ff00
     lda old_fcb_drive
     zif_pl
         ldy #FCB_DR
@@ -693,8 +695,14 @@ zendproc
 zproc entry_SETDMAADDRESS
     lda param+0
     sta user_dma+0
+    clc 
+    adc #'0'
+    jsr internal_CONOUT
     lda param+1
     sta user_dma+1
+    clc 
+    adc #'0'
+    jsr internal_CONOUT
     rts
 zendproc
 
@@ -1235,9 +1243,14 @@ zendproc
 ; --- Read next sequential record -------------------------------------------
 
 zproc entry_READSEQUENTIAL
+    lda #'I'
+    jsr internal_CONOUT
     jsr convert_user_fcb
 zendproc
 zproc internal_READSEQUENTIAL
+    lda #'J'
+    jsr internal_CONOUT
+
     ldy #FCB_CR
     lda (param), y
     ldy #FCB_RC
@@ -1252,7 +1265,8 @@ zproc internal_READSEQUENTIAL
         bcs eof$
 
         ; Open it.
-
+        lda #'K'
+        jsr internal_CONOUT
         jsr internal_OPENFILE
         bcs eof$
     zendif
@@ -1262,6 +1276,8 @@ zproc internal_READSEQUENTIAL
     jsr get_sequential_sector_number
 
     ; Move the FCB on to the next record, for next time.
+    lda #'L'
+    jsr internal_CONOUT
 
     ldy #FCB_CR
     lda (param), y
@@ -1272,11 +1288,19 @@ zproc internal_READSEQUENTIAL
     ; Actually do the read!
 
     jsr reset_user_dma
+    lda #'M'
+    jsr internal_CONOUT
+
     jsr read_sector
+    lda #'N'
+    jsr internal_CONOUT
+    
     clc
     rts
 
 eof$:
+    lda #'O'
+    jsr internal_CONOUT
     lda #CPME_NODATA           ; = EOF
     sec
     rts
@@ -2056,6 +2080,7 @@ find_first:
     jsr reset_dir_pos
     ; fall through
 zproc find_next
+
     jsr read_dir_entry
     jsr check_dir_pos
     beq no_more_files
