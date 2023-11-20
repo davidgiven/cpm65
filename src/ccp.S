@@ -621,8 +621,6 @@ zproc entry_TRANSIENT
         jmp newline
     zendif
 
-    lda #$77
-    jsr print_hex_number
     ; Compute the start address.
 
     jsr bios_GETTPA         ; leaves page number in A
@@ -631,8 +629,6 @@ zproc entry_TRANSIENT
     sta temp+0
 
     ; Read the first sector to get the header.
-    lda #$78
-    jsr print_hex_number
 
     jsr read_command_sector
     zif_cs
@@ -642,9 +638,6 @@ zproc entry_TRANSIENT
     sta temp+0              ; set pointer to beginning of file
 
     ; Check that there's room.
-
-    lda #$88
-    jsr print_hex_number
 
     jsr bios_GETTPA
     stx temp2
@@ -676,9 +669,6 @@ zproc entry_TRANSIENT
 
     ; Relocate the file.
 
-    lda #$99
-    jsr print_hex_number
-  
     jsr bios_GETTPA
     tax
     lda #0
@@ -776,15 +766,11 @@ read_command_sector:
     lda temp+0
     ldx temp+1
     jsr bdos_SETDMA
-    lda #$79
-    jsr print_hex_number
     lda #<cmdfcb
     ldx #>cmdfcb
     jsr bdos_READSEQUENTIAL
     bcs 1f
 
-    lda #$7a
-    jsr print_hex_number
     lda temp+0
     eor #$80
     sta temp+0
@@ -792,11 +778,7 @@ read_command_sector:
         inc temp+1
     zendif
     clc
-    rts
 1:
-    lda #$7b
-    jsr print_hex_number
-    sec
     rts
 
 com:

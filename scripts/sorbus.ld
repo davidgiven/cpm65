@@ -1,5 +1,5 @@
 MEMORY {
-    zp : ORIGIN = 4, LENGTH = 0x8e
+    zp : ORIGIN = 4, LENGTH = 0xfe
     ram (rw) : ORIGIN = 0x7ff, LENGTH = 0x1000
 }
 
@@ -7,9 +7,9 @@ SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
 		__USERZEROPAGE_START__ = .;
-		__USERZEROPAGE_END__ = 0x90;
+		__USERZEROPAGE_END__ = 0xe0;
 
-		. = 0x80;
+		. = 0xe0;
 		*(.loaderzp)
 	} >zp
 

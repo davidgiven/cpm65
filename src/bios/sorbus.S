@@ -164,13 +164,13 @@ zendproc
 zproc entry_SETDMA
     sta dma+0    
     stx dma+1
-    pha
-    txa
-    jsr print_hex_number
-    pla
-    jsr print_hex_number
-    lda #' '
-    jsr CHROUT
+  ;  pha
+  ;  txa
+  ;  jsr print_hex_number
+  ;  pla
+  ;  jsr print_hex_number
+  ;  lda #' '
+  ;  jsr CHROUT
     clc
     rts
 zendproc
@@ -210,13 +210,13 @@ zproc entry_SETSEC
 zendproc
 
 zproc entry_GETTPA
-   ; lda mem_base
-   ; ldx mem_end
-   ; jsr print_hex_number
-   ; txa 
-   ; jsr print_hex_number
-   ; lda #'G'
-   ; jsr CHROUT
+    ;lda mem_base
+    ;ldx mem_end
+    ;jsr print_hex_number
+    ;txa 
+    ;jsr print_hex_number
+    ;lda #'G'
+    ;jsr CHROUT
     lda mem_base
     ldx mem_end
     clc
@@ -226,11 +226,11 @@ zendproc
 zproc entry_SETTPA
     sta mem_base
     stx mem_end
-    jsr print_hex_number
-    txa 
-    jsr print_hex_number
-    lda #'S'
-    jsr CHROUT
+   ; jsr print_hex_number
+   ; txa 
+   ; jsr print_hex_number
+   ; lda #'S'
+   ; jsr CHROUT
     clc
     rts
 zendproc
@@ -267,7 +267,7 @@ zproc entry_SETBANK
         lda #$20
         sta mem_base
         lda mem_end    ; its from $2000 to $3f00    
-        lda #$40
+        lda #$c0
         sta mem_end
         clc
         rts
@@ -278,19 +278,7 @@ zproc entry_SETBANK
 zendproc
 
 zproc entry_READ
-    lda #'R'
-    jsr CHROUT
     jsr change_sectors
-   ; lda sector_num+0     
-   ; jsr print_hex_number    
-    
-    lda dma+1
-    jsr print_hex_number
-    lda dma
-    jsr print_hex_number
-    lda #'.'
-    jsr CHROUT
-
     lda sector_num+0
     ror a               ; bottom bit -> C
     lda #0
@@ -305,13 +293,6 @@ zproc entry_READ
         inx
         cpy #$80
     zuntil_eq
-
-    lda dma+1
-    jsr print_hex_number
-    lda dma
-    jsr print_hex_number
-    lda #';'
-    jsr CHROUT
 
     clc
     rts
@@ -368,9 +349,6 @@ zproc change_sectors
         zendif
     zendif
 
-    lda #'S'
-    jsr CHROUT
-
     ; We need to change sectors. Flush the current one?
 
     jsr flush_buffered_sector
@@ -419,8 +397,6 @@ zendproc
 zproc read_sector
     sta SECTOR_LBA_L
     stx SECTOR_LBA_M
-    lda #'T'
-    jsr CHROUT
 
     lda #$0
     sta SECTOR_LBA_H
@@ -440,9 +416,9 @@ zendproc
 ; Writes a 256-byte sector whose LBA index is in XA.
 
 zproc write_sector
-    pha
-    jsr print_hex_number
-    pla
+   ; pha
+   ; jsr print_hex_number
+   ; pla
     sta SECTOR_LBA_L
     stx SECTOR_LBA_M
     lda #$0
@@ -506,18 +482,7 @@ zendproc
 
 zproc init_system
 
-    lda #$34
-    sta $01
-    ldx #$00
-    ldy #$80
-    zrepeat
-        txa
-        sta $4400,x
-        tya
-        sta $8400,x
-        iny
-        dex
-    zuntil_eq
+    ; Clear memory here ?
 
     ; Print the startup banner (directly with CHROUT).
 

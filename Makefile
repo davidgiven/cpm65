@@ -260,19 +260,17 @@ sorbus: sorbus.prg sorbus.bin
 sorbus.prg: $(OBJDIR)/sorbus.exe
 	@cp $(OBJDIR)/sorbus.exe sorbus.prg
 
-$(OBJDIR)/sorbus.exe: $(OBJDIR)/libsorbus.a 
+$(OBJDIR)/sorbus.exe: $(OBJDIR)/libsorbus.a
 sorbus.bin: $(OBJDIR)/sorbus.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs $(OBJDIR)/generic-1m-cpmfs.img
 	@rm -f $@
 	@cp $(OBJDIR)/generic-1m-cpmfs.img $@
-	
-	
 
 $(OBJDIR)/generic-1m-cpmfs.img: $(OBJDIR)/bdos.sys $(APPS) $(OBJDIR)/ccp.sys
 	@rm -f $@
 	mkfs.cpm -f generic-1m $@
 	cpmcp -f generic-1m $@ $(OBJDIR)/ccp.sys $(APPS) 0:
-	# cpmchattr -f generic-1m $@ sr 0:ccp.sys
+	cpmchattr -f generic-1m $@ sr 0:ccp.sys
 
 $(OBJDIR)/x16.exe: $(OBJDIR)/libcommodore.a
 x16.zip: $(OBJDIR)/x16.exe $(OBJDIR)/bdos.sys $(OBJDIR)/generic-1m-cpmfs.img
