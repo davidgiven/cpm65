@@ -6,48 +6,17 @@
 #include "cpm65.inc"
 #include "driver.inc"
 
-UART_READ    = $DFFA; read from uart input
-UART_READ_Q  = $DFFB; can be $00-$7f in normal operation
-UART_WRITE   = $DFFC; write to uart output
-UART_WRITE_Q = $DFFD; can be $00-$7f in normal operation
-
 CHROUT = $ff00
 GETIN  = $ff03
 
-SECTOR_LBA_L = $DF80
-SECTOR_LBA_M = $DF81
-SECTOR_LBA_H = $DF82
+SECTOR_LBA_L = $DF70
+SECTOR_LBA_M = $DF71
 
-SECTOR_CMD = $DF83
-SECTOR_DATA = $DF84
+SECTOR_CMD_READ = $DF74
+SECTOR_CMD_WRITE = $DF75
+SECTOR_DATA = $DF76
 
 MEMBASE = $c000   ; Location of the BDOS
-
-
-READST = $ffb7
-SETLFS = $ffba
-SETNAM = $ffbd
-OPEN = $ffc0
-CLOSE = $ffc3
-CHKIN = $ffc6
-CHKOUT = $ffc9
-CHRIN = $ffcf
-
-LOAD = $ffd5
-SAVE = $ffd8
-CLALL = $ffe7
-SETMSG = $ff90
-ACPTR = $ffa5
-CIOUT = $ffa8
-UNTALK = $ffab
-UNLSN = $ffae
-LISTEN = $ffb1
-TALK = $ffb4
-SECOND = $ff93
-TALKSA = $ff96
-CLRCHN = $ffcc
-
-STATUS = $90
 
 ZEROPAGE
 
@@ -57,15 +26,13 @@ ptr:        .word 0
 ptr1:       .word 0
 dma:        .word 0    ; current DMA
 
-    .text
-
-    .word $0801
-    .word 1f, 1
-    .byte $9e
-    .asciz "2061"
 1:
     .word 0
 zproc _start
+    ldx #$ff
+    txs
+    cld
+
     jsr init_system
   
     ; Relocate the BDOS.
@@ -224,6 +191,7 @@ zproc entry_GETTPA
 zendproc
 
 zproc entry_SETTPA
+  ;TODO make use of this 
     sta mem_base
     stx mem_end
    ; jsr print_hex_number
@@ -252,21 +220,21 @@ zendproc
 zproc entry_SETBANK
     cmp #BANK_EXTRA  ; This is for BIOS and CCP
     zif_eq  
-        lda mem_base    ; its from $0000 to $2000    
-        lda #$10
+        ;lda mem_base    ; its from $e000 to $f000    
+        lda #$e8
         sta mem_base
-        lda mem_end    ; its from $0000 to $2000    
-        lda #$20
+        ;lda mem_end    ; its from $e000 to $f000    
+        lda #$f0
         sta mem_end
         clc
         rts
     zendif
     cmp #BANK_MAIN  ; This is executing COMs
     zif_eq  
-        lda mem_base    ; its from $2000 to $3f00    
-        lda #$20
+        ;lda mem_base    ; its from $0200 to $c000    
+        lda #$02
         sta mem_base
-        lda mem_end    ; its from $2000 to $3f00    
+        ;lda mem_end    ; its from $0200 to $c000    
         lda #$c0
         sta mem_end
         clc
@@ -279,12 +247,7 @@ zendproc
 
 zproc entry_READ
     jsr change_sectors
-    lda sector_num+0
-    ror a               ; bottom bit -> C
-    lda #0
-    ror a               ; C -> top bit, producing $00 or $80
-    tax
-
+    ldx #$00
     ldy #0
     zrepeat
         lda disk_buffer, x
@@ -304,12 +267,7 @@ zproc entry_WRITE
     pha
     jsr change_sectors
 
-    lda sector_num+0
-    ror a               ; bottom bit -> C
-    lda #0
-    ror a               ; C -> top bit, producing $00 or $80
-    tax
-
+    ldx #$0 
     ldy #0
     zrepeat
         lda (dma), y
@@ -333,9 +291,12 @@ zendproc
 
 zproc change_sectors
     ; If the buffered sector is the one we want, just return.
+    ;lda sector_num+1    
+    ;jsr print_hex_number
+    ;lda sector_num+0
+    ;jsr print_hex_number
 
     lda sector_num+0
-    and #$fe
     cmp buffered_sector+0
     zif_eq
         lda sector_num+1
@@ -356,7 +317,6 @@ zproc change_sectors
     ; Now read the new one.
 
     lda sector_num+0
-    and #$fe
     sta buffered_sector+0
     lda sector_num+1
     sta buffered_sector+1
@@ -370,11 +330,13 @@ zendproc
 ; Compute the current LBA sector number in XA for the buffered sector.
 
 zproc buffered_sector_to_lba
-    lda buffered_sector+1
-    lsr a
-    tax
+   ; lda buffered_sector+1    
+   ; jsr print_hex_number
+   ; lda buffered_sector+0
+   ; jsr print_hex_number
+
+    ldx buffered_sector+1    
     lda buffered_sector+0
-    ror
     rts
 zendproc
 
@@ -398,16 +360,15 @@ zproc read_sector
     sta SECTOR_LBA_L
     stx SECTOR_LBA_M
 
-    lda #$0
-    sta SECTOR_LBA_H
     lda #$aa        // iniate read
-    sta SECTOR_CMD
+    sta SECTOR_CMD_READ
 
     ldy #$00
     zrepeat
         lda SECTOR_DATA
         sta disk_buffer, y
         iny
+        cpy #$80
     zuntil_eq
 
     rts
@@ -421,16 +382,15 @@ zproc write_sector
    ; pla
     sta SECTOR_LBA_L
     stx SECTOR_LBA_M
-    lda #$0
-    sta SECTOR_LBA_H
     lda #$55        // iniate write
-    sta SECTOR_CMD
+    sta SECTOR_CMD_WRITE
 
     ldy #$00
     zrepeat
         lda disk_buffer, y
         sta SECTOR_DATA
         iny
+        cpy #$80
     zuntil_eq
 
 
@@ -519,9 +479,9 @@ loading_msg:
 
 zp_base:    .byte __USERZEROPAGE_START__
 zp_end:     .byte __USERZEROPAGE_END__
-//BDOS adds it's own size to the start. but ee shifted it up to $c000
-mem_base:   .byte __USERTPA_START__@mos16hi
-mem_end:    .byte __USERTPA_END__@mos16hi
+
+mem_base:   .byte $02
+mem_end:    .byte $c0
 
 ; DPH for drive 0 (our only drive)
 

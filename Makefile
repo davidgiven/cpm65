@@ -76,10 +76,6 @@ LIBCOMMODORE_OBJS = \
 	$(OBJDIR)/src/bios/commodore/ieee488.o \
 	$(OBJDIR)/src/bios/commodore/petscii.o \
 
-LIBSORBUS_OBJS = \
-	$(OBJDIR)/src/bios/sorbus/ieee488.o \
-	$(OBJDIR)/src/bios/sorbus/petscii.o \
-
 CPMEMU_OBJS = \
 	$(OBJDIR)/tools/cpmemu/main.o \
 	$(OBJDIR)/tools/cpmemu/emulator.o \
@@ -173,10 +169,6 @@ $(OBJDIR)/libcommodore.a: $(LIBCOMMODORE_OBJS)
 	@mkdir -p $(dir $@)
 	$(LLVM)llvm-ar rs $@ $^
 
-$(OBJDIR)/libsorbus.a: $(LIBSORBUS_OBJS)
-	@mkdir -p $(dir $@)
-	$(LLVM)llvm-ar rs $@ $^
-
 $(OBJDIR)/libbios.a: $(LIBBIOS_OBJS)
 	@mkdir -p $(dir $@)
 	$(LLVM)llvm-ar rs $@ $^
@@ -260,7 +252,7 @@ sorbus: sorbus.prg sorbus.bin
 sorbus.prg: $(OBJDIR)/sorbus.exe
 	@cp $(OBJDIR)/sorbus.exe sorbus.prg
 
-$(OBJDIR)/sorbus.exe: $(OBJDIR)/libsorbus.a
+$(OBJDIR)/sorbus.exe: 
 sorbus.bin: $(OBJDIR)/sorbus.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs $(OBJDIR)/generic-1m-cpmfs.img
 	@rm -f $@

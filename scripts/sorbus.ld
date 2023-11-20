@@ -1,6 +1,6 @@
 MEMORY {
     zp : ORIGIN = 4, LENGTH = 0xfe
-    ram (rw) : ORIGIN = 0x7ff, LENGTH = 0x1000
+    ram (rw) : ORIGIN = 0xe000, LENGTH = 0x1000
 }
 
 SECTIONS {
@@ -21,7 +21,7 @@ SECTIONS {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		__USERTPA_START__ = .;
-		__USERTPA_END__ = 0x4000;
+		__USERTPA_END__ = 0xefff;
 	} >ram
 }
 
