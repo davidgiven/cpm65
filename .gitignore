@@ -1,6 +1,8 @@
 *~
 .*.swp
 .obj
+*.bin
+*.prg
 apple2e.po
 atari800.atr
 atari800hd.atr

@@ -10,11 +10,14 @@ CHROUT = $ff00
 GETIN  = $ff03
 
 SECTOR_LBA_L = $DF70
-SECTOR_LBA_M = $DF71
+SECTOR_LBA_H = $DF71
+
+SECTOR_DMA_L = $DF72
+SECTOR_DMA_H = $DF73
+
 
 SECTOR_CMD_READ = $DF74
 SECTOR_CMD_WRITE = $DF75
-SECTOR_DATA = $DF76
 
 MEMBASE = $c000   ; Location of the BDOS
 
@@ -245,18 +248,23 @@ zproc entry_SETBANK
     rts
 zendproc
 
-zproc entry_READ
-    jsr change_sectors
-    ldx #$00
-    ldy #0
-    zrepeat
-        lda disk_buffer, x
-        sta (dma), y
-        iny
-        inx
-        cpy #$80
-    zuntil_eq
+zproc entry_READ    
+    ;lda sector_num+1    
+    ;jsr print_hex_number
+    ;lda sector_num+0   
+    ;jsr print_hex_number
 
+    lda sector_num+0
+    sta SECTOR_LBA_L
+    lda sector_num+1
+    sta SECTOR_LBA_H
+    lda dma
+    sta SECTOR_DMA_L
+    lda dma+1
+    sta SECTOR_DMA_H
+
+    lda #$88        // iniate read with DMA
+    sta SECTOR_CMD_READ
     clc
     rts
 zendproc
@@ -264,138 +272,28 @@ zendproc
 ; On entry, A=0 for a normal write; A=1 to always flush to disk.
 
 zproc entry_WRITE
-    pha
-    jsr change_sectors
 
-    ldx #$0 
-    ldy #0
-    zrepeat
-        lda (dma), y
-        sta disk_buffer, x
-        iny
-        inx
-        cpy #$80
-    zuntil_eq
+    lda dma
+    sta SECTOR_DMA_L
+    lda dma+1
+    sta SECTOR_DMA_H
 
-    lda #$80
-    sta buffer_dirty
-
-    pla
-    zif_ne
-        jsr flush_buffered_sector
-    zendif
+    lda sector_num+0
+    ldx sector_num+1
+    stx SECTOR_LBA_H
+    sta SECTOR_LBA_L
+   ; pha
+   ; txa
+   ; jsr print_hex_number
+   ; pla
+   ; jsr print_hex_number
+    lda #$44        // iniate write with DMA
+    sta SECTOR_CMD_WRITE
 
     clc
     rts
+
 zendproc
-
-zproc change_sectors
-    ; If the buffered sector is the one we want, just return.
-    ;lda sector_num+1    
-    ;jsr print_hex_number
-    ;lda sector_num+0
-    ;jsr print_hex_number
-
-    lda sector_num+0
-    cmp buffered_sector+0
-    zif_eq
-        lda sector_num+1
-        cmp buffered_sector+1
-        zif_eq
-            lda sector_num+2
-            cmp buffered_sector+2
-            zif_eq
-                rts
-            zendif
-        zendif
-    zendif
-
-    ; We need to change sectors. Flush the current one?
-
-    jsr flush_buffered_sector
-
-    ; Now read the new one.
-
-    lda sector_num+0
-    sta buffered_sector+0
-    lda sector_num+1
-    sta buffered_sector+1
-    lda sector_num+2
-    sta buffered_sector+2
-
-    jsr buffered_sector_to_lba
-    jmp read_sector
-zendproc
-
-; Compute the current LBA sector number in XA for the buffered sector.
-
-zproc buffered_sector_to_lba
-   ; lda buffered_sector+1    
-   ; jsr print_hex_number
-   ; lda buffered_sector+0
-   ; jsr print_hex_number
-
-    ldx buffered_sector+1    
-    lda buffered_sector+0
-    rts
-zendproc
-
-; Flush the current buffer to disk, if necessary.
-
-zproc flush_buffered_sector
-    lda buffer_dirty
-    zif_mi
-        jsr buffered_sector_to_lba
-        jsr write_sector
-
-        lda #0
-        sta buffer_dirty
-    zendif
-    rts
-zendproc
-
-; Reads a 256-byte sector whose LBA index is in XA.
-
-zproc read_sector
-    sta SECTOR_LBA_L
-    stx SECTOR_LBA_M
-
-    lda #$aa        // iniate read
-    sta SECTOR_CMD_READ
-
-    ldy #$00
-    zrepeat
-        lda SECTOR_DATA
-        sta disk_buffer, y
-        iny
-        cpy #$80
-    zuntil_eq
-
-    rts
-zendproc
-
-; Writes a 256-byte sector whose LBA index is in XA.
-
-zproc write_sector
-   ; pha
-   ; jsr print_hex_number
-   ; pla
-    sta SECTOR_LBA_L
-    stx SECTOR_LBA_M
-    lda #$55        // iniate write
-    sta SECTOR_CMD_WRITE
-
-    ldy #$00
-    zrepeat
-        lda disk_buffer, y
-        sta SECTOR_DATA
-        iny
-        cpy #$80
-    zuntil_eq
-
-
-    rts
-
 
 ; Prints an 8-bit hex number in A.
 zproc print_hex_number
@@ -458,11 +356,6 @@ zproc init_system
 
     lda #0
     sta pending_key
-    sta buffer_dirty
-    lda #$ff
-    sta buffered_sector+0
-    sta buffered_sector+1
-    sta buffered_sector+2
    
     jsr initdrivers
 
@@ -492,8 +385,6 @@ NOINIT
 
 pending_key:     .byte 0 ; pending keypress from system
 sector_num:      .fill 3 ; current absolute sector number
-buffered_sector: .fill 3 ; sector currently in disk buffer
-buffer_dirty:    .fill 1 ; non-zero if sector needs flushing
 
 .global directory_buffer
 directory_buffer: .fill 128
