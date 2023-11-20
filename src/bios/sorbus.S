@@ -6,15 +6,21 @@
 #include "cpm65.inc"
 #include "driver.inc"
 
+; functions for console printing and reading the keyboard
 CHROUT = $ff00
 GETIN  = $ff03
+
+; IO Register for Disk-Access. 
+; Write Sector LBA ( 128 Byte sectors ), Address of the DMA-buffer
+; then trigger the read  ( write 0x55 to SECTOR_CMD_READ ) 
+; or the           write ( write 0x44 to SECTOR_CMD_WRITE ) 
+; DMA-adress and LBA will be auto-incremented, be aware to set them properly before trigger !
 
 SECTOR_LBA_L = $DF70
 SECTOR_LBA_H = $DF71
 
 SECTOR_DMA_L = $DF72
 SECTOR_DMA_H = $DF73
-
 
 SECTOR_CMD_READ = $DF74
 SECTOR_CMD_WRITE = $DF75
@@ -133,14 +139,7 @@ zendproc
 
 zproc entry_SETDMA
     sta dma+0    
-    stx dma+1
-  ;  pha
-  ;  txa
-  ;  jsr print_hex_number
-  ;  pla
-  ;  jsr print_hex_number
-  ;  lda #' '
-  ;  jsr CHROUT
+    stx dma+1  
     clc
     rts
 zendproc
@@ -277,7 +276,6 @@ zproc entry_WRITE
     sta SECTOR_DMA_L
     lda dma+1
     sta SECTOR_DMA_H
-
     lda sector_num+0
     ldx sector_num+1
     stx SECTOR_LBA_H
@@ -363,9 +361,10 @@ zproc init_system
 
 zendproc
 
-loading_msg:
-    .byte 147, 14, 5
+loading_msg:   
     .ascii "CP/M 65 for the Sorbus Computer"
+    .byte 13, 10 
+    .ascii "ported by SvOlli and Benson / TRSI"
     .byte 13, 10 , 0
 
 .data
@@ -378,7 +377,6 @@ mem_end:    .byte $c0
 
 ; DPH for drive 0 (our only drive)
 
-;define_drive dph, 136*10, 1024, 64, 0
 define_drive dph,128*64, 2048, 128, 0
 
 NOINIT
@@ -388,7 +386,7 @@ sector_num:      .fill 3 ; current absolute sector number
 
 .global directory_buffer
 directory_buffer: .fill 128
-disk_buffer: .fill 256
+
 
 ; vim: sw=4 ts=4 et ft=asm
 
