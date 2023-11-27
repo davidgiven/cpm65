@@ -9,6 +9,8 @@
 ; functions for console printing and reading the keyboard
 CHROUT = $ff00
 GETIN  = $ff03
+AUXOUT = $ff06
+AUXIN  = $ff09
 
 ; IO Register for Disk-Access. 
 ; Write Sector LBA ( 128 Byte sectors ), Address of the DMA-buffer
@@ -67,28 +69,51 @@ zendproc
 .global drvtop
 drvtop: .word drv_TTY
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_AUX
+defdriver "AUX", DRVID_AUX, drvstrat_AUX, 0
+ 
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
     pha
-    lda jmptable_lo, y
+    lda tty_jmptable_lo, y
     sta ptr+0
-    lda jmptable_hi, y
+    lda tty_jmptable_hi, y
     sta ptr+1
     pla
     jmp (ptr)
 
-jmptable_lo:
+tty_jmptable_lo:
     .byte tty_const@mos16lo
     .byte tty_conin@mos16lo
     .byte tty_conout@mos16lo
-jmptable_hi:
+tty_jmptable_hi:
     .byte tty_const@mos16hi
     .byte tty_conin@mos16hi
     .byte tty_conout@mos16hi
 zendproc
+
+
+; AUX driver strategy routine.
+; Y=AUX opcode.
+zproc drvstrat_AUX
+    pha
+    lda aux_jmptable_lo, y
+    sta ptr+0
+    lda aux_jmptable_hi, y
+    sta ptr+1
+    pla
+    jmp (ptr)
+
+aux_jmptable_lo:
+    .byte aux_in@mos16lo
+    .byte aux_out@mos16lo
+aux_jmptable_hi:
+    .byte aux_in@mos16hi
+    .byte aux_out@mos16hi
+zendproc
+
 
 ; Blocks and waits for the next keypress; returns it in A.
 
@@ -131,6 +156,20 @@ zproc tty_const
     zendif
 
     lda #$ff
+    clc
+    rts
+zendproc
+
+; Reads and writes the AUX channel
+
+
+zproc aux_in   ; returns with carry set on timeout
+    jsr AUXIN
+    rts
+zendproc
+
+zproc aux_out
+    jsr AUXOUT
     clc
     rts
 zendproc
@@ -179,13 +218,13 @@ zproc entry_SETSEC
 zendproc
 
 zproc entry_GETTPA
-    ;lda mem_base
-    ;ldx mem_end
-    ;jsr print_hex_number
-    ;txa 
-    ;jsr print_hex_number
-    ;lda #'G'
-    ;jsr CHROUT
+  ;  lda mem_base
+  ;  ldx mem_end
+  ;  jsr print_hex_number
+  ;  txa 
+  ;  jsr print_hex_number
+  ;  lda #'G'
+  ;  jsr CHROUT
     lda mem_base
     ldx mem_end
     clc
@@ -193,14 +232,13 @@ zproc entry_GETTPA
 zendproc
 
 zproc entry_SETTPA
-  ;TODO make use of this 
     sta mem_base
     stx mem_end
-   ; jsr print_hex_number
-   ; txa 
-   ; jsr print_hex_number
-   ; lda #'S'
-   ; jsr CHROUT
+  ;  jsr print_hex_number
+  ;  txa 
+  ;  jsr print_hex_number
+  ;  lda #'S'
+  ;  jsr CHROUT
     clc
     rts
 zendproc
@@ -219,31 +257,8 @@ zproc entry_SETZP
     rts
 zendproc
 
-zproc entry_SETBANK
-    cmp #BANK_EXTRA  ; This is for BIOS and CCP
-    zif_eq  
-        ;lda mem_base    ; its from $e000 to $f000    
-        lda #$e8
-        sta mem_base
-        ;lda mem_end    ; its from $e000 to $f000    
-        lda #$f0
-        sta mem_end
-        clc
-        rts
-    zendif
-    cmp #BANK_MAIN  ; This is executing COMs
-    zif_eq  
-        ;lda mem_base    ; its from $0200 to $c000    
-        lda #$02
-        sta mem_base
-        ;lda mem_end    ; its from $0200 to $c000    
-        lda #$c0
-        sta mem_end
-        clc
-        rts
-    zendif
-      
-    sec  ; unknown bank
+zproc entry_SETBANK     
+    sec  ; ignoring the bank
     rts
 zendproc
 
@@ -356,6 +371,8 @@ zproc init_system
     sta pending_key
    
     jsr initdrivers
+    lda #'X'
+    jsr CHROUT    
 
     rts
 
@@ -372,8 +389,13 @@ loading_msg:
 zp_base:    .byte __USERZEROPAGE_START__
 zp_end:     .byte __USERZEROPAGE_END__
 
-mem_base:   .byte $02
-mem_end:    .byte $c0
+
+; Bank_Extra is from $e800 to $f000
+; Bank_Main is from $0200 to $c000
+; subtract $0f00 bytes, that bdos wants to map
+; BDOS is already fixed at $c000
+mem_base:   .byte  $02-$0f
+mem_end:    .byte  $c0
 
 ; DPH for drive 0 (our only drive)
 
