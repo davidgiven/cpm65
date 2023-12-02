@@ -29,6 +29,7 @@ TARGETS = \
 MINIMAL_APPS = \
 	$(OBJDIR)/apps/bedit.com \
 	$(OBJDIR)/apps/capsdrv.com \
+	$(OBJDIR)/apps/cpuinfo.com \
 	$(OBJDIR)/apps/devices.com \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
@@ -47,6 +48,7 @@ APPS = \
 	$(OBJDIR)/third_party/altirrabasic/atbasic.com \
 	$(OBJDIR)/objdump.com \
 	apps/bedit.asm \
+	apps/cpuinfo.asm \
 	apps/dinfo.asm \
 	cpmfs/asm.txt \
 	cpmfs/basic.txt \
