@@ -9,8 +9,9 @@
 ; functions for console printing and reading the keyboard
 CHROUT = $ff00
 GETIN  = $ff03
-AUXOUT = $ff06
-AUXIN  = $ff09
+AUXOUT = $ff00
+AUXIN  = $ff03
+PRINT = $ff06
 
 ; IO Register for Disk-Access. 
 ; Write Sector LBA ( 128 Byte sectors ), Address of the DMA-buffer
@@ -27,7 +28,7 @@ SECTOR_DMA_H = $DF73
 SECTOR_CMD_READ = $DF74
 SECTOR_CMD_WRITE = $DF75
 
-MEMBASE = $c000   ; Location of the BDOS
+MEMBASE = $e800   ; Location of the BDOS
 
 ZEROPAGE
 
@@ -40,6 +41,11 @@ dma:        .word 0    ; current DMA
 1:
     .word 0
 zproc _start
+    jmp cold_start
+signature:
+    .byte 'S','B','C','2','3'   ; mark this as valid rom for sorbus
+
+cold_start:
     ldx #$ff
     txs
     cld
@@ -356,14 +362,13 @@ zproc init_system
     ; Clear memory here ?
 
     ; Print the startup banner (directly with CHROUT).
-
-    ldy #0
-    zloop
-        lda loading_msg, y
-        zbreakif_eq
-        jsr CHROUT
-        iny
-    zendloop
+    jsr PRINT
+loading_msg:
+    .byte 13, 10
+    .ascii "CP/M 65 for the Sorbus Computer"
+    .byte 13, 10
+    .ascii "ported by SvOlli and Benson / TRSI"
+    .byte 13, 10 , 0
 
     ; General initialisation.
 
@@ -371,18 +376,12 @@ zproc init_system
     sta pending_key
    
     jsr initdrivers
-    lda #'X'
-    jsr CHROUT    
 
     rts
 
 zendproc
 
-loading_msg:   
-    .ascii "CP/M 65 for the Sorbus Computer"
-    .byte 13, 10 
-    .ascii "ported by SvOlli and Benson / TRSI"
-    .byte 13, 10 , 0
+
 
 .data
 
@@ -391,15 +390,15 @@ zp_end:     .byte __USERZEROPAGE_END__
 
 
 ; Bank_Extra is from $e800 to $f000
-; Bank_Main is from $0200 to $c000
+; Bank_Main is from $0200 to $d000
 ; subtract $0f00 bytes, that bdos wants to map
-; BDOS is already fixed at $c000
+; BDOS is already fixed at $e800
 mem_base:   .byte  $02-$0f
 mem_end:    .byte  $c0
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph,128*64, 2048, 128, 0
+define_drive dph,32768, 2048, 1024, 256
 
 NOINIT
 
