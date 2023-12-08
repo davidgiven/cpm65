@@ -471,13 +471,13 @@ h4:
     and #0x0f ; %00001111
     ora #'0'
     cmp #'9'+1
-	zif_cs
-		adc #6
-	zendif
-   	pha
-	jsr CHROUT
-	pla
-	rts
+    zif_cs
+        adc #6
+    zendif
+    pha
+    jsr CHROUT
+    pla
+    rts
 zendproc
 
 zproc get_status
@@ -588,7 +588,7 @@ zproc print
 
         jsr topetscii
         jsr CHROUT
-        
+
         iny
     zendloop
     rts

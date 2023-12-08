@@ -53,7 +53,7 @@ zproc main
     adc cpm_header + COMHDR_ZP_USAGE
     ldy #BIOS_SETZP
     jsr callbios
-    
+
     jsr bios_GETTPA
     clc
     adc cpm_header + COMHDR_TPA_USAGE
@@ -120,7 +120,7 @@ entry_EXIT:
     ldy #COMHDR_ZP_USAGE
     sbc (directory_buffer), y
     pha
-    
+
     jsr bios_GETTPA         ; top of TPA page number in X
     txa
     sec
@@ -158,7 +158,7 @@ entry_EXIT:
     sta temp+0
     pla
     sta temp+1
-    
+
     ldy #COMHDR_BDOS
     lda #<ENTRY
     sta (temp), y
@@ -399,7 +399,7 @@ zproc internal_CONOUT
     zendif
 continue$:
     pla
-        
+
     ; Actually print it.
 
     jsr bios_CONOUT
@@ -526,7 +526,7 @@ zproc entry_READLINE
         zendif
         ldx #0
         stx buffered_key
-        
+
         ; Delete?
 
         cmp #8
@@ -544,7 +544,7 @@ zproc entry_READLINE
             zendif
             zcontinue
         zendif
-        
+
         ; Reboot?
 
         cmp #3
@@ -649,7 +649,7 @@ zproc entry_RESET
         sta bdos_state_start, y
         dey
     zuntil_mi
-    
+
     ; Log in drive A.
 
     ; A is 0
@@ -812,7 +812,7 @@ zproc entry_PARSEFCB
 
         dex
     zuntil_eq
-        
+
     ; Discard any remaining filename characters.
 
     lda (param), y          ; get a character
@@ -954,7 +954,7 @@ zproc internal_OPENFILE
     zendif
     rts
 zendproc
-    
+
 ; Creates a file; the FCB is in param.
 ; Returns C is error; the code is in A.
 
@@ -997,13 +997,13 @@ zproc internal_CREATEFILE
         iny
         cpy #FCB_AL+16
     zuntil_eq
-    
+
     ; Set the user code correctly.
 
     lda current_user
     ldy #FCB_DR
     sta (current_dirent), y
-    
+
     ; We might have extended the directory, so make sure
     ; the count is updated.
 
@@ -1055,7 +1055,7 @@ zproc convert_user_fcb
 
     lda current_user
     sta (param), y              ; update FCB
-    
+
     jmp select_active_drive
 zendproc
 
@@ -1105,9 +1105,9 @@ zproc internal_CLOSEFILE
 
     lda #1
     jsr write_sector            ; sector number remains set up from find_first
-    
+
     ; Mark the FCB as modified and exit.
-    
+
     jsr fcb_is_not_modified
     clc
     rts
@@ -1245,7 +1245,7 @@ zproc internal_READSEQUENTIAL
     zif_eq
         cmp #$80                ; is this extent full?
         bne eof$                ; no, we've reached the end of the file
-            
+
         ; Move to the next extent.
 
         jsr close_extent_and_move_to_next_one
@@ -1256,7 +1256,7 @@ zproc internal_READSEQUENTIAL
         jsr internal_OPENFILE
         bcs eof$
     zendif
-    
+
     jsr get_fcb_block           ; get disk block value in XA
     beq eof$
     jsr get_sequential_sector_number
@@ -1567,7 +1567,7 @@ zproc entry_WRITESEQUENTIAL
     zendif
 
     jsr seek_to_block_and_create
-    
+
     ; Move the FCB on to the next record, for next time.
 
     ldy #FCB_CR
@@ -1636,7 +1636,7 @@ zproc seek_to_block_and_create
                         inc current_sector+2
                     zendif
                 zendif
-                
+
                 lda current_sector+0
                 and block_mask
             zuntil_eq
@@ -1681,7 +1681,7 @@ zproc entry_WRITERANDOM
             sec
             rts
         zendif
-            
+
         ; Could not open new extent --- it must not exist.
 
         jsr internal_CREATEFILE
@@ -2116,13 +2116,13 @@ zproc find_next
 
     clc
     rts
-    
+
 no_more_files:
     jsr reset_dir_pos
     sec
     rts
 zendproc
-    
+
 ; Check that the currently opened FCB is r/w.
 
 zproc check_fcb_writable
@@ -2309,7 +2309,7 @@ zproc read_dir_entry
         jsr read_sector
         lda #0
     zendif
-    
+
     clc
     adc directory_buffer+0
     sta current_dirent+0
@@ -2351,7 +2351,7 @@ zproc update_bitmap_for_dirent
 
         lda blocks_on_disk+1
         bne bigdisk
-        
+
         lda (current_dirent), y
         sta temp+0              ; store low bye
         lda #0
@@ -2627,7 +2627,7 @@ zproc select_active_drive
     zendif
     rts
 zendproc
-    
+
 ; Checks that the current disk isn't in the read-only vector.
 
 zproc check_disk_writable
@@ -2671,7 +2671,7 @@ shift_exit:
     ldx temp+1
     rts
 zendproc
-    
+
 ; Shifts XA left Y bits.
 ; Uses temp. Leaves the shifted value in temp+0.
 
@@ -2735,7 +2735,7 @@ zproc rotatel8
     zendloop
     rts
 zendproc
-    
+
 ; Calls the BIOS entrypoint.
 
 callbios:

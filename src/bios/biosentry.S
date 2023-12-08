@@ -15,7 +15,7 @@
 
 ; BIOS entry point. Parameter is in XA, function in Y.
 zproc biosentry
-	jmpdispatch biostable_lo, biostable_hi
+    jmpdispatch biostable_lo, biostable_hi
 
 biostable_lo:
     jmptablo entry_CONST
@@ -32,8 +32,8 @@ biostable_lo:
     jmptablo entry_GETZP
     jmptablo entry_SETZP
     jmptablo entry_SETBANK
-	jmptablo entry_ADDDRV
-	jmptablo entry_FINDDRV
+    jmptablo entry_ADDDRV
+    jmptablo entry_FINDDRV
 biostable_hi:
     jmptabhi entry_CONST
     jmptabhi entry_CONIN
@@ -49,127 +49,127 @@ biostable_hi:
     jmptabhi entry_GETZP
     jmptabhi entry_SETZP
     jmptabhi entry_SETBANK
-	jmptabhi entry_ADDDRV
-	jmptabhi entry_FINDDRV
+    jmptabhi entry_ADDDRV
+    jmptabhi entry_FINDDRV
 zendproc
 
 zproc entry_ADDDRV
-	sta ptr+0			; save new driver address
-	stx ptr+1
+    sta ptr+0           ; save new driver address
+    stx ptr+1
 
-	ldy #DRVSTRUCT_NEXT
-	lda drvtop+0		; get old driver address
-	sta (ptr), y
-	iny
-	lda drvtop+1
-	sta (ptr), y
+    ldy #DRVSTRUCT_NEXT
+    lda drvtop+0        ; get old driver address
+    sta (ptr), y
+    iny
+    lda drvtop+1
+    sta (ptr), y
 
-	ldy ptr+0			; update address
-	sty drvtop+0
-	ldy ptr+1
-	sty drvtop+1
+    ldy ptr+0           ; update address
+    sty drvtop+0
+    ldy ptr+1
+    sty drvtop+1
 
-	pha
-	txa
-	pha
-	jsr initdrivers
-	pla
-	tax
-	pla
-	rts
+    pha
+    txa
+    pha
+    jsr initdrivers
+    pla
+    tax
+    pla
+    rts
 zendproc
 
 zproc entry_FINDDRV
-	sta ptr1+0
-	stx ptr1+1
+    sta ptr1+0
+    stx ptr1+1
 
-	ora ptr1+1
-	zif_eq
-		; input ID is 0; return first driver structure
+    ora ptr1+1
+    zif_eq
+        ; input ID is 0; return first driver structure
 
-		lda drvtop+0
-		ldx drvtop+1
-		clc
-		rts
-	zendif
+        lda drvtop+0
+        ldx drvtop+1
+        clc
+        rts
+    zendif
 
-	lda drvtop+0
-	sta ptr+0
-	lda drvtop+1
-	sta ptr+1
+    lda drvtop+0
+    sta ptr+0
+    lda drvtop+1
+    sta ptr+1
 
-	zloop
-		; Stop if no more drivers.
+    zloop
+        ; Stop if no more drivers.
 
-		lda ptr+0
-		ora ptr+1
-		zif_eq
-			sec
-			rts
-		zendif
+        lda ptr+0
+        ora ptr+1
+        zif_eq
+            sec
+            rts
+        zendif
 
-		; Check this driver's ID.
+        ; Check this driver's ID.
 
-		ldy #DRVSTRUCT_ID
-		lda (ptr), y
-		cmp ptr1+0
-		zif_eq
-			iny
-			lda (ptr), y
-			cmp ptr1+1
-			zif_eq
-				; Found a matching driver, so return its strategy routine.
+        ldy #DRVSTRUCT_ID
+        lda (ptr), y
+        cmp ptr1+0
+        zif_eq
+            iny
+            lda (ptr), y
+            cmp ptr1+1
+            zif_eq
+                ; Found a matching driver, so return its strategy routine.
 
-				iny
-				iny
-				lda (ptr), y
-				tax
-				dey
-				lda (ptr), y
-				clc
-				rts
-			zendif
-		zendif
+                iny
+                iny
+                lda (ptr), y
+                tax
+                dey
+                lda (ptr), y
+                clc
+                rts
+            zendif
+        zendif
 
-		; This driver doesn't match, so continue on down the list.
+        ; This driver doesn't match, so continue on down the list.
 
-		ldy #DRVSTRUCT_NEXT
-		lda (ptr), y
-		tax
-		iny
-		lda (ptr), y
-		sta ptr+1
-		stx ptr+0
-	zendloop
+        ldy #DRVSTRUCT_NEXT
+        lda (ptr), y
+        tax
+        iny
+        lda (ptr), y
+        sta ptr+1
+        stx ptr+0
+    zendloop
 zendproc
 
 ; Recache driver pointers.
 
 zproc initdrivers
-	lda #<DRVID_TTY
-	ldx #>DRVID_TTY
-	jsr entry_FINDDRV
-	sta TTY+1
-	stx TTY+2
-	rts
+    lda #<DRVID_TTY
+    ldx #>DRVID_TTY
+    jsr entry_FINDDRV
+    sta TTY+1
+    stx TTY+2
+    rts
 zendproc
 
 ; TTY routine implementations which delegate to a driver.
 
 zproc entry_CONST
-	ldy #TTY_CONST
-	jmp TTY
+    ldy #TTY_CONST
+    jmp TTY
 zendproc
 
 zproc entry_CONIN
-	ldy #TTY_CONIN
-	jmp TTY
+    ldy #TTY_CONIN
+    jmp TTY
 zendproc
 
 zproc entry_CONOUT
-	ldy #TTY_CONOUT
+    ldy #TTY_CONOUT
 zendproc
-	; fall through
+    ; fall through
 zproc TTY
-	jmp 0xffff
+    jmp 0xffff
 zendproc

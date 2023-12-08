@@ -1007,7 +1007,8 @@ zproc entry_SETTPA
 #ifdef ATARI_XL
     ldy mem_bank
     sta mem_base,y
-    stx mem_end,y
+    txa                 ; BUG: stx mem_end,y - invalid 6502 instruction
+    sta mem_end,y
 #else
     sta mem_base
     stx mem_end

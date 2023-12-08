@@ -466,7 +466,7 @@ zproc init_control_block
         ror osgbpb_block+9, x
         dex
     zuntil_mi
-    
+
     rts
 zendproc
 

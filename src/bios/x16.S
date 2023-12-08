@@ -51,11 +51,11 @@ dma: .fill 2 ; current DMA address
     .word 0
 .global _start
 _start:
-	; Initialise.
+    ; Initialise.
 
-	clc
-	lda #1
-	jsr SCREEN_MODE
+    clc
+    lda #1
+    jsr SCREEN_MODE
 
     ; Print the startup banner (directly with CHROUT).
 
@@ -67,35 +67,35 @@ _start:
         iny
     zendloop
 
-	; Relocate the high-memory part of the BIOS into, um, high memory.
+    ; Relocate the high-memory part of the BIOS into, um, high memory.
 
-	1:
-		srcp = . + 1
-		lda __bios_data_start
-		destp = . + 1
-		sta __bios_start
+    1:
+        srcp = . + 1
+        lda __bios_data_start
+        destp = . + 1
+        sta __bios_start
 
-		inc srcp+0
-		zif_eq
-			inc srcp+1
-		zendif
+        inc srcp+0
+        zif_eq
+            inc srcp+1
+        zendif
 
-		inc destp+0
-		zif_eq
-			inc destp+1
-		zendif
+        inc destp+0
+        zif_eq
+            inc destp+1
+        zendif
 
-		lda destp+0
-		cmp #<__bios_end
-		bne 1b
+        lda destp+0
+        cmp #<__bios_end
+        bne 1b
 
-		lda destp+1
-		cmp #>__bios_end
-		bne 1b
+        lda destp+1
+        cmp #>__bios_end
+        bne 1b
 
-	; BIOS initialisation.
+    ; BIOS initialisation.
 
-	jsr initdrivers
+    jsr initdrivers
 
     ; Open the BDOS file (using low level disk access).
 
@@ -127,7 +127,7 @@ _start:
     jsr TALKSA
 
     ldy #0
-	sty STATUS
+    sty STATUS
     zrepeat
         jsr ACPTR       ; read a byte
         sta (ptr), y
@@ -137,7 +137,7 @@ _start:
             inc ptr+1
         zendif
 
-		lda STATUS		; check for EOF
+        lda STATUS      ; check for EOF
     zuntil_ne
     ; The drive will UNTALK automatically on EOF.
 
@@ -147,7 +147,7 @@ _start:
     jsr SECOND
     jsr UNLSN
 
-	; Open the CPMFS file.
+    ; Open the CPMFS file.
 
     lda #8
     jsr LISTEN
@@ -169,7 +169,7 @@ _start:
     lda #>__TPA1_START__
     ldx #__ZP1_START__
     jsr entry_RELOCATE
-	
+
     ; Compute the entry address and jump.
 
     lda #>__TPA1_START__
@@ -304,33 +304,33 @@ zendproc
 ; XA is a pointer to a three-byte sector number.
 
 zproc entry_SETSEC
-	sta ptr+0
-	stx ptr+1
+    sta ptr+0
+    stx ptr+1
 
-	ldy #2
-	lda (ptr), y
-	lsr a
-	sta cpmfs_offset+3
+    ldy #2
+    lda (ptr), y
+    lsr a
+    sta cpmfs_offset+3
 
-	dey
-	lda (ptr), y
-	ror a
-	sta cpmfs_offset+2
+    dey
+    lda (ptr), y
+    ror a
+    sta cpmfs_offset+2
 
-	dey
-	lda (ptr), y
-	ror a
-	sta cpmfs_offset+1
+    dey
+    lda (ptr), y
+    ror a
+    sta cpmfs_offset+1
 
-	lda #0
-	ror a
-	sta cpmfs_offset+0
+    lda #0
+    ror a
+    sta cpmfs_offset+0
     clc
     rts
 zendproc
 
 zproc entry_GETTPA
-	ldy current_bank
+    ldy current_bank
     lda mem_base, y
     ldx mem_end, y
     clc
@@ -338,15 +338,16 @@ zproc entry_GETTPA
 zendproc
 
 zproc entry_SETTPA
-	ldy current_bank
+    ldy current_bank
     sta mem_base, y
-    stx mem_end, y
+    txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
+    sta mem_end, y
     clc
     rts
 zendproc
 
 zproc entry_GETZP
-	ldy current_bank
+    ldy current_bank
     lda zp_base, y
     ldx zp_end, y
     clc
@@ -354,7 +355,7 @@ zproc entry_GETZP
 zendproc
 
 zproc entry_SETZP
-	ldy current_bank
+    ldy current_bank
     sta zp_base, y
     stx zp_end, y
     clc
@@ -362,84 +363,84 @@ zproc entry_SETZP
 zendproc
 
 zproc entry_SETBANK
-	sta current_bank
+    sta current_bank
     rts
 zendproc
 
 zproc entry_READ
-	jsr seek_to_sector
+    jsr seek_to_sector
 
-	; Read the data.
+    ; Read the data.
 
-	lda #8					; start reading from file channel
-	jsr TALK
-	lda #$62				; channel 2
-	jsr TALKSA
+    lda #8                  ; start reading from file channel
+    jsr TALK
+    lda #$62                ; channel 2
+    jsr TALKSA
 
-	ldy #0
-	zrepeat
-		jsr ACPTR
-		sta (dma), y
-		iny
-		cpy #$80
-	zuntil_eq
+    ldy #0
+    zrepeat
+        jsr ACPTR
+        sta (dma), y
+        iny
+        cpy #$80
+    zuntil_eq
 
-	jsr UNTALK
-	clc
-	rts
+    jsr UNTALK
+    clc
+    rts
 zendproc
 
 zproc entry_WRITE
-	jsr seek_to_sector
+    jsr seek_to_sector
 
-	; Write the data.
+    ; Write the data.
 
-	lda #8					; start writing to file channel
-	jsr LISTEN
-	lda #$62				; channel 2
-	jsr SECOND
+    lda #8                  ; start writing to file channel
+    jsr LISTEN
+    lda #$62                ; channel 2
+    jsr SECOND
 
-	ldy #0
-	zrepeat
-		lda (dma), y
-		jsr CIOUT
-		iny
-		cpy #$80
-	zuntil_eq
+    ldy #0
+    zrepeat
+        lda (dma), y
+        jsr CIOUT
+        iny
+        cpy #$80
+    zuntil_eq
 
-	jsr UNLSN
-	clc
-	rts
+    jsr UNLSN
+    clc
+    rts
 zendproc
 
 ; Seeks the CPMFS file to the current sector.
 
 zproc seek_to_sector
-    lda #8					; start writing to command channel
+    lda #8                  ; start writing to command channel
     jsr LISTEN
-    lda #$6f				; channel 15
+    lda #$6f                ; channel 15
     jsr SECOND
 
-	lda #'P'				; seek command
-	jsr CIOUT
+    lda #'P'                ; seek command
+    jsr CIOUT
 
-	lda #2					; seek on channel 2
-	jsr CIOUT
+    lda #2                  ; seek on channel 2
+    jsr CIOUT
 
-	ldy #0					; send file offset
-	zrepeat
-		lda cpmfs_offset, y
-		jsr CIOUT
-		iny
-		cpy #4
-	zuntil_eq
+    ldy #0                  ; send file offset
+    zrepeat
+        lda cpmfs_offset, y
+        jsr CIOUT
+        iny
+        cpy #4
+    zuntil_eq
 
     jmp UNLSN
 zendproc
 
 .data
 
-pending_key:	  .byte 0
+pending_key:      .byte 0
 current_bank:     .byte 0
 
 zp_base:    .byte __ZP0_START__,          __ZP1_START__
