@@ -60,6 +60,7 @@ SCREEN_APPS = \
 	$(OBJDIR)/apps/cls.com \
 	apps/cls.asm \
 	$(OBJDIR)/qe.com \
+	$(OBJDIR)/life.com \
 
 LIBCPM_OBJS = \
 	$(OBJDIR)/lib/printi.o \
