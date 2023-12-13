@@ -20,6 +20,8 @@ EXT ?=
 
 include $(OBJ)/build.mk
 
+.SECONDARY:
+
 .PHONY: update-ab
 update-ab:
 	@echo "Press RETURN to update ab from the repository, or CTRL+C to cancel." \
