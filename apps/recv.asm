@@ -25,7 +25,7 @@
 count=ret
 endcondx=tmp+3
 
-.zp drvaux, 2 
+.zp drvaux, 2
 
 
 SOH = 1         \     H001          Start Of Header
@@ -55,11 +55,8 @@ start:
     jsr BIOS
     sta drvaux+0
     stx drvaux+1
-  
 
-    
-
-    bcc found_aux 
+    bcc found_aux
     .label aux_not_found
     lda #<aux_not_found
     ldx #>aux_not_found
@@ -69,7 +66,7 @@ found_aux:
     .label aux_found
     lda #<aux_found
     ldx #>aux_found
-    jsr print_string    
+    jsr print_string
 
     lda drvaux+1
     jsr print_hex_number
@@ -77,9 +74,9 @@ found_aux:
     jsr print_hex_number
 
     lda #'\r'
-    jsr putchar    
+    jsr putchar
     lda #'\n'
-    jsr putchar  
+    jsr putchar
 
     lda cpm_fcb+1
     cmp #' '
@@ -98,20 +95,20 @@ found_aux:
         ldx #>cant_open_file
         jmp print_string    \ exits
     .zendif
-    
+
     .label start_transmission
     lda #<start_transmission
     ldx #>start_transmission
-    jsr print_string    
+    jsr print_string
 
     jsr aux_open
 
 
-mainloop: 
+mainloop:
 
 
     jsr receive_file
-   \ bcs mainloop    
+   \ bcs mainloop
     lda #<cpm_fcb
     ldx #>cpm_fcb
     ldy #BDOS_CLOSE_FILE
@@ -125,21 +122,21 @@ mainloop:
 
 
 receive_file:
-    lda #200   
+    lda #200
     sta blkwaiter
     lda #0
     sta blkcnt
 
-getblock:      
+getblock:
     lda #NAK        \ start transmission
-getblock2:    
+getblock2:
     jsr putaux
     lda #0
     sta offset
     jsr getblockchar
     bcs no_char
     cmp #SOH
-    beq got_header 
+    beq got_header
     cmp #EOT
     beq end_of_tranmission
     cmp #CAN
@@ -150,7 +147,7 @@ no_char:
     jsr putchar
     lda blkwaiter
     beq abort_transmission
-    jmp getblock    
+    jmp getblock
 
 end_of_tranmission:
     lda #ACK
@@ -160,7 +157,7 @@ end_of_tranmission:
     .label transmission_done
     lda #<transmission_done
     ldx #>transmission_done
-    jsr print_string  
+    jsr print_string
     clc
     rts
 
@@ -169,7 +166,7 @@ abort_transmission:
     .label transmission_stopped
     lda #<transmission_stopped
     ldx #>transmission_stopped
-    jsr print_string   
+    jsr print_string
     sec
     rts
 
@@ -181,14 +178,14 @@ got_header:
     sta blkcnt
 
 got_blkcnt:
-    jsr getblockchar    
+    jsr getblockchar
     eor #$ff
     cmp blkcnt
-    beq got_invblkcnt    
+    beq got_invblkcnt
     jmp getblock     \ retry transmission
 
 got_invblkcnt:
-    jsr getblockchar    
+    jsr getblockchar
     ldy offset
     sta buffer,y
     clc
@@ -200,39 +197,34 @@ got_invblkcnt:
     bne got_invblkcnt
 
 got_block:
-    jsr getblockchar    
+    jsr getblockchar
     cmp checksum
     bne getblock    \ retransmit block
     jsr write_buffer
-    lda #ACK        \ confirm block 
+    lda #ACK        \ confirm block
     jmp getblock2
 
 
 chrwait: .byte 0,0
 
-getblockchar:       
+getblockchar:
     lda #0
     sta chrwait
     sta chrwait+1
-getblockchar2:    
+getblockchar2:
     jsr getaux
     .zif cs
        inc chrwait
        lda chrwait
-       bne getblockchar2                   
+       bne getblockchar2
        inc chrwait+1
        lda chrwait+1
        cmp #$09
-       bne getblockchar2                   
+       bne getblockchar2
        lda #0
-       sec 
+       sec
        rts
-    .zendif    
-   
- 
-    \jsr print_hex_number
-    \ Abort : 18181818080808
-    \ get#98,a$:a=asc(a$+chr$(0)):ifa<>1anda<>4anda<>24then540
+    .zendif
 
     rts
 
@@ -251,11 +243,11 @@ write_buffer:
 
 
 create_file_from_fcb:
-    
+
     .label writing_to
     lda #<writing_to
     ldx #>writing_to
-    jsr print_string    
+    jsr print_string
 
     jsr print_fcb
 
@@ -266,7 +258,6 @@ create_file_from_fcb:
     ldx #>cpm_fcb
     ldy #BDOS_MAKE_FILE
     jsr BDOS
-      
     rts
 
 aux_open:
@@ -347,9 +338,9 @@ print_fcb:
     .zendif
 
     lda #'\r'
-    jsr putchar    
+    jsr putchar
     lda #'\n'
-    jsr putchar  
+    jsr putchar
     rts
 
 
@@ -372,13 +363,13 @@ print_fcb:
     jsr h4
     pla
 h4:
-    and #0x0f 
+    and #0x0f
     ora #'0'
     cmp #'9'+1
 	.zif cs
 		adc #6
 	.zendif
-   	pha
+    pha
     jsr putchar
 	pla
 	rts

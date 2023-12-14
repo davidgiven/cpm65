@@ -254,7 +254,7 @@ sorbus: sorbus.prg sorbus.bin
 sorbus.prg: $(OBJDIR)/sorbus.exe
 	@cp $(OBJDIR)/sorbus.exe sorbus.prg
 
-$(OBJDIR)/sorbus.exe: 
+$(OBJDIR)/sorbus.exe:
 sorbus.bin: $(OBJDIR)/sorbus.exe $(OBJDIR)/bdos.sys Makefile $(APPS) $(OBJDIR)/ccp.sys \
 		$(OBJDIR)/mkcombifs $(OBJDIR)/generic-1m-cpmfs.img
 	@rm -f $@

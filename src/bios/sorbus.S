@@ -15,10 +15,10 @@ UART_WRITE   = $DFFC; write to uart output
 UART_WRITE_Q = $DFFD; can be $00-$7f in normal operation
 
 
-; IO Register for Disk-Access. 
+; IO Register for Disk-Access.
 ; Write Sector LBA ( 128 Byte sectors ), Address of the DMA-buffer
-; then trigger the read  ( write 0x55 to SECTOR_CMD_READ ) 
-; or the           write ( write 0x44 to SECTOR_CMD_WRITE ) 
+; then trigger the read  ( write 0x55 to SECTOR_CMD_READ )
+; or the           write ( write 0x44 to SECTOR_CMD_WRITE )
 ; DMA-adress and LBA will be auto-incremented, be aware to set them properly before trigger !
 
 SECTOR_LBA_L = $DF70
@@ -53,7 +53,7 @@ cold_start:
     cld
 
     jsr init_system
-  
+
     ; Relocate the BDOS.
 
     lda #>MEMBASE
@@ -79,7 +79,7 @@ drvtop: .word drv_TTY
 
 defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_AUX
 defdriver "AUX", DRVID_AUX, drvstrat_AUX, 0
- 
+
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -162,7 +162,6 @@ zproc tty_conout
         jsr CHROUT
         lda #8
     zendif
-    
     jsr CHROUT
     clc
     rts
@@ -210,8 +209,8 @@ zendproc
 ; Sets the current DMA address.
 
 zproc entry_SETDMA
-    sta dma+0    
-    stx dma+1  
+    sta dma+0
+    stx dma+1
     clc
     rts
 zendproc
@@ -254,7 +253,7 @@ zproc entry_GETTPA
   ;  lda mem_base
   ;  ldx mem_end
   ;  jsr print_hex_number
-  ;  txa 
+  ;  txa
   ;  jsr print_hex_number
   ;  lda #'G'
   ;  jsr CHROUT
@@ -268,7 +267,7 @@ zproc entry_SETTPA
     sta mem_base
     stx mem_end
   ;  jsr print_hex_number
-  ;  txa 
+  ;  txa
   ;  jsr print_hex_number
   ;  lda #'S'
   ;  jsr CHROUT
@@ -282,7 +281,7 @@ zproc entry_GETZP
     clc
     rts
 zendproc
- 
+
 zproc entry_SETZP
     sta zp_base
     stx zp_end
@@ -290,15 +289,15 @@ zproc entry_SETZP
     rts
 zendproc
 
-zproc entry_SETBANK     
+zproc entry_SETBANK
     sec  ; ignoring the bank
     rts
 zendproc
 
-zproc entry_READ    
-    ;lda sector_num+1    
+zproc entry_READ
+    ;lda sector_num+1
     ;jsr print_hex_number
-    ;lda sector_num+0   
+    ;lda sector_num+0
     ;jsr print_hex_number
 
     lda sector_num+0
@@ -357,7 +356,7 @@ h4:
 	zif_cs
 		adc #6
 	zendif
-   	pha
+    pha
 	jsr CHROUT
 	pla
 	rts
@@ -375,10 +374,7 @@ zproc print
     zloop
         lda (ptr), y
         zbreakif_eq
-
-        
         jsr CHROUT
-        
         iny
     zendloop
     rts
@@ -402,7 +398,6 @@ zproc init_system
 
     lda #0
     sta pending_key
-   
     jsr initdrivers
 
     rts
