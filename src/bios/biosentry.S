@@ -182,6 +182,16 @@ zendproc
 
 ; TTY routine implementations which delegate to a driver.
 
+zproc entry_AUXOPEN
+	ldy #AUX_OPEN
+	jmp AUX
+zendproc
+
+zproc entry_AUXCLOSE
+	ldy #AUX_CLOSE
+	jmp AUX
+zendproc
+
 
 zproc entry_AUXIN
 	ldy #AUX_IN

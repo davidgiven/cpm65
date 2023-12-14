@@ -6,12 +6,14 @@
 #include "cpm65.inc"
 #include "driver.inc"
 
-; functions for console printing and reading the keyboard
-CHROUT = $ff00
-GETIN  = $ff03
-AUXOUT = $ff00
-AUXIN  = $ff03
-PRINT = $ff06
+
+; IO Register for Console Access
+
+UART_READ    = $DFFA; read from uart input
+UART_READ_Q  = $DFFB; can be $00-$7f in normal operation
+UART_WRITE   = $DFFC; write to uart output
+UART_WRITE_Q = $DFFD; can be $00-$7f in normal operation
+
 
 ; IO Register for Disk-Access. 
 ; Write Sector LBA ( 128 Byte sectors ), Address of the DMA-buffer
@@ -115,9 +117,13 @@ zproc drvstrat_AUX
 aux_jmptable_lo:
     .byte aux_in@mos16lo
     .byte aux_out@mos16lo
+    .byte aux_open@mos16lo
+    .byte aux_close@mos16lo
 aux_jmptable_hi:
     .byte aux_in@mos16hi
     .byte aux_out@mos16hi
+    .byte aux_open@mos16hi
+    .byte aux_close@mos16hi
 zendproc
 
 
@@ -138,12 +144,25 @@ zproc tty_conin
     zif_eq
         lda #8
     zendif
+    cmp #$7f         ; Backspace
+    zif_eq
+        lda #8
+    zendif
 
     clc
     rts
 zendproc
 
 zproc tty_conout
+    cmp #$7f         ; Backspace
+    zif_eq
+        lda #8
+        jsr CHROUT
+        lda #20
+        jsr CHROUT
+        lda #8
+    zendif
+    
     jsr CHROUT
     clc
     rts
@@ -167,15 +186,23 @@ zproc tty_const
 zendproc
 
 ; Reads and writes the AUX channel
-
-
-zproc aux_in   ; returns with carry set on timeout
-    jsr AUXIN
+zproc aux_open   ; switch off cr/lf translation
+    lda #$00
+    sta UART_READ  ; Write parameter to the read-register , hmm
+    rts
+zendproc
+zproc aux_close   ; switch on cr/lf translation
+    lda #$01
+    sta UART_READ  ; Write parameter to the read-register , hmm
     rts
 zendproc
 
+zproc aux_in   ; returns with carry set on timeout
+    jmp GETIN
+zendproc
+
 zproc aux_out
-    jsr AUXOUT
+    jsr CHROUT
     clc
     rts
 zendproc
@@ -362,13 +389,14 @@ zproc init_system
     ; Clear memory here ?
 
     ; Print the startup banner (directly with CHROUT).
-    jsr PRINT
-loading_msg:
-    .byte 13, 10
-    .ascii "CP/M 65 for the Sorbus Computer"
-    .byte 13, 10
-    .ascii "ported by SvOlli and Benson / TRSI"
-    .byte 13, 10 , 0
+
+    ldy #0
+    zloop
+        lda loading_msg, y
+        zbreakif_eq
+        jsr CHROUT
+        iny
+    zendloop
 
     ; General initialisation.
 
@@ -377,6 +405,46 @@ loading_msg:
    
     jsr initdrivers
 
+    rts
+
+loading_msg:
+    .byte 13, 10
+    .ascii "CP/M 65 for the Sorbus Computer"
+    .byte 13, 10
+    .ascii "ported by SvOlli and Benson / TRSI"
+    .byte 10
+    .ascii "original code by David Given"
+    .byte 13, 10 , 0
+
+zendproc
+
+
+;-------------------------------------------------------------------------
+;  Subroutine to print a character to the terminal
+;-------------------------------------------------------------------------
+
+zproc CHROUT
+   bit   UART_WRITE_Q
+   bmi   CHROUT
+   sta   UART_WRITE
+   rts
+
+zendproc
+
+;-------------------------------------------------------------------------
+;  Subroutine to fetch a character from the terminal
+;-------------------------------------------------------------------------
+
+
+zproc GETIN
+    lda   UART_READ_Q ; check input
+    bne   read_key ; no input -> return 0
+    sec
+    rts
+
+read_key:
+    lda   UART_READ      ; get key
+    clc
     rts
 
 zendproc

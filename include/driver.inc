@@ -42,6 +42,9 @@ drv_\name:
 
 #define AUX_IN  0  /* exit: C if no char pending, !C char in A */
 #define AUX_OUT  1 /* exit: A=key */
+#define AUX_OPEN  2 /*Open AUX channel */
+#define AUX_CLOSE 3 /* Close AUX channel */
+
 
 
 ; SCREEN driver endpoints
