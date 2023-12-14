@@ -158,7 +158,7 @@ zproc tty_conout
     zif_eq
         lda #8
         jsr CHROUT
-        lda #20
+        lda #32
         jsr CHROUT
         lda #8
     zendif
