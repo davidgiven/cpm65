@@ -1,6 +1,7 @@
 from build.ab import normalrule
 from tools.build import mkdfs, mkcpmfs
 from build.llvm import llvmrawprogram
+from config import APPS
 
 llvmrawprogram(
     name="bios",
@@ -9,7 +10,7 @@ llvmrawprogram(
     linkscript="./bbcmicro.ld",
 )
 
-mkcpmfs(name="cpmfs", format="bbc192", items={"0:ccp.sys": "src+ccp"})
+mkcpmfs(name="cpmfs", format="bbc192", items={"0:ccp.sys": "src+ccp"} | APPS)
 
 mkdfs(
     name="diskimage",
