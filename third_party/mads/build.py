@@ -6,7 +6,7 @@ normalrule(
     name="mads",
     ins=["./mads.pas"],
     outs=["mads"],
-    commands=["$(FPC) -Mdelphi -v0 -Os {ins[0]} -o{outs[0]}"],
+    commands=["chronic $(FPC) -Mdelphi -Os {ins[0]} -o{outs[0]}"],
     label="FREEPASCAL",
 )
 

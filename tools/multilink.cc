@@ -4,12 +4,20 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
+#include <unistd.h>
 #include <fmt/format.h>
 #include <filesystem>
 #include <vector>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+
+static std::string outfilename;
+static std::string corefilename;
+static std::string zpfilename;
+static std::string memfilename;
+static bool verbose = false;
 
 template <typename... T>
 void error(fmt::format_string<T...> fmt, T&&... args)
@@ -93,38 +101,76 @@ unsigned roundup(unsigned value)
     return (value + 127) & ~127;
 }
 
+static void syntaxError()
+{
+    fmt::print(stderr,
+        "Usage: multilink -o <outfile> <corefile> <zpfile> <memfile>\n");
+    exit(1);
+}
+
+static void parseArguments(int argc, char* const* argv)
+{
+    for (;;)
+    {
+        switch (getopt(argc, argv, "vo:"))
+        {
+            case -1:
+                if (!argv[optind + 0] || !argv[optind + 1] || !argv[optind + 2])
+                    syntaxError();
+
+                corefilename = argv[optind + 0];
+                zpfilename = argv[optind + 1];
+                memfilename = argv[optind + 2];
+                return;
+
+            case 'o':
+                outfilename = optarg;
+                break;
+
+            case 'v':
+                verbose = true;
+                break;
+
+            default:
+                syntaxError();
+        }
+    }
+}
+
 int main(int argc, char* const* argv)
 {
-    if ((argc != 6) || (std::string(argv[1]) != "-o"))
-        error("syntax: multilink -o <outfile> <corefile> <zpfile> <memfile>");
+    parseArguments(argc, argv);
 
-    auto outfile = std::string(argv[2]);
-    auto corefile = std::string(argv[3]);
-    auto zpfile = std::string(argv[4]);
-    auto memfile = std::string(argv[5]);
+    if (verbose)
+    {
+        fmt::print("core file: {}\n", corefilename);
+        fmt::print("zp file:   {}\n", zpfilename);
+        fmt::print("mem file:  {}\n", memfilename);
+    }
 
-    auto coreSize = std::filesystem::file_size(corefile);
+    auto coreSize = std::filesystem::file_size(corefilename);
 
-    auto [zpDifferences, zpMax] = compare(corefile, zpfile);
+    auto [zpDifferences, zpMax] = compare(corefilename, zpfilename);
     auto zpBytes = toBytestream(zpDifferences);
-    auto [memDifferences, memMax] = compare(corefile, memfile);
+    auto [memDifferences, memMax] = compare(corefilename, memfilename);
     auto memBytes = toBytestream(memDifferences);
 
     unsigned reloBytesSize = zpBytes.size() + 1 + memBytes.size();
 
-    std::fstream outs(outfile,
+    std::fstream outs(outfilename,
         std::fstream::in | std::fstream::out | std::fstream::trunc |
             std::fstream::binary);
-    fmt::print("{} code bytes, {} zprelo bytes, {} memrelo bytes\n",
-        coreSize,
-        zpBytes.size(),
-        memBytes.size());
+    if (verbose)
+        fmt::print("{} code bytes, {} zprelo bytes, {} memrelo bytes\n",
+            coreSize,
+            zpBytes.size(),
+            memBytes.size());
 
     /* Write the actual code body. */
 
     {
         auto memi = memDifferences.begin();
-        std::ifstream is(corefile);
+        std::ifstream is(corefilename);
         unsigned pos = 0;
         for (;;)
         {
@@ -161,12 +207,6 @@ int main(int argc, char* const* argv)
         outs.put(b);
     for (uint8_t b : memBytes)
         outs.put(b);
-
-    /* Remove temporary files. */
-
-    std::filesystem::remove(corefile);
-    std::filesystem::remove(zpfile);
-    std::filesystem::remove(memfile);
 
     return 0;
 }

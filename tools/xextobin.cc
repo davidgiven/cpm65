@@ -16,6 +16,7 @@ static uint8_t ram[0x10000];
 static uint16_t base = 0;
 static uint16_t himem = 0;
 static std::string outfilename;
+static bool verbose = false;
 
 template <typename... T>
 void error(fmt::format_string<T...> fmt, T&&... args)
@@ -36,7 +37,7 @@ static uint16_t readle16(std::istream& is)
 static void read_file(std::string filename)
 {
     std::ifstream ifs(filename, std::ios::binary);
-	if (!ifs)
+    if (!ifs)
         error("could not read input file: {}", strerror(errno));
 
     for (;;)
@@ -49,7 +50,7 @@ static void read_file(std::string filename)
             default:
                 if ((header & 0xff00) == 0xff00)
                     error("unsupported header 0x{:04x}\n", header);
-                ifs.seekg(ifs.tellg()-2L);
+                ifs.seekg(ifs.tellg() - 2L);
                 /* fall through */
             case 0xffff:
             {
@@ -58,9 +59,11 @@ static void read_file(std::string filename)
                 if (start == 0x0000)
                     error("relocatable blocks are not supported");
                 uint16_t len = (end - start) + 1;
-                fmt::print("reading 0x{:04x} bytes to 0x{:04x}\n", len, start);
+                if (verbose)
+                    fmt::print(
+                        "reading 0x{:04x} bytes to 0x{:04x}\n", len, start);
                 ifs.read((char*)(ram + start), len);
-                himem = std::max((int)himem, (int)end+1);
+                himem = std::max((int)himem, (int)end + 1);
                 break;
             }
         }
@@ -70,8 +73,9 @@ static void read_file(std::string filename)
 static void write_file()
 {
     uint16_t len = himem - base;
-    fmt::print("writing 0x{:04x} bytes from 0x{:04x}\n", len, base);
-    
+    if (verbose)
+        fmt::print("writing 0x{:04x} bytes from 0x{:04x}\n", len, base);
+
     std::ofstream ofs(outfilename, std::ios::out | std::ios::binary);
     if (!ofs)
         error("failed to open output file: {}", strerror(errno));
@@ -100,6 +104,10 @@ int main(int argc, char* const argv[])
                 outfilename = optarg;
                 break;
 
+            case 'v':
+                verbose = true;
+                break;
+
             default:
                 fmt::print(stderr,
                     "Usage: xextobin -i <infile> -o <outfile> -b <base>\n");
@@ -107,4 +115,3 @@ int main(int argc, char* const argv[])
         }
     }
 }
-
