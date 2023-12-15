@@ -59,15 +59,14 @@ def mkdfs(
     cs = []
     ins = []
     for k, v in items.items():
-        if type(k) == str:
-            k = {"name": k}
+        addr = None
+        if "@" in k:
+            k, addr = k.split("@")
 
         ins += [v]
-        cs += ["-f", filenameof(v), "-n", k["name"]]
-        if "loadaddr" in k:
-            cs += ["-l", k["loadaddr"]]
-        if "execaddr" in k:
-            cs += ["-e", k["execaddr"]]
+        cs += ["-f", filenameof(v), "-n", k]
+        if addr:
+            cs += ["-l", addr, "-e", addr]
 
     normalrule(
         replaces=self,

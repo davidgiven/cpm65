@@ -15,7 +15,7 @@ endif
 
 
 @Rule
-def proto(self, name, srcs: Targets = [], deps: Targets = []):
+def proto(self, name, srcs: Targets = None, deps: Targets = None):
     normalrule(
         replaces=self,
         ins=srcs,
@@ -32,7 +32,7 @@ def proto(self, name, srcs: Targets = [], deps: Targets = []):
 
 
 @Rule
-def protocc(self, name, srcs: Targets = [], deps: Targets = []):
+def protocc(self, name, srcs: Targets = None, deps: Targets = None):
     outs = []
     protos = []
     for f in flatten([s.proto.srcs for s in flatten(srcs + deps)]):

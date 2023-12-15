@@ -12,7 +12,7 @@ normalrule(
 
 
 @Rule
-def mads(self, name=None, src: Target = None, deps: Targets = [], defines={}):
+def mads(self, name=None, src: Target = None, deps: Targets = None, defines={}):
     ds = [f"-d:{k}={v}" for k, v in defines.items()]
 
     normalrule(
