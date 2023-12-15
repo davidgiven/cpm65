@@ -9,10 +9,11 @@
 
 ; IO Register for Console Access
 
-UART_READ    = $DFFA; read from uart input
-UART_READ_Q  = $DFFB; can be $00-$7f in normal operation
-UART_WRITE   = $DFFC; write to uart output
-UART_WRITE_Q = $DFFD; can be $00-$7f in normal operation
+UART_CONFIG  = $DF0B; uart configuration register
+UART_READ    = $DF0C; read from uart input
+UART_RBUFSIZ = $DF0D; can be $00-$ef in normal operation
+UART_WRITE   = $DF0E; write to uart output
+UART_WBUFSIZ = $DF0F; can be $00-$7f in normal operation
 
 
 ; IO Register for Disk-Access.
@@ -140,10 +141,6 @@ zproc tty_conin
     ldx #0
     stx pending_key
 
-    cmp #20         ; DEL
-    zif_eq
-        lda #8
-    zendif
     cmp #$7f         ; Backspace
     zif_eq
         lda #8
@@ -185,14 +182,14 @@ zproc tty_const
 zendproc
 
 ; Reads and writes the AUX channel
-zproc aux_open   ; switch off cr/lf translation
+zproc aux_open    ; switch off cr/lf translation
     lda #$00
-    sta UART_READ  ; Write parameter to the read-register , hmm
+    sta UART_CONFIG
     rts
 zendproc
 zproc aux_close   ; switch on cr/lf translation
     lda #$01
-    sta UART_READ  ; Write parameter to the read-register , hmm
+    sta UART_CONFIG
     rts
 zendproc
 
@@ -353,13 +350,13 @@ h4:
     and #0x0f ; %00001111
     ora #'0'
     cmp #'9'+1
-	zif_cs
-		adc #6
-	zendif
+    zif_cs
+        adc #6
+    zendif
     pha
-	jsr CHROUT
-	pla
-	rts
+    jsr CHROUT
+    pla
+    rts
 zendproc
 
 
@@ -406,7 +403,7 @@ loading_msg:
     .byte 13, 10
     .ascii "CP/M 65 for the Sorbus Computer"
     .byte 13, 10
-    .ascii "ported by SvOlli and Benson / TRSI"
+    .ascii "ported by Benson and SvOlli of TRSI"
     .byte 10
     .ascii "original code by David Given"
     .byte 13, 10 , 0
@@ -419,7 +416,7 @@ zendproc
 ;-------------------------------------------------------------------------
 
 zproc CHROUT
-   bit   UART_WRITE_Q
+   bit   UART_WBUFSIZ
    bmi   CHROUT
    sta   UART_WRITE
    rts
@@ -432,7 +429,7 @@ zendproc
 
 
 zproc GETIN
-    lda   UART_READ_Q ; check input
+    lda   UART_RBUFSIZ ; check input
     bne   read_key ; no input -> return 0
     sec
     rts
@@ -461,7 +458,8 @@ mem_end:    .byte  $c0
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph,32768, 2048, 1024, 256
+; drive parameters: total sectors, bytes per block, dir entries, boot sectors
+define_drive dph, 32768, 2048, 1024, 256
 
 NOINIT
 
