@@ -1,0 +1,61 @@
+from build.ab import Rule, Targets
+from build.c import cprogram, cfile, clibrary
+
+
+@Rule
+def llvmcfile(
+    self,
+    name,
+    srcs: Targets = [],
+    deps: Targets = [],
+    cflags=[],
+    suffix=".o",
+    commands=["$(CC6502) -c -o {outs[0]} {ins[0]} $(CFLAGS6502) {cflags}"],
+    label="CC6502",
+):
+    cfile(
+        replaces=self,
+        srcs=srcs,
+        deps=deps,
+        cflags=cflags,
+        suffix=suffix,
+        commands=commands,
+        label=label,
+    )
+
+
+@Rule
+def llvmprogram(
+    self,
+    name=None,
+    srcs: Targets = [],
+    deps: Targets = [],
+    cflags=[],
+    ldflags=[],
+    commands=["$(CC6502) -o {outs[0]} {ins} {ldflags} $(LDFLAGS6502)"],
+    label="CLINK6502",
+):
+    cprogram(
+        replaces=self,
+        srcs=srcs,
+        deps=deps,
+        cflags=cflags,
+        ldflags=ldflags,
+        commands=commands,
+        label=label,
+        cfilerule=llvmcfile,
+        cfilekind="llvmprogram",
+    )
+
+
+@Rule
+def llvmclibrary(
+    name, self, commands=["$(AR6502) cqs {outs[0]} {ins}"], **kwargs
+):
+    clibrary(
+        replaces=self,
+        commands=commands,
+        cfilerule=llvmcfile,
+        label="LIB6502",
+        **kwargs
+    )

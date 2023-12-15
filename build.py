@@ -10,5 +10,6 @@ export(
         "bin/cpmemu": "tools/cpmemu",
         "bin/mads": "third_party/mads",
         "bin/atbasic.com": "third_party/altirrabasic",
+        "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
     },
 )

@@ -69,7 +69,11 @@ def findsources(name, srcs, deps, cflags, filerule):
                 cflags=cflags,
             )
             for f in filenamesof(s)
-            if f.endswith(".c") or f.endswith(".cc") or f.endswith(".cpp")
+            if f.endswith(".c")
+            or f.endswith(".cc")
+            or f.endswith(".cpp")
+            or f.endswith(".S")
+            or f.endswith(".s")
         ]
         if any(f.endswith(".o") for f in filenamesof(s)):
             objs += [s]
@@ -168,9 +172,19 @@ def clibrary(
     ldflags=[],
     commands=["$(AR) cqs {outs[0]} {ins}"],
     label="LIB",
+    cfilerule=cfile,
 ):
     return libraryimpl(
-        self, name, srcs, deps, hdrs, cflags, ldflags, commands, label, cfile
+        self,
+        name,
+        srcs,
+        deps,
+        hdrs,
+        cflags,
+        ldflags,
+        commands,
+        label,
+        cfilerule,
     )
 
 
@@ -225,6 +239,8 @@ def cprogram(
     ldflags=[],
     commands=["$(CC) -o {outs[0]} {ins} {ldflags} $(LDFLAGS)"],
     label="CLINK",
+    cfilerule=cfile,
+    cfilekind="cprogram",
 ):
     programimpl(
         self,
@@ -235,8 +251,8 @@ def cprogram(
         ldflags,
         commands,
         label,
-        cfile,
-        "cprogram",
+        cfilerule,
+        cfilekind,
     )
 
 

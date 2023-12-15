@@ -3,7 +3,6 @@
  * see the COPYING file in the root project directory for the full text.
  */
 
-#define _XOPEN_SOURCE 500
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
