@@ -20,6 +20,6 @@ def mads(self, name=None, src: Target = None, deps: Targets = [], defines={}):
         ins=[src],
         outs=[name + ".bin"],
         deps=["third_party/mads"] + deps,
-        commands=["{deps[0]} {ins[0]} -c -o:{outs[0]} " + " ".join(ds)],
+        commands=["chronic {deps[0]} {ins[0]} -c -o:{outs[0]} " + " ".join(ds)],
         label="MADS",
     )
