@@ -18,12 +18,12 @@ jobs:
       run: echo "MOS_SDK_VERSION=$(cd llvm-mos-sdk && git rev-parse --short HEAD)" >> $GITHUB_ENV
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils ninja-build
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils
 
     - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
       name: install llvm-mos
       run: |
-        curl https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar -C $HOME xvJf -
+        curl https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xvJf - -C $HOME
 
     - name: make
       run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65 LLVM=
