@@ -2,10 +2,9 @@ from build.ab import Rule, Target, normalrule, filenameof, targetsof, TargetsMap
 from build.c import cxxprogram, cprogram
 
 cxxprogram(name="multilink", srcs=["./multilink.cc"], deps=["+libfmt"])
-
 cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
-
 cprogram(name="mkdfs", srcs=["./mkdfs.c"], deps=["+libfmt"])
+cxxprogram(name="shuffle", srcs=["./shuffle.cc"], deps=["+libfmt"])
 
 
 @Rule
@@ -85,4 +84,21 @@ def mkdfs(
             + " ".join(cs)
         ],
         label="MKDFS",
+    )
+
+
+@Rule
+def shuffle(
+    self, name, src: Target = None, blocksize=256, blockspertrack=16, map=""
+):
+    normalrule(
+        replaces=self,
+        ins=[src],
+        outs=[name + ".bin"],
+        deps=["tools+shuffle"],
+        commands=[
+            "{deps[0]} -i {ins[0]} -o {outs[0]} -b %d -t %d -r -m %s"
+            % (blocksize, blockspertrack, map)
+        ],
+        label="SHUFFLE",
     )

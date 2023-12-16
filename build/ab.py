@@ -339,6 +339,7 @@ def templateexpand(s, invocation):
             return " ".join(
                 [templateexpand(f, invocation) for f in filenamesof(value)]
             )
+
     return Formatter().format(s)
 
 

@@ -12,5 +12,6 @@ export(
         "bin/atbasic.com": "third_party/altirrabasic",
         "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
         "oric.dsk": "src/arch/oric+diskimage",
+        "apple2e.po": "src/arch/apple2e+diskimage",
     },
 )
