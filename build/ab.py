@@ -2,7 +2,6 @@ from collections.abc import Iterable, Sequence
 from os.path import *
 from types import SimpleNamespace
 import argparse
-import copy
 import functools
 import importlib
 import importlib.abc
@@ -10,10 +9,8 @@ import importlib.util
 import inspect
 import re
 import sys
-import types
-import pathlib
 import builtins
-import os
+import string
 
 defaultGlobals = {}
 targets = {}
@@ -329,16 +326,20 @@ def emit(*args):
 
 
 def templateexpand(s, invocation):
-    class Converter:
-        def __getitem__(self, key):
-            if key == "self":
-                return invocation
-            f = filenamesof(invocation.args[key])
-            if isinstance(f, Sequence):
-                f = ParameterList(f)
-            return f
+    class Formatter(string.Formatter):
+        def get_field(self, name, a1, a2):
+            return (
+                eval(name, invocation.callback.__globals__, invocation.args),
+                False,
+            )
 
-    return eval("f%r" % s, invocation.callback.__globals__, Converter())
+        def format_field(self, value, format_spec):
+            if type(self) == str:
+                return value
+            return " ".join(
+                [templateexpand(f, invocation) for f in filenamesof(value)]
+            )
+    return Formatter().format(s)
 
 
 def emitter_rule(name, ins, outs, deps=[]):

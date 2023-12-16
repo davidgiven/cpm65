@@ -35,8 +35,15 @@ def xextobin(self, name=None, src: Target = None, address=0):
 
 
 @Rule
-def mkcpmfs(self, name, format, items: TargetsMap = {}):
-    cs = ["mkfs.cpm -f %s {outs[0]}" % format]
+def mkcpmfs(
+    self, name, format, bootimage: Target = None, items: TargetsMap = {}
+):
+    mkfs = "mkfs.cpm -f %s" % format
+    if bootimage:
+        mkfs += " -b %s" % filenameof(bootimage)
+    mkfs += " {outs[0]}"
+
+    cs = [mkfs]
     ins = []
     for k, v in items.items():
         cs += ["cpmcp -f %s {outs[0]} %s %s" % (format, filenameof(v), k)]
@@ -46,7 +53,7 @@ def mkcpmfs(self, name, format, items: TargetsMap = {}):
         replaces=self,
         ins=ins,
         outs=[name + ".img"],
-        deps=["diskdefs"],
+        deps=["diskdefs"] + [bootimage] if bootimage else [],
         commands=cs,
         label="MKCPMFS",
     )

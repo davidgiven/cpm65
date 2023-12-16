@@ -16,6 +16,11 @@ from types import SimpleNamespace
 
 
 def cfileimpl(self, name, srcs, deps, suffix, commands, label, kind, cflags):
+    libraries = [d for d in deps if hasattr(d, "clibrary")]
+    for library in libraries:
+        if library.clibrary.cflags:
+            cflags += library.clibrary.cflags
+
     outleaf = stripext(basename(filenameof(srcs[0]))) + suffix
 
     normalrule(
