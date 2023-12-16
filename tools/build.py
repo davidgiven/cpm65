@@ -37,7 +37,12 @@ def xextobin(self, name=None, src: Target = None, address=0):
 
 @Rule
 def mkcpmfs(
-    self, name, format, bootimage: Target = None, items: TargetsMap = {}
+    self,
+    name,
+    format,
+    bootimage: Target = None,
+    size=None,
+    items: TargetsMap = {},
 ):
     mkfs = "mkfs.cpm -f %s" % format
     if bootimage:
@@ -49,6 +54,9 @@ def mkcpmfs(
     for k, v in items.items():
         cs += ["cpmcp -f %s {outs[0]} %s %s" % (format, filenameof(v), k)]
         ins += [v]
+
+    if size:
+        cs += ["truncate -s %d {outs[0]}" % size]
 
     normalrule(
         replaces=self,
@@ -117,12 +125,14 @@ def fontconvert(self, name, src: Target = None):
         label="FONTCONVERT",
     )
 
+
 @Rule
-def mkoricdsk(self, name, src:Target=None):
+def mkoricdsk(self, name, src: Target = None):
     normalrule(
         replaces=self,
         ins=[src],
-        outs=[name+".img"],
+        outs=[name + ".img"],
         deps=["tools+mkoricdsk"],
         commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
-        label="MKORICDSK")
+        label="MKORICDSK",
+    )

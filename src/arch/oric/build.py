@@ -53,6 +53,4 @@ mkcpmfs(
     | SCREEN_APPS_SRCS,
 )
 
-mkoricdsk(
-    name="diskimage",
-    src=".+cpmfs")
+mkoricdsk(name="diskimage", src=".+cpmfs")

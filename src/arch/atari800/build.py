@@ -69,7 +69,7 @@ mkcpmfs(
     | BIG_APPS
     | BIG_APPS_SRCS
     | SCREEN_APPS
-    | SCREEN_APPS_SRCS
+    | SCREEN_APPS_SRCS,
 )
 
 normalrule(
@@ -107,7 +107,7 @@ mkcpmfs(
     | BIG_APPS
     | BIG_APPS_SRCS
     | SCREEN_APPS
-    | SCREEN_APPS_SRCS
+    | SCREEN_APPS_SRCS,
 )
 
 normalrule(
