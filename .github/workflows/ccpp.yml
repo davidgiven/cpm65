@@ -20,21 +20,10 @@ jobs:
     - name: apt
       run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils ninja-build
 
-    - name: cache llvm-mos
-      id: cache-llvm-mos
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-llvm-mos
-      with:
-        path: ~/llvm-mos
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-ver-${{ env.MOS_SDK_VERSION }}
-
     - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
       name: install llvm-mos
       run: |
-        mkdir -p llvm-mos-sdk/build
-        (cd llvm-mos-sdk/build && cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX=$HOME/llvm-mos ..)
-        (cd llvm-mos-sdk/build && ninja install)
+        curl https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar -C $HOME xvJf -
 
     - name: make
       run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65 LLVM=
