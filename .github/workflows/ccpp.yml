@@ -23,10 +23,10 @@ jobs:
     - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
       name: install llvm-mos
       run: |
-        wget -O - https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xvJf - -C $HOME
+        wget -O - https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xJf - -C $HOME
 
     - name: make
-      run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65 LLVM=
+      run: make -C cpm65 LLVM=$HOME/llvm-mos/bin
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v2
