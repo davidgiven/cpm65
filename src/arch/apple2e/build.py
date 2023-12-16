@@ -51,7 +51,7 @@ mkcpmfs(
     name="diskimage",
     format="appleiie",
     bootimage=".+bios_shuffled",
-    items={"0:ccp.sys": "src+ccp"}
+    items={"0:ccp.sys": "src+ccp", "0:bdos.sys": "src+bdos"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS

@@ -3,8 +3,9 @@ from build.c import cxxprogram, cprogram
 
 cxxprogram(name="multilink", srcs=["./multilink.cc"], deps=["+libfmt"])
 cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
-cprogram(name="mkdfs", srcs=["./mkdfs.c"], deps=["+libfmt"])
 cxxprogram(name="shuffle", srcs=["./shuffle.cc"], deps=["+libfmt"])
+cprogram(name="mkdfs", srcs=["./mkdfs.c"])
+cprogram(name="fontconvert", srcs=["./fontconvert.c"])
 
 
 @Rule
@@ -101,4 +102,16 @@ def shuffle(
             % (blocksize, blockspertrack, map)
         ],
         label="SHUFFLE",
+    )
+
+
+@Rule
+def fontconvert(self, name, src: Target = None):
+    normalrule(
+        replaces=self,
+        ins=[src],
+        outs=[name + ".inc"],
+        deps=["tools+fontconvert"],
+        commands=["{deps[0]} {ins[0]} > {outs[0]}"],
+        label="FONTCONVERT",
     )
