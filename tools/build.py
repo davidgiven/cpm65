@@ -4,6 +4,7 @@ from build.c import cxxprogram, cprogram
 cxxprogram(name="multilink", srcs=["./multilink.cc"], deps=["+libfmt"])
 cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
 cxxprogram(name="shuffle", srcs=["./shuffle.cc"], deps=["+libfmt"])
+cxxprogram(name="mkoricdsk", srcs=["./mkoricdsk.cc"], deps=["+libfmt"])
 cprogram(name="mkdfs", srcs=["./mkdfs.c"])
 cprogram(name="fontconvert", srcs=["./fontconvert.c"])
 
@@ -115,3 +116,13 @@ def fontconvert(self, name, src: Target = None):
         commands=["{deps[0]} {ins[0]} > {outs[0]}"],
         label="FONTCONVERT",
     )
+
+@Rule
+def mkoricdsk(self, name, src:Target=None):
+    normalrule(
+        replaces=self,
+        ins=[src],
+        outs=[name+".img"],
+        deps=["tools+mkoricdsk"],
+        commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
+        label="MKORICDSK")

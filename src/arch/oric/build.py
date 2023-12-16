@@ -1,5 +1,5 @@
 from build.ab import normalrule
-from tools.build import mkdfs, mkcpmfs
+from tools.build import mkcpmfs, mkoricdsk
 from build.llvm import llvmrawprogram, llvmcfile
 from config import (
     MINIMAL_APPS,
@@ -41,7 +41,7 @@ llvmrawprogram(
 )
 
 mkcpmfs(
-    name="diskimage",
+    name="cpmfs",
     format="oric",
     bootimage=".+bios",
     items={"0:ccp.sys": "src+ccp", "0:bdos.sys": "src+bdos"}
@@ -52,3 +52,7 @@ mkcpmfs(
     | SCREEN_APPS
     | SCREEN_APPS_SRCS,
 )
+
+mkoricdsk(
+    name="diskimage",
+    src=".+cpmfs")
