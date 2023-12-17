@@ -5,8 +5,11 @@ cxxprogram(name="multilink", srcs=["./multilink.cc"], deps=["+libfmt"])
 cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
 cxxprogram(name="shuffle", srcs=["./shuffle.cc"], deps=["+libfmt"])
 cxxprogram(name="mkoricdsk", srcs=["./mkoricdsk.cc"], deps=["+libfmt"])
+cxxprogram(name="mkcombifs", srcs=["./mkcombifs.cc"], deps=["+libfmt"])
 cprogram(name="mkdfs", srcs=["./mkdfs.c"])
-cprogram(name="fontconvert", srcs=["./fontconvert.c"])
+cprogram(
+    name="fontconvert", srcs=["./fontconvert.c", "./libbdf.c", "./libbdf.h"]
+)
 
 
 @Rule
@@ -40,19 +43,29 @@ def mkcpmfs(
     self,
     name,
     format,
+    template: Target = None,
     bootimage: Target = None,
     size=None,
     items: TargetsMap = {},
 ):
-    mkfs = "mkfs.cpm -f %s" % format
-    if bootimage:
-        mkfs += " -b %s" % filenameof(bootimage)
-    mkfs += " {outs[0]}"
+    cs = []
+    if template:
+        cs += ["cp %s {outs[0]}" % filenameof(template)]
+    else:
+        mkfs = "mkfs.cpm -f %s" % format
+        if bootimage:
+            mkfs += " -b %s" % filenameof(bootimage)
+        mkfs += " {outs[0]}"
+        cs += [mkfs]
 
-    cs = [mkfs]
     ins = []
     for k, v in items.items():
+        flags = None
+        if "@" in k:
+            k, flags = k.split("@")
         cs += ["cpmcp -f %s {outs[0]} %s %s" % (format, filenameof(v), k)]
+        if flags:
+            cs += ["chpmchattr -f %s {outs[0]} %s %s" % (format, flags, k)]
         ins += [v]
 
     if size:
@@ -62,16 +75,18 @@ def mkcpmfs(
         replaces=self,
         ins=ins,
         outs=[name + ".img"],
-        deps=["diskdefs"] + [bootimage] if bootimage else [],
+        deps=["diskdefs"] + [bootimage]
+        if bootimage
+        else [] + [template]
+        if template
+        else [],
         commands=cs,
         label="MKCPMFS",
     )
 
 
 @Rule
-def mkdfs(
-    self, name=None, out=None, title="DFS", opt=0, items: TargetsMap = {}
-):
+def mkdfs(self, name, out=None, title="DFS", opt=0, items: TargetsMap = {}):
     cs = []
     ins = []
     for k, v in items.items():
