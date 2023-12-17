@@ -22,6 +22,7 @@ MINIMAL_APPS_SRCS = {
 BIG_APPS = {
     "0:atbasic.com": "third_party/altirrabasic",
     "0:objdump.com": "apps+objdump",
+    "0:scrntest.com": "apps+scrntest",
 }
 
 BIG_APPS_SRCS = {}
