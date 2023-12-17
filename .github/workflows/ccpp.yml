@@ -20,8 +20,7 @@ jobs:
     - name: apt
       run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils
 
-    - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
-      name: install llvm-mos
+    - name: install llvm-mos
       run: |
         wget -O - https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xJf - -C $HOME
 
