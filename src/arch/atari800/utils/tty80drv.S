@@ -38,7 +38,7 @@
 #include "zif.inc"
 
 ; force to include the clang version and not the asm.com version
-#include "include/cpm65.inc"
+#include "cpm65.inc"
 
 #include "atari800.inc"
 #include "driver.inc"
@@ -834,7 +834,7 @@ banner:
 ; position) equals 576 bytes
 
 font:
-    #include "../third_party/fonts/atari/ivo3x6.inc"
+    #include "third_party/fonts/atari/ivo3x6.inc"
 
 ; -------------------------------------------------------------------------
 

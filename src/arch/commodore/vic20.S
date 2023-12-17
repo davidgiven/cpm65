@@ -765,7 +765,7 @@ zproc draw_glyph
     rts
 
 font_tab:
-    #include ".obj/4x8font.inc"
+    #include "4x8font.inc"
 zendproc
 
 zproc toggle_cursor

@@ -3,7 +3,6 @@
  * see the COPYING file in the root project directory for the full text.
  */
 
-#define _XOPEN_SOURCE 500
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -67,7 +66,7 @@ static void add_file(const char* filename)
         leaf = filename;
     else
         leaf++;
-    for (int i=0; i<7; i++)
+    for (int i = 0; i < 7; i++)
     {
         char c = leaf[i];
         if ((c == '.') || (c == '\0'))
@@ -100,18 +99,18 @@ static void write_byte(int fd, uint32_t pos, uint8_t value)
 static void write_word(int fd, uint32_t pos, uint16_t value)
 {
     write_byte(fd, pos, value);
-    write_byte(fd, pos+1, value>>8);
+    write_byte(fd, pos + 1, value >> 8);
 }
 
 static void write_quad(int fd, uint32_t pos, uint32_t value)
 {
     write_word(fd, pos, value);
-    write_word(fd, pos+2, value>>16);
+    write_word(fd, pos + 2, value >> 16);
 }
 
 static void write_disk(void)
 {
-    int fd = open(output_filename, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    int fd = open(output_filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd == -1)
     {
         fprintf(stderr, "cannot open output file: %s\n", strerror(errno));
@@ -120,27 +119,27 @@ static void write_disk(void)
 
     ftruncate(fd, disk_size * 0x100);
     write_byte(fd, 0x107, disk_size);
-    write_byte(fd, 0x106, (boot_mode<<4) | (disk_size>>8));
+    write_byte(fd, 0x106, (boot_mode << 4) | (disk_size >> 8));
     write_byte(fd, 0x105, catalogue_pos << 3);
-    pwrite(fd, disk_name+0, 8, 0x000);
-    pwrite(fd, disk_name+8, 4, 0x100);
+    pwrite(fd, disk_name + 0, 8, 0x000);
+    pwrite(fd, disk_name + 8, 4, 0x100);
 
-    for (int i=0; i<catalogue_pos; i++)
+    for (int i = 0; i < catalogue_pos; i++)
     {
         struct catalogue_entry* ce = &catalogue[catalogue_pos - i - 1];
         pwrite(fd, ce->data, 0x100 * ce->sectors, ce->startsector * 0x100);
-        pwrite(fd, ce->name, 7, 8 + i*8);
-        write_byte(fd, 0x008 + i*8 + 7, ce->directory);
-        write_word(fd, 0x108 + i*8 + 0, ce->load_address);
-        write_word(fd, 0x108 + i*8 + 2, ce->exec_address);
-        write_word(fd, 0x108 + i*8 + 4, ce->length);
-        write_byte(fd, 0x108 + i*8 + 7, ce->startsector);
+        pwrite(fd, ce->name, 7, 8 + i * 8);
+        write_byte(fd, 0x008 + i * 8 + 7, ce->directory);
+        write_word(fd, 0x108 + i * 8 + 0, ce->load_address);
+        write_word(fd, 0x108 + i * 8 + 2, ce->exec_address);
+        write_word(fd, 0x108 + i * 8 + 4, ce->length);
+        write_byte(fd, 0x108 + i * 8 + 7, ce->startsector);
 
-        write_byte(fd, 0x108 + i*8 + 6,
+        write_byte(fd,
+            0x108 + i * 8 + 6,
             (((ce->load_address >> 16) & 0x3) << 2) |
-            (((ce->exec_address >> 16) & 3) << 6) |
-            (((ce->length >> 16) & 3) << 4) |
-            (ce->startsector >> 8));
+                (((ce->exec_address >> 16) & 3) << 6) |
+                (((ce->length >> 16) & 3) << 4) | (ce->startsector >> 8));
     }
 
     close(fd);
@@ -184,7 +183,7 @@ int main(int argc, char* const argv[])
                     optarg = optarg + 2;
                 }
                 memset(&lastfile->name, ' ', 7);
-                for (int i=0; i<7; i++)
+                for (int i = 0; i < 7; i++)
                 {
                     char c = optarg[i];
                     if (c == '\0')
@@ -204,7 +203,8 @@ int main(int argc, char* const argv[])
                 break;
 
             default:
-                fprintf(stderr, "Usage: mkdfs -O <diskname> -f <filename> ...\n");
+                fprintf(
+                    stderr, "Usage: mkdfs -O <diskname> -f <filename> ...\n");
                 exit(1);
         }
     }

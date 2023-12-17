@@ -3,7 +3,6 @@
 ; see the COPYING file in the root project directory for the full text.
 
 #include "zif.inc"
-#include "mos.inc"
 #include "cpm65.inc"
 #include "driver.inc"
 #include "jumptables.inc"
