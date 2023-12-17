@@ -70,13 +70,13 @@ success:
     sta val1+1
     sta dsm+1
 
-	lda val1
-	ldx val1+1
-	jsr print16padded
+    lda val1
+    ldx val1+1
+    jsr print16padded
 
-	lda #<blocks
-	ldx #>blocks
-	jsr printstring
+    lda #<blocks
+    ldx #>blocks
+    jsr printstring
 
 \ shift by BSH
 
@@ -98,10 +98,16 @@ success:
 \ directory entries
 
     ldy #DPB_DRM
+    iny
+    lda (dpb),y
+    tax
+    dey
     lda (dpb),y
     clc
     adc #1
-    ldx #0
+    .zif cs
+        inx
+    .zendif
     jsr print16padded
 
     lda #<direntries
@@ -111,8 +117,11 @@ success:
 \ checked entries
 
     ldy #DPB_CKS
+    iny
     lda (dpb),y
-    ldx #0
+    tax
+    dey
+    lda (dpb),y
     jsr print16padded
 
     lda #<chkentries
@@ -139,8 +148,11 @@ success:
 \ reserved sectors
 
     ldy #DPB_OFF
+    iny
     lda (dpb),y
-    ldx #0
+    tax
+    dey
+    lda (dpb),y
     jsr print16padded
 
     lda #<ressect
@@ -342,7 +354,7 @@ error:
 crlf:
     .byte "\r\n$"
 blocks:
-	.byte " : Number of blocks\r\n$"
+    .byte " : Number of blocks\r\n$"
 capacity:
     .byte " : Sectors Capacity\r\n$"
 direntries:
