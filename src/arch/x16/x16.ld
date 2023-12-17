@@ -9,7 +9,7 @@ SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
 		__ZP1_START__ = .;
-		__ZP1_END__ = 0x100;
+		__ZP1_END__ = 0xff;
 
 		__ZP0_START__ = 0x22;
 		__ZP0_END__ = 0x80;

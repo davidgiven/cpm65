@@ -23,7 +23,7 @@ COMMODORE_ITEMS_WITH_SCREEN = COMMODORE_ITEMS | SCREEN_APPS | SCREEN_APPS_SRCS
 
 @Rule
 def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
-    cs = []
+    cs = ["rm -f {outs[0]}"]
     ins = []
 
     cmd = "chronic cc1541 -q "
