@@ -10,12 +10,6 @@ jobs:
       with:
         repository: 'davidgiven/cpm65'
         path: 'cpm65'
-    - uses: actions/checkout@v3
-      with:
-        repository: 'davidgiven/llvm-mos-sdk'
-        path: 'llvm-mos-sdk'
-    - name: get llvm-mos-sdk version
-      run: echo "MOS_SDK_VERSION=$(cd llvm-mos-sdk && git rev-parse --short HEAD)" >> $GITHUB_ENV
 
     - name: apt
       run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils
