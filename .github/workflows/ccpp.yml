@@ -11,7 +11,7 @@ jobs:
         repository: 'davidgiven/cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils mame
 
     - name: install llvm-mos
       run: |
