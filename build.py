@@ -24,3 +24,8 @@ export(
         "x16.zip": "src/arch/x16+diskimage",
     },
 )
+
+export(
+    name="mametest",
+    deps=["src/arch/bbcmicro+mametest", "src/arch/apple2e+mametest"],
+)

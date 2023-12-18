@@ -1,5 +1,4 @@
-from build.ab import normalrule
-from tools.build import mkdfs, mkcpmfs, shuffle
+from tools.build import mkcpmfs, shuffle, mametest
 from build.llvm import llvmrawprogram, llvmcfile
 from config import (
     MINIMAL_APPS,
@@ -57,4 +56,12 @@ mkcpmfs(
     | MINIMAL_APPS_SRCS
     | BIG_APPS
     | BIG_APPS_SRCS,
+)
+
+mametest(
+    name="mametest",
+    target="apple2e",
+    diskimage=".+diskimage",
+    imagetype=".po",
+    script="./mame-test.lua",
 )

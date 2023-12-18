@@ -151,3 +151,26 @@ def mkoricdsk(self, name, src: Target = None):
         commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
         label="MKORICDSK",
     )
+
+
+@Rule
+def mametest(
+    self,
+    name,
+    target,
+    diskimage: Target = None,
+    imagetype=".img",
+    script: Target = None,
+):
+    normalrule(
+        replaces=self,
+        ins=[diskimage, script],
+        outs=["stamp"],
+        deps=["scripts/mame-test.sh"],
+        commands=[
+            "sh {deps[0]} %s %s %s %s"
+            % (target, filenameof(diskimage), filenameof(script), imagetype),
+            "touch {outs[0]}",
+        ],
+        label="MAMETEST",
+    )
