@@ -23,6 +23,7 @@ mkcpmfs(
     name="atari800_rawdiskimage",
     format="atari90",
     bootimage=".+atari800_bios",
+    size=128*720,
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src+bdos",
@@ -37,7 +38,7 @@ mkcpmfs(
 normalrule(
     name="atari800_diskimage",
     ins=[".+atari800_rawdiskimage"],
-    outs=["atari80.atr"],
+    outs=["atari800.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
@@ -57,6 +58,7 @@ mkcpmfs(
     name="atari800hd_rawdiskimage",
     format="atarihd",
     bootimage=".+atari800hd_bios",
+    size=128*8190,
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src+bdos",
@@ -83,7 +85,7 @@ mkcpmfs(
 normalrule(
     name="atari800hd_diskimage",
     ins=[".+atari800hd_rawdiskimage"],
-    outs=["atari80hd.atr"],
+    outs=["atari800hd.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
@@ -103,6 +105,7 @@ mkcpmfs(
     name="atari800xlhd_rawdiskimage",
     format="atarihd",
     bootimage=".+atari800xlhd_bios",
+    size=128*8190,
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src+bdos",
@@ -129,7 +132,7 @@ mkcpmfs(
 normalrule(
     name="atari800xlhd_diskimage",
     ins=[".+atari800xlhd_rawdiskimage"],
-    outs=["atari80xlhd.atr"],
+    outs=["atari800xlhd.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
