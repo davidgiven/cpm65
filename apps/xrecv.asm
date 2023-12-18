@@ -52,7 +52,7 @@ start:
     .label welcome_msg
     lda #<welcome_msg
     ldx #>welcome_msg
-    jsr print_string    
+    jsr print_string
 
 
     lda #<DRVID_AUX

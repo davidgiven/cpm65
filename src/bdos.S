@@ -1256,7 +1256,7 @@ zproc internal_READSEQUENTIAL
         jsr internal_OPENFILE
         bcs eof$
     zendif
-    
+
     jsr get_fcb_block           ; get disk block value in XA
     beq eof$
     jsr get_sequential_sector_number
