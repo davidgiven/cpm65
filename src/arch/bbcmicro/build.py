@@ -20,7 +20,7 @@ llvmrawprogram(
 mkcpmfs(
     name="cpmfs",
     format="bbc192",
-    items={"0:ccp.sys": "src+ccp"}
+    items={"0:ccp.sys@sr": "src+ccp"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
