@@ -8,7 +8,7 @@ get_rom() {
     fi
     if ! [ -f roms/$rom ]; then
         mkdir -p roms
-        wget -O roms/$rom $1
+        wget -q -O roms/$rom $1
     fi
 }
 
