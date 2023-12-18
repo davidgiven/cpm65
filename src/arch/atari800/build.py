@@ -24,8 +24,8 @@ mkcpmfs(
     format="atari90",
     bootimage=".+atari800_bios",
     items={
-        "0:ccp.sys": "src+ccp",
-        "0:bdos.sys": "src+bdos",
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src+bdos",
         "0:setfnt.com": "src/arch/atari800/utils+setfnt",
         "0:tty80drv.com": "src/arch/atari800/utils+tty80drv",
         "0:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
@@ -58,8 +58,8 @@ mkcpmfs(
     format="atarihd",
     bootimage=".+atari800hd_bios",
     items={
-        "0:ccp.sys": "src+ccp",
-        "0:bdos.sys": "src+bdos",
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src+bdos",
         "0:setfnt.com": "src/arch/atari800/utils+setfnt",
         "0:tty80drv.com": "src/arch/atari800/utils+tty80drv",
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
@@ -96,8 +96,8 @@ mkcpmfs(
     format="atarihd",
     bootimage=".+atari800xlhd_bios",
     items={
-        "0:ccp.sys": "src+ccp",
-        "0:bdos.sys": "src+bdos",
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src+bdos",
         "0:setfnt.com": "src/arch/atari800/utils+setfnt",
         "0:tty80drv.com": "src/arch/atari800/utils+tty80drv",
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",

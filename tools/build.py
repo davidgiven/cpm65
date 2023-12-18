@@ -65,7 +65,7 @@ def mkcpmfs(
             k, flags = k.split("@")
         cs += ["cpmcp -f %s {outs[0]} %s %s" % (format, filenameof(v), k)]
         if flags:
-            cs += ["chpmchattr -f %s {outs[0]} %s %s" % (format, flags, k)]
+            cs += ["cpmchattr -f %s {outs[0]} %s %s" % (format, flags, k)]
         ins += [v]
 
     if size:
