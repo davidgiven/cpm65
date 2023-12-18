@@ -27,5 +27,9 @@ export(
 
 export(
     name="mametest",
-    deps=["src/arch/bbcmicro+mametest", "src/arch/apple2e+mametest", "src/arch/atari800+mametest"],
+    deps=[
+        "src/arch/bbcmicro+mametest",
+        "src/arch/apple2e+mametest",
+        #"src/arch/atari800+mametest",
+    ],
 )

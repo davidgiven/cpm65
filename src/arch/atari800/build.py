@@ -23,7 +23,7 @@ mkcpmfs(
     name="atari800_rawdiskimage",
     format="atari90",
     bootimage=".+atari800_bios",
-    size=128*720,
+    size=128 * 720,
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src+bdos",
@@ -58,7 +58,7 @@ mkcpmfs(
     name="atari800hd_rawdiskimage",
     format="atarihd",
     bootimage=".+atari800hd_bios",
-    size=128*8190,
+    size=128 * 8190,
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src+bdos",
@@ -105,7 +105,7 @@ mkcpmfs(
     name="atari800xlhd_rawdiskimage",
     format="atarihd",
     bootimage=".+atari800xlhd_bios",
-    size=128*8190,
+    size=128 * 8190,
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src+bdos",

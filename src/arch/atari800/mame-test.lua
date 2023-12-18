@@ -8,10 +8,10 @@ local function wait_kbd()
     end
 end
 
-emu.wait(3)
+emu.wait(4)
 
 kbd:post_coded("BEDIT{ENTER}")
-emu.wait(7)
+emu.wait(2)
 kbd:post_coded("10 lda #0x12{ENTER}") wait_kbd()
 kbd:post_coded("20 ldx #0x23{ENTER}") wait_kbd()
 kbd:post_coded("30 ldy #0x34{ENTER}") wait_kbd()
