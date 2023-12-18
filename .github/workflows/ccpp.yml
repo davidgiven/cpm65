@@ -18,8 +18,12 @@ jobs:
       run: |
         wget -O - https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xJf - -C $HOME
 
+    - name: install roms
+      run: |
+        sh scripts/get-roms.sh
+
     - name: make
-      run: make -C cpm65 LLVM=$HOME/llvm-mos/bin
+      run: make -C cpm65 LLVM=$HOME/llvm-mos/bin -j`nproc` +all +mametest
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v2
