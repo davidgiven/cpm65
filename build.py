@@ -29,6 +29,7 @@ export(
     name="mametest",
     deps=[
         "src/arch/bbcmicro+mametest",
+        "src/arch/commodore+c64_mametest",
         "src/arch/apple2e+mametest",
         # "src/arch/atari800+mametest",
         "src/arch/oric+mametest",
