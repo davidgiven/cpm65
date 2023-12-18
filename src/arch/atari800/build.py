@@ -26,9 +26,9 @@ mkcpmfs(
     items={
         "0:ccp.sys": "src+ccp",
         "0:bdos.sys": "src+bdos",
-        "0:setfnt.com": "src/arch/atari800/utils+setfnt",
-        "0:tty80drv.com": "src/arch/atari800/utils+tty80drv",
-        "0:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
+        "1:setfnt.com": "src/arch/atari800/utils+setfnt",
+        "1:tty80drv.com": "src/arch/atari800/utils+tty80drv",
+        "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
     }
     | MINIMAL_APPS
     | BIG_APPS,
@@ -60,9 +60,17 @@ mkcpmfs(
     items={
         "0:ccp.sys": "src+ccp",
         "0:bdos.sys": "src+bdos",
-        "0:setfnt.com": "src/arch/atari800/utils+setfnt",
-        "0:tty80drv.com": "src/arch/atari800/utils+tty80drv",
+        "1:setfnt.com": "src/arch/atari800/utils+setfnt",
+        "1:tty80drv.com": "src/arch/atari800/utils+tty80drv",
+        "1:amstrad.fnt": "third_party/fonts/atari/amstrad.fnt",
+        "1:apricot.fnt": "third_party/fonts/atari/apricot.fnt",
+        "1:eagle.fnt": "third_party/fonts/atari/eagle.fnt",
+        "1:ibmega.fnt": "third_party/fonts/atari/ibmega.fnt",
+        "1:mbytepc.fnt": "third_party/fonts/atari/mbytepc.fnt",
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
+        "1:phoenix.fnt": "third_party/fonts/atari/phoenix.fnt",
+        "1:toshiba.fnt": "third_party/fonts/atari/toshiba.fnt",
+        "1:verite.fnt": "third_party/fonts/atari/verite.fnt",
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
@@ -98,9 +106,17 @@ mkcpmfs(
     items={
         "0:ccp.sys": "src+ccp",
         "0:bdos.sys": "src+bdos",
-        "0:setfnt.com": "src/arch/atari800/utils+setfnt",
-        "0:tty80drv.com": "src/arch/atari800/utils+tty80drv",
+        "1:setfnt.com": "src/arch/atari800/utils+setfnt",
+        "1:tty80drv.com": "src/arch/atari800/utils+tty80drv",
+        "1:setfnt.com": "src/arch/atari800/utils+setfnt",
+        "1:amstrad.fnt": "third_party/fonts/atari/amstrad.fnt",
+        "1:apricot.fnt": "third_party/fonts/atari/apricot.fnt",
+        "1:eagle.fnt": "third_party/fonts/atari/eagle.fnt",
+        "1:ibmega.fnt": "third_party/fonts/atari/ibmega.fnt",
+        "1:mbytepc.fnt": "third_party/fonts/atari/mbytepc.fnt",
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
+        "1:phoenix.fnt": "third_party/fonts/atari/phoenix.fnt",
+        "1:toshiba.fnt": "third_party/fonts/atari/toshiba.fnt",
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
