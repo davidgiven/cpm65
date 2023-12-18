@@ -14,23 +14,23 @@
     sta BIOS+1
     stx BIOS+2
 
-	lda #<DRVID_SCREEN
-	ldx #>DRVID_SCREEN
-	ldy #BIOS_FINDDRV
-	jsr BIOS
-	.zif cs
-		rts
-	.zendif
-	sta SCREEN+1
-	stx SCREEN+2
+    lda #<DRVID_SCREEN
+    ldx #>DRVID_SCREEN
+    ldy #BIOS_FINDDRV
+    jsr BIOS
+    .zif cs
+        rts
+    .zendif
+    sta SCREEN+1
+    stx SCREEN+2
 
-	ldy #SCREEN_CLEAR
-	jmp SCREEN
+    ldy #SCREEN_CLEAR
+    jmp SCREEN
 
 BIOS:
     jmp 0
 SCREEN:
-	jmp 0
+    jmp 0
 
 \ vim: sw=4 ts=4 et
 

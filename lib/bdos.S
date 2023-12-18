@@ -2,17 +2,17 @@
 #include "zif.inc"
 
 .macro bdos name, func
-	zproc \name
-		ldy #\func
-		jmp BDOS
-	zendproc
+    zproc \name
+        ldy #\func
+        jmp BDOS
+    zendproc
 .endm
 
 .macro bios name, func
-	zproc \name
-		ldy #\func
-		jmp BIOS
-	zendproc
+    zproc \name
+        ldy #\func
+        jmp BIOS
+    zendproc
 .endm
 
 bdos bdos_EXIT,            BDOS_EXIT_PROGRAM
@@ -30,8 +30,8 @@ bdos bdos_RENAME,          BDOS_RENAME_FILE
 bdos bdos_READSEQUENTIAL,  BDOS_READ_SEQUENTIAL
 
 bios bios_SETBANK,     BIOS_SETBANK
-bios bios_GETTPA,	   BIOS_GETTPA
-bios bios_GETZP,	   BIOS_GETZP
+bios bios_GETTPA,      BIOS_GETTPA
+bios bios_GETZP,       BIOS_GETZP
 bios bios_RELOCATE,    BIOS_RELOCATE
 
 ; vim: sw=4 ts=4 et ft=asm

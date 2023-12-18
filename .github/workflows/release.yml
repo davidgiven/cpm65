@@ -13,34 +13,16 @@ jobs:
       with:
         repository: 'davidgiven/cpm65'
         path: 'cpm65'
-    - uses: actions/checkout@v3
-      with:
-        repository: 'davidgiven/llvm-mos-sdk'
-        path: 'llvm-mos-sdk'
-    - name: get llvm-mos-sdk version
-      run: echo "MOS_SDK_VERSION=$(cd llvm-mos-sdk && git rev-parse --short HEAD)" >> $GITHUB_ENV
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev ninja-build fp-compiler
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils
 
-    - name: cache llvm-mos
-      id: cache-llvm-mos
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-llvm-mos
-      with:
-        path: ~/llvm-mos
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-ver-${{ env.MOS_SDK_VERSION }}
-
-    - if: ${{ steps.cache-llvm-mos.outputs.cache-hit != 'true' }}
-      name: install llvm-mos
+    - name: install llvm-mos
       run: |
-        mkdir -p llvm-mos-sdk/build
-        (cd llvm-mos-sdk/build && cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX=$HOME/llvm-mos ..)
-        (cd llvm-mos-sdk/build && ninja install)
+        wget -O - https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xJf - -C $HOME
 
     - name: make
-      run: PATH=$PATH:$HOME/llvm-mos/bin make -C cpm65 LLVM=
+      run: make -C cpm65 LLVM=$HOME/llvm-mos/bin
 
     - name: date
       run: |
