@@ -1,5 +1,5 @@
 from build.ab import normalrule
-from tools.build import mkcpmfs
+from tools.build import mkcpmfs, mametest
 from build.llvm import llvmrawprogram, llvmclibrary
 from config import (
     MINIMAL_APPS,
@@ -119,4 +119,12 @@ normalrule(
         "cat {ins[0]} >> {outs[0]}",
     ],
     label="MAKEATR",
+)
+
+mametest(
+    name="mametest",
+    target="a800xlp",
+    diskimage=".+atari800_diskimage",
+    imagetype=".atr",
+    script="./mame-test.lua",
 )
