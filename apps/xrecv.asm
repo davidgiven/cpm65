@@ -49,6 +49,12 @@ start:
     sta BIOS+1
     stx BIOS+2
 
+    .label welcome_msg
+    lda #<welcome_msg
+    ldx #>welcome_msg
+    jsr print_string    
+
+
     lda #<DRVID_AUX
 	ldx #>DRVID_AUX
     ldy #BIOS_FINDDRV
@@ -416,5 +422,9 @@ done_transmission:
 
 transmission_done:
     .byte "\r\ninfo : reception complete\r\n$"
+
+welcome_msg:
+    .byte "\r\nxmodem-receiver\r\n\r\nfetches x-modem protocol data from AUX-device and writes to disk\r\n$"
+
 
 

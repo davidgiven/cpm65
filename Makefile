@@ -35,14 +35,14 @@ MINIMAL_APPS = \
 	$(OBJDIR)/apps/dinfo.com \
 	$(OBJDIR)/apps/dump.com \
 	$(OBJDIR)/apps/ls.com \
-	$(OBJDIR)/apps/recv.com \
+	$(OBJDIR)/apps/xrecv.com \
 	$(OBJDIR)/asm.com \
 	$(OBJDIR)/copy.com \
 	$(OBJDIR)/stat.com \
 	$(OBJDIR)/submit.com \
 	apps/dump.asm \
 	apps/ls.asm \
-	apps/recv.asm \
+	apps/xrecv.asm \
 	apps/cpm65.inc \
 	apps/drivers.inc \
 
