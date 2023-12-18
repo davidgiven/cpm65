@@ -20,3 +20,5 @@ get_rom $URL/apple2e.zip
 get_rom $URL/a2diskiing.zip
 get_rom $URL/d2fdc.zip
 get_rom $URL/votrax.zip votrsc01a.zip
+get_rom $URL/oric1.zip
+get_rom $URL/oric_microdisc.zip

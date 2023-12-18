@@ -158,6 +158,7 @@ def mametest(
     self,
     name,
     target,
+    runscript: Target = "scripts/mame-test.sh",
     diskimage: Target = None,
     imagetype=".img",
     script: Target = None,
@@ -166,7 +167,7 @@ def mametest(
         replaces=self,
         ins=[diskimage, script],
         outs=["stamp"],
-        deps=["scripts/mame-test.sh"],
+        deps=[runscript],
         commands=[
             "sh {deps[0]} %s %s %s %s"
             % (target, filenameof(diskimage), filenameof(script), imagetype),

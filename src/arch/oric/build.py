@@ -1,5 +1,5 @@
 from build.ab import normalrule
-from tools.build import mkcpmfs, mkoricdsk
+from tools.build import mkcpmfs, mkoricdsk, mametest
 from build.llvm import llvmrawprogram, llvmcfile
 from config import (
     MINIMAL_APPS,
@@ -54,3 +54,12 @@ mkcpmfs(
 )
 
 mkoricdsk(name="diskimage", src=".+cpmfs")
+
+mametest(
+    name="mametest",
+    target="oric1",
+    runscript="scripts/oric-mame-test.sh",
+    diskimage=".+diskimage",
+    imagetype=".dsk",
+    script="./mame-test.lua",
+)
