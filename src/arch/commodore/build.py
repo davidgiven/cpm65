@@ -128,4 +128,22 @@ mametest(
     target="c64",
     diskimage=".+c64_diskimage",
     imagetype=".d64",
-    script="./mame-test.lua")
+    script="./mame-test.lua",
+)
+
+mametest(
+    name="pet4032_mametest",
+    target="pet4032",
+    diskimage=".+pet4032_diskimage",
+    imagetype=".d64",
+    script="./pet-mame-test.lua",
+)
+
+mametest(
+    name="pet8032_mametest",
+    target="pet8032",
+    diskimage=".+pet8032_diskimage",
+    imagetype=".d64",
+    runscript="scripts/pet-mame-test.sh",
+    script="./pet-mame-test.lua",
+)

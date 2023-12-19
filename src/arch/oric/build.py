@@ -1,4 +1,3 @@
-from build.ab import normalrule
 from tools.build import mkcpmfs, mkoricdsk, mametest
 from build.llvm import llvmrawprogram, llvmcfile
 from config import (

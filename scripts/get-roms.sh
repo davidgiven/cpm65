@@ -24,4 +24,13 @@ get_rom $URL/d2fdc.zip
 get_rom $URL/oric1.zip
 get_rom $URL/oric_microdisc.zip
 get_rom $URL/saa5050.zip
+get_rom $URL/vic1001.zip
+get_rom $URL/pet4016.zip
+get_rom $URL/pet4032b.zip
+get_rom $URL/pet8032.zip
+get_rom $URL/c8050.zip
+get_rom $URL/c8050fdc.zip
+get_rom $URL/c4040.zip
+get_rom $URL/c2040_fdc.zip
+get_rom $URL/vic20_fe3.zip vic20.zip
 get_rom $URL/votrax.zip votrsc01a.zip
