@@ -15,7 +15,7 @@ coroutine.resume(coroutine.create(function()
     kbd:post_coded("run{ENTER}") wait_kbd()
     emu.wait(15)
 
-    kbd:post_coded("BEDIT{ENTER}") wait_kbd()
+    kbd:post_coded("bedit{ENTER}") wait_kbd()
     emu.wait(14)
     kbd:post_coded("10 lda #18{ENTER}") wait_kbd()
     kbd:post_coded("20 ldx #35{ENTER}") wait_kbd()
