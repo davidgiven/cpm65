@@ -54,9 +54,9 @@ void life(void)
     // Render updated screen
     addr = 0;
 
-    screen_setcursor(0,0);
     for(y=0; y<h; y++) 
     {
+        screen_setcursor(0,y);
         for(x=0; x<(w+1); x++) 
         {
             buf_a[addr]=buf_b[addr];
