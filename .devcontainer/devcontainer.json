@@ -1,0 +1,19 @@
+{
+  "name": "cpm65_buildenv",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "development",
+  "workspaceFolder": "/workspace",
+  "settings": {
+    "terminal.integrated.profiles.linux": {
+      "bash": {
+        "path": "/bin/bash"
+      }
+    },
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "http.proxyStrictSSL": false,
+    "editor.formatOnSave": true,
+  },
+  "extensions": [
+  ]
+}

@@ -1,0 +1,14 @@
+version: '3.9'
+
+services:
+  development:
+    image: mcr.microsoft.com/vscode/devcontainers/base:ubuntu-22.04 
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./devcontainer.env
+    command: sleep infinity
+    volumes:
+      - ..:/workspace
+ 
