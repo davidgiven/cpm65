@@ -136,6 +136,7 @@ mametest(
     target="pet4032",
     diskimage=".+pet4032_diskimage",
     imagetype=".d64",
+    runscript="./pet-mame-test.sh",
     script="./pet-mame-test.lua",
 )
 
