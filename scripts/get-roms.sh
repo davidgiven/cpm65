@@ -33,4 +33,5 @@ get_rom $URL/c8050fdc.zip
 get_rom $URL/c4040.zip
 get_rom $URL/c2040_fdc.zip
 get_rom $URL/vic20_fe3.zip vic20.zip
-get_rom $URL/votrax.zip votrsc01a.zip
+get_rom $URL/votrax.zip
+cp roms/votrax.zip roms/votrsc01a.zip
