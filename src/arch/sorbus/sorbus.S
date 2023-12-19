@@ -401,7 +401,7 @@ zproc init_system
 
 loading_msg:
     .byte 13, 10
-    .ascii "CP/M 65 for the Sorbus Computer"
+    .ascii "CP/M 65 for the Sorbus Computer V1.0"
     .byte 13, 10
     .ascii "ported by Benson and SvOlli of TRSI"
     .byte 10
