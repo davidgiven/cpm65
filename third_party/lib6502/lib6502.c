@@ -384,7 +384,7 @@ enum
         unsigned int i = getMemory(ea) << 1; \
         putMemory(ea, i);                    \
         fetch();                             \
-        setNZC(i & 0x80, !i, i >> 8);        \
+        setNZC(i & 0x80, !(i & 0xff), i >> 8);        \
     }                                        \
     next();
 
