@@ -147,14 +147,14 @@ enum
     tick(ticks);                                   \
     {                                              \
         byte tmp = memory[PC++] + X;               \
-        ea = memory[tmp] + (memory[tmp + 1] << 8); \
+        ea = memory[tmp] + (memory[(tmp + 1) & 0xff] << 8); \
     }
 
 #define indy(ticks)                                             \
     tick(ticks);                                                \
     {                                                           \
         byte tmp = memory[PC++];                                \
-        ea = memory[tmp] + (memory[tmp + 1] << 8);              \
+        ea = memory[tmp] + (memory[(tmp + 1) & 0xff] << 8);              \
         tickIf((ticks == 5) && ((ea >> 8) != ((ea + Y) >> 8))); \
         ea += Y;                                                \
     }
@@ -172,7 +172,7 @@ enum
     {                                              \
         byte tmp;                                  \
         tmp = memory[PC++];                        \
-        ea = memory[tmp] + (memory[tmp + 1] << 8); \
+        ea = memory[tmp] + (memory[(tmp + 1) & 0xff] << 8); \
     }
 
 /* insns */
