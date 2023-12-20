@@ -27,6 +27,8 @@ to the 6502. So far it runs on:
   - Oric 1 and Oric Atmos (but not, currently, the Telestrat) with Microdisc
     interface; TPA 44kB.
 
+  - Sorbus homebrew 6502-based computer.
+
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
 much less standardised than 8080 and Z80 systems. (The systems above all load
@@ -49,6 +51,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/pet8096.png"><img src="doc/pet8096.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 8096"></a>
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
+<a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
 </div>
 
@@ -246,6 +249,10 @@ the same time.
   - The console is 40x28. It has a SCREEN driver.
 
   - The port runs completely bare-metal and does not use any ROM routines.
+
+### Sorbus notes
+
+  - None yet!
 
 ### Supported programs
 
