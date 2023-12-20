@@ -7,6 +7,7 @@
 #define DRVID_TTY    1
 #define DRVID_SCREEN 2
 #define DRVID_BLOCK  3
+#define DRVID_AUX    4
 
 ; Driver structure:
 ;
@@ -36,6 +37,15 @@ drv_\name:
 #define TTY_CONST  0 /* exit: C if no key pending, !C if key pending */
 #define TTY_CONIN  1 /* exit: A=key */
 #define TTY_CONOUT 2 /* entry: A=key */
+
+; AUX driver entrypoints
+
+#define AUX_IN  0  /* exit: C if no char pending, !C char in A */
+#define AUX_OUT  1 /* exit: A=key */
+#define AUX_OPEN  2 /*Open AUX channel */
+#define AUX_CLOSE 3 /* Close AUX channel */
+
+
 
 ; SCREEN driver endpoints
 

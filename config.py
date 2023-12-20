@@ -10,6 +10,7 @@ MINIMAL_APPS = {
     "0:ls.com": "apps+ls",
     "0:stat.com": "apps+stat",
     "0:submit.com": "apps+submit",
+    "0:xrecv.com": "apps+xrecv",
 }
 
 MINIMAL_APPS_SRCS = {
