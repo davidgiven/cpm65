@@ -106,6 +106,12 @@ enum
         ea -= 0x100;    \
     tickIf((ea >> 8) != (PC >> 8));
 
+#define zpr(ticks)              \
+  tick(ticks);                  \
+  ea= memory[PC++];             \
+  if (ea & 0x80) ea -= 0x100;   \
+  tickIf((ea >> 8) != (PC >> 8));
+
 #define indirect(ticks)                            \
     tick(ticks);                                   \
     {                                              \
@@ -367,6 +373,44 @@ enum
     }                           \
     next();
 
+#define rmb0(ticks, adrmode) rmbN(ticks, adrmode, (1<<0))
+#define rmb1(ticks, adrmode) rmbN(ticks, adrmode, (1<<1))
+#define rmb2(ticks, adrmode) rmbN(ticks, adrmode, (1<<2))
+#define rmb3(ticks, adrmode) rmbN(ticks, adrmode, (1<<3))
+#define rmb4(ticks, adrmode) rmbN(ticks, adrmode, (1<<4))
+#define rmb5(ticks, adrmode) rmbN(ticks, adrmode, (1<<5))
+#define rmb6(ticks, adrmode) rmbN(ticks, adrmode, (1<<6))
+#define rmb7(ticks, adrmode) rmbN(ticks, adrmode, (1<<7))
+
+#define rmbN(ticks, adrmode, mask)  \
+  adrmode(ticks);                   \
+  fetch();                          \
+  {                                 \
+    byte b= getMemory(ea);          \
+    b &= (byte)~mask;               \
+    putMemory(ea, b);               \
+  }                                 \
+  next();
+
+#define smb0(ticks, adrmode) smbN(ticks, adrmode, (1<<0))
+#define smb1(ticks, adrmode) smbN(ticks, adrmode, (1<<1))
+#define smb2(ticks, adrmode) smbN(ticks, adrmode, (1<<2))
+#define smb3(ticks, adrmode) smbN(ticks, adrmode, (1<<3))
+#define smb4(ticks, adrmode) smbN(ticks, adrmode, (1<<4))
+#define smb5(ticks, adrmode) smbN(ticks, adrmode, (1<<5))
+#define smb6(ticks, adrmode) smbN(ticks, adrmode, (1<<6))
+#define smb7(ticks, adrmode) smbN(ticks, adrmode, (1<<7))
+
+#define smbN(ticks, adrmode, mask)  \
+  adrmode(ticks);                   \
+  fetch();                          \
+  {                                 \
+    byte b= getMemory(ea);          \
+    b |= mask;                      \
+    putMemory(ea, b);               \
+  }                                 \
+  next();
+
 #define bitwise(ticks, adrmode, op) \
     adrmode(ticks);                 \
     fetch();                        \
@@ -518,6 +562,24 @@ enum
     }                                \
     fetch();                         \
     next();
+
+#define bbr0(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<0)))
+#define bbr1(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<1)))
+#define bbr2(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<2)))
+#define bbr3(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<3)))
+#define bbr4(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<4)))
+#define bbr5(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<5)))
+#define bbr6(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<6)))
+#define bbr7(ticks, adrmode)    branch(ticks, adrmode, !(memory[memory[PC++]] & (1<<7)))
+
+#define bbs0(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<0)))
+#define bbs1(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<1)))
+#define bbs2(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<2)))
+#define bbs3(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<3)))
+#define bbs4(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<4)))
+#define bbs5(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<5)))
+#define bbs6(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<6)))
+#define bbs7(ticks, adrmode)    branch(ticks, adrmode,  (memory[memory[PC++]] & (1<<7)))
 
 #define bcc(ticks, adrmode) branch(ticks, adrmode, !getC())
 #define bcs(ticks, adrmode) branch(ticks, adrmode, getC())
@@ -827,6 +889,9 @@ int M6502_disassemble(M6502* mpu, word ip, char buffer[64])
 #define _relative                              \
     sprintf(s, "%04X", ip + 2 + (int8_t)b[1]); \
     return 2;
+#define _zpr \
+    sprintf(s, "%02X,%04X", b[1], ip + 2 + (int8_t)b[2]); \
+    return 3;
 #define _indirect                         \
     sprintf(s, "(%02X%02X)", b[2], b[1]); \
     return 3;
