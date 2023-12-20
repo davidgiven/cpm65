@@ -136,7 +136,7 @@
     _(86, stx, zp, 2)        \
     _(87, smb0, zp,     2)   \
     _(88, dey, implied, 2)   \
-    _(89, bit, immediate, 2) \
+    _(89, bim, immediate, 2) \
     _(8a, txa, implied, 2)   \
     _(8b, nop, implied, 1)   \
     _(8c, sty, abs, 4)       \
