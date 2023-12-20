@@ -633,7 +633,7 @@ zproc screen_scrolldown
     zrepeat
         lda ptr1
         sec
-        sbc #SCREEN_WIDTH-1
+        sbc #SCREEN_WIDTH
         sta ptr
         zif_cc
             dec ptr+1
@@ -646,16 +646,16 @@ zproc screen_scrolldown
             dey
         zuntil_mi
 
-        lda ptr1
-        sta ptr
-        lda ptr1+1
-        sta ptr+1
+        lda ptr
+        sta ptr1
+        lda ptr+1
+        sta ptr1+1
 
         dex
     zuntil_eq
 
     ldy #SCREEN_WIDTH-1
-    lda #' '
+    lda #0                          ; screen memory space
     zrepeat
         sta (ptr), y
         dey

@@ -40,15 +40,6 @@
     sta SCREEN+1
     stx SCREEN+2
 
-    \ Clear screen and print help
-    ldy #SCREEN_CLEAR
-    jsr SCREEN
-
-    lda #<string_init
-    ldx #>string_init
-    ldy #SCREEN_PUTSTRING
-    jsr SCREEN
-
     \ Get screen size and initalize variables
 
     ldy #SCREEN_GETSIZE
@@ -61,6 +52,16 @@
 
     lda #0
     sta style
+
+help:
+    \ Clear screen and print help
+    ldy #SCREEN_CLEAR
+    jsr SCREEN
+
+    lda #<string_init
+    ldx #>string_init
+    ldy #BDOS_PRINTSTRING
+    jsr BDOS
 
 mainloop:
     \ Get and store current cursor position
@@ -212,15 +213,7 @@ case_done:
   
     \ Clear screen and print help 
     cmp #'H'
-    .zif eq
-        ldy #SCREEN_CLEAR
-        jsr SCREEN
-        lda #<string_init
-        ldx #>string_init
-        ldy #SCREEN_PUTSTRING
-        jsr SCREEN
-        jmp mainloop
-    .zendif
+    beq help
 
     \ Clear screen and quit 
     cmp #'Q'
@@ -250,7 +243,7 @@ SCREEN:
 .zendproc
 
 string_init:
-    .byte "CP/M-65 Screen driver tester\r\n\n"
+    .byte "CP/M-65 Screen driver tester\r\n\r\n"
     .byte "W,A,S,D - Move cursor\r\n"
     .byte "C - Put character\r\n"
     .byte "P - Put string\r\n"
