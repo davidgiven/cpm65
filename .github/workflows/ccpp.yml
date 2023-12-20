@@ -21,10 +21,10 @@ jobs:
       run: |
         sh scripts/get-roms.sh
 
-    - name: Setup upterm session
-      uses: lhotari/action-upterm@v1
-      with:
-        limit-access-to-actor: true
+    #- name: Setup upterm session
+    #  uses: lhotari/action-upterm@v1
+    #  with:
+    #    limit-access-to-actor: true
 
     - name: make
       run: make LLVM=$HOME/llvm-mos/bin -j`nproc` +all +mametest
