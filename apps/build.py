@@ -30,6 +30,7 @@ for prog in [
     "dump",
     "ls",
     "scrntest",
+    "xrecv",
 ]:
     asm(name=prog, src=("./%s.asm" % prog), deps=["./cpm65.inc"])
 

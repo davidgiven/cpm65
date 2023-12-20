@@ -22,6 +22,7 @@ export(
         "pet8096.d64": "src/arch/commodore+pet8096_diskimage",
         "vic20.d64": "src/arch/commodore+vic20_diskimage",
         "x16.zip": "src/arch/x16+diskimage",
+        "sorbus.zip": "src/arch/sorbus+diskimage",
     },
 )
 
