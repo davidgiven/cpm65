@@ -597,7 +597,7 @@ zendproc
 
 zproc screen80_cleartoeol
     lda cursorx
-    ror
+    lsr
     pha
     php                         ; carry is set if cursorx is odd
     zif_cs
