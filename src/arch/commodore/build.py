@@ -1,5 +1,5 @@
 from build.ab import normalrule, TargetsMap, filenameof, Rule
-from tools.build import mkcpmfs
+from tools.build import mkcpmfs, mametest
 from build.llvm import llvmrawprogram, llvmclibrary
 from config import (
     MINIMAL_APPS,
@@ -122,3 +122,29 @@ for target in ["c64", "vic20"]:
         template=".+%s_cbmfs" % target,
         items=COMMODORE_ITEMS_WITH_SCREEN,
     )
+
+mametest(
+    name="c64_mametest",
+    target="c64",
+    diskimage=".+c64_diskimage",
+    imagetype=".d64",
+    script="./mame-test.lua",
+)
+
+mametest(
+    name="pet4032_mametest",
+    target="pet4032",
+    diskimage=".+pet4032_diskimage",
+    imagetype=".d64",
+    runscript="./pet-mame-test.sh",
+    script="./pet-mame-test.lua",
+)
+
+mametest(
+    name="pet8032_mametest",
+    target="pet8032",
+    diskimage=".+pet8032_diskimage",
+    imagetype=".d64",
+    runscript="./pet-mame-test.sh",
+    script="./pet-mame-test.lua",
+)

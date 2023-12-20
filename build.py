@@ -24,3 +24,18 @@ export(
         "x16.zip": "src/arch/x16+diskimage",
     },
 )
+
+export(
+    name="mametest",
+    deps=[
+        "src/arch/bbcmicro+mametest",
+        "src/arch/commodore+c64_mametest",
+        "src/arch/commodore+pet4032_mametest",
+        "src/arch/commodore+pet8032_mametest",
+        # Works locally, but not on github CI.
+        #"src/arch/apple2e+mametest",
+        # Fails everywhere.
+        #"src/arch/atari800+mametest",
+        "src/arch/oric+mametest",
+    ],
+)

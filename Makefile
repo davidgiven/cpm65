@@ -11,4 +11,5 @@ export OBJ = .obj
 .PHONY: all
 all: +all
 
+TARGETS = +all +mametest
 include build/ab.mk

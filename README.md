@@ -73,16 +73,26 @@ is available out of the box. Once installed, you should just be able to run the
 Makefile and you'll get bootable disk images for the Commodore 64 (with 1541
 drive) and BBC Micro (producing a 200kB SSSD DFS disk):
 
-    make LLVM=<your llvm-mos bin directory here>/
+    make LLVM=<your llvm-mos bin directory here>/ -j$(nproc)
 
 Building CP/M-65 is a bit of a performance because it's aggregating lots of
 other software, all of which need building in turn. You'll need: a C and C++
 compiler, cc1541 (for creating 1541 disk images), cpmtools (for creating CP/M
-disk images), libfmt (all the C++ tools use this), ninja-build (for the build
+disk images), libfmt (all the C++ tools use this), python3 (for the build
 system), and FreePascal (because the MADS assembler is written in Pascal). Use
 these Debian packages:
 
-    cc1541 cpmtools libfmt-dev ninja-build fp-compiler
+    cc1541 cpmtools libfmt-dev python3 fp-compiler
+
+There are also automated tests which use `mame` to emulate a reasonable number
+of the platforms, to verify that they actually work. To use this, install
+`mame`, and then run `scripts/get-roms.sh` to download the necessary system
+ROMs. Then do:
+
+    make LLVM=<your llvm-mos bin directory here>/ -j$(nproc) +mametest
+
+You can add `+all` to that if you want to do a normal build and run the tests at
+the same time.
 
 ### BBC Micro notes
 

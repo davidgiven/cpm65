@@ -1,5 +1,5 @@
 from build.ab import normalrule
-from tools.build import mkdfs, mkcpmfs
+from tools.build import mkdfs, mkcpmfs, mametest
 from build.llvm import llvmrawprogram
 from config import (
     MINIMAL_APPS,
@@ -39,4 +39,12 @@ mkdfs(
         "bdos": "src+bdos",
         "cpmfs": ".+cpmfs",
     },
+)
+
+mametest(
+    name="mametest",
+    target="bbcm",
+    diskimage=".+diskimage",
+    imagetype=".img",
+    script="./mame-test.lua",
 )

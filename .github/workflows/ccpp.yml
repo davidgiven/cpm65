@@ -9,33 +9,41 @@ jobs:
     - uses: actions/checkout@v3
       with:
         repository: 'davidgiven/cpm65'
-        path: 'cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils mame
 
     - name: install llvm-mos
       run: |
-        wget -O - https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xJf - -C $HOME
+        wget -q -O - https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz | tar xJf - -C $HOME
+
+    - name: install roms
+      run: |
+        sh scripts/get-roms.sh
+
+    #- name: Setup upterm session
+    #  uses: lhotari/action-upterm@v1
+    #  with:
+    #    limit-access-to-actor: true
 
     - name: make
-      run: make -C cpm65 LLVM=$HOME/llvm-mos/bin
+      run: make LLVM=$HOME/llvm-mos/bin -j`nproc` +all +mametest
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v2
       with:
         name: ${{ github.event.repository.name }}.${{ github.sha }}
         path: |
-          cpm65/apple2e.po
-          cpm65/atari800.atr
-          cpm65/atari800hd.atr
-          cpm65/atari800xlhd.atr
-          cpm65/bbcmicro.ssd
-          cpm65/c64.d64
-          cpm65/diskdefs
-          cpm65/oric.dsk
-          cpm65/pet4032.d64
-          cpm65/pet8032.d64
-          cpm65/pet8096.d64
-          cpm65/x16.zip
+          apple2e.po
+          atari800.atr
+          atari800hd.atr
+          atari800xlhd.atr
+          bbcmicro.ssd
+          c64.d64
+          diskdefs
+          oric.dsk
+          pet4032.d64
+          pet8032.d64
+          pet8096.d64
+          x16.zip
 
