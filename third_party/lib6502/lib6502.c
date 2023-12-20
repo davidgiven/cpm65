@@ -684,6 +684,7 @@ enum
     next();
 
 #define nop(ticks, adrmode) \
+    adrmode(ticks);         \
     fetch();                \
     tick(ticks);            \
     next();
