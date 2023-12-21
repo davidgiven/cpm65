@@ -360,7 +360,7 @@ static char consumeToken()
 
     for (;;)
     {
-        if (currentByte == '\\')
+        if ((currentByte == '\\') || (currentByte == ';'))
         {
             do
                 consumeByte();
