@@ -509,6 +509,8 @@ zproc screen_getchar
     ldy RTCLOK                      ; incremented every 1/50th of a second
     iny
 
+    jsr toggle_cursor
+
     zloop
         ldx CH
         inx
@@ -522,6 +524,7 @@ zproc screen_getchar
                 ldx ptr+1
                 cpx #$ff
                 zif_eq
+                    jsr toggle_cursor
                     sec             ; timer expired
                     rts
                 zendif
@@ -530,6 +533,7 @@ zproc screen_getchar
         zendif
     zendloop
 
+    jsr toggle_cursor
     jsr tty_conin
     clc
     rts
