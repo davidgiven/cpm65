@@ -496,7 +496,7 @@ zproc screen_getcursor
     rts
 zendproc
 
-; XZ = timeout in cs
+; XA = timeout in cs
 
 zproc screen_getchar
     sta ptr
@@ -508,6 +508,9 @@ zproc screen_getchar
 
     ldy RTCLOK                      ; incremented every 1/50th of a second
     iny
+
+    lda #$ff
+    sta CH
 
     zloop
         ldx CH
