@@ -186,6 +186,14 @@ static uint8_t indabsx_cb(uint16_t ip, const uint8_t* b)
     return 3;
 }
 
+static uint8_t zpr_cb(uint16_t ip, const uint8_t* b)
+{
+    oh2(b[1]);
+    *outptr++ = ',';
+    oh4(ip + 2 + (int8_t)b[2]);
+    return 3;
+}
+
 #define disassemble(num, name, mode, cycles) {#name, mode##_cb},
 
 static const struct insn insns[] = {do_insns(disassemble)};
