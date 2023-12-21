@@ -376,7 +376,7 @@ static char consumeToken()
     if (currentByte == '\n')
     {
         currentFile->lineNumber++;
-        currentByte = ';';
+        currentByte = ':';
     }
 
     switch (currentByte)
