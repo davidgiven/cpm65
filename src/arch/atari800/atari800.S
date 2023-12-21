@@ -512,7 +512,7 @@ zproc screen_getchar
     zloop
         ldx CH
         inx
-        zbreakif_eq                 ; break if key is pending
+        zbreakif_ne                 ; break if key is pending
         cpy RTCLOK
         zif_eq
             iny
