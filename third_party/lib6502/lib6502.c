@@ -651,11 +651,11 @@ enum
     PC++;                                                            \
     push(PC >> 8);                                                   \
     push(PC & 0xff);                                                 \
+    push(P | flagX | flagB);                                                 \
     /* http://www.6502.org/tutorials/65c02opcodes.html - unlike      \
      * the 6502, the 65C02 clears D on BRK.                          \
      */                                                              \
     P &= ~flagD;                                                     \
-    push(P | flagX | flagB);                                                 \
     P |= flagI;                                                      \
     {                                                                \
         word hdlr = getMemory(0xfffe) + (getMemory(0xffff) << 8);    \
