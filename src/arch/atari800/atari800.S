@@ -496,7 +496,7 @@ zproc screen_getcursor
     rts
 zendproc
 
-; XZ = timeout in cs
+; XA = timeout in cs
 
 zproc screen_getchar
     sta ptr
