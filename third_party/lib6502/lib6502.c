@@ -651,12 +651,11 @@ enum
     PC++;                                                            \
     push(PC >> 8);                                                   \
     push(PC & 0xff);                                                 \
-    P |= flagB;                                                      \
     /* http://www.6502.org/tutorials/65c02opcodes.html - unlike      \
      * the 6502, the 65C02 clears D on BRK.                          \
      */                                                              \
     P &= ~flagD;                                                     \
-    push(P | flagX);                                                 \
+    push(P | flagX | flagB);                                                 \
     P |= flagI;                                                      \
     {                                                                \
         word hdlr = getMemory(0xfffe) + (getMemory(0xffff) << 8);    \
@@ -776,9 +775,9 @@ void M6502_irq(M6502* mpu)
             (byte)(mpu->registers->pc >> 8);
         mpu->memory[0x0100 + mpu->registers->s--] =
             (byte)(mpu->registers->pc & 0xff);
-        mpu->memory[0x0100 + mpu->registers->s--] = mpu->registers->p;
-        mpu->registers->p &= ~flagB;
+        mpu->memory[0x0100 + mpu->registers->s--] = (mpu->registers->p & ~flagB) | flagX;
         mpu->registers->p |= flagI;
+        mpu->registers->p &= ~flagD;
         mpu->registers->pc = M6502_getVector(mpu, IRQ);
     }
 }
@@ -788,9 +787,9 @@ void M6502_nmi(M6502* mpu)
     mpu->memory[0x0100 + mpu->registers->s--] = (byte)(mpu->registers->pc >> 8);
     mpu->memory[0x0100 + mpu->registers->s--] =
         (byte)(mpu->registers->pc & 0xff);
-    mpu->memory[0x0100 + mpu->registers->s--] = mpu->registers->p;
-    mpu->registers->p &= ~flagB;
+    mpu->memory[0x0100 + mpu->registers->s--] = (mpu->registers->p & ~flagB) | flagX;
     mpu->registers->p |= flagI;
+    mpu->registers->p &= ~flagD;
     mpu->registers->pc = M6502_getVector(mpu, NMI);
 }
 
