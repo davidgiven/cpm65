@@ -496,7 +496,7 @@ zproc screen_getcursor
     rts
 zendproc
 
-; XZ = timeout in cs
+; XA = timeout in cs
 
 zproc screen_getchar
     sta ptr
@@ -509,10 +509,12 @@ zproc screen_getchar
     ldy RTCLOK                      ; incremented every 1/50th of a second
     iny
 
+    jsr toggle_cursor
+
     zloop
         ldx CH
         inx
-        zbreakif_eq                 ; break if key is pending
+        zbreakif_ne                 ; break if key is pending
         cpy RTCLOK
         zif_eq
             iny
@@ -522,6 +524,7 @@ zproc screen_getchar
                 ldx ptr+1
                 cpx #$ff
                 zif_eq
+                    jsr toggle_cursor
                     sec             ; timer expired
                     rts
                 zendif
@@ -530,6 +533,7 @@ zproc screen_getchar
         zendif
     zendloop
 
+    jsr toggle_cursor
     jsr tty_conin
     clc
     rts

@@ -1,259 +1,259 @@
 #define do_insns(_)           \
     _(00, brk, implied, 7)   \
     _(01, ora, indx, 6)      \
-    _(02, ill, implied, 2)   \
-    _(03, ill, implied, 2)   \
+    _(02, nop, immediate, 2) \
+    _(03, nop, implied, 1)   \
     _(04, tsb, zp, 3)        \
     _(05, ora, zp, 3)        \
     _(06, asl, zp, 5)        \
-    _(07, ill, implied, 2)   \
+    _(07, rmb0, zp,     2)   \
     _(08, php, implied, 3)   \
     _(09, ora, immediate, 3) \
     _(0a, asla, implied, 2)  \
-    _(0b, ill, implied, 2)   \
+    _(0b, nop, implied, 1)   \
     _(0c, tsb, abs, 4)       \
     _(0d, ora, abs, 4)       \
     _(0e, asl, abs, 6)       \
-    _(0f, ill, implied, 2)   \
+    _(0f, bbr0, zpr,    2)   \
     _(10, bpl, relative, 2)  \
     _(11, ora, indy, 5)      \
     _(12, ora, indzp, 3)     \
-    _(13, ill, implied, 2)   \
+    _(13, nop, implied, 1)   \
     _(14, trb, zp, 3)        \
     _(15, ora, zpx, 4)       \
     _(16, asl, zpx, 6)       \
-    _(17, ill, implied, 2)   \
+    _(17, rmb1, zp,     2)   \
     _(18, clc, implied, 2)   \
     _(19, ora, absy, 4)      \
     _(1a, ina, implied, 2)   \
-    _(1b, ill, implied, 2)   \
+    _(1b, nop, implied, 1)   \
     _(1c, trb, abs, 4)       \
     _(1d, ora, absx, 4)      \
     _(1e, asl, absx, 7)      \
-    _(1f, ill, implied, 2)   \
+    _(1f, bbr1, zpr,    2)   \
     _(20, jsr, abs, 6)       \
     _(21, and, indx, 6)      \
-    _(22, ill, implied, 2)   \
-    _(23, ill, implied, 2)   \
+    _(22, nop, immediate, 2) \
+    _(23, nop, implied, 1)   \
     _(24, bit, zp, 3)        \
     _(25, and, zp, 3)        \
     _(26, rol, zp, 5)        \
-    _(27, ill, implied, 2)   \
+    _(27, rmb2, zp,     2)   \
     _(28, plp, implied, 4)   \
     _(29, and, immediate, 3) \
     _(2a, rola, implied, 2)  \
-    _(2b, ill, implied, 2)   \
+    _(2b, nop, implied, 1)   \
     _(2c, bit, abs, 4)       \
     _(2d, and, abs, 4)       \
     _(2e, rol, abs, 6)       \
-    _(2f, ill, implied, 2)   \
+    _(2f, bbr2, zpr,    2)   \
     _(30, bmi, relative, 2)  \
     _(31, and, indy, 5)      \
     _(32, and, indzp, 3)     \
-    _(33, ill, implied, 2)   \
+    _(33, nop, implied, 1)   \
     _(34, bit, zpx, 4)       \
     _(35, and, zpx, 4)       \
     _(36, rol, zpx, 6)       \
-    _(37, ill, implied, 2)   \
+    _(37, rmb3, zp,     2)   \
     _(38, sec, implied, 2)   \
     _(39, and, absy, 4)      \
     _(3a, dea, implied, 2)   \
-    _(3b, ill, implied, 2)   \
+    _(3b, nop, implied, 1)   \
     _(3c, bit, absx, 4)      \
     _(3d, and, absx, 4)      \
     _(3e, rol, absx, 7)      \
-    _(3f, ill, implied, 2)   \
+    _(3f, bbr3, zpr,    2)   \
     _(40, rti, implied, 6)   \
     _(41, eor, indx, 6)      \
-    _(42, ill, implied, 2)   \
-    _(43, ill, implied, 2)   \
-    _(44, ill, zp, 3)        \
+    _(42, nop, immediate, 2) \
+    _(43, nop, implied, 1)   \
+    _(44, nop, zp,        3) \
     _(45, eor, zp, 3)        \
     _(46, lsr, zp, 5)        \
-    _(47, ill, implied, 2)   \
+    _(47, rmb4, zp,     2)   \
     _(48, pha, implied, 3)   \
     _(49, eor, immediate, 3) \
     _(4a, lsra, implied, 2)  \
-    _(4b, ill, implied, 2)   \
+    _(4b, nop, implied, 1)   \
     _(4c, jmp, abs, 3)       \
     _(4d, eor, abs, 4)       \
     _(4e, lsr, abs, 6)       \
-    _(4f, ill, implied, 2)   \
+    _(4f, bbr4, zpr,    2)   \
     _(50, bvc, relative, 2)  \
     _(51, eor, indy, 5)      \
     _(52, eor, indzp, 3)     \
-    _(53, ill, implied, 2)   \
-    _(54, ill, zp, 4)        \
+    _(53, nop, implied, 1)   \
+    _(54, nop, zpx,       4) \
     _(55, eor, zpx, 4)       \
     _(56, lsr, zpx, 6)       \
-    _(57, ill, implied, 2)   \
+    _(57, rmb5, zp,     2)   \
     _(58, cli, implied, 2)   \
     _(59, eor, absy, 4)      \
     _(5a, phy, implied, 3)   \
-    _(5b, ill, implied, 2)   \
-    _(5c, ill, abs, 8)       \
+    _(5b, nop, implied, 1)   \
+    _(5c, nop, abs,       8) \
     _(5d, eor, absx, 4)      \
     _(5e, lsr, absx, 7)      \
-    _(5f, ill, implied, 2)   \
+    _(5f, bbr5, zpr,    2)   \
     _(60, rts, implied, 6)   \
     _(61, adc, indx, 6)      \
-    _(62, ill, implied, 2)   \
-    _(63, ill, implied, 2)   \
+    _(62, nop, immediate, 2) \
+    _(63, nop, implied, 1)   \
     _(64, stz, zp, 3)        \
     _(65, adc, zp, 3)        \
     _(66, ror, zp, 5)        \
-    _(67, ill, implied, 2)   \
+    _(67, rmb6, zp,     2)   \
     _(68, pla, implied, 4)   \
     _(69, adc, immediate, 3) \
     _(6a, rora, implied, 2)  \
-    _(6b, ill, implied, 2)   \
+    _(6b, nop, implied, 1)   \
     _(6c, jmp, indirect, 5)  \
     _(6d, adc, abs, 4)       \
     _(6e, ror, abs, 6)       \
-    _(6f, ill, implied, 2)   \
+    _(6f, bbr6, zpr,    2)   \
     _(70, bvs, relative, 2)  \
     _(71, adc, indy, 5)      \
     _(72, adc, indzp, 3)     \
-    _(73, ill, implied, 2)   \
+    _(73, nop, implied, 1)   \
     _(74, stz, zpx, 4)       \
     _(75, adc, zpx, 4)       \
     _(76, ror, zpx, 6)       \
-    _(77, ill, implied, 2)   \
+    _(77, rmb7, zp,     2)   \
     _(78, sei, implied, 2)   \
     _(79, adc, absy, 4)      \
     _(7a, ply, implied, 4)   \
-    _(7b, ill, implied, 2)   \
+    _(7b, nop, implied, 1)   \
     _(7c, jmp, indabsx, 6)   \
     _(7d, adc, absx, 4)      \
     _(7e, ror, absx, 7)      \
-    _(7f, ill, implied, 2)   \
+    _(7f, bbr7, zpr,    2)   \
     _(80, bra, relative, 2)  \
     _(81, sta, indx, 6)      \
-    _(82, ill, implied, 2)   \
-    _(83, ill, implied, 2)   \
+    _(82, nop, immediate, 2) \
+    _(83, nop, implied, 1)   \
     _(84, sty, zp, 2)        \
     _(85, sta, zp, 2)        \
     _(86, stx, zp, 2)        \
-    _(87, ill, implied, 2)   \
+    _(87, smb0, zp,     2)   \
     _(88, dey, implied, 2)   \
-    _(89, bit, immediate, 2) \
+    _(89, bim, immediate, 2) \
     _(8a, txa, implied, 2)   \
-    _(8b, ill, implied, 2)   \
+    _(8b, nop, implied, 1)   \
     _(8c, sty, abs, 4)       \
     _(8d, sta, abs, 4)       \
     _(8e, stx, abs, 4)       \
-    _(8f, ill, implied, 2)   \
+    _(8f, bbs0,    zpr, 2)   \
     _(90, bcc, relative, 2)  \
     _(91, sta, indy, 6)      \
     _(92, sta, indzp, 3)     \
-    _(93, ill, implied, 2)   \
+    _(93, nop, implied, 1)   \
     _(94, sty, zpx, 4)       \
     _(95, sta, zpx, 4)       \
     _(96, stx, zpy, 4)       \
-    _(97, ill, implied, 2)   \
+    _(97, smb1, zp,     2)   \
     _(98, tya, implied, 2)   \
     _(99, sta, absy, 5)      \
     _(9a, txs, implied, 2)   \
-    _(9b, ill, implied, 2)   \
+    _(9b, nop, implied, 1)   \
     _(9c, stz, abs, 4)       \
     _(9d, sta, absx, 5)      \
     _(9e, stz, absx, 5)      \
-    _(9f, ill, implied, 2)   \
+    _(9f, bbs1,    zpr, 2)   \
     _(a0, ldy, immediate, 3) \
     _(a1, lda, indx, 6)      \
     _(a2, ldx, immediate, 3) \
-    _(a3, ill, implied, 2)   \
+    _(a3, nop, implied, 1)   \
     _(a4, ldy, zp, 3)        \
     _(a5, lda, zp, 3)        \
     _(a6, ldx, zp, 3)        \
-    _(a7, ill, implied, 2)   \
+    _(a7, smb2, zp,     2)   \
     _(a8, tay, implied, 2)   \
     _(a9, lda, immediate, 3) \
     _(aa, tax, implied, 2)   \
-    _(ab, ill, implied, 2)   \
+    _(ab, nop, implied, 1)   \
     _(ac, ldy, abs, 4)       \
     _(ad, lda, abs, 4)       \
     _(ae, ldx, abs, 4)       \
-    _(af, ill, implied, 2)   \
+    _(af, bbs2,    zpr, 2)   \
     _(b0, bcs, relative, 2)  \
     _(b1, lda, indy, 5)      \
     _(b2, lda, indzp, 3)     \
-    _(b3, ill, implied, 2)   \
+    _(b3, nop, implied, 1)   \
     _(b4, ldy, zpx, 4)       \
     _(b5, lda, zpx, 4)       \
     _(b6, ldx, zpy, 4)       \
-    _(b7, ill, implied, 2)   \
+    _(b7, smb3, zp,     2)   \
     _(b8, clv, implied, 2)   \
     _(b9, lda, absy, 4)      \
     _(ba, tsx, implied, 2)   \
-    _(bb, ill, implied, 2)   \
+    _(bb, nop, implied, 1)   \
     _(bc, ldy, absx, 4)      \
     _(bd, lda, absx, 4)      \
     _(be, ldx, absy, 4)      \
-    _(bf, ill, implied, 2)   \
+    _(bf, bbs3,    zpr, 2)   \
     _(c0, cpy, immediate, 3) \
     _(c1, cmp, indx, 6)      \
-    _(c2, ill, implied, 2)   \
-    _(c3, ill, implied, 2)   \
+    _(c2, nop, immediate, 2) \
+    _(c3, nop, implied, 1)   \
     _(c4, cpy, zp, 3)        \
     _(c5, cmp, zp, 3)        \
     _(c6, dec, zp, 5)        \
-    _(c7, ill, implied, 2)   \
+    _(c7, smb4, zp,     2)   \
     _(c8, iny, implied, 2)   \
     _(c9, cmp, immediate, 3) \
     _(ca, dex, implied, 2)   \
-    _(cb, ill, implied, 2)   \
+    _(cb, nop, implied, 1)   \
     _(cc, cpy, abs, 4)       \
     _(cd, cmp, abs, 4)       \
     _(ce, dec, abs, 6)       \
-    _(cf, ill, implied, 2)   \
+    _(cf, bbs4,    zpr, 2)   \
     _(d0, bne, relative, 2)  \
     _(d1, cmp, indy, 5)      \
     _(d2, cmp, indzp, 3)     \
-    _(d3, ill, implied, 2)   \
-    _(d4, ill, zp, 4)        \
+    _(d3, nop, implied, 1)   \
+    _(d4, nop, zpx,       4) \
     _(d5, cmp, zpx, 4)       \
     _(d6, dec, zpx, 6)       \
-    _(d7, ill, implied, 2)   \
+    _(d7, smb5, zp,     2)   \
     _(d8, cld, implied, 2)   \
     _(d9, cmp, absy, 4)      \
     _(da, phx, implied, 3)   \
-    _(db, ill, implied, 2)   \
-    _(dc, ill, abs, 4)       \
+    _(db, nop, implied, 1)   \
+    _(dc, nop, abs,       4) \
     _(dd, cmp, absx, 4)      \
     _(de, dec, absx, 7)      \
-    _(df, ill, implied, 2)   \
+    _(df, bbs5,    zpr, 2)   \
     _(e0, cpx, immediate, 3) \
     _(e1, sbc, indx, 6)      \
-    _(e2, ill, implied, 2)   \
-    _(e3, ill, implied, 2)   \
+    _(e2, nop, immediate, 2) \
+    _(e3, nop, implied, 1)   \
     _(e4, cpx, zp, 3)        \
     _(e5, sbc, zp, 3)        \
     _(e6, inc, zp, 5)        \
-    _(e7, ill, implied, 2)   \
+    _(e7, smb6, zp,     2)   \
     _(e8, inx, implied, 2)   \
     _(e9, sbc, immediate, 3) \
     _(ea, nop, implied, 2)   \
-    _(eb, ill, implied, 2)   \
+    _(eb, nop, implied, 1)   \
     _(ec, cpx, abs, 4)       \
     _(ed, sbc, abs, 4)       \
     _(ee, inc, abs, 6)       \
-    _(ef, ill, implied, 2)   \
+    _(ef, bbs6,    zpr, 2)   \
     _(f0, beq, relative, 2)  \
     _(f1, sbc, indy, 5)      \
     _(f2, sbc, indzp, 3)     \
-    _(f3, ill, implied, 2)   \
-    _(f4, ill, zp, 4)        \
+    _(f3, nop, implied, 1)   \
+    _(f4, nop, zpx,       4) \
     _(f5, sbc, zpx, 4)       \
     _(f6, inc, zpx, 6)       \
-    _(f7, ill, implied, 2)   \
+    _(f7, smb7, zp,     2)   \
     _(f8, sed, implied, 2)   \
     _(f9, sbc, absy, 4)      \
     _(fa, plx, implied, 4)   \
-    _(fb, ill, implied, 2)   \
-    _(fc, ill, abs, 4)       \
+    _(fb, nop, implied, 1)   \
+    _(fc, nop, abs,       4) \
     _(fd, sbc, absx, 4)      \
     _(fe, inc, absx, 7)      \
-    _(ff, ill, implied, 2)
+    _(ff, bbs7,    zpr, 2)
 
 
