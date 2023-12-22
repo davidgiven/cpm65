@@ -150,12 +150,6 @@ zproc initdrivers
     jsr entry_FINDDRV
     sta TTY+1
     stx TTY+2
-    
-    lda #<DRVID_AUX
-	ldx #>DRVID_AUX
-	jsr entry_FINDDRV
-	sta AUX+1
-	stx AUX+2
     rts
 zendproc
 
@@ -177,31 +171,4 @@ zendproc
     ; fall through
 zproc TTY
     jmp 0xffff
-zendproc
-
-
-; TTY routine implementations which delegate to a driver.
-
-zproc entry_AUXOPEN
-	ldy #AUX_OPEN
-	jmp AUX
-zendproc
-
-zproc entry_AUXCLOSE
-	ldy #AUX_CLOSE
-	jmp AUX
-zendproc
-
-
-zproc entry_AUXIN
-	ldy #AUX_IN
-	jmp AUX
-zendproc
-
-zproc entry_AUXOUT
-	ldy #AUX_OUT
-zendproc
-	; fall through
-zproc AUX
-	jmp 0xffff
 zendproc

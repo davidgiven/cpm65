@@ -25,7 +25,7 @@
 count=ret
 endcondx=tmp+3
 
-.zp drvaux, 2
+.zp drvserial, 2
 
 
 SOH = 1         \     H001          Start Of Header
@@ -49,34 +49,31 @@ start:
     sta BIOS+1
     stx BIOS+2
 
-    .label welcome_msg
     lda #<welcome_msg
     ldx #>welcome_msg
     jsr print_string
 
 
-    lda #<DRVID_AUX
-	ldx #>DRVID_AUX
+    lda #<DRVID_SERIAL
+	ldx #>DRVID_SERIAL
     ldy #BIOS_FINDDRV
     jsr BIOS
-    sta drvaux+0
-    stx drvaux+1
+    sta drvserial+0
+    stx drvserial+1
 
-    bcc found_aux
-    .label aux_not_found
-    lda #<aux_not_found
-    ldx #>aux_not_found
+    bcc found_serial
+    lda #<serial_not_found
+    ldx #>serial_not_found
     jmp print_string    \ exits
 
-found_aux:
-    .label aux_found
-    lda #<aux_found
-    ldx #>aux_found
+found_serial:
+    lda #<serial_found
+    ldx #>serial_found
     jsr print_string
 
-    lda drvaux+1
+    lda drvserial+1
     jsr print_hex_number
-    lda drvaux+0
+    lda drvserial+0
     jsr print_hex_number
 
     lda #'\r'
@@ -102,12 +99,11 @@ found_aux:
         jmp print_string    \ exits
     .zendif
 
-    .label start_transmission
     lda #<start_transmission
     ldx #>start_transmission
     jsr print_string
 
-    jsr aux_open
+    jsr serial_open
 
 
 mainloop:
@@ -121,7 +117,6 @@ mainloop:
     jsr BDOS
 
 
-    .label done_transmission
     lda #<done_transmission
     ldx #>done_transmission
     jmp print_string     \ exit
@@ -136,7 +131,7 @@ receive_file:
 getblock:
     lda #NAK        \ start transmission
 getblock2:
-    jsr putaux
+    jsr putserial
     lda #0
     sta offset
     jsr getblockchar
@@ -157,10 +152,9 @@ no_char:
 
 end_of_tranmission:
     lda #ACK
-    jsr putaux
+    jsr putserial
 
-    jsr aux_close
-    .label transmission_done
+    jsr serial_close
     lda #<transmission_done
     ldx #>transmission_done
     jsr print_string
@@ -168,8 +162,7 @@ end_of_tranmission:
     rts
 
 abort_transmission:
-    jsr aux_close
-    .label transmission_stopped
+    jsr serial_close
     lda #<transmission_stopped
     ldx #>transmission_stopped
     jsr print_string
@@ -218,7 +211,7 @@ getblockchar:
     sta chrwait
     sta chrwait+1
 getblockchar2:
-    jsr getaux
+    jsr getserial
     .zif cs
        inc chrwait
        lda chrwait
@@ -250,7 +243,6 @@ write_buffer:
 
 create_file_from_fcb:
 
-    .label writing_to
     lda #<writing_to
     ldx #>writing_to
     jsr print_string
@@ -266,21 +258,21 @@ create_file_from_fcb:
     jsr BDOS
     rts
 
-aux_open:
-    ldy #AUX_OPEN
-    jmp (drvaux)
+serial_open:
+    ldy #SERIAL_OPEN
+    jmp (drvserial)
 
-aux_close:
-    ldy #AUX_CLOSE
-    jmp (drvaux)
+serial_close:
+    ldy #SERIAL_CLOSE
+    jmp (drvserial)
 
-getaux:
-    ldy #AUX_IN
-    jmp (drvaux)
+getserial:
+    ldy #SERIAL_INP
+    jmp (drvserial)
 
-putaux:
-    ldy #AUX_OUT
-    jmp (drvaux)
+putserial:
+    ldy #SERIAL_OUT
+    jmp (drvserial)
 
 \ Prints the name of the file in cpm_fcb.
 
@@ -393,8 +385,8 @@ h4:
 BIOS:
     jmp 0
 
-aux_not_found:
-    .byte "error : cannot find auxilary devices\r\n$"
+serial_not_found:
+    .byte "error : cannot find serial device\r\n$"
 
 filename_not_given:
     .byte "error : please add filename to save as parameter\r\n$"
@@ -407,8 +399,8 @@ cant_open_file:
     .byte "cannot open file\r\n$"
 
 
-aux_found:
-    .byte "info : found auxilary device at :$"
+serial_found:
+    .byte "info : found serial device at :$"
 
 writing_to:
     .byte "info : writing to file : $"
@@ -424,7 +416,7 @@ transmission_done:
     .byte "\r\ninfo : reception complete\r\n$"
 
 welcome_msg:
-    .byte "\r\nxmodem-receiver\r\n\r\nfetches x-modem protocol data from AUX-device and writes to disk\r\n$"
+    .byte "\r\nxmodem-receiver\r\n\r\nfetches x-modem protocol data from serial-device and writes to disk\r\n$"
 
 
 

@@ -7,7 +7,7 @@
 #define DRVID_TTY    1
 #define DRVID_SCREEN 2
 #define DRVID_BLOCK  3
-#define DRVID_AUX    4
+#define DRVID_SERIAL 4
 
 ; Driver structure:
 ;
@@ -38,14 +38,14 @@ drv_\name:
 #define TTY_CONIN  1 /* exit: A=key */
 #define TTY_CONOUT 2 /* entry: A=key */
 
-; AUX driver entrypoints
+; Serial driver entrypoints
 
-#define AUX_IN  0  /* exit: C if no char pending, !C char in A */
-#define AUX_OUT  1 /* exit: A=key */
-#define AUX_OPEN  2 /*Open AUX channel */
-#define AUX_CLOSE 3 /* Close AUX channel */
-
-
+#define SERIAL_INP   0 /* exit: C if no char pending, !C char in A */
+#define SERIAL_OUT   1 /* exit: A=char */
+#define SERIAL_OPEN  2 /* entry: open serial port; XA=flags */
+#define SERIAL_CLOSE 3 /* entry: close serial port */
+#define SERIAL_OUTP  4 /* entry: A=char, exit: C if not writable, !C writable */
+#define SERIAL_IN    5 /* entry: A=char */
 
 ; SCREEN driver endpoints
 
