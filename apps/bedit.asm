@@ -962,7 +962,7 @@ dec_table:
 
         jsr print_current_line
 
-        lda #0xff
+        ldx #0xff
         ldy #BDOS_CONIO
         jsr BDOS
         tax
