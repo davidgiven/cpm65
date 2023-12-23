@@ -10,9 +10,8 @@ def asm(self, name, src: Target = None, deps: Targets = []):
         outs=["out.com"],
         deps=["tools/cpmemu", "apps+asm"] + deps,
         commands=[
-            "chronic {deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})"
-            + " a:$(notdir {ins[0]}) b:$(notdir {outs[0]})",
-            "test -f {outs[0]}",
+            "chronic sh -c \"{deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})"
+            + " a:$(notdir {ins[0]}) b:$(notdir {outs[0]}); test -f {outs[0]}\""
         ],
         label="ASM",
     )
@@ -32,7 +31,7 @@ for prog in [
     "scrntest",
     "xrecv",
 ]:
-    asm(name=prog, src=("./%s.asm" % prog), deps=["./cpm65.inc"])
+    asm(name=prog, src=("./%s.asm" % prog), deps=["./cpm65.inc", "./drivers.inc"])
 
 # Simple C programs.
 

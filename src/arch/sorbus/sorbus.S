@@ -78,8 +78,8 @@ zendproc
 .global drvtop
 drvtop: .word drv_TTY
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_AUX
-defdriver "AUX", DRVID_AUX, drvstrat_AUX, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SERIAL
+defdriver "SERIAL", DRVID_SERIAL, drvstrat_SERIAL, 0
 
 
 ; TTY driver strategy routine.
@@ -106,7 +106,7 @@ zendproc
 
 ; AUX driver strategy routine.
 ; Y=AUX opcode.
-zproc drvstrat_AUX
+zproc drvstrat_SERIAL
     pha
     lda aux_jmptable_lo, y
     sta ptr+0
@@ -116,17 +116,20 @@ zproc drvstrat_AUX
     jmp (ptr)
 
 aux_jmptable_lo:
-    .byte aux_in@mos16lo
-    .byte aux_out@mos16lo
-    .byte aux_open@mos16lo
-    .byte aux_close@mos16lo
+    .byte GETIN@mos16lo
+    .byte CHROUT@mos16lo
+    .byte serial_open@mos16lo
+    .byte serial_close@mos16lo
+    .byte serial_outp@mos16lo
+    .byte serial_in@mos16lo
 aux_jmptable_hi:
-    .byte aux_in@mos16hi
-    .byte aux_out@mos16hi
-    .byte aux_open@mos16hi
-    .byte aux_close@mos16hi
+    .byte GETIN@mos16hi
+    .byte CHROUT@mos16hi
+    .byte serial_open@mos16hi
+    .byte serial_close@mos16hi
+    .byte serial_outp@mos16hi
+    .byte serial_in@mos16hi
 zendproc
-
 
 ; Blocks and waits for the next keypress; returns it in A.
 
@@ -182,24 +185,32 @@ zproc tty_const
 zendproc
 
 ; Reads and writes the AUX channel
-zproc aux_open    ; switch off cr/lf translation
+zproc serial_open    ; switch off cr/lf translation
     lda #$00
     sta UART_CONFIG
     rts
 zendproc
-zproc aux_close   ; switch on cr/lf translation
+
+zproc serial_close   ; switch on cr/lf translation
     lda #$01
     sta UART_CONFIG
     rts
 zendproc
 
-zproc aux_in   ; returns with carry set on timeout
-    jmp GETIN
+zproc serial_outp    ; polling write
+    bit UART_WBUFSIZ
+    bmi fail
+    sta UART_WRITE
+    clc
+    rts
+fail:
+    sec
+    rts
 zendproc
 
-zproc aux_out
-    jsr CHROUT
-    clc
+zproc serial_in      ; blocking read
+    jsr GETIN
+    bcs serial_in
     rts
 zendproc
 
@@ -419,8 +430,8 @@ zproc CHROUT
    bit   UART_WBUFSIZ
    bmi   CHROUT
    sta   UART_WRITE
+   clc
    rts
-
 zendproc
 
 ;-------------------------------------------------------------------------
