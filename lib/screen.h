@@ -11,6 +11,8 @@ extern void screen_putchar(char c);
 extern void screen_putstring(const char* s);
 extern uint16_t screen_getchar(uint16_t timeout_cs);
 extern uint8_t screen_waitchar(void);
+extern void screen_scrollup(void);
+extern void screen_scrolldown(void);
 extern void screen_clear_to_eol(void);
 extern void screen_setstyle(uint8_t style);
 

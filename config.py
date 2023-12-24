@@ -32,6 +32,7 @@ SCREEN_APPS = {
     "0:cls.com": "apps+cls",
     "0:life.com": "apps+life",
     "0:qe.com": "apps+qe",
+    "0:vt52term.com": "apps+vt52term",
 }
 
 SCREEN_APPS_SRCS = {"0:cls.asm": "apps/cls.asm"}

@@ -53,6 +53,16 @@ zproc screen_putstring, .text.screen_putstring
     jmp _call_screen
 zendproc
 
+zproc screen_scrollup, text.screen_scrollup
+    ldy #SCREEN_SCROLLUP
+    jmp _call_screen
+zendproc
+
+zproc screen_scrolldown, text.screen_scrolldown
+    ldy #SCREEN_SCROLLDOWN
+    jmp _call_screen
+zendproc
+
 zproc screen_clear_to_eol, .text.screen_clear_to_eol
     ldy #SCREEN_CLEARTOEOL
     jmp _call_screen

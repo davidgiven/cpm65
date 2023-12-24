@@ -35,5 +35,5 @@ for prog in [
 
 # Simple C programs.
 
-for prog in ["asm", "copy", "stat", "submit", "objdump", "qe", "life"]:
+for prog in ["asm", "copy", "stat", "submit", "objdump", "qe", "life", "vt52term"]:
     llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
