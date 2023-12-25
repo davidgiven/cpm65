@@ -27,6 +27,14 @@
 #include "lib/serial.h"
 #include "lib/screen.h"
 
+#define ESC         0x1b
+#define BELL        0x07
+#define BACKSPACE   0x08
+#define TAB         0x09
+#define CR          0x0d
+#define LF          0x0a
+#define LOCAL_CMD   0x11   // ctrl+q
+
 static void cr(void) 
 {
     cpm_printstring("\n\r");
@@ -95,10 +103,10 @@ int main(void)
             if((parse == 1) && (inp != 0)) {
                 screen_getcursor(&cur_x, &cur_y);
                 switch(inp) {
-                    case 0x0d:
+                    case CR:
                         cur_x = 0;
                         break;
-                    case 0x0a:
+                    case LF:
                         cur_y++;
                         if(cur_y > h) {
                             cur_y = h;
@@ -106,17 +114,17 @@ int main(void)
                         }
                         
                         break;
-                    case 0x08:
+                    case BACKSPACE:
                         cur_x--;
                         break;
-                    case 0x09:
+                    case TAB:
                         cur_x = cur_x + 8 - (cur_x % 8);
                         if(cur_x > w) cur_x = w;
                         break;
-                    case 0x07:
+                    case BELL:
                         // Bell, ignore
                         break;
-                    case 0x1b:
+                    case ESC:
                         // Escape
                         mEsc = 1;
                         break;
@@ -219,7 +227,7 @@ int main(void)
         if(cpm_const()) {
             // Use cpm_bios_conin as cpm_conin crashes...
             inp = cpm_bios_conin();
-            if(inp == 0x11) { // Ctrl+Q, check for local commands
+            if(inp == LOCAL_CMD) { // Ctrl+Q, check for local commands
                 inp = cpm_bios_conin();
                 switch(inp) {
                     case 'q':
