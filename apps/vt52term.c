@@ -53,8 +53,11 @@ int main(void)
     uint8_t inp;
     uint8_t local_echo = 0;
     uint8_t vt52 = 1;
-    uint8_t cur_x, cur_y;
-    uint8_t w,h,i;
+    uint8_t cur_x;
+    uint8_t cur_y;
+    uint8_t w;
+    uint8_t h;
+    uint8_t i;
     uint8_t mEsc=0;
     uint8_t parse=0;
     if(!serial_init())
@@ -76,12 +79,15 @@ int main(void)
         // Check for data on serial port and parse it
         inp = serial_inp();
         parse = 1;
-        if(vt52) {        
+        if(vt52) {
+            screen_getcursor(&cur_x, &cur_y);
             if((inp >= 32) && (inp < 127)) {
                 switch(mEsc) {
                     case 0: // Regular ASCII
-                        // TODO: Graphicsmode?
-                        cpm_conout(inp);
+                        screen_putchar(inp);
+                        cur_x++;
+                        if(cur_x > w) cur_x = 0;
+                        screen_setcursor(cur_x,cur_y);
                         parse = 0;
                         break;
                     case 1: // Escape sequence
@@ -101,7 +107,6 @@ int main(void)
             
             }
             if((parse == 1) && (inp != 0)) {
-                screen_getcursor(&cur_x, &cur_y);
                 switch(inp) {
                     case CR:
                         cur_x = 0;
@@ -231,15 +236,18 @@ int main(void)
                 inp = cpm_bios_conin();
                 switch(inp) {
                     case 'q':
+                    case 'Q':
                         // Quit
                         cpm_warmboot();
                         break;
                     case 'e':
+                    case 'E':
                         // Toggle local echo
                         if(!local_echo) local_echo = 1;
                         else local_echo = 0;
                         break;
                     case 'v':
+                    case 'V':
                         // Toggle VT52 emulation
                         if(!vt52) vt52 = 1;
                         else vt52 = 0;

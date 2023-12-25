@@ -53,12 +53,12 @@ zproc screen_putstring, .text.screen_putstring
     jmp _call_screen
 zendproc
 
-zproc screen_scrollup, text.screen_scrollup
+zproc screen_scrollup, .text.screen_scrollup
     ldy #SCREEN_SCROLLUP
     jmp _call_screen
 zendproc
 
-zproc screen_scrolldown, text.screen_scrolldown
+zproc screen_scrolldown, .text.screen_scrolldown
     ldy #SCREEN_SCROLLDOWN
     jmp _call_screen
 zendproc
