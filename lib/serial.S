@@ -33,9 +33,15 @@ zproc serial_close, .text.serial_close
     jmp _call_serial
 zendproc
 
-zproc serial_inp, .text.serial_inp
+zproc _serial_inp, .text._serial_inp
     ldy #SERIAL_INP
-    jmp _call_serial
+    jsr _call_serial
+    zif_cs
+        ldx #0
+        rts
+    zendif
+    ldx #1
+    rts
 zendproc
 
 zproc serial_out, .text.serial_out
