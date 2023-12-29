@@ -4,12 +4,14 @@
  *
  * A VT52 terminal emulator for CP/M-65. Works well enough to login and run
  * vim on a linux server (if the shell is configured correctly for VT52).
- * Xmodem file transfer using sx on linux works.
+ * Xmodem file transfer during a session using sx on linux works.
  *
  * Requires SERIAL driver. SCREEN driver needed for VT52 emulation.
  * 
  * VT52 parsing code heavily inspired by Kenneth Gobers VT52 terminal emulator for 
  * windows, see https://github.com/kgober/VT52/
+ *
+ * Xmodem code heavily inspired by xrecv.asm
  *
  * Commands:
  * Ctrl-q + q   -   Quit
@@ -235,7 +237,7 @@ static void xmodem_receive(void) {
     uint8_t block_cnt = 0;
     uint8_t pos = 0;
     uint8_t checksum;
-    uint8_t delay_1;
+    uint8_t delay;
     uint8_t inp;
     uint8_t outp;
     uint8_t data_available;
@@ -261,7 +263,7 @@ static void xmodem_receive(void) {
         return;
     }
 
-    delay_1 = 0;
+    delay = 0;
     outp = NAK;
     // Transmission
     while(1) {
@@ -303,9 +305,9 @@ static void xmodem_receive(void) {
                 }
             } 
         }
-        delay_1++;
+        delay++;
         cpm_conout('.');
-        if(delay_1 == 200) {
+        if(delay == 200) {
             cpm_close_file(&xmodem_file);
             cpm_printstring("Timeout");
             cr();
@@ -414,8 +416,8 @@ int main(void)
                     break;
                 }
             } else {
-                // Send data to serial port if found (echo?)
-                if(local_echo) cpm_conout(inp); // Echo
+                // Send data to serial port and echo if avtivated
+                if(local_echo) cpm_conout(inp);
                 serial_out(inp);
             }
         }
