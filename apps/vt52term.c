@@ -300,7 +300,8 @@ static void xmodem_receive(void) {
                     if(checksum == inp) {
                         outp = ACK;
                         cpm_set_dma(&xmodem_buffer);
-                        cpm_write_sequential(&xmodem_file);    
+                        cpm_write_sequential(&xmodem_file);
+                        if(delay > 0) delay--;    
                     }
                 }
             } 
