@@ -365,6 +365,7 @@ int main(void)
                         // Quit
                         cpm_printstring("Goodbye!");
                         cr();
+                        serial_close();
                         cpm_warmboot();
                         break;
                     case 'e':
