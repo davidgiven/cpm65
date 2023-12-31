@@ -4,7 +4,10 @@
  *
  * A VT52 terminal emulator for CP/M-65. Works well enough to login and run
  * vim on a linux server (if the shell is configured correctly for VT52).
- * Xmodem file transfer during a session using sx on linux works.
+ * Xmodem file transfer during a session using sx/rx on linux works.
+ *
+ * Known issue: Sometimes file corruption occurs if several file transfers are done
+ * sequentially.
  *
  * Requires SERIAL driver. SCREEN driver needed for VT52 emulation.
  * 
@@ -18,19 +21,19 @@
  * Ctrl-q + e   -   Local echo on/off (default off)
  * Ctrl-q + v   -   VT52 emulation on/off (default on if SCREEN driver available)
  * Ctrl-q + r   -   Xmodem receive
+ * Ctrl-q + s   -   Xmodem send
  *
  * TODO:
  * Implement sending VT52 sequences for arrow keys (needs updated screen driver)
  * Implement port settings (needs updated serial driver)
- * Implement Xmodem send
  * Implement XON/XOFF flow control (or should it be handled by the driver?)
- * Add xmodem send/receive to allow file transfer
-*/
+ */
  
 #include <cpm.h>
 #include <stdio.h>
 #include "lib/serial.h"
 #include "lib/screen.h"
+#include "lib/printi.h"
 
 #define ESC         0x1b
 #define BELL        0x07
@@ -234,10 +237,10 @@ static uint8_t getblockchar(uint8_t *data) {
 
 static void xmodem_receive(void) {
     char filename_input[14];
-    uint8_t block_cnt = 0;
+    uint8_t block_cnt;
+    uint8_t block_exp = 1;
     uint8_t pos = 0;
     uint8_t checksum;
-    uint8_t delay;
     uint8_t inp;
     uint8_t outp;
     uint8_t data_available;
@@ -245,7 +248,7 @@ static void xmodem_receive(void) {
     cr();
     cpm_printstring("Enter filename: ");
 
-    filename_input[0]=11;
+    filename_input[0]=13;
     filename_input[1]=0;    
     cpm_readline((uint8_t *)filename_input);
     cr();
@@ -263,19 +266,24 @@ static void xmodem_receive(void) {
         return;
     }
 
-    delay = 0;
+    cpm_printstring("Waiting for sender");
+    cr();
+    cpm_printstring("Press any key to cancel");
+    cr(); 
     outp = NAK;
     // Transmission
     while(1) {
         serial_out(outp);
         if(getblockchar(&inp)) {
             if(inp == EOT) {
+                cr();
                 cpm_printstring("Transmission done");
                 cr();
                 cpm_close_file(&xmodem_file);
                 return;
             }
             if(inp == CAN) {
+                cr();
                 cpm_printstring("Transmission cancelled");
                 cr();
                 cpm_close_file(&xmodem_file);
@@ -288,7 +296,7 @@ static void xmodem_receive(void) {
                 getblockchar(&inp);
                 block_cnt = inp;
                 getblockchar(&inp);
-                if(block_cnt == (inp ^ 0xFF)) {
+                if((block_cnt == (inp ^ 0xFF)) && (block_cnt == block_exp)) {
                     // Get block, otherwise retry
                     for(pos=0; pos<128; pos++) {
                         getblockchar(&inp);
@@ -301,21 +309,123 @@ static void xmodem_receive(void) {
                         outp = ACK;
                         cpm_set_dma(&xmodem_buffer);
                         cpm_write_sequential(&xmodem_file);
-                        if(delay > 0) delay--;    
+                        printi(block_cnt);    
                     }
+                    block_exp++;
                 }
             } 
         }
-        delay++;
         cpm_conout('.');
-        if(delay == 200) {
+        if(cpm_const()) {
             cpm_close_file(&xmodem_file);
-            cpm_printstring("Timeout");
-            cr();
             return;
         }
     }
 
+}
+
+void xmodem_send_block(uint8_t block_cnt) {
+    uint8_t i;
+    uint8_t checksum;
+    uint8_t data;
+    
+    // Print block number
+    printi(block_cnt);
+
+    // Send header
+    serial_outp(SOH);
+    serial_outp(block_cnt);
+    serial_outp(block_cnt ^ 0xFF);
+
+    checksum = 0;
+    // Send data
+    for(i=0; i<128; i++) {
+        data = xmodem_buffer[i];
+        checksum += data;
+        serial_outp(data);
+    }
+
+    // Send checksum
+    serial_outp(checksum);    
+}
+
+void xmodem_send(void) {
+    char filename_input[14];
+    uint8_t block_cnt = 1;
+    uint8_t pos = 0;
+    uint8_t delay;
+    uint8_t inp;
+    uint8_t outp;
+    uint8_t nak_cnt = 0;
+    cpm_printstring("X modem send");
+    cr();
+    cpm_printstring("Enter filename: ");
+
+    filename_input[0]=13;
+    filename_input[1]=0;    
+    cpm_readline((uint8_t *)filename_input);
+    cr();
+
+    // Parse filename
+    cpm_set_dma(&xmodem_file);
+    if(!cpm_parse_filename(&filename_input[2])) {
+        cpm_printstring("Bad filename\r\n");
+        return;
+    }
+
+    // Open file
+    if(cpm_open_file( &xmodem_file)) {
+        cpm_printstring("Error creating file\r\n");
+        return;
+    }
+
+    // Load first block
+    cpm_set_dma(&xmodem_buffer);
+    cpm_read_sequential(&xmodem_file);
+
+    cpm_printstring("Waiting for receiver...");
+    cr();
+    cpm_printstring("Press any key to cancel");
+    cr();
+
+    while(1) {
+        if(getblockchar(&inp)) {
+            if(inp == NAK) {
+                // Resend block
+                xmodem_send_block(block_cnt);
+                nak_cnt++;
+                if(nak_cnt == 11) {
+                    cpm_printstring("Too many NAKs, aborting");
+                    cr();
+                    serial_outp(CAN);
+                    cpm_close_file(&xmodem_file);
+                    return;
+                }
+            }
+            if(inp == ACK) {
+                cpm_conout('.');
+                // Load next block
+                cpm_set_dma(&xmodem_buffer);
+                if(cpm_read_sequential(&xmodem_file)) {
+                    cr();
+                    cpm_printstring("Transmission done");
+                    cr();
+                    serial_outp(EOT);
+                    cpm_close_file(&xmodem_file);
+                    return;
+                }
+                block_cnt++;
+                // Send next block
+                xmodem_send_block(block_cnt);
+            }    
+        }
+        if(cpm_const()) {
+            // Cancel due to keypress
+            cpm_close_file(&xmodem_file);
+            serial_outp(CAN);
+            return;
+        }
+    }
 }
 
 int main(void) 
@@ -400,6 +510,11 @@ int main(void)
                         // Xmodem receive;
                         xmodem_receive();
                         break;
+                    case 's':
+                    case 'S':
+                        // Xmodem send
+                        xmodem_send();
+                        break;
                     case 'h':
                     case 'H':
                         // Print help
@@ -412,6 +527,8 @@ int main(void)
                         cpm_printstring("Ctrl-q + v:    Toggle VT52 emulation");
                         cr();
                         cpm_printstring("Ctrl-q + r:    Xmodem Receive");
+                        cr();
+                        cpm_printstring("Ctrl-q + s:    Xmodem Send");
                         cr();
                         break;
                     default:
