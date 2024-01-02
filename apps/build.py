@@ -30,6 +30,8 @@ for prog in [
     "ls",
     "scrntest",
     "xrecv",
+    "vt52drv",
+    "vt52test",
 ]:
     asm(name=prog, src=("./%s.asm" % prog), deps=["./cpm65.inc", "./drivers.inc"])
 
