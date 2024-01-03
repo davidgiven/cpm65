@@ -30,10 +30,12 @@ for prog in [
     "ls",
     "scrntest",
     "xrecv",
+    "vt52drv",
+    "vt52test",
 ]:
     asm(name=prog, src=("./%s.asm" % prog), deps=["./cpm65.inc", "./drivers.inc"])
 
 # Simple C programs.
 
-for prog in ["asm", "copy", "stat", "submit", "objdump", "qe", "life"]:
+for prog in ["asm", "copy", "stat", "submit", "objdump", "qe", "life", "vt52term"]:
     llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
