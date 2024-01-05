@@ -59,9 +59,7 @@ No, it won't let you run 8080 programs on the 6502!
 Why?
 ----
 
-- Why not?
-- The Sorbus Computer, built about one year after CP/M 65 was started, needed
-  an operating system.
+Why not?
 
 
 Where?
