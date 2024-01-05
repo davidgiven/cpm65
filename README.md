@@ -52,7 +52,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
-<a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
+<a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
 </div>
 
 
@@ -252,7 +252,18 @@ the same time.
 
 ### Sorbus notes
 
-  - None yet!
+  - The Sorbus Computer is a simple, open and cheap (<$15) machine to learn
+    about the 65(C)02 processor. It combines an original CPU with a Raspberry
+    Pi RP2040 microcontroller that implements all the rest (like RAM, I/O, and
+    clock).
+
+  - For building a full image, it is also possible to copy the compiled
+    binaries into the proper position into the source tree, and just run a
+    global build.
+
+  - More info is available here:
+    - [Homepage with lightning talk](https://xayax.net/sorbus/)
+    - [Source code on github](https://github.com/SvOlli/sorbus)
 
 ### Supported programs
 
@@ -261,9 +272,9 @@ some smaller utilities. I'd love more --- send me pull requests! The build
 system supports cc65 assembler and llvm-mos C programs. The native assembler
 can be used (in emulation) to cross compile programs for CP/M-65.
 
-In the CCP, you get the usual `DIR`, `ERA`, `TYPE` and `USER`. There is no
-`SAVE` as on the relocatable CP/M-65 system assembling images in memory is of
-questionable utility, but there's a new `FREE` command which shows memory
+In the CCP, you get the usual `DIR`, `ERA`, `REN`, `TYPE` and `USER`. There is
+no `SAVE` as on the relocatable CP/M-65 system assembling images in memory is
+of questionable utility, but there's a new `FREE` command which shows memory
 usage.
 
 You also get a port of Altirra BASIC, an open source Atari BASIC clone. This is
