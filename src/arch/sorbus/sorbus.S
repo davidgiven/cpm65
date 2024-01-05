@@ -465,7 +465,7 @@ zp_end:     .byte __USERZEROPAGE_END__
 ; subtract $0f00 bytes, that bdos wants to map
 ; BDOS is already fixed at $e800
 mem_base:   .byte  $02-$0f
-mem_end:    .byte  $c0
+mem_end:    .byte  $d0
 
 ; DPH for drive 0 (our only drive)
 
