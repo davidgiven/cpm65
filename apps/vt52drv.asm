@@ -330,38 +330,11 @@ driver:
                 jmp par_done
             .zendif
 
-            cmp #'['
-            .zif eq
-                \ Enter hold screen mode, ignore
-                lda #0
-                sta mEsc
-                jmp par_done
-            .zendif
- 
-            cmp #'\\'
-            .zif eq
-                \ Exit hold screen mode, ignore
-                lda #0
-                sta mEsc
-                jmp par_done
-            .zendif
- 
-            cmp #'='
-            .zif eq
-                \ Enter alternate keypad mode, ignore
-                lda #0
-                sta mEsc
-                jmp par_done
-            .zendif
- 
-            cmp #'>'
-            .zif eq
-                \ Exit alternate keypad mode, ignore
-                lda #0
-                sta mEsc
-                jmp par_done
-            .zendif
- 
+            \ Not a valid escape sequence
+            \ Also covers not implemented sequences for screen more and
+            \ alternate keypad mode
+            lda #0
+            sta mEsc
 
             par_done:
             lda cur_x
