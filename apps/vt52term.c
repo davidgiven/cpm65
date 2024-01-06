@@ -245,7 +245,7 @@ static void xmodem_receive(void) {
     uint8_t inp;
     uint8_t outp;
     uint8_t data_available;
-    //static FCB xmodem_file;
+    
     cpm_printstring("X modem receive");
     cr();
     cpm_printstring("Enter filename: ");
@@ -362,7 +362,7 @@ static void xmodem_send(void) {
     uint8_t inp;
     uint8_t outp;
     uint8_t nak_cnt = 0;
-    //static FCB xmodem_file;
+    
     cpm_printstring("X modem send");
     cr();
     cpm_printstring("Enter filename: ");
