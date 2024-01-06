@@ -331,7 +331,7 @@ driver:
             .zendif
 
             \ Not a valid escape sequence
-            \ Also covers not implemented sequences for screen more and
+            \ Also covers not implemented sequences for screen mode and
             \ alternate keypad mode
             lda #0
             sta mEsc
