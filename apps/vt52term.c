@@ -31,6 +31,7 @@
  
 #include <cpm.h>
 #include <stdio.h>
+#include <string.h>
 #include "lib/serial.h"
 #include "lib/screen.h"
 #include "lib/printi.h"
@@ -244,6 +245,7 @@ static void xmodem_receive(void) {
     uint8_t inp;
     uint8_t outp;
     uint8_t data_available;
+    //static FCB xmodem_file;
     cpm_printstring("X modem receive");
     cr();
     cpm_printstring("Enter filename: ");
@@ -253,6 +255,9 @@ static void xmodem_receive(void) {
     cpm_readline((uint8_t *)filename_input);
     cr();
 
+    // Reset FCB
+    memset(&xmodem_file, 0, sizeof(FCB));
+    
     // Parse filename
     cpm_set_dma(&xmodem_file);
     if(!cpm_parse_filename(&filename_input[2])) {
@@ -324,7 +329,7 @@ static void xmodem_receive(void) {
 
 }
 
-void xmodem_send_block(uint8_t block_cnt) {
+static void xmodem_send_block(uint8_t block_cnt) {
     uint8_t i;
     uint8_t checksum;
     uint8_t data;
@@ -349,7 +354,7 @@ void xmodem_send_block(uint8_t block_cnt) {
     serial_outp(checksum);    
 }
 
-void xmodem_send(void) {
+static void xmodem_send(void) {
     char filename_input[14];
     uint8_t block_cnt = 1;
     uint8_t pos = 0;
@@ -357,6 +362,7 @@ void xmodem_send(void) {
     uint8_t inp;
     uint8_t outp;
     uint8_t nak_cnt = 0;
+    //static FCB xmodem_file;
     cpm_printstring("X modem send");
     cr();
     cpm_printstring("Enter filename: ");
@@ -366,6 +372,9 @@ void xmodem_send(void) {
     cpm_readline((uint8_t *)filename_input);
     cr();
 
+    // Reset FCB
+    memset(&xmodem_file, 0, sizeof(FCB));
+    
     // Parse filename
     cpm_set_dma(&xmodem_file);
     if(!cpm_parse_filename(&filename_input[2])) {
@@ -435,6 +444,7 @@ int main(void)
     uint8_t local_echo = 0;
     uint8_t vt52 = 1;
     uint8_t screen_available = 1;
+    
     if(!serial_init())
         fatal("No SERIAL driver, exiting");
 
