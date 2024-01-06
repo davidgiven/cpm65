@@ -242,22 +242,6 @@ driver:
                 jmp par_done
             .zendif
 
-            cmp #'F'
-            .zif eq
-                \ Enter graphics mode, ignore
-                lda #0
-                sta mEsc
-                jmp par_done
-            .zendif
-        
-            cmp #'G'
-            .zif eq
-                \ Exit graphics mode, ignore
-                lda #0
-                sta mEsc
-                jmp par_done
-            .zendif
-            
             cmp #'H'
             .zif eq
                 \ Cursor home
@@ -331,8 +315,8 @@ driver:
             .zendif
 
             \ Not a valid escape sequence
-            \ Also covers not implemented sequences for screen mode and
-            \ alternate keypad mode
+            \ Also covers not implemented sequences for graphics mode,
+            \ hold screen mode and alternate keypad mode
             lda #0
             sta mEsc
 
