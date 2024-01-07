@@ -360,7 +360,7 @@ static char consumeToken()
 
     for (;;)
     {
-        if ((currentByte == '\\') || (currentByte == ';'))
+        if (currentByte == '\\')
         {
             do
                 consumeByte();
@@ -376,7 +376,7 @@ static char consumeToken()
     if (currentByte == '\n')
     {
         currentFile->lineNumber++;
-        currentByte = ':';
+        currentByte = ';';
     }
 
     switch (currentByte)
