@@ -6,9 +6,6 @@
  * vim on a linux server (if the shell is configured correctly for VT52).
  * Xmodem file transfer during a session using sx/rx on linux works.
  *
- * Known issue: Sometimes file corruption occurs if several file transfers are done
- * sequentially.
- *
  * Requires SERIAL driver. SCREEN driver needed for VT52 emulation.
  * 
  * VT52 parsing code heavily inspired by Kenneth Gobers VT52 terminal emulator for 
@@ -257,7 +254,7 @@ static void xmodem_receive(void) {
 
     // Reset FCB
     memset(&xmodem_file, 0, sizeof(FCB));
-    
+ 
     // Parse filename
     cpm_set_dma(&xmodem_file);
     if(!cpm_parse_filename(&filename_input[2])) {
