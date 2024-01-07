@@ -28,7 +28,6 @@
  
 #include <cpm.h>
 #include <stdio.h>
-#include <string.h>
 #include "lib/serial.h"
 #include "lib/screen.h"
 #include "lib/printi.h"
@@ -253,8 +252,8 @@ static void xmodem_receive(void) {
     cr();
 
     // Reset FCB
-    memset(&xmodem_file, 0, sizeof(FCB));
- 
+    xmodem_file = (const FCB){0}; 
+    
     // Parse filename
     cpm_set_dma(&xmodem_file);
     if(!cpm_parse_filename(&filename_input[2])) {
@@ -370,7 +369,7 @@ static void xmodem_send(void) {
     cr();
 
     // Reset FCB
-    memset(&xmodem_file, 0, sizeof(FCB));
+    xmodem_file = (const FCB){0};
     
     // Parse filename
     cpm_set_dma(&xmodem_file);
@@ -381,7 +380,7 @@ static void xmodem_send(void) {
 
     // Open file
     if(cpm_open_file( &xmodem_file)) {
-        cpm_printstring("Error creating file\r\n");
+        cpm_printstring("Error opening file\r\n");
         return;
     }
 
