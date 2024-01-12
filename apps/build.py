@@ -30,6 +30,7 @@ for prog in [
     "ls",
     "scrntest",
     "xrecv",
+    "xsend",
     "vt52drv",
     "vt52test",
 ]:
