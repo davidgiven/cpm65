@@ -6,9 +6,6 @@
  * vim on a linux server (if the shell is configured correctly for VT52).
  * Xmodem file transfer during a session using sx/rx on linux works.
  *
- * Known issue: Sometimes file corruption occurs if several file transfers are done
- * sequentially.
- *
  * Requires SERIAL driver. SCREEN driver needed for VT52 emulation.
  * 
  * VT52 parsing code heavily inspired by Kenneth Gobers VT52 terminal emulator for 
@@ -244,6 +241,7 @@ static void xmodem_receive(void) {
     uint8_t inp;
     uint8_t outp;
     uint8_t data_available;
+    
     cpm_printstring("X modem receive");
     cr();
     cpm_printstring("Enter filename: ");
@@ -253,6 +251,9 @@ static void xmodem_receive(void) {
     cpm_readline((uint8_t *)filename_input);
     cr();
 
+    // Reset FCB
+    xmodem_file = (const FCB){0}; 
+    
     // Parse filename
     cpm_set_dma(&xmodem_file);
     if(!cpm_parse_filename(&filename_input[2])) {
@@ -324,7 +325,7 @@ static void xmodem_receive(void) {
 
 }
 
-void xmodem_send_block(uint8_t block_cnt) {
+static void xmodem_send_block(uint8_t block_cnt) {
     uint8_t i;
     uint8_t checksum;
     uint8_t data;
@@ -349,7 +350,7 @@ void xmodem_send_block(uint8_t block_cnt) {
     serial_outp(checksum);    
 }
 
-void xmodem_send(void) {
+static void xmodem_send(void) {
     char filename_input[14];
     uint8_t block_cnt = 1;
     uint8_t pos = 0;
@@ -357,6 +358,7 @@ void xmodem_send(void) {
     uint8_t inp;
     uint8_t outp;
     uint8_t nak_cnt = 0;
+    
     cpm_printstring("X modem send");
     cr();
     cpm_printstring("Enter filename: ");
@@ -366,6 +368,9 @@ void xmodem_send(void) {
     cpm_readline((uint8_t *)filename_input);
     cr();
 
+    // Reset FCB
+    xmodem_file = (const FCB){0};
+    
     // Parse filename
     cpm_set_dma(&xmodem_file);
     if(!cpm_parse_filename(&filename_input[2])) {
@@ -375,7 +380,7 @@ void xmodem_send(void) {
 
     // Open file
     if(cpm_open_file( &xmodem_file)) {
-        cpm_printstring("Error creating file\r\n");
+        cpm_printstring("Error opening file\r\n");
         return;
     }
 
@@ -435,6 +440,7 @@ int main(void)
     uint8_t local_echo = 0;
     uint8_t vt52 = 1;
     uint8_t screen_available = 1;
+    
     if(!serial_init())
         fatal("No SERIAL driver, exiting");
 
