@@ -793,6 +793,7 @@ int main(void)
             inp = cpm_bios_conin();
             if(inp == LOCAL_CMD) { // Ctrl+Q, check for local commands
                 inp = cpm_bios_conin();
+                cr();
                 switch(inp) {
                     case 'q':
                     case 'Q':
