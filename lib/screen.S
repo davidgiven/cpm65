@@ -82,3 +82,8 @@ zproc screen_setstyle, .text.screen_setstyle
     ldy #SCREEN_SETSTYLE
     jmp _call_screen
 zendproc
+
+zproc screen_showcursor, .text.screen_showcursor
+    ldy #SCREEN_SHOWCURSOR
+    jmp _call_screen
+zendproc
