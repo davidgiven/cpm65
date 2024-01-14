@@ -76,6 +76,7 @@ typedef enum {
 } t_mode;
 
 static a_state ansi_state = C0;
+static uint8_t linewrap = 1;
 static uint8_t CSI_param[2];
 static uint8_t CSI_param_pos;
 static uint8_t CSI_num_pos;
@@ -96,7 +97,19 @@ static void vt52_parse(uint8_t inp) {
             case 0: // Regular ASCII
                 screen_putchar(inp);
                 cur_x++;
-                if(cur_x > w) cur_x = 0;
+                
+                if(cur_x > w) { 
+                    if(linewrap) {
+                        cur_x = 0;
+                        cur_y++;
+                        if(cur_y > h) {
+                            cur_y = h;
+                            screen_scrollup();
+                        }
+                    } else {
+                        cur_x = w;
+                    }
+                }
                 screen_setcursor(cur_x,cur_y);
                 parse = 0;
                 break;
@@ -252,7 +265,19 @@ static void ansi_parse(uint8_t inp) {
                 // Regular ASCII text
                 screen_putchar(inp);
                 cur_x++;
-                if(cur_x > w) cur_x = 0;
+                if(cur_x > w) {
+                    if(linewrap) { 
+                        cur_x = 0;
+                        cur_y++;
+                        if(cur_y > h) {
+                            cur_y = h;
+                            screen_scrollup();
+                        }
+                    } else {
+                        cur_x = w;
+                    }
+                }
+
             } else {
                 // Parse C0 codes
                 switch(inp) {
@@ -285,8 +310,8 @@ static void ansi_parse(uint8_t inp) {
                     default:
                         break;     
                 }
-                screen_setcursor(cur_x, cur_y);
             }
+            screen_setcursor(cur_x, cur_y);
             break;
         case ESCAPE:
             if(inp == '[') {
@@ -323,9 +348,17 @@ static void ansi_parse(uint8_t inp) {
         case CSI:
             if((inp >=0x30) && (inp <= 0x39)) {
                 // Numerical input
-                if(CSI_param_pos < 2) // No supported commands have more than 2 args
-                    CSI_param[CSI_param_pos] = CSI_param[CSI_param_pos]*10*CSI_num_pos
-                                               + (inp - 0x30);
+                if(CSI_param_pos < 2) {// No supported commands have more than 2 args
+                    if(CSI_num_pos > 0) {
+                        // Multiply by ten
+                        i = CSI_param[CSI_param_pos];
+                        CSI_param[CSI_param_pos] = (i << 3)+ (i << 1);
+                    }
+                    CSI_param[CSI_param_pos] += inp - 0x30;
+                    
+                    //CSI_param[CSI_param_pos] = CSI_param[CSI_param_pos]*10*CSI_num_pos
+                
+                }     //                          + (inp - 0x30);
                 CSI_num_pos++;
             } else if(inp == ';') {
                 // Argument separator
@@ -488,19 +521,29 @@ static void ansi_parse(uint8_t inp) {
                         serial_outp('R');
                         break;
                     case 'l':
-                        // Enter VT52 mode
-                        if(CSI_param[0] == 2)
-                            ansi_state = VT52_MODE;
-                        // Make cursor invisible
-                        if(CSI_param[0] == 25)
-                            screen_showcursor(0);
-                        // Ignore other private commands
+                        if(CSI_private) {
+                            // Enter VT52 mode
+                            if(CSI_param[0] == 2)
+                                ansi_state = VT52_MODE;
+                            // Disable auto-wrap
+                            if(CSI_param[0] == 7)
+                                linewrap = 0;
+                            // Make cursor invisible
+                            if(CSI_param[0] == 25)
+                                screen_showcursor(0);
+                            // Ignore other private commands
+                        }
                         break; 
                     case 'h':
-                        if(CSI_param[0] == 25)
-                            screen_showcursor(1);
-                        // Ignore other private commands
-                        
+                        if(CSI_private) {
+                            // Enable auto-wrap
+                            if(CSI_param[0] == 7)
+                                linewrap = 1;
+                            // Make cursor visible
+                            if(CSI_param[0] == 25)
+                                screen_showcursor(1);
+                            // Ignore other private commands
+                        }
                         break;               
                     default:
                         break;
@@ -832,6 +875,19 @@ int main(void)
                         }
                         cr();
                         break;
+                    case 'w':
+                    case 'W':
+                        // Toggle automatic line wrap
+                        cpm_printstring("Line wrap: ");
+                        if(linewrap) {
+                            linewrap = 0;
+                            cpm_printstring("OFF");
+                        } else {
+                            linewrap = 1;
+                            cpm_printstring("ON");
+                        }
+                        cr();
+                        break;
                     case 'r':
                     case 'R':
                         // Xmodem receive;
@@ -852,6 +908,8 @@ int main(void)
                         cpm_printstring("Ctrl-q + e:    Toggle local echo");
                         cr();
                         cpm_printstring("Ctrl-q + m:    Cycle emulation mode");
+                        cr();
+                        cpm_printstring("Ctrl-q + w:    Toggle linewrap");
                         cr();
                         cpm_printstring("Ctrl-q + r:    Xmodem Receive");
                         cr();
