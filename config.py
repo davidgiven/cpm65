@@ -25,7 +25,7 @@ BIG_APPS = {
     "0:atbasic.com": "third_party/altirrabasic",
     "0:objdump.com": "apps+objdump",
     "0:scrntest.com": "apps+scrntest",
-    "0:vt52term.com": "apps+vt52term",
+    "0:ansiterm.com": "apps+ansiterm",
 }
 
 BIG_APPS_SRCS = {}
