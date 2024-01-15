@@ -15,6 +15,7 @@ extern void screen_scrollup(void);
 extern void screen_scrolldown(void);
 extern void screen_clear_to_eol(void);
 extern void screen_setstyle(uint8_t style);
+extern void screen_showcursor(uint8_t show);
 
 #define screen_setcursor(x, y) \
 	_screen_setcursor((x) | ((y)<<8))
