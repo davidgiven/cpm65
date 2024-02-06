@@ -17,6 +17,7 @@ export(
         "atari800hd.atr": "src/arch/atari800+atari800hd_diskimage",
         "atari800xlhd.atr": "src/arch/atari800+atari800xlhd_diskimage",
         "c64.d64": "src/arch/commodore+c64_diskimage",
+        "neo6502.neo": "src/arch/neo6502+bios",
         "pet4032.d64": "src/arch/commodore+pet4032_diskimage",
         "pet8032.d64": "src/arch/commodore+pet8032_diskimage",
         "pet8096.d64": "src/arch/commodore+pet8096_diskimage",
