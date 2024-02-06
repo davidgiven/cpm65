@@ -4,6 +4,7 @@
 #include "cpm65.inc"
 #include "zif.inc"
 #include "jumptables.inc"
+#include "driver.inc"
 
 ZEROPAGE
 
@@ -300,6 +301,9 @@ zproc entry_DIR
     txa
     jsr bdos_SELECTDISK
 
+    ; Find number of files to print per line
+    jsr set_dirlen
+
     ; Start iterating.
 
     lda #0
@@ -345,7 +349,7 @@ zproc entry_DIR
             txa
             inx
             stx file_counter
-            and #$01
+            cmp #$00
             zif_eq
                 jsr bdos_GETDRIVE
                 clc
@@ -368,9 +372,11 @@ zproc entry_DIR
             jsr print_filename_bytes
 
             lda file_counter
-            and #$01
+            cmp dirlen
             zif_eq
                 jsr newline
+                lda #0 
+                sta file_counter
             zendif
         zendif
 
@@ -998,6 +1004,39 @@ zproc printi
     rts
 zendproc
 
+; Sets number of files to print per line
+; Defaults to 2 if no screen driver is available
+zproc set_dirlen
+    ; Find screen driver
+    lda #<DRVID_SCREEN
+    ldx #>DRVID_SCREEN
+    ldy #BIOS_FINDDRV 
+    jsr BIOS    
+
+    ; Defailt to 2 files per line if no driver is found
+    zif_cs
+        lda #2
+        sta dirlen
+        rts
+    zendif
+    
+    ; Get screen width and calculate number of files per line
+    sta SCREEN+1
+    stx SCREEN+2
+
+    ldy #SCREEN_GETSIZE
+    jsr SCREEN
+    tax
+    inx
+    txa 
+    lsr
+    lsr
+    lsr
+    lsr
+    sta dirlen
+    rts 
+zendproc
+
 space:
     lda #' '
     jmp bdos_CONOUT
@@ -1009,6 +1048,9 @@ newline:
     jmp bdos_CONOUT
 
     .data
+
+SCREEN:
+    jmp 0
 
 ; Submit file FCB.
 submit_fcb:
@@ -1024,6 +1066,7 @@ NOINIT
 
 stackptr: .fill 1           ; stack pointer on startup
 drive:    .fill 1           ; current drive, 0-based
+dirlen:   .fill 1           ; number of files to list per line
 cmdline:  .fill 128         ; command line buffer
 cmdfcb:   .fill XFCB__SIZE  ; FCB of command
 userfcb:  .fill XFCB__SIZE  ; parameter FCB
