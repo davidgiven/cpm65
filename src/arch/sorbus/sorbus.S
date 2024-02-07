@@ -59,7 +59,7 @@ cold_start:
 
     lda #>MEMBASE
     ldx zp_base
-    jsr entry_RELOCATE
+    jsr bios_RELOCATE
 
     ; Compute the entry address and jump.
 
@@ -216,7 +216,7 @@ zendproc
 
 ; Sets the current DMA address.
 
-zproc entry_SETDMA
+zproc bios_SETDMA
     sta dma+0
     stx dma+1
     clc
@@ -228,7 +228,7 @@ zendproc
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-zproc entry_SELDSK
+zproc bios_SELDSK
     cmp #0
     zif_ne
         sec                 ; invalid drive
@@ -244,7 +244,7 @@ zendproc
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
-zproc entry_SETSEC
+zproc bios_SETSEC
     sta ptr+0
     stx ptr+1
     ldy #2
@@ -257,7 +257,7 @@ zproc entry_SETSEC
     rts
 zendproc
 
-zproc entry_GETTPA
+zproc bios_GETTPA
   ;  lda mem_base
   ;  ldx mem_end
   ;  jsr print_hex_number
@@ -271,7 +271,7 @@ zproc entry_GETTPA
     rts
 zendproc
 
-zproc entry_SETTPA
+zproc bios_SETTPA
     sta mem_base
     stx mem_end
   ;  jsr print_hex_number
@@ -283,26 +283,26 @@ zproc entry_SETTPA
     rts
 zendproc
 
-zproc entry_GETZP
+zproc bios_GETZP
     lda zp_base
     ldx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETZP
+zproc bios_SETZP
     sta zp_base
     stx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETBANK
+zproc bios_SETBANK
     sec  ; ignoring the bank
     rts
 zendproc
 
-zproc entry_READ
+zproc bios_READ
     ;lda sector_num+1
     ;jsr print_hex_number
     ;lda sector_num+0
@@ -325,7 +325,7 @@ zendproc
 
 ; On entry, A=0 for a normal write; A=1 to always flush to disk.
 
-zproc entry_WRITE
+zproc bios_WRITE
 
     lda dma
     sta SECTOR_DMA_L

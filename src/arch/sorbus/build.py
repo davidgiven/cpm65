@@ -32,12 +32,12 @@ normalrule(
     ins=[
         ".+cpmfs",
         ".+sorbus",
-        "src+bdos",
+        "src/bdos",
     ],
     outs=["sorbus.zip"],
     commands=[
         "zip -9qj {outs[0]} {ins}",
-        r'printf "@ src+bdos\n@=BDOS\n" | zipnote -w {outs[0]}',
+        r'printf "@ bdos+bdos\n@=BDOS\n" | zipnote -w {outs[0]}',
         r'printf "@ sorbus+sorbus\n@=CPM\n" | zipnote -w {outs[0]}',
         r'printf "@ sorbus+cpmfs.img\n@=CPMFS\n" | zipnote -w {outs[0]}',
     ],

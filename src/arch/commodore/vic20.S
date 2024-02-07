@@ -144,7 +144,7 @@ zproc _init, .init
         tya
         pha
         lda banner-1, y
-        jsr entry_CONOUT
+        jsr bios_CONOUT
         pla
         tay
         dey
@@ -187,7 +187,7 @@ zproc _init, .init
 
     lda #>__HIGHTPA_START__
     ldx #__ZEROPAGE_START__
-    jsr entry_RELOCATE
+    jsr bios_RELOCATE
 
     ; Go!
 
@@ -219,7 +219,7 @@ zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
-zproc entry_GETTPA
+zproc bios_GETTPA
     ldy current_bank
     lda mem_base, y
     ldx mem_end, y
@@ -227,7 +227,7 @@ zproc entry_GETTPA
     rts
 zendproc
 
-zproc entry_SETTPA
+zproc bios_SETTPA
     ldy current_bank
     sta mem_base, y
     txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
@@ -236,21 +236,21 @@ zproc entry_SETTPA
     rts
 zendproc
 
-zproc entry_GETZP
+zproc bios_GETZP
     lda zp_base
     ldx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETZP
+zproc bios_SETZP
     sta zp_base
     stx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETBANK
+zproc bios_SETBANK
     sta current_bank
     rts
 zendproc
@@ -1099,7 +1099,7 @@ print:
         adc #6
     zendif
     pha
-    jsr entry_CONOUT
+    jsr bios_CONOUT
     pla
     rts
 zendproc

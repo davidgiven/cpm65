@@ -105,7 +105,7 @@ _start:
         tya
         pha
         lda banner-1, y
-        jsr entry_CONOUT
+        jsr bios_CONOUT
         pla
         tay
         dey
@@ -161,7 +161,7 @@ _start:
 
     lda #>__TPA1_START__
     ldx #__ZEROPAGE_START__
-    jsr entry_RELOCATE
+    jsr bios_RELOCATE
 
     ; Go!
 
@@ -179,7 +179,7 @@ banner_end:
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
-zproc entry_GETTPA
+zproc bios_GETTPA
     ldy current_bank
     lda mem_base, y
     ldx mem_end, y
@@ -187,7 +187,7 @@ zproc entry_GETTPA
     rts
 zendproc
 
-zproc entry_SETTPA
+zproc bios_SETTPA
     ldy current_bank
     sta mem_base, y
     txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
@@ -196,21 +196,21 @@ zproc entry_SETTPA
     rts
 zendproc
 
-zproc entry_GETZP
+zproc bios_GETZP
     lda zp_base
     ldx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETZP
+zproc bios_SETZP
     sta zp_base
     stx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETBANK
+zproc bios_SETBANK
     sta current_bank
     rts
 zendproc
@@ -468,7 +468,7 @@ zendproc
 
 ; Sets the current DMA address.
 
-zproc entry_SETDMA
+zproc bios_SETDMA
     sta dma+0
     stx dma+1
     clc
@@ -480,7 +480,7 @@ zendproc
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-zproc entry_SELDSK
+zproc bios_SELDSK
     cmp #0
     zif_ne
         sec                 ; invalid drive
@@ -496,7 +496,7 @@ zendproc
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte sector number.
 
-zproc entry_SETSEC
+zproc bios_SETSEC
     sta ptr+0
     stx ptr+1
 
@@ -533,7 +533,7 @@ zendproc
 
 ; Reads the current sector to the DMA address
 
-zproc entry_READ
+zproc bios_READ
     jsr change_tracks
     zif_cc
         lda wanted_trackoffset+0
@@ -554,7 +554,7 @@ zendproc
 
 ; On entry, A=0 for a normal write; A=1 to always flush to disk.
 
-zproc entry_WRITE
+zproc bios_WRITE
     pha
     jsr change_tracks
     pla

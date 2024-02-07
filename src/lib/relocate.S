@@ -10,7 +10,7 @@
 ; Relocate an image. High byte of memory address is in A,
 ; zero page address is in X.
 
-zproc entry_RELOCATE
+zproc bios_RELOCATE
     pha                 ; store memory start
     sta ptr+1
     lda #0

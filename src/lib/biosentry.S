@@ -17,42 +17,42 @@ zproc biosentry
     jmpdispatch biostable_lo, biostable_hi
 
 biostable_lo:
-    jmptablo entry_CONST
-    jmptablo entry_CONIN
-    jmptablo entry_CONOUT
-    jmptablo entry_SELDSK
-    jmptablo entry_SETSEC
-    jmptablo entry_SETDMA
-    jmptablo entry_READ
-    jmptablo entry_WRITE
-    jmptablo entry_RELOCATE
-    jmptablo entry_GETTPA
-    jmptablo entry_SETTPA
-    jmptablo entry_GETZP
-    jmptablo entry_SETZP
-    jmptablo entry_SETBANK
-    jmptablo entry_ADDDRV
-    jmptablo entry_FINDDRV
+    jmptablo bios_CONST
+    jmptablo bios_CONIN
+    jmptablo bios_CONOUT
+    jmptablo bios_SELDSK
+    jmptablo bios_SETSEC
+    jmptablo bios_SETDMA
+    jmptablo bios_READ
+    jmptablo bios_WRITE
+    jmptablo bios_RELOCATE
+    jmptablo bios_GETTPA
+    jmptablo bios_SETTPA
+    jmptablo bios_GETZP
+    jmptablo bios_SETZP
+    jmptablo bios_SETBANK
+    jmptablo bios_ADDDRV
+    jmptablo bios_FINDDRV
 biostable_hi:
-    jmptabhi entry_CONST
-    jmptabhi entry_CONIN
-    jmptabhi entry_CONOUT
-    jmptabhi entry_SELDSK
-    jmptabhi entry_SETSEC
-    jmptabhi entry_SETDMA
-    jmptabhi entry_READ
-    jmptabhi entry_WRITE
-    jmptabhi entry_RELOCATE
-    jmptabhi entry_GETTPA
-    jmptabhi entry_SETTPA
-    jmptabhi entry_GETZP
-    jmptabhi entry_SETZP
-    jmptabhi entry_SETBANK
-    jmptabhi entry_ADDDRV
-    jmptabhi entry_FINDDRV
+    jmptabhi bios_CONST
+    jmptabhi bios_CONIN
+    jmptabhi bios_CONOUT
+    jmptabhi bios_SELDSK
+    jmptabhi bios_SETSEC
+    jmptabhi bios_SETDMA
+    jmptabhi bios_READ
+    jmptabhi bios_WRITE
+    jmptabhi bios_RELOCATE
+    jmptabhi bios_GETTPA
+    jmptabhi bios_SETTPA
+    jmptabhi bios_GETZP
+    jmptabhi bios_SETZP
+    jmptabhi bios_SETBANK
+    jmptabhi bios_ADDDRV
+    jmptabhi bios_FINDDRV
 zendproc
 
-zproc entry_ADDDRV
+zproc bios_ADDDRV
     sta ptr+0           ; save new driver address
     stx ptr+1
 
@@ -78,7 +78,7 @@ zproc entry_ADDDRV
     rts
 zendproc
 
-zproc entry_FINDDRV
+zproc bios_FINDDRV
     sta ptr1+0
     stx ptr1+1
 
@@ -147,7 +147,7 @@ zendproc
 zproc initdrivers
     lda #<DRVID_TTY
     ldx #>DRVID_TTY
-    jsr entry_FINDDRV
+    jsr bios_FINDDRV
     sta TTY+1
     stx TTY+2
     rts
@@ -155,17 +155,17 @@ zendproc
 
 ; TTY routine implementations which delegate to a driver.
 
-zproc entry_CONST
+zproc bios_CONST
     ldy #TTY_CONST
     jmp TTY
 zendproc
 
-zproc entry_CONIN
+zproc bios_CONIN
     ldy #TTY_CONIN
     jmp TTY
 zendproc
 
-zproc entry_CONOUT
+zproc bios_CONOUT
     ldy #TTY_CONOUT
 zendproc
     ; fall through

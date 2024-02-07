@@ -296,7 +296,7 @@ init:
     lda #>__USERTPA_START__
 #endif
     ldx #__USERZEROPAGE_START__
-    jsr entry_RELOCATE
+    jsr bios_RELOCATE
 
     ; Compute the entry address and jump.
 
@@ -895,7 +895,7 @@ zendproc
 
 ; Sets the current DMA address.
 
-zproc entry_SETDMA
+zproc bios_SETDMA
     sta dma+0
     stx dma+1
     rts
@@ -906,7 +906,7 @@ zendproc
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-zproc entry_SELDSK
+zproc bios_SELDSK
     cmp #0
     zif_ne
         sec                 ; invalid drive
@@ -926,7 +926,7 @@ zendproc
 
 ; BDOS looks at DPH to see how many sectors to skip.
 
-zproc entry_SETSEC
+zproc bios_SETSEC
     sta ptr+0
     stx ptr+1
     ldy #2
@@ -938,14 +938,14 @@ zproc entry_SETSEC
     rts
 zendproc
 
-zproc entry_READ
+zproc bios_READ
     lda #$40        ; data direction receive
     sta DSTATS
     lda #SIO_READ_SECTOR
     bne do_SIO
 zendproc            ; fallthrough
 
-zproc entry_WRITE
+zproc bios_WRITE
     lda #$80        ; data direction send
     sta DSTATS
     lda #SIO_WRITE_SECTOR
@@ -995,7 +995,7 @@ status_ok:
     rts
 zendproc
 
-zproc entry_GETTPA
+zproc bios_GETTPA
 #ifdef ATARI_XL
     ldy mem_bank
     lda mem_base,y
@@ -1007,7 +1007,7 @@ zproc entry_GETTPA
     rts
 zendproc
 
-zproc entry_SETTPA
+zproc bios_SETTPA
 #ifdef ATARI_XL
     ldy mem_bank
     sta mem_base,y
@@ -1020,19 +1020,19 @@ zproc entry_SETTPA
     rts
 zendproc
 
-zproc entry_GETZP
+zproc bios_GETZP
     lda zp_base
     ldx zp_end
     rts
 zendproc
 
-zproc entry_SETZP
+zproc bios_SETZP
     sta zp_base
     stx zp_end
     rts
 zendproc
 
-zproc entry_SETBANK
+zproc bios_SETBANK
 #ifdef ATARI_XL
     sta mem_bank
 #endif

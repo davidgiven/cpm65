@@ -387,7 +387,7 @@ msg_crlf:
 
     lda #>__TPA1_START__
     ldx #__ZEROPAGE_START__
-    jsr entry_RELOCATE
+    jsr bios_RELOCATE
 
     ; Go!
 
@@ -493,7 +493,7 @@ zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
-zproc entry_GETTPA
+zproc bios_GETTPA
     ldy current_bank
     lda mem_base, y
     ldx mem_end, y
@@ -501,7 +501,7 @@ zproc entry_GETTPA
     rts
 zendproc
 
-zproc entry_SETTPA
+zproc bios_SETTPA
     ldy current_bank
     sta mem_base, y
     txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
@@ -510,21 +510,21 @@ zproc entry_SETTPA
     rts
 zendproc
 
-zproc entry_GETZP
+zproc bios_GETZP
     lda zp_base
     ldx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETZP
+zproc bios_SETZP
     sta zp_base
     stx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETBANK
+zproc bios_SETBANK
     sta current_bank
     rts
 zendproc
@@ -536,7 +536,7 @@ zendproc
 
 ; Sets the current DMA address.
 
-zproc entry_SETDMA
+zproc bios_SETDMA
     sta dma+0
     stx dma+1
     rts
@@ -547,7 +547,7 @@ zendproc
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-zproc entry_SELDSK
+zproc bios_SELDSK
     cmp #0
     bne fail                ; invalid drive
 
@@ -560,7 +560,7 @@ zendproc
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
-zproc entry_SETSEC
+zproc bios_SETSEC
     sta ptr+0
     stx ptr+1
 
@@ -598,7 +598,7 @@ zproc entry_SETSEC
     rts
 zendproc
 
-zproc entry_READ
+zproc bios_READ
     jsr change_sector
     zif_cc
         lda requested_cpm_sector
@@ -620,7 +620,7 @@ zproc entry_READ
     rts
 zendproc
 
-zproc entry_WRITE
+zproc bios_WRITE
     pha
     jsr change_sector
     pla
