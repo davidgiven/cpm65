@@ -32,7 +32,7 @@ zproc loadfile
     ; Select the drive.
 
     ; A is zero
-    jsr entry_SELDSK
+    jsr bios_SELDSK
     sta ptr1+0
     stx ptr1+1
 
@@ -71,7 +71,7 @@ zproc loadfile
 
     lda #<directory_buffer
     ldx #>directory_buffer
-    jsr entry_SETDMA
+    jsr bios_SETDMA
 
     ; Scan the directory for the filename.
 
@@ -172,7 +172,7 @@ found:
 
             lda destination_addr+0
             ldx destination_addr+1
-            jsr entry_SETDMA
+            jsr bios_SETDMA
             zrepeat
                 jsr readsector
             zuntil_cc
@@ -235,8 +235,8 @@ zendproc
 zproc readsector,,local
     lda #<current_sector
     ldx #>current_sector
-    jsr entry_SETSEC
-    jmp entry_READ
+    jsr bios_SETSEC
+    jmp bios_READ
 zendproc
 
 .section .loaderzp, "zax", @nobits

@@ -30,12 +30,12 @@ normalrule(
     ins=[
         ".+cpmfs",
         ".+x16",
-        "src+bdos",
+        "src/bdos",
     ],
     outs=["x16.zip"],
     commands=[
         "zip -9qj {outs[0]} {ins}",
-        r'printf "@ src+bdos\n@=BDOS\n" | zipnote -w {outs[0]}',
+        r'printf "@ bdos+bdos\n@=BDOS\n" | zipnote -w {outs[0]}',
         r'printf "@ x16+x16\n@=CPM\n" | zipnote -w {outs[0]}',
         r'printf "@ x16+cpmfs.img\n@=CPMFS\n" | zipnote -w {outs[0]}',
     ],

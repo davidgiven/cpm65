@@ -43,7 +43,7 @@ mkcpmfs(
     name="cpmfs",
     format="oric",
     bootimage=".+bios",
-    items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src+bdos"}
+    items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
