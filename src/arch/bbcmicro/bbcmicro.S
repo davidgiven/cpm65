@@ -60,7 +60,7 @@ zproc _start
 
     lda mem_base
     ldx zp_base
-    jsr entry_RELOCATE
+    jsr bios_RELOCATE
 
     ; Close any existing files.
 
@@ -382,7 +382,7 @@ zendproc
 
 ; Sets the current DMA address.
 
-zproc entry_SETDMA
+zproc bios_SETDMA
     sta dma+0
     stx dma+1
     rts
@@ -393,7 +393,7 @@ zendproc
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-zproc entry_SELDSK
+zproc bios_SELDSK
     cmp #0
     bne fail                ; invalid drive
 
@@ -406,7 +406,7 @@ zendproc
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
-zproc entry_SETSEC
+zproc bios_SETSEC
     sta ptr+0
     stx ptr+1
     ldy #2
@@ -418,13 +418,13 @@ zproc entry_SETSEC
     rts
 zendproc
 
-zproc entry_READ
+zproc bios_READ
     jsr init_control_block
     lda #3              ; read bytes using pointer
     jmp do_gbpb
 zendproc
 
-zproc entry_WRITE
+zproc bios_WRITE
     jsr init_control_block
     lda #1              ; write bytes using pointer
 do_gbpb:
@@ -470,31 +470,31 @@ zproc init_control_block
     rts
 zendproc
 
-zproc entry_GETTPA
+zproc bios_GETTPA
     lda mem_base
     ldx mem_end
     rts
 zendproc
 
-zproc entry_SETTPA
+zproc bios_SETTPA
     sta mem_base
     stx mem_end
     rts
 zendproc
 
-zproc entry_GETZP
+zproc bios_GETZP
     lda zp_base
     ldx zp_end
     rts
 zendproc
 
-zproc entry_SETZP
+zproc bios_SETZP
     sta zp_base
     stx zp_end
     rts
 zendproc
 
-zproc entry_SETBANK
+zproc bios_SETBANK
     rts
 zendproc
 
@@ -521,7 +521,7 @@ pending_key: .byte 0    ; pending keypress from system
 dma:         .word 0    ; current DMA
 sector_num:  .fill 3    ; current absolute sector number
 
-osgbpb_block:           ; block used by entry_READ and entry_WRITE
+osgbpb_block:           ; block used by bios_READ and bios_WRITE
     .fill $0d
 osgbpb_block_end:
 

@@ -1,204 +1,42 @@
-; CP/M-65 Copyright © 2022 David Given
+; CP/M-65 Copyright © 2024 David Given
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
-
-#include "cpm65.inc"
 #include "zif.inc"
+#include "cpm65.inc"
 #include "jumptables.inc"
-
-CPM_MACHINE_TYPE = $f ; 6502!
-CPM_SYSTEM_TYPE = 0
-CPM_VERSION = $22 ; CP/M 2.2 (compatible)
+#include "bdos.inc"
 
 ZEROPAGE
 
 current_dirent:   .word 0 ; current directory entry
-param:            .word 0 ; current user input parameter
-user_dma:         .word 0 ; current user DMA address
 dph:              .word 0 ; currently selected DPH
 
+; This is a copy of the DPH, and must be in this order.
 directory_buffer: .word 0 ; directory buffer from the DPH
 current_dpb:      .word 0 ; currently selected DPB
 checksum_buffer:  .word 0 ; checksum buffer from the DPH
 bitmap:           .word 0 ; allocation bitmap from the DPH
 
-temp:             .fill 4 ; temporary storage
-tempb:            .byte 0 ; more temporary storage
+zproc internal_RESETFILESYSTEM
+    ; Reset transient BDOS state.
 
-; --- Initialisation --------------------------------------------------------
-; TODO: figure out how to discard this.
-
-zproc main
-    ; Store BIOS entrypoint pointer.
-
-    sta bios+0
-    stx bios+1
-
-    ; Reset persistent state.
-
+    ldy #(filesystem_state_end - filesystem_state_start - 1)
     lda #0
-    sta current_user
-    sta current_drive
+    zrepeat
+        sta filesystem_state_start, y
+        dey
+    zuntil_mi
 
-    ; Update memory region.
+    ; Log in drive A.
 
-    ldy #BIOS_SETBANK
-    lda #BANK_EXTRA
-    jsr callbios
-
-    ldy #BIOS_GETZP
-    jsr callbios
-    clc
-    adc cpm_header + COMHDR_ZP_USAGE
-    ldy #BIOS_SETZP
-    jsr callbios
-
-    jsr bios_GETTPA
-    clc
-    adc cpm_header + COMHDR_TPA_USAGE
-    ldy #BIOS_SETTPA
-    jsr callbios
-    jmp entry_EXIT
+    ; A is 0
+    jmp internal_LOGINDRIVE
 zendproc
 
-; --- Warm start ------------------------------------------------------------
+; Called before system call processing happens.
 
-; Prints the message in XA and performs a warm boot.
-
-harderror:
-    jsr internal_WRITESTRING
-    ; fall through
-entry_EXIT:
-    ldx #$ff                ; reset stack point
-    txs
-
-    jsr bios_NEWLINE
-    jsr entry_RESET
-
-    ; Open the CCP.SYS file.
-
-    lda #0
-    sta ccp_fcb + FCB_EX
-    sta ccp_fcb + FCB_S2
-    sta ccp_fcb + FCB_CR
-    lda #1
-    sta ccp_fcb + FCB_DR
-
-    lda #<ccp_fcb
-    sta param+0
-    lda #>ccp_fcb
-    sta param+1
-    jsr entry_OPENFILE
-    zif_cs
-        lda #<1f
-        ldx #>1f
-        jsr internal_WRITESTRING
-        jmp .
-    1:
-        .ascii "Couldn't open CCP"
-        .byte 13, 10, 0
-    zendif
-
-    ; Read the first sector.
-
-    lda directory_buffer+0
-    sta user_dma+0
-    lda directory_buffer+1
-    sta user_dma+1
-    jsr internal_READSEQUENTIAL ; load one record
-
-    ; Compute the load address.
-
-    ldy #BIOS_SETBANK
-    lda #BANK_EXTRA
-    jsr callbios
-
-    jsr bios_GETZP          ; top of ZP in X
-    txa
-    sec
-    ldy #COMHDR_ZP_USAGE
-    sbc (directory_buffer), y
-    pha
-
-    jsr bios_GETTPA         ; top of TPA page number in X
-    txa
-    sec
-    ldy #COMHDR_TPA_USAGE
-    sbc (directory_buffer), y
-    sta user_dma+1
-    pha                     ; store load address for later
-    lda #0
-    sta user_dma+0
-
-    ; Copy the first record into memory.
-
-    jsr copy_directory_buffer_to_dma
-    lda #$80
-    sta user_dma+0
-
-    ; Read the CCP into memory.
-
-    zloop
-        ; param remains set from above
-        jsr internal_READSEQUENTIAL
-        zbreakif_cs
-
-        lda user_dma+0
-        eor #$80
-        sta user_dma+0
-        zif_eq
-            inc user_dma+1
-        zendif
-    zendloop
-
-    ; Patch the BIOS entry vector.
-
-    lda #0                  ; pop start address, saved earlier
-    sta temp+0
-    pla
-    sta temp+1
-
-    ldy #COMHDR_BDOS
-    lda #<ENTRY
-    sta (temp), y
-    iny
-    lda #>ENTRY
-    sta (temp), y
-
-    ; Relocate.
-
-    pla                     ; pop start zero page address, saved earlier
-    tax
-    lda temp+1              ; start of TPA, in pages
-    ldy #BIOS_RELOCATE
-    jsr callbios
-
-    ; Execute it.
-
-    ldy #BIOS_SETBANK
-    lda #BANK_MAIN
-    jsr callbios
-
-    lda #COMHDR_ENTRY      ; start address is 256-byte aligned
-    sta temp+0
-calltemp:
-    jmp (temp)
-
-    .data
-ccp_fcb:
-    .byte 1                 ; drive A:
-    .ascii "CCP     SYS"    ; filename: CCP.SYS
-    .byte 0, 0, 0, 0        ; EX, S1, S2, RC
-    .fill 16, 1, 0          ; allocation block
-    .byte 0                 ; CR
-
-; --- BDOS entrypoint -------------------------------------------------------
-
-zproc ENTRY
-    sta param+0
-    stx param+1
-
+zproc internal_BEGINSYS
     lda #$ff
     sta old_fcb_drive       ; mark FCB as not fiddled with
 
@@ -206,8 +44,13 @@ zproc ENTRY
 
     lda #0
     sta block_needs_clearing
+    rts
+zendproc
 
-    jsr icall               ; preserve carry from this!
+; Called after system call processing happens.
+; Must preserve all registers and P.
+
+zproc internal_ENDSYS
     php
     pha
     tya
@@ -224,441 +67,11 @@ zproc ENTRY
     pla
     plp
     rts
-
-unimplemented:
-    clc
-    rts
-
-icall:
-    lda jumptable_hi, y
-    pha
-    lda jumptable_lo, y
-    pha
-    rts
-
-jumptable_lo:
-    jmptablo entry_EXIT ; exit_program = 0
-    jmptablo entry_CONIN ; console_input = 1
-    jmptablo entry_CONOUT ; console_output = 2
-    jmptablo entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
-    jmptablo entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
-    jmptablo entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
-    jmptablo entry_DIRECTIO ; direct_io = 6
-    jmptablo entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
-    jmptablo entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
-    jmptablo entry_WRITESTRING ; write_string = 9
-    jmptablo entry_READLINE ; read_line = 10
-    jmptablo entry_GETCONSOLESTATUS ; console_status = 11
-    jmptablo entry_GETVERSION ; get_version = 12
-    jmptablo entry_RESET ; reset_disks = 13
-    jmptablo entry_LOGINDRIVE ; select_disk = 14
-    jmptablo entry_OPENFILE ; open_file = 15
-    jmptablo entry_CLOSEFILE ; close_file = 16
-    jmptablo entry_FINDFIRST ; find_first = 17
-    jmptablo entry_FINDNEXT ; find_next = 18
-    jmptablo entry_DELETEFILE ; delete_file = 19
-    jmptablo entry_READSEQUENTIAL ; read_sequential = 20
-    jmptablo entry_WRITESEQUENTIAL ; write_sequential = 21
-    jmptablo entry_CREATEFILE ; create_file = 22
-    jmptablo entry_RENAMEFILE ; rename_file = 23
-    jmptablo entry_GETLOGINBITMAP ; get_login_bitmap = 24
-    jmptablo entry_GETDRIVE ; get_current_drive = 25
-    jmptablo entry_SETDMAADDRESS ; set_dma_address = 26
-    jmptablo entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
-    jmptablo entry_SETDRIVEREADONLY ; set_drive_readonly = 28
-    jmptablo entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
-    jmptablo entry_SETFILEATTRS ; set_file_attributes = 30
-    jmptablo entry_GETDPB ; get_DPB = 31
-    jmptablo entry_GETSETUSER ; get_set_user_number = 32
-    jmptablo entry_READRANDOM ; read_random = 33
-    jmptablo entry_WRITERANDOM ; write_random = 34
-    jmptablo entry_COMPUTEFILESIZE ; compute_file_size = 35
-    jmptablo entry_COMPUTEPOINTER ; compute_random_pointer = 36
-    jmptablo entry_RESETDISK ; reset_disk = 37
-    jmptablo entry_GETBIOS ; get_bios = 38
-    jmptablo unimplemented ; 39
-    jmptablo entry_WRITERANDOMFILLED ; write_random_filled = 40
-    jmptablo bios_GETZP ; get_zp = 41
-    jmptablo bios_GETTPA ; get_tpa = 42
-    jmptablo entry_PARSEFCB ; 43
-jumptable_hi:
-    jmptabhi entry_EXIT ;exit_program = 0
-    jmptabhi entry_CONIN ; console_input = 1
-    jmptabhi entry_CONOUT ; console_output = 2
-    jmptabhi entry_UNIMPLEMENTED ; aux_input = 3 UNSUPPORTED
-    jmptabhi entry_UNIMPLEMENTED ; aux_output = 4 UNSUPPORTED
-    jmptabhi entry_UNIMPLEMENTED ; printer_output = 5 UNSUPPORTED
-    jmptabhi entry_DIRECTIO ; direct_console_io = 6
-    jmptabhi entry_GETIOBYTE ; get_io_byte = 7 UNSUPPORTED
-    jmptabhi entry_UNIMPLEMENTED ; set_io_byte = 8 UNSUPPORTED
-    jmptabhi entry_WRITESTRING ; write_string = 9
-    jmptabhi entry_READLINE ; read_line = 10
-    jmptabhi entry_GETCONSOLESTATUS ; console_status = 11
-    jmptabhi entry_GETVERSION ; get_version = 12
-    jmptabhi entry_RESET ; reset_disks = 13
-    jmptabhi entry_LOGINDRIVE ; select_disk = 14
-    jmptabhi entry_OPENFILE ; open_file = 15
-    jmptabhi entry_CLOSEFILE ; close_file = 16
-    jmptabhi entry_FINDFIRST ; find_first = 17
-    jmptabhi entry_FINDNEXT ; find_next = 18
-    jmptabhi entry_DELETEFILE ; delete_file = 19
-    jmptabhi entry_READSEQUENTIAL ; read_sequential = 20
-    jmptabhi entry_WRITESEQUENTIAL ; write_sequential = 21
-    jmptabhi entry_CREATEFILE ; create_file = 22
-    jmptabhi entry_RENAMEFILE ; rename_file = 23
-    jmptabhi entry_GETLOGINBITMAP ; get_login_bitmap = 24
-    jmptabhi entry_GETDRIVE ; get_current_drive = 25
-    jmptabhi entry_SETDMAADDRESS ; set_dma_address = 26
-    jmptabhi entry_GETALLOCATIONBITMAP ; get_allocation_bitmap = 27
-    jmptabhi entry_SETDRIVEREADONLY ; set_drive_readonly = 28
-    jmptabhi entry_GETREADONLYBITMAP ; get_readonly_bitmap = 29
-    jmptabhi entry_SETFILEATTRS ; set_file_attributes = 30
-    jmptabhi entry_GETDPB ; get_dpb = 31
-    jmptabhi entry_GETSETUSER ; get_set_user_number = 32
-    jmptabhi entry_READRANDOM ; read_random = 33
-    jmptabhi entry_WRITERANDOM ; write_random = 34
-    jmptabhi entry_COMPUTEFILESIZE ; compute_file_size = 35
-    jmptabhi entry_COMPUTEPOINTER ; compute_random_pointer = 36
-    jmptabhi entry_RESETDISK ; reset_disk = 37
-    jmptabhi entry_GETBIOS ; 38
-    jmptabhi unimplemented ; 39
-    jmptabhi entry_WRITERANDOMFILLED ; write_random_filled = 40
-    jmptabhi bios_GETZP ; get_zp = 41
-    jmptabhi bios_GETTPA ; get_tpa = 42
-    jmptabhi entry_PARSEFCB ; 43
-zendproc
-
-; --- Misc ------------------------------------------------------------------
-
-zproc entry_GETBIOS
-    lda bios+0
-    sta param+0
-    ldx bios+1
-    stx param+1
-    rts
-zendproc
-
-zproc entry_GETVERSION
-    lda #CPM_VERSION
-    ldx #(CPM_MACHINE_TYPE<<4) | CPM_SYSTEM_TYPE
-    rts
-zendproc
-
-zproc entry_GETIOBYTE
-    lda #0x94               ; %10010100
-    clc
-    rts
-zendproc
-
-zproc entry_UNIMPLEMENTED
-    sec
-    rts
-zendproc
-
-; --- Console ---------------------------------------------------------------
-
-zproc entry_CONIN
-    lda buffered_key
-    zif_eq
-        jsr bios_CONIN
-        tax
-    zelse
-        ldx #0
-        stx buffered_key
-    zendif
-    txa
-    pha
-    cmp #31
-    zif_cs
-        jsr entry_CONOUT
-    zendif
-    rts
-zendproc
-
-; Prints the character in param+0.
-zproc entry_CONOUT
-    lda param+0
-    ; fall through
-zendproc
-zproc internal_CONOUT
-    pha
-    jsr bios_CONST
-    cmp #0
-    zif_ne                  ; is there a key pending?
-        jsr bios_CONIN      ; read it
-        cmp #19             ; was it ^S?
-        zif_eq
-            jsr bios_CONIN  ; wait for another key press
-            cmp #3
-            beq reboot$
-            jmp continue$
-        zendif
-        cmp #3              ; was it ^C?
-        beq reboot$
-        sta buffered_key
-    zendif
-continue$:
-    pla
-
-    ; Actually print it.
-
-    jsr bios_CONOUT
-
-    ; Compute column position?
-
-    ldx column_position
-    cmp #8
-    beq backspace$
-    cmp #127
-    beq backspace$
-    cmp #9
-    zif_eq
-        inx
-        tax
-        and #<~7
-        sta column_position
-        rts
-    zendif
-    cmp #32
-    bcc zero_column$
-    inx
-    jmp exit$
-
-backspace$:
-    dex
-    bpl exit$
-zero_column$:
-    ldx #0
-exit$:
-    stx column_position
-    rts
-reboot$:
-    jmp entry_EXIT
-zendproc
-
-zproc entry_GETCONSOLESTATUS
-    lda buffered_key
-    zif_eq
-        jsr bios_CONST
-    zendif
-    clc
-    rts
-zendproc
-
-; If param+1 == $ff, returns a character without waiting and without echo.
-; If param+1 == $fd, returns a character while waiting and without echo.
-; If otherwise, prints param+0.
-
-zproc entry_DIRECTIO
-    ldx param+1
-    cpx #$ff    
-    zif_eq
-        lda buffered_key
-        ; A is either a character, or zero
-        zif_eq
-            jsr bios_CONST
-            cmp #$ff
-            zif_eq
-                jsr bios_CONIN
-            zendif
-            ; A is either a character, or zero
-        zendif
-        clc
-        rts
-    zendif
-
-    cpx #$fd
-    zif_eq
-        jmp bios_CONIN
-    zendif
-
-    lda param+0
-    jsr bios_CONOUT
-    clc
-    rts
-zendproc
-
-internal_WRITESTRING:
-    sta param+0
-    stx param+1
-zproc entry_WRITESTRING
-    zloop
-        ldy #0
-        lda (param), y
-        zbreakif_eq
-        cmp #'$'
-        zbreakif_eq
-
-        jsr internal_CONOUT
-
-        inc param+0
-        zif_eq
-            inc param+1
-        zendif
-    zendloop
-    rts
-zendproc
-
-; Read a line from the keyboard. Buffer is at param, size at param+0.
-zproc entry_READLINE
-    start_column_position = temp+0
-    buffer_pos = temp+1
-    buffer_max = temp+2
-    count = temp+3
-    current_column_position = temp+4
-
-    lda column_position
-    sta start_column_position
-    sta current_column_position
-    lda #2
-    sta buffer_pos
-    ldy #0
-    lda (param), y
-    sta buffer_max
-
-    zloop
-        ; Read a key without echo.
-
-        lda buffered_key
-        zif_eq
-            jsr bios_CONIN
-            tax
-        zendif
-        ldx #0
-        stx buffered_key
-
-        ; Delete?
-
-        cmp #8
-        zif_eq
-            lda #127
-        zendif
-        cmp #127
-        zif_eq
-            ldy buffer_pos
-            cpy #2
-            zif_ne
-                dec buffer_pos
-                dec current_column_position
-                jsr bios_CONOUT
-            zendif
-            zcontinue
-        zendif
-
-        ; Reboot?
-
-        cmp #3
-        zif_eq
-            ldy buffer_pos
-            cpy #2
-            zif_eq
-                jmp entry_EXIT
-            zendif
-            zcontinue
-        zendif
-
-        ; Retype line?
-
-        cmp #18
-        zif_eq
-            jsr indent_new_line
-            ldy #1
-            sty count
-            zloop
-                ldy count
-                cpy buffer_pos
-                zbreakif_eq
-
-                lda (param), y
-                jsr bios_CONOUT
-                inc current_column_position
-                inc count
-            zendloop
-            zcontinue
-        zendif
-
-        ; Delete line?
-
-        cmp #21
-        zif_eq
-            lda #'#'
-            jsr bios_CONOUT
-            jsr indent_new_line
-
-            lda #2
-            sta buffer_pos
-            zcontinue
-        zendif
-
-        ; Finished?
-
-        cmp #13
-        zbreakif_eq
-        cmp #10
-        zbreakif_eq
-
-        ; Graphic character?
-
-        cmp #32
-        zif_cs
-            ldy buffer_max
-            cpy buffer_pos
-            zif_cs
-                ldy buffer_pos
-                sta (param), y
-                jsr bios_CONOUT
-                inc buffer_pos
-                inc current_column_position
-            zendif
-        zendif
-    zendloop
-
-    lda #13
-    jsr internal_CONOUT
-    ldx buffer_pos
-    dex
-    dex
-    txa
-    ldy #1
-    sta (param), y
-    rts
-
-indent_new_line:
-    jsr bios_NEWLINE
-    lda #0
-    sta current_column_position
-    zloop
-        lda current_column_position
-        cmp start_column_position
-        zbreakif_eq
-        lda #' '
-        jsr bios_CONOUT
-        inc current_column_position
-    zendloop
-    rts
-zendproc
-
-; --- Reset disk system -----------------------------------------------------
-
-zproc entry_RESET
-    ; Reset transient BDOS state.
-
-    ldy #(bdos_state_end - bdos_state_start - 1)
-    lda #0
-    zrepeat
-        sta bdos_state_start, y
-        dey
-    zuntil_mi
-
-    ; Log in drive A.
-
-    ; A is 0
-    jmp internal_LOGINDRIVE
 zendproc
 
 ; Reset the write-protect bits for the drives the user asked for.
 
-zproc entry_RESETDISK
+zproc bdos_RESETDISK
     lda param+0
     eor #$ff
     and write_protect_vector+0
@@ -673,237 +86,15 @@ zproc entry_RESETDISK
     rts
 zendproc
 
-zproc entry_GETDRIVE
-    lda current_drive
-    sta param+0
-    rts
-zendproc
-
-zproc entry_GETSETUSER
-    clc
-    lda param+0
-    zif_mi
-        lda current_user
-        rts
-    zendif
-    sta current_user
-    rts
-zendproc
-
-zproc entry_SETDMAADDRESS
-    lda param+0
-    sta user_dma+0
-    lda param+1
-    sta user_dma+1
-    rts
-zendproc
-
-; --- FCB parsing -----------------------------------------------------------
-
-; This is a CP/M-65 extension. DMA points at the FCB structure; on entry,
-; XA points at the string. A filename is parsed into the FCB and the updated
-; pointer returned. fcb->f[0] will be zero for an invalid filename.
-
-zproc entry_PARSEFCB
-    ; param -> filename
-    ; dma -> FCB
-
-    lda #0
-    sta temp+1                  ; failure flag
-
-    ; Check for drive.
-
-    ldy #0
-    ldx #0                      ; drive byte
-    lda (param), y              ; drive letter
-    zif_ne
-        iny
-        lda (param), y
-        dey
-        cmp #':'                    ; colon?
-        zif_eq
-            lda (param), y
-            jsr toupper
-            sec
-            sbc #'A'-1              ; to 1-based drive
-            cmp #16
-            zif_cs
-                dec temp+1
-            zendif
-
-            tax
-            iny
-            iny
-        zendif
-    zendif
-    txa
-    pha
-
-    ; Read the filename.
-
-    ; y = offset into string
-    ldx #8
-    zrepeat
-        lda (param), y         ; get a character
-        jsr toupper
-
-        jsr is_terminator_char
-        zif_cs
-            ; Turn "ABC .X" -> "AB     .X"
-            lda #' '
-            dey                 ; reread the char again next time
-        zendif
-        cmp #'*'
-        zif_eq
-            ; Turn "ABC*.X" -> "ABC?????.X"
-            lda #'?'
-            dey                 ; reread the * again next time
-        zendif
-        pha
-        iny
-
-        dex
-    zuntil_eq
-    ; X is cmdoffset
-
-    ; Skip non-dot filename characters.
-
-    lda (param), y
-    zloop
-        cmp #'.'
-        zbreakif_eq
-        jsr is_terminator_char
-        zif_cs
-            lda #' '            ; filename has no extension
-            pha
-            pha
-            pha
-            bne parse_filename_exit  ; always taken
-        zendif
-
-        iny
-        lda (param), y
-    zendloop
-    ; A is the character just read
-    ; X is cmdoffset
-
-    ; Read the extension
-
-    iny                         ; skip dot
-    ldx #3
-    zrepeat
-        lda (param), y          ; get a character
-        jsr toupper
-
-        jsr is_terminator_char
-        zif_cs
-            ; Turn "ABC .X" -> "AB     .X"
-            lda #' '
-            dey                 ; reread the char again next time
-        zendif
-        cmp #'*'
-        zif_eq
-            ; Turn "ABC.X*" -> "ABC.X*"
-            lda #'?'
-            dey                 ; reread the * again next time
-        zendif
-        pha
-        iny
-
-        dex
-    zuntil_eq
-
-    ; Discard any remaining filename characters.
-
-    lda (param), y          ; get a character
-    zrepeat
-        jsr is_terminator_char
-        zbreakif_cs
-
-        iny
-        lda (param), y
-    zuntil_eq
-
-parse_filename_exit:
-    ; Push the four zeroes for the metadata.
-
-    lda #0
-    pha
-    pha
-    pha
-    pha
-
-    ; Now A contains the terminating character --- either a space or \0.  We
-    ; have a valid FCB!
-
-    ; Copy the generated bytes off the stack into the destination.
-
-    tya
-    tax
-    ldy #15
-    zrepeat
-        pla
-        sta (user_dma), y
-        dey
-    zuntil_mi
-    txa                         ; offset into A
-
-    ; Compute the updated pointer.
-
-    clc
-    adc param+0
-    ldx param+1
-    zif_cs
-        inx
-    zendif
-
-    ; Exit status.
-
-    clc
-    ldy temp+1
-    zif_ne
-        sec
-    zendif
-
-    rts
-
-is_terminator_char:
-    stx temp+2
-    ldx #(terminators_end - terminators) - 1
-    zrepeat
-        cmp terminators, x
-        beq 1f                  ; carry set on branch
-        dex
-    zuntil_mi
-    clc
-1:
-    ldx temp+2
-    rts
-
-terminators:
-    .ascii " =><.:,[]/|"
-    .byte 10, 13, 127, 9, 0
-terminators_end:
-zendproc
-
-zproc toupper
-    cmp #'a'
-    zif_cs
-        cmp #'z'+1
-        zif_cc
-            and #$5f
-        zendif
-    zendif
-    rts
-zendproc
-
 ; --- Open a file -----------------------------------------------------------
 
 ; Opens a file; the FCB is in param.
 ; Returns C is error; the code is in A.
 
-entry_OPENFILE:
+zproc bdos_OPENFILE
     jsr new_user_fcb
+zendproc
+    ; fall through
 zproc internal_OPENFILE
     lda #FCB_S2+1              ; match 15 bytes of FCB
     jsr find_first
@@ -958,8 +149,10 @@ zendproc
 ; Creates a file; the FCB is in param.
 ; Returns C is error; the code is in A.
 
-entry_CREATEFILE:
+zproc bdos_CREATEFILE
     jsr new_user_fcb
+zendproc
+    ; fall through
 zproc internal_CREATEFILE
     jsr check_disk_writable
 
@@ -1061,8 +254,10 @@ zendproc
 
 ; --- Close a file (flush the FCB to disk) ----------------------------------
 
-entry_CLOSEFILE:
+zproc bdos_CLOSEFILE
     jsr convert_user_fcb
+zendproc
+    ; fall through
 zproc internal_CLOSEFILE
     jsr check_fcb_writable
     jsr check_disk_writable
@@ -1115,7 +310,7 @@ zendproc
 
 ; --- Other file manipulation -----------------------------------------------
 
-zproc entry_DELETEFILE
+zproc bdos_DELETEFILE
     jsr convert_user_fcb
     jsr check_disk_writable
 
@@ -1150,7 +345,7 @@ zproc entry_DELETEFILE
     rts
 zendproc
 
-zproc entry_RENAMEFILE
+zproc bdos_RENAMEFILE
     jsr convert_user_fcb
     jsr check_disk_writable
 
@@ -1196,7 +391,7 @@ zproc entry_RENAMEFILE
     rts
 zendproc
 
-zproc entry_SETFILEATTRS
+zproc bdos_SETFILEATTRS
     jsr convert_user_fcb
 
     ; Update the filename (and attribute bits) of all files matching the
@@ -1234,7 +429,7 @@ zendproc
 
 ; --- Read next sequential record -------------------------------------------
 
-zproc entry_READSEQUENTIAL
+zproc bdos_READSEQUENTIAL
     jsr convert_user_fcb
 zendproc
 zproc internal_READSEQUENTIAL
@@ -1531,7 +726,7 @@ zendproc
 
 ; --- Write the next sequential record --------------------------------------
 
-zproc entry_WRITESEQUENTIAL
+zproc bdos_WRITESEQUENTIAL
     jsr convert_user_fcb
     jsr check_fcb_writable
     jsr check_disk_writable
@@ -1667,7 +862,7 @@ zendproc
 
 ; --- Random access ---------------------------------------------------------
 
-zproc entry_WRITERANDOM
+zproc bdos_WRITERANDOM
     jsr convert_user_fcb
     jsr check_fcb_writable
     jsr check_disk_writable
@@ -1714,13 +909,13 @@ zproc entry_WRITERANDOM
     rts
 zendproc
 
-zproc entry_WRITERANDOMFILLED
+zproc bdos_WRITERANDOMFILLED
     lda #1
     sta block_needs_clearing
-    jmp entry_WRITERANDOM
+    jmp bdos_WRITERANDOM
 zendproc
 
-zproc entry_READRANDOM
+zproc bdos_READRANDOM
     jsr convert_user_fcb
     jsr seek_to_random_location
     zif_cc
@@ -1823,7 +1018,7 @@ zendproc
 ; Sets the random access pointer to whereever the FCB is currently
 ; pointing.
 
-zproc entry_COMPUTEPOINTER
+zproc bdos_COMPUTEPOINTER
     ldy #FCB_EX
     lda (param), y              ; get EX
     lsr a                       ; bottom bit -> C
@@ -1853,7 +1048,7 @@ zendproc
 
 ; Determines the size of a file and seeks to the end.
 
-zproc entry_COMPUTEFILESIZE
+zproc bdos_COMPUTEFILESIZE
     jsr new_user_fcb
 
     ; temp+0/1 are used by find_first
@@ -1971,7 +1166,7 @@ zendproc
 ; searching.
 ; Returns C on error.
 
-zproc entry_FINDFIRST
+zproc bdos_FINDFIRST
     jsr setup_fcb_for_find
     bcs find_error
     ; A = number of bytes to search
@@ -1979,7 +1174,7 @@ zproc entry_FINDFIRST
     jmp copy_result_of_find
 zendproc
 
-zproc entry_FINDNEXT
+zproc bdos_FINDNEXT
     jsr setup_fcb_for_find
     bcs find_error
     ; A = number of bytes to search
@@ -1989,7 +1184,12 @@ copy_result_of_find:
     zif_cc
         ; Copy the directory buffer into the DMA buffer.
 
-        jsr copy_directory_buffer_to_dma
+        ldy #127
+        zrepeat
+            lda (directory_buffer), y
+            sta (user_dma), y
+            dey
+        zuntil_mi
 
         ; Calculate the offset into the DMA buffer.
 
@@ -2030,23 +1230,6 @@ zproc setup_fcb_for_find
     zendif
     clc
 error:
-    rts
-zendproc
-
-; This is used twice, so factor it out. That's not a lot, but it's strange it's
-; happened twice.
-zproc copy_directory_buffer_to_dma
-    lda user_dma+0
-    sta temp+0
-    lda user_dma+1
-    sta temp+1
-
-    ldy #127
-    zrepeat
-        lda (directory_buffer), y
-        sta (temp), y
-        dey
-    zuntil_mi
     rts
 zendproc
 
@@ -2153,7 +1336,7 @@ zendproc
 ; Logs in active_drive. If the drive was not already logged in, the bitmap
 ; is recomputed. In all cases the drive is selected.
 
-zproc entry_LOGINDRIVE
+zproc bdos_LOGINDRIVE
     lda param+0
 zendproc
 zproc internal_LOGINDRIVE
@@ -2470,7 +1653,7 @@ zendproc
 
 ; Sets a drive as being readonly.
 
-zproc entry_SETDRIVEREADONLY
+zproc bdos_SETDRIVEREADONLY
     lda #<write_protect_vector
     ldx #>write_protect_vector
     ldy current_drive
@@ -2481,7 +1664,7 @@ zendproc
 
 ; Returns the login bitmap in XA.
 
-zproc entry_GETLOGINBITMAP
+zproc bdos_GETLOGINBITMAP
     lda login_vector+0
     ldx login_vector+1
     clc
@@ -2490,7 +1673,7 @@ zendproc
 
 ; Returns the readonly bitmap in XA.
 
-zproc entry_GETREADONLYBITMAP
+zproc bdos_GETREADONLYBITMAP
     lda write_protect_vector+0
     ldx write_protect_vector+1
     rts
@@ -2498,7 +1681,7 @@ zendproc
 
 ; Returns a pointer to the allocation bitmap in XA.
 
-zproc entry_GETALLOCATIONBITMAP
+zproc bdos_GETALLOCATIONBITMAP
     lda bitmap+0
     ldx bitmap+1
     clc
@@ -2507,7 +1690,7 @@ zendproc
 
 ; Returns a pointer to the current drive's DPB.
 
-zproc entry_GETDPB
+zproc bdos_GETDPB
     lda current_dpb+0
     ldx current_dpb+1
     clc
@@ -2649,139 +1832,11 @@ zproc check_disk_writable
     .byte 13, 10, 0
 zendproc
 
-; --- Utilities -------------------------------------------------------------
-
-; Shifts XA right Y bits.
-; Uses temp. Leaves the shifted value in temp+0.
-
-zproc shiftr
-    sta temp+0
-    stx temp+1
-shiftr_temp0:
-    iny
-    zloop
-        dey
-        beq shift_exit
-        clc
-        ror temp+1
-        ror temp+0
-    zendloop
-shift_exit:
-    lda temp+0
-    ldx temp+1
-    rts
-zendproc
-
-; Shifts XA left Y bits.
-; Uses temp. Leaves the shifted value in temp+0.
-
-zproc shiftl
-    sta temp+0
-    stx temp+1
-    iny
-    zloop
-        dey
-        beq shift_exit
-        clc
-        rol temp+0
-        rol temp+1
-    zendloop
-zendproc
-
-; Sets bit Y of (XA).
-; Uses temp.
-
-zproc setbit
-    sta temp+2
-    stx temp+3
-
-    lda #1
-    ldx #0
-    jsr shiftl      ; shift it left by Y
-
-    ldy #1
-    zrepeat
-        lda (temp+2), y
-        ora temp+0, y
-        sta (temp+2), y
-        dey
-    zuntil_mi
-
-    rts
-zendproc
-
-; Rotate A right X times.
-zproc rotater8
-    inx
-    zloop
-        dex
-        zbreakif_eq
-        lsr a
-        zif_cs
-            ora #$80
-        zendif
-    zendloop
-    rts
-zendproc
-
-; Rotate A left X times.
-zproc rotatel8
-    inx
-    zloop
-        dex
-        zbreakif_eq
-        asl a
-        adc #0
-    zendloop
-    rts
-zendproc
-
-; Calls the BIOS entrypoint.
-
-callbios:
-bios = callbios + 1
-    jmp 0
-
-bios_NEWLINE:
-    lda #13
-    jsr bios_CONOUT
-    lda #10
-    ; fall through
-bios_CONOUT:
-    ldy #BIOS_CONOUT
-    jmp callbios
-
-bios_CONIN:
-    ldy #BIOS_CONIN
-    jmp callbios
-
-bios_CONST:
-    ldy #BIOS_CONST
-    jmp callbios
-
-bios_GETTPA:
-    ldy #BIOS_GETTPA
-    jmp callbios
-
-bios_GETZP:
-    ldy #BIOS_GETZP
-    jmp callbios
-
-bios_SETDMA:
-    ldy #BIOS_SETDMA
-    jmp callbios
-
 NOINIT
 
-; State preserved between BDOS invocations.
+; State used by the filesystem. Cleared whenever the filesystem is reset.
 
-current_drive:  .byte 0     ; current working drive
-current_user:   .byte 0     ; current working user
-
-; State used by BDOS invocation. Reset to zero every time the BDOS
-; is initialised.
-
-bdos_state_start:
+filesystem_state_start:
 find_first_count:       .byte 0
 active_drive:           .byte 0 ; drive currently being worked on
 old_drive:              .byte 0 ; if the drive has been overridden by the FCB
@@ -2791,12 +1846,7 @@ login_vector:           .word 0
 directory_pos:          .word 0
 current_sector:         .fill 3  ; 24-bit sector number
 block_needs_clearing:   .byte 0 ; if set, any new block that's created will be zeroed
-
-buffered_key:           .byte 0
-output_paused:          .byte 0 ; top bit set if paused
-column_position:        .byte 0
-entry_stack:            .byte 0 ; saved stack on system call entry
-bdos_state_end:
+filesystem_state_end:
 
 ; Copy of DPB of currently selected drive.
 
@@ -2811,6 +1861,4 @@ bitmap_init:        .word 0
 checksum_vector_size: .word 0
 reserved_sectors:   .word 0
 dpb_copy_end:
-
-; vim: filetype=asm sw=4 ts=4 et
 
