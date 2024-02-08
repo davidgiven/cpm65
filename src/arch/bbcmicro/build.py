@@ -36,7 +36,7 @@ mkdfs(
     opt=2,
     items={
         "!boot@0x0400": ".+bios",
-        "bdos": "src+bdos",
+        "bdos": "src/bdos",
         "cpmfs": ".+cpmfs",
     },
 )

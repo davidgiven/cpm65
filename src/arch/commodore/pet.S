@@ -222,7 +222,7 @@ zproc _start, .init
 
     lda #>__TPA_START__
     ldx #__ZEROPAGE_START__
-    jsr entry_RELOCATE
+    jsr bios_RELOCATE
 
     ; Go!
 
@@ -253,35 +253,35 @@ zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
-zproc entry_GETTPA
+zproc bios_GETTPA
     lda mem_base
     ldx mem_end
     clc
     rts
 zendproc
 
-zproc entry_SETTPA
+zproc bios_SETTPA
     sta mem_base
     stx mem_end
     clc
     rts
 zendproc
 
-zproc entry_GETZP
+zproc bios_GETZP
     lda zp_base
     ldx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETZP
+zproc bios_SETZP
     sta zp_base
     stx zp_end
     clc
     rts
 zendproc
 
-zproc entry_SETBANK
+zproc bios_SETBANK
     rts
 zendproc
 

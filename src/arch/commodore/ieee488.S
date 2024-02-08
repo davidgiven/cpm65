@@ -112,7 +112,7 @@ zendproc
 
 ; Sets the current DMA address.
 
-zproc entry_SETDMA
+zproc bios_SETDMA
     sta dma+0
     stx dma+1
     clc
@@ -124,7 +124,7 @@ zendproc
 ; Returns the DPH in XA.
 ; Sets carry on error.
 
-zproc entry_SELDSK
+zproc bios_SELDSK
     cmp #0
     zif_ne
         sec                 ; invalid drive
@@ -140,7 +140,7 @@ zendproc
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
 
-zproc entry_SETSEC
+zproc bios_SETSEC
     sta ptr+0
     stx ptr+1
     ldy #2
@@ -153,7 +153,7 @@ zproc entry_SETSEC
     rts
 zendproc
 
-zproc entry_READ
+zproc bios_READ
     jsr change_sectors
     zif_cc
         lda sector_num+0
@@ -178,7 +178,7 @@ zendproc
 
 ; On entry, A=0 for a normal write; A=1 to always flush to disk.
 
-zproc entry_WRITE
+zproc bios_WRITE
     pha
     jsr change_sectors
     zif_cs
@@ -372,13 +372,13 @@ zproc getstatus
     zloop
         jsr ieee_getb
         zbreakif_cs
-        jsr entry_CONOUT
+        jsr bios_CONOUT
     zendloop
 
     lda #0x0d
-    jsr entry_CONOUT
+    jsr bios_CONOUT
     lda #0x0a
-    jsr entry_CONOUT
+    jsr bios_CONOUT
     jsr ieee_untalk
     rts
 zendproc
