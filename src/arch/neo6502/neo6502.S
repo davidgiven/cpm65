@@ -53,21 +53,8 @@ _start:
         zendif
     zendloop
 
-	lda #<biosentry ; force biosentry to be linked
-	jmp bdosstart
-
-.global cpm_header
-cpm_header:
-    .byte 0   ; zero page used
-    .byte 0   ; tpa used
-
-zproc bdosstart
-	zloop
-		jsr tty_conin
-		jsr tty_conout
-	zendloop
-    jmp bdos_core
-zendproc
+    jsr initdrivers
+	jmp bdos_core
 
 ; ===========================================================================
 ;                            BDOS IMPLEMENTATION
@@ -229,8 +216,7 @@ zendproc
 
 zproc bios_SETTPA
     sta mem_base
-    txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
-    sta mem_end
+    stx mem_end
     clc
     rts
 zendproc
@@ -274,5 +260,3 @@ zp_base:    .byte __ZEROPAGE_START__
 zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA0_START__@mos16hi, __TPA0_START__@mos16hi
 mem_end:    .byte __TPA0_END__@mos16hi,   __TPA0_END__@mos16hi
-
-
