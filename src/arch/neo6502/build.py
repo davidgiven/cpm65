@@ -5,6 +5,9 @@ llvmcfile(
     name="bios_obj",
     srcs=["./neo6502.S"],
     deps=["include", "src/lib+bioslib", "src/bdos+bdoslib"],
+    cflags=[
+        "-mcpu=mosw65c02",
+    ],
 )
 
 llvmrawprogram(
