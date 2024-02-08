@@ -817,8 +817,7 @@ zproc seek_to_block_and_create
 
             lda directory_buffer+0
             ldx directory_buffer+1
-            ldy #BIOS_SETDMA
-            jsr callbios
+            jsr bios_SETDMA
 
             zrepeat
                 lda #2
@@ -1486,8 +1485,7 @@ zproc read_dir_entry
 
         lda directory_buffer+0
         ldx directory_buffer+1
-        ldy #BIOS_SETDMA
-        jsr callbios
+        jsr bios_SETDMA
 
         jsr read_sector
         lda #0
@@ -1702,19 +1700,16 @@ zendproc
 reset_user_dma:
     lda user_dma+0
     ldx user_dma+1
-    ldy #BIOS_SETDMA
-    jmp callbios
+    jmp bios_SETDMA
 
 set_current_sector:
     lda #<current_sector
     ldx #>current_sector
-    ldy #BIOS_SETSEC
-    jmp callbios
+    jmp bios_SETSEC
 
 read_sector:
     jsr set_current_sector
-    ldy #BIOS_READ
-    jmp callbios
+    jmp bios_READ
 
 ; A=0, 1 or 2 as for BIOS_WRITE on entry.
 
@@ -1722,8 +1717,7 @@ write_sector:
     pha
     jsr set_current_sector
     pla
-    ldy #BIOS_WRITE
-    jmp callbios
+    jmp bios_WRITE
 
 ; Calculates the block and sector addresses of the dirent in
 ; directory_pos.
@@ -1779,8 +1773,7 @@ zendproc
 
 zproc select_active_drive
     lda active_drive
-    ldy #BIOS_SELDSK
-    jsr callbios
+    jsr bios_SELDSK
     zif_cc
         ; Copy DPH into local storage.
 
