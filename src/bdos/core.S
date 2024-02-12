@@ -84,6 +84,37 @@ zproc bdos_SETDMAADDRESS
     rts
 zendproc
 
+; Sets the random access pointer to whereever the FCB is currently
+; pointing.
+
+zproc bdos_COMPUTEPOINTER
+    ldy #FCB_EX
+    lda (param), y              ; get EX
+    lsr a                       ; bottom bit -> C
+    sta temp+1                  ; store high byte
+    lda #0
+    ror a                       ; C -> top bit
+    ; low byte in A (the top bit)
+
+    ldy #FCB_CR
+    ora (param), y              ; merge in record count
+    ldy #FCB_R0
+    sta (param), y              ; finished with low byte
+
+    ldy #FCB_S2                ; get S2
+    lda (param), y
+    asl a
+    asl a
+    asl a
+    asl a
+    ora temp+1
+    ldy #FCB_R1                ; finished with high byte
+    sta (param), y
+
+    clc
+    rts
+zendproc
+
 ; --- Utilities -------------------------------------------------------------
 
 NOINIT
