@@ -1,5 +1,15 @@
 from tools.build import mkcpmfs, shuffle, mametest
 from build.llvm import llvmrawprogram, llvmcfile
+from build.zip import zip
+from config import (
+    MINIMAL_APPS,
+    MINIMAL_APPS_SRCS,
+    BIG_APPS,
+    BIG_APPS_SRCS,
+    SCREEN_APPS,
+    SCREEN_APPS_SRCS,
+)
+import re
 
 llvmcfile(
     name="bios_obj",
@@ -34,22 +44,19 @@ llvmrawprogram(
     ],
 )
 
-# mkcpmfs(
-#    name="diskimage",
-#    format="appleiie",
-#    bootimage=".+bios_shuffled",
-#    size=143360,
-#    items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
-#    | MINIMAL_APPS
-#    | MINIMAL_APPS_SRCS
-#    | BIG_APPS
-#    | BIG_APPS_SRCS,
-# )
-#
-# mametest(
-#    name="mametest",
-#    target="apple2e",
-#    diskimage=".+diskimage",
-#    imagetype=".po",
-#    script="./mame-test.lua",
-# )
+zip(
+    name="diskimage",
+    items={
+        re.sub("^0:", "A/", k).upper(): v
+        for k, v in (
+            MINIMAL_APPS
+            | MINIMAL_APPS_SRCS
+            | BIG_APPS
+            | BIG_APPS_SRCS
+            | SCREEN_APPS
+            | SCREEN_APPS_SRCS
+        ).items()
+    }
+    | {"cpm65.neo": ".+bios"},
+)
+

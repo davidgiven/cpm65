@@ -2,6 +2,7 @@
 #include "cpm65.inc"
 #include "driver.inc"
 #include "jumptables.inc"
+#include "bdos.inc"
 
 CP = 0xff00
 CP_GROUP    = CP + 0
@@ -24,6 +25,11 @@ FUNC_FILE_READH   = 8
 FUNC_FILE_WRITEH  = 9
 FUNC_FILE_GETSIZE = 10
 FUNC_FILE_SETSIZE = 11
+FUNC_FILE_RENAME  = 12
+FUNC_FILE_DELETE  = 13
+FUNC_FILE_STAT    = 16
+FUNC_FILE_OPENDIR = 17
+FUNC_FILE_READDIR = 18
 
 FIOMODE_RDONLY 	    = 0
 FIOMODE_WRONLY      = 1
@@ -32,9 +38,10 @@ FIOMODE_RDWR_CREATE = 3
 
 ; Filenames are of the form: "/A10/ABCDEFGH.XYZ"
 
-FT_FILENAMELEN    = 0 ; 0 if not in use
-FT_FILENAME       = 1
-FT__SIZE          = 18
+FT_INUSE          = 0
+FT_FILENAMELEN    = 1
+FT_FILENAME       = 2
+FT__SIZE          = 20
 
 NUM_FILES         = 8
 
@@ -83,7 +90,6 @@ _start:
 ;                            BDOS IMPLEMENTATION
 ; ===========================================================================
 
-.global internal_RESETFILESYSTEM, internal_BEGINSYS, internal_ENDSYS
 .global internal_READSEQUENTIAL
 
 .global bdos_UNIMPLEMENTED, bdos_LOGINDRIVE, bdos_OPENFILE, bdos_CLOSEFILE
@@ -106,7 +112,7 @@ zproc internal_RESETFILESYSTEM
 
 	ldx #0
 	zrepeat
-		stz file_table+FT_FILENAMELEN, x
+		stz file_table+FT_INUSE, x
 
 		txa
 		clc
@@ -115,44 +121,36 @@ zproc internal_RESETFILESYSTEM
 
 		cpx #NUM_FILES*FT__SIZE
 	zuntil_eq
+
+	; Initialise the LRU list.
+
+	ldx #NUM_FILES-1
+	zrepeat
+		txa
+		sta file_table_lru, x
+
+		dex
+	zuntil_mi
+
 	rts
 zendproc
 
-
+.global internal_BEGINSYS, internal_ENDSYS, bdos_LOGINDRIVE
 internal_BEGINSYS:
 internal_ENDSYS:
 bdos_LOGINDRIVE:
 	rts
 
-bdos_OPENFILE:
-	jsr get_file_handle
-	sta CP_PARAM+0
-
-	.byte 3
-
-	clc
-	txa
-	adc #<file_table
-	sta CP_PARAM+1
-	lda #>file_table
-	adc #0
-	sta CP_PARAM+2
-
-	lda #FIOMODE_RDWR
-	sta CP_PARAM+3
-
-	phx
-	lda #FUNC_FILE_OPEN
-	jsr neo_file_func_blocking
-	plx
-
+zproc bdos_OPENFILE
+	jsr get_and_reopen_file_table_entry
 	lda CP_ERRNO
 	zif_ne
-		stz file_table+FT_FILENAMELEN, x ; mark file as unused
 		sec
 		rts
 	zendif
-
+zendproc
+	; falls through
+zproc rewind_fcb
 	ldy #FCB_EX
 	lda #0
 	sta (param), y
@@ -163,53 +161,310 @@ bdos_OPENFILE:
 	iny
 	sta (param), y
 
+	jsr update_rc_field
+
+	clc
+	rts
+zendproc
+
+zproc bdos_CREATEFILE
+	jsr convert_filename
+	lda #<(temp_file_entry + FT_FILENAMELEN)
+	sta CP_PARAM+0
+	lda #>(temp_file_entry + FT_FILENAMELEN)
+	sta CP_PARAM+1
+
+	lda #FUNC_FILE_STAT
+	jsr neo_file_func_blocking
+	lda CP_ERRNO
+	beq fail_read_write
+
+	jsr get_file_table_entry
+
+	lda #FIOMODE_RDWR_CREATE
+	jsr do_open_file_table_entry
+	lda CP_ERRNO
+	bne fail_read_write
+	bra rewind_fcb
+zendproc
+
+zproc bdos_READRANDOM
+	jsr update_fcb_for_record_number
+zendproc
+	; fall through
+.global internal_READSEQUENTIAL
+internal_READSEQUENTIAL:
+zproc bdos_READSEQUENTIAL
+	jsr get_and_reopen_file_table_entry
+	lda CP_ERRNO
+	bne fail_read_write
+
+	jsr seek_to_fcb_location
+	lda CP_ERRNO
+	bne fail_read_write
+
+	lda #FUNC_FILE_READH
+	jsr do_read_write
+	lda CP_ERRNO
+	bne fail_read_write
+
+	jsr increment_fcb_location
+	clc
+	rts
+zendproc
+
+.global bdos_WRITERANDOMFILLED
+bdos_WRITERANDOMFILLED:
+zproc bdos_WRITERANDOM
+	jsr update_fcb_for_record_number
+zendproc
+	; fall through
+zproc bdos_WRITESEQUENTIAL
+	jsr get_and_reopen_file_table_entry
+	lda CP_ERRNO
+	bne fail_read_write
+
+	jsr seek_to_fcb_location
+	lda CP_ERRNO
+	bne fail_read_write
+
+	lda #FUNC_FILE_WRITEH
+	jsr do_read_write
+	lda CP_ERRNO
+	bne fail_read_write
+
+	jsr increment_fcb_location
+
+	; Ensure any new record is reflected in FCB_RC.
+
+	ldy #FCB_CR
+	lda (param), y
+	ldy #FCB_RC
+	cmp (param), y
+	zif_cs
+		sta (param), y
+	zendif
+
+	clc
+	rts
+zendproc
+
+zproc fail_read_write
+	sec
+	rts
+zendproc
+
+; TODO: this needs to take a wildcard
+
+zproc bdos_DELETEFILE
+	jsr convert_filename
+
+	lda #<(temp_file_entry + FT_FILENAMELEN)
+	sta CP_PARAM+0
+	lda #>(temp_file_entry + FT_FILENAMELEN)
+	sta CP_PARAM+1
+
+	lda #FUNC_FILE_DELETE
+	jsr neo_file_func_blocking
+	lda CP_ERRNO
+	bne fail_read_write
+
+	clc
+	rts
+zendproc
+
+zproc bdos_CLOSEFILE
+	jsr get_and_reopen_file_table_entry
+	lda CP_ERRNO
+	bne fail_read_write
+	phx
+
+	jsr flush_rc_count
+
+	lda #FUNC_FILE_CLOSE
+	jsr neo_file_func_blocking
+	plx
+	lda CP_ERRNO
+	bne fail_read_write
+
+	stz file_table+FT_INUSE, x
+	clc
+	rts
+zendproc
+
+zproc fail_find
+	sec
+	lda #0xff
+	rts
+zendproc
+
+zproc bdos_FINDFIRST
+	; FCB contains a pattern:
+	;
+	;    ?:????????.???
+	
+	jsr convert_filename
+
+	; Filename is '/A5/ABCDEFGH.IJK'
+
+	ldx #2
+	lda temp_file_entry+FT_FILENAME, x
+	cmp #'/'
+	zif_ne
+		; Must have two digits for the user code
+		inx
+	zendif
+	stx temp_file_entry+FT_FILENAMELEN
+
+	; Filename should look like '/A5'
+
+	lda #<(temp_file_entry+FT_FILENAMELEN)
+	sta CP_PARAM+0
+	lda #>(temp_file_entry+FT_FILENAMELEN)
+	sta CP_PARAM+1
+	lda #FUNC_FILE_OPENDIR
+	jsr neo_file_func_blocking
+
+	lda CP_ERRNO
+	bne fail_find
+zendproc
+	; fall through
+zproc bdos_FINDNEXT
+	lda #<temp_file_entry
+	sta CP_PARAM+0
+	lda #>temp_file_entry
+	sta CP_PARAM+1
+	lda #FT__SIZE-1
+	sta temp_file_entry
+
+	lda #FUNC_FILE_READDIR
+	jsr neo_file_func_blocking
+	lda CP_ERRNO
+	bne fail_find
+
+	; Convert the DOS filename to an FCB in user_dma.
+
+	ldx #0				; offset into DOS filename
+	ldy #FCB_F1			; offset into FCB
+	zrepeat
+		lda temp_file_entry+1, x
+		cmp #'.'
+		zif_eq
+			cpy #FCB_T1
+			zif_eq
+				inx
+				zcontinue
+			zendif
+			dex
+			lda #' '
+		zendif
+		cpx temp_file_entry
+		zif_eq
+			dex
+			lda #' '
+		zendif
+	
+		jsr toupper
+		sta (user_dma), y
+
+		iny
+		inx
+		cpy #FCB_T3+1
+	zuntil_eq
+
+	ldy #FCB_DR
+	lda (param), y
+	sta (user_dma), y
+
+	; Set the M/E/R length.
+	;
+	;  +4        +3        +2        +1
+	;  --------- --------- --------- ---------
+	;  0000 0000 MMMM MEEE EERR RRRR RXXX XXXX
+
+	lda CP_PARAM+1
+	asl a
+	lda CP_PARAM+2
+	rol a
+	and #0x7f
+	tax
+	lda CP_PARAM+1
+	and #0x7f
+	zif_ne
+		inx
+	zendif
+	txa
+	ldy #FCB_RC
+	sta (user_dma), y
+
+	lda CP_PARAM+2
+	asl a
+	sta temp+0
+	lda CP_PARAM+3
+	rol a
+	asl temp+0
+	rol a
+	and #0b00011111
+	ldy #FCB_EX
+	sta (user_dma), y
+
+	lda CP_PARAM+3
+	lsr a
+	lsr a
+	lsr a
+	and #0b00011111
+	ldy #FCB_S2
+	sta (user_dma), y
+
+	ldy #FCB_S1
+	lda #0
+	sta (user_dma), y
+
+	; Match against the pattern.
+
+	ldy #FCB_F1
+	zrepeat
+		lda (param), y
+		cmp #'?'
+		zif_ne
+			cmp (user_dma), y
+			zif_ne
+				; Character is not a wildcard and does not match!
+				; Try the next file.
+
+				jmp bdos_FINDNEXT
+			zendif
+		zendif
+		iny
+		cpy #FCB_T3+1
+	zuntil_eq
+
+	lda #0
+	clc
+	rts
+zendproc
+
+bdos_SETFILEATTRS:
+	.byte 3
+
+bdos_GETLOGINBITMAP:
+	lda #0xff
+	ldx #0xff
+bdos_RESETDISK:
 	clc
 	rts
 
-bdos_UNIMPLEMENTED:
-	.byte 3
-bdos_CLOSEFILE:
-	.byte 3
-bdos_FINDFIRST:
-	.byte 3
-bdos_FINDNEXT:
-	.byte 3
-bdos_DELETEFILE:
-	.byte 3
-bdos_READSEQUENTIAL:
-	.byte 3
-internal_READSEQUENTIAL:
-	.byte 3
-bdos_WRITESEQUENTIAL:
-	.byte 3
-bdos_CREATEFILE:
-	.byte 3
-bdos_RENAMEFILE:
-	.byte 3
-bdos_GETLOGINBITMAP:
-	.byte 3
-bdos_GETALLOCATIONBITMAP:
-	.byte 3
 bdos_SETDRIVEREADONLY:
-	.byte 3
+bdos_UNIMPLEMENTED:
+bdos_GETALLOCATIONBITMAP:
 bdos_GETREADONLYBITMAP:
-	.byte 3
-bdos_SETFILEATTRS:
-	.byte 3
 bdos_GETDPB:
-	.byte 3
-bdos_READRANDOM:
-	.byte 3
-bdos_WRITERANDOM:
-	.byte 3
-bdos_COMPUTEFILESIZE:
-	.byte 3
-bdos_COMPUTEPOINTER:
-	.byte 3
-bdos_RESETDISK:
-	.byte 3
-bdos_WRITERANDOMFILLED:
-	.byte 3
+	lda #<unimplemented_string
+	ldx #>unimplemented_string
+	jmp harderror
+unimplemented_string:
+	.ascii "Unimplemented"
+	.byte 0
 
 zproc bdos_GETBIOS
     lda #<biosentry
@@ -219,12 +474,374 @@ zproc bdos_GETBIOS
     rts
 zendproc
 
-; Gets the file handle for the FCB pointed to by param.
-; A = file handle
-; X = offset into file_table
+zproc bdos_COMPUTEFILESIZE
+	jsr get_and_reopen_file_table_entry
+	lda CP_ERRNO
+	zif_ne
+		clc
+		rts
+	zendif
 
-zproc get_file_handle
-	; Construct the template filetab entry.
+	lda #FUNC_FILE_GETSIZE
+	jsr neo_file_func_blocking
+
+	; Place the file size (in records) into FCB_Rx.
+	;
+	; The file size in the CP_PARAM block is:
+
+	;  +4        +3        +2        +1
+	;  --------- --------- --------- ---------
+	;  0000 0000 MMMM MEEE EERR RRRR RXXX XXXX
+
+	lda CP_PARAM+1
+	asl a
+	lda CP_PARAM+2
+	rol a
+	ldy #FCB_R0
+	sta (param), y
+	lda CP_PARAM+3
+	rol a
+	iny
+	sta (param), y		; R1
+	lda CP_PARAM+4
+	rol a
+	iny
+	sta (param), y		; R2
+
+	; Round up the last record.
+
+	lda CP_PARAM+1
+	and #0x7f
+	zif_ne
+		ldy #FCB_R0
+		lda (param), y
+		inc a
+		sta (param), y
+		zif_eq
+			iny
+			lda (param), y
+			inc a
+			sta (param), y
+			zif_eq
+				iny
+				lda (param), y
+				inc a
+				sta (param), y
+			zendif
+		zendif
+	zendif
+	clc
+	rts
+zendproc
+
+zproc bdos_RENAMEFILE
+	; Old name: param+0
+	; New name: param+16
+
+	jsr get_file_table_entry
+	phx
+
+	clc
+	lda param+0
+	adc #16
+	sta param+0
+	zif_eq
+		inc param+1
+	zendif
+
+	jsr convert_filename
+
+	pla
+	inc a
+	clc
+	adc #<file_table
+	sta CP_PARAM+0
+	lda #>file_table
+	adc #0
+	sta CP_PARAM+1
+
+	lda #<(temp_file_entry+FT_FILENAMELEN)
+	sta CP_PARAM+2
+	lda #>(temp_file_entry+FT_FILENAMELEN)
+	sta CP_PARAM+3
+
+	lda #FUNC_FILE_RENAME
+	jsr neo_file_func_blocking
+	clc
+	lda CP_ERRNO
+	zif_ne
+		sec
+	zendif
+	rts
+zendproc
+
+; Seeks the file whose handle is in CP_PARAM+0 to the location
+; pointed at by the FCB in (param).
+
+zproc seek_to_fcb_location
+	ldy #FCB_CR
+	jsr compute_seek_location
+
+	; Do the seek.
+
+	lda #FUNC_FILE_SEEK
+	jmp neo_file_func_blocking
+zendproc
+
+; Computes the seek location (into CP_PARAM+1) of an FCB.
+; On entry, Y is the offset of the FCB field to use to get
+; the record count (normally, FCB_CR).
+
+zproc compute_seek_location
+	; Convert the file position to an absolute location.
+	; There are:
+	;   128 bytes per record
+	;   32 records per extent
+	;   32 extents per module (S2)
+	; So, the final location is:
+	;
+	;  +4        +3        +2        +1
+	;  --------- --------- --------- ---------
+	;  0000 0000 MMMM MEEE EERR RRRR R000 0000
+
+	stz CP_PARAM+1
+	lda (param), y
+	lsr a				; puts the low bit into C
+	sta CP_PARAM+2
+	ror CP_PARAM+1		; 0x00 or 0x80
+
+	ldy #FCB_EX
+	lda (param), y
+	ror a
+	ror a
+	ror a				; bottom two bits rotated to the top
+	pha
+	and #0xc0			; discard everything else
+	ora CP_PARAM+2
+	sta CP_PARAM+2
+	pla
+	and #0x07			; top three bits of extent
+	sta CP_PARAM+3
+
+	ldy #FCB_S2
+	lda (param), y
+	lsr a
+	lsr a
+	lsr a
+	and #0x1f
+	sta CP_PARAM+3
+	stz CP_PARAM+4
+	rts
+zendproc
+
+; Changes the FCB to point at the current random record.
+
+zproc update_fcb_for_record_number
+	ldy #FCB_RC
+	lda (param), y
+	cmp #0x80
+	zif_ne
+		; If RC is not 0x80, then this is must be the last extent
+		; in the file; we need to set the file length appropriately
+		; in case we move to a new extent.
+
+		jsr flush_rc_count
+	zendif
+
+    ; Convert random access record number to M/E/R.
+
+	ldy #FCB_EX
+	lda (param), y
+	sta temp+0				; old extent
+	ldy #FCB_S2
+	lda (param), y
+	sta temp+1				; old module
+
+    ldy #FCB_R0
+    lda (param), y
+    and #$7f
+    ldy #FCB_CR
+    sta (param), y          ; new current record
+
+    ldy #FCB_R0
+    lda (param), y          ; get low byte
+    rol a                   ; top bit into carry
+    iny
+    lda (param), y          ; get high byte
+    rol a                   ; carry into bottom bit and x2
+    and #$1f
+	ldy #FCB_EX
+	sta (param), y
+
+    ldy #FCB_R1
+    lda (param), y          ; get high byte
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+	ldy #FCB_S2
+	sta (param), y
+
+	cmp temp+1				; is the module different?
+	zif_eq
+		ldy #FCB_EX
+		lda (param), y
+		cmp temp+0			; is the extent different?
+		zif_eq
+			rts				; neither is different
+		zendif
+	zendif
+zendproc
+	; fall through
+zproc update_rc_field
+	; Get the current extent number into temp.
+	;
+	; 0000 00MM MMME EEEE
+
+	ldy #FCB_S2
+	lda (param), y
+	lsr a
+	lsr a
+	lsr a
+	and #0x03
+	sta temp+1
+
+	ldy #FCB_S2
+	lda (param), y
+	and #0x07
+	asl a
+	asl a
+	asl a
+	asl a
+	asl a
+	ldy #FCB_EX
+	ora (param), y
+	sta temp+0
+
+	; Fetch the real length of the file into ptr.
+	;
+	;  +4        +3        +2        +1
+	;  --------- --------- --------- ---------
+	;  0000 0000 MMMM MEEE EERR RRRR RXXX XXXX
+
+	lda #FUNC_FILE_GETSIZE
+	jsr neo_file_func_blocking
+
+	lda CP_PARAM+2
+	sta ptr+0
+	lda CP_PARAM+3
+	ldx #6
+	zrepeat
+		lsr a
+		ror ptr+0
+		dex
+	zuntil_eq
+
+	; If they're the same, we're looking at the last extent.
+	; Otherwise, it's RC.
+
+	tax
+	lda #0x80
+	cpx temp+1
+	zif_eq
+		ldx ptr+0
+		cpx temp+0
+		zif_eq
+			lda CP_PARAM+1
+			asl a
+			lda CP_PARAM+2
+			rol a
+			and #0x7f
+
+			tay
+			lda CP_PARAM+1
+			and #0x7f
+			zif_ne
+				iny
+			zendif
+			tya
+		zendif
+	zendif
+
+	ldy #FCB_RC
+	sta (param), y
+	rts
+zendproc
+
+; If we are on the last extent of the file, update the file's size to match the
+; current record count.
+
+zproc flush_rc_count
+	ldy #FCB_RC
+	lda (param), y
+	cmp #0x80
+	zif_eq
+		rts
+	zendif
+
+	jsr compute_seek_location
+
+	lda #FUNC_FILE_SETSIZE
+	jmp neo_file_func_blocking
+zendproc
+
+; Increments the FCB file location to the next record.
+
+zproc increment_fcb_location
+	ldy #FCB_CR
+	lda (param), y
+	inc a
+	sta (param), y
+	cmp #128
+	zif_eq
+		lda #0
+		sta (param), y
+		ldy #FCB_EX
+		lda (param), y
+		inc a
+		sta (param), y
+		cmp #32
+		zif_eq
+			lda #0
+			sta (param), y
+			ldy #FCB_S2
+			lda (param), y
+			inc a
+			sta (param), y
+		zendif
+
+		; Update the RC field with the number of records in the
+	    ; current extent.
+
+		jsr update_rc_field
+	zendif
+	rts
+zendproc
+
+; Perform a read or write to the file handle in CP_PARAM+0.
+; The function code is in A.
+
+zproc do_read_write
+	pha
+
+	lda user_dma+0
+	sta CP_PARAM+1
+	lda user_dma+1
+	sta CP_PARAM+2
+
+	lda #0x80
+	sta CP_PARAM+3
+	stz CP_PARAM+4
+
+	pla
+	jmp neo_file_func_blocking
+zendproc
+
+; Converts the current FCB filename into a Pascal string filename
+; in temp_file_entry.
+
+zproc convert_filename
+	stz temp_file_entry+FT_INUSE
 
 	lda #'/'
 	sta temp_file_entry+FT_FILENAME+0
@@ -287,14 +904,24 @@ zproc get_file_handle
 	zuntil_eq
 
 	stx temp_file_entry+FT_FILENAMELEN
+	rts
+zendproc
+
+; Finds or allocates a new file table slot
+; A = index of entry (i.e. file handle)
+; X = offset into file_table
+
+zproc get_file_table_entry
+	jsr convert_filename
 
 	; Now look for a matching slot.
 
-	ldx #0				; offset to FT being considered
-	stx ptr+0			; file handle
+	ldx #0              ; offset to FT being considered
+	stz ptr+0			; file handle
 	zrepeat
 		phx
-		ldy #0
+		inx
+		ldy #FT_FILENAMELEN
 		zrepeat
 			lda file_table, x
 			cmp temp_file_entry, y
@@ -302,18 +929,19 @@ zproc get_file_handle
 
 			inx
 			iny
-			cpy temp_file_entry
+			cpy temp_file_entry+FT_FILENAMELEN
 		zuntil_eq
 		zif_eq
 			plx
 			bra found_matching_filetab
 		zendif
 		pla
+		clc
 		adc #FT__SIZE
 		tax
 
 		inc ptr+0
-		cpx #FT__SIZE * NUM_FILES
+		cpx #FT__SIZE*NUM_FILES
 	zuntil_eq
 
 	; No slots match. Find an empty slot.
@@ -321,27 +949,8 @@ zproc get_file_handle
 	ldx #0
 	stx ptr+0
 	zrepeat
-		lda file_table+FT_FILENAMELEN, x
-		zif_eq			; empty?
-			; Yes! Copy in the template.
-
-			lda temp_file_entry
-			inc
-			sta ptr+1
-
-			phx
-			ldy #0
-			zrepeat
-				lda temp_file_entry, y
-				sta file_table, x
-				inx
-				iny
-				cpy ptr+1
-			zuntil_eq
-			plx
-
-			bra found_matching_filetab
-		zendif
+		lda file_table+FT_INUSE, x
+		beq found_empty_slot
 
 		inc ptr+0
 
@@ -355,10 +964,119 @@ zproc get_file_handle
 
 	; A file needs to be evicted.
 
-	.byte 3
+	lda file_table_lru+NUM_FILES-1
+	sta ptr+0
+	tay
+	lda file_table_offsets, y
+	tax
+
+	lda file_table+FT_INUSE, x
+	zif_ne
+		; Yes; it needs closing.
+
+		lda ptr+0
+		sta CP_PARAM+0
+
+		lda #FUNC_FILE_CLOSE
+		jsr neo_file_func_blocking
+		lda CP_ERRNO
+		zif_ne
+			rts
+		zendif
+	zendif
+
+found_empty_slot:
+	; X is the offset, ptr+0 is the handle.
+
+	lda temp_file_entry+FT_FILENAMELEN
+	inc a
+	inc a
+	sta ptr+1
+
+	phx
+	ldy #0
+	zrepeat
+		lda temp_file_entry, y
+		sta file_table, x
+		inx
+		iny
+		cpy ptr+1
+	zuntil_eq
+	plx
 
 found_matching_filetab:
 	lda ptr+0
+	sta CP_PARAM+0
+	rts
+zendproc
+
+file_table_offsets:
+	offset = 0
+	.rept NUM_FILES
+		.byte offset * FT__SIZE
+		offset = offset + 1
+	.endr
+
+zproc get_and_reopen_file_table_entry
+	jsr get_file_table_entry
+zendproc
+	; fall through
+zproc open_file_table_entry
+	phx
+
+	stz CP_ERRNO
+	lda file_table+FT_INUSE, x
+	zif_eq
+		; This file has not been opened.
+
+		lda #FIOMODE_RDWR
+		jsr do_open_file_table_entry
+	zendif
+
+	; Update the LRU list.
+
+update_lru_list_debug:
+	ldx #NUM_FILES-1
+	ldy #NUM_FILES-1
+	zrepeat
+		lda file_table_lru, x
+		cmp ptr+0
+		zif_ne
+			sta file_table_lru, y
+			dey
+		zendif
+		dex
+	zuntil_mi
+	lda ptr+0
+	sta file_table_lru
+
+	plx
+	rts
+zendproc
+
+; On entry:
+;   X = offset to file table entry
+;   A = mode
+
+zproc do_open_file_table_entry
+	sta CP_PARAM+3
+
+	clc
+	txa
+	adc #<(file_table + FT_FILENAMELEN)
+	sta CP_PARAM+1
+	lda #>(file_table + FT_FILENAMELEN)
+	adc #0
+	sta CP_PARAM+2
+
+	lda #FUNC_FILE_OPEN
+	jsr neo_file_func_blocking
+
+	lda CP_ERRNO
+	zif_eq
+		inc file_table+FT_INUSE, x
+	zendif
+
 	rts
 zendproc
 
@@ -440,9 +1158,12 @@ zendproc
 ; Writes the character in A.
 
 zproc tty_conout
-	sta CP_PARAM + 0
-	lda #FUNC_TTY_WRITECH
-	jsr neo_tty_func
+	cmp #'\n'
+	zif_ne
+		sta CP_PARAM + 0
+		lda #FUNC_TTY_WRITECH
+		jsr neo_tty_func
+	zendif
 	clc
 	rts
 zendproc
@@ -478,8 +1199,6 @@ bios_WRITE:
 
 zproc bios_NEWLINE
     lda #13
-    jsr bios_CONOUT
-    lda #10
     jmp bios_CONOUT
 zendproc
 
@@ -538,3 +1257,6 @@ zp_base:    .byte __ZEROPAGE_START__
 zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA0_START__@mos16hi, __TPA0_START__@mos16hi
 mem_end:    .byte __TPA0_END__@mos16hi,   __TPA0_END__@mos16hi
+
+file_table_lru: .fill NUM_FILES
+
