@@ -12,8 +12,8 @@ from config import (
 llvmcfile(
     name="bios_obj",
     srcs=["./apple2e.S"],
-#    cflags=["-DAPPLE2E"],
-    cflags=["-DAPPLE2PLUS"],
+    cflags=["-DAPPLE2E"],
+#    cflags=["-DAPPLE2PLUS"],
     deps=["include", "src/lib+bioslib"],
 )
 
@@ -57,7 +57,8 @@ mkcpmfs(
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
-    | BIG_APPS_SRCS,
+    | BIG_APPS_SRCS
+    | SCREEN_APPS,
 )
 
 mametest(
