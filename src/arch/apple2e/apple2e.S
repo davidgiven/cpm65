@@ -57,6 +57,28 @@ dma:    .word 0
 disk_sixes_buffer = 0x300
 track_buffer = 0xd000
 
+//#define APPLE2
+//#define APPLE2PLUS
+//#define APPLE2EUROPLUS
+//#define APPLE2JPLUS
+//#define APPLE2E
+//#define APPLE2EENHANCED
+//#define APPLE2C
+//#define APPLE2GS
+
+#define TTY_MODE_40COLUMNS 1
+#define TTY_MODE_80COLUMNS 2
+#if defined APPLE2GS || defined APPLE2EENHANCED || defined APPLE2E
+#define TTY_MODE TTY_MODE_80COLUMNS
+SCREEN_WIDTH = 80
+#elif defined APPLE2C || defined APPLE2JPLUS || defined APPLE2EUROPLUS || defined APPLE2PLUS || defined APPLE2
+#define TTY_MODE TTY_MODE_40COLUMNS
+SCREEN_WIDTH = 40
+#else
+#error Unknown Apple II model
+#endif
+SCREEN_HEIGHT = 24
+
 ; --- Initialisation code ---------------------------------------------------
 
 ; Boot sector and relocator. Loaded at 0x0800 when the disk boots. Called once
@@ -67,9 +89,11 @@ _start:
     cli
     lda MEM_BANKING+0xb     ; R/W 0xe000 RAM; bank 1 in 0xd000
     lda MEM_BANKING+0xb     ; yes, I'm sure
+#if TTY_MODE == TTY_MODE_80COLUMNS
     sta SCREEN_80COLON
     sta SCREEN_80STOREON
     sta SCREEN_PAGE2OFF
+#endif
     ldx #0xff
     txs                     ; reset stack
 
@@ -275,7 +299,7 @@ zproc tty_conout
 
     inc cursorx
     lda cursorx
-    cmp #80
+    cmp #SCREEN_WIDTH
     zif_eq
         lda #0
         sta cursorx
@@ -287,7 +311,7 @@ zendproc
 zproc write_nl
     inc cursory
     lda cursory
-    cmp #24
+    cmp #SCREEN_HEIGHT
     zif_eq
         dec cursory
         jmp scroll_up
@@ -311,10 +335,12 @@ zproc scroll_up
 
         ldy #39
         zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2OFF
             lda (ptr), y
             sta (ptr1), y
             sta SCREEN_PAGE2ON
+#endif
             lda (ptr), y
             sta (ptr1), y
             dey
@@ -326,9 +352,11 @@ zproc scroll_up
     ldy #39
     lda #32|0x80
     zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
         sta SCREEN_PAGE2OFF
         sta (ptr), y
         sta SCREEN_PAGE2ON
+#endif
         sta (ptr), y
         dey
     zuntil_mi
@@ -342,13 +370,17 @@ zproc prepare_for_screen_write
     lda cursory
     jsr calculate_screen_address
     lda cursorx
+#if TTY_MODE == TTY_MODE_80COLUMNS
     lsr a
+#endif
     tay
     lda #0
     rol
     eor #1
     tax
+#if TTY_MODE == TTY_MODE_80COLUMNS
     sta SCREEN_PAGE2OFF, x
+#endif
     rts
 zendproc
 
@@ -392,9 +424,11 @@ zproc clear_screen
         lda #32|0x80
         zrepeat
             dey
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2ON
             sta (ptr), y
             sta SCREEN_PAGE2OFF
+#endif
             sta (ptr), y
         zuntil_eq
 

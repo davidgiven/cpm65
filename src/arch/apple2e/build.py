@@ -12,6 +12,8 @@ from config import (
 llvmcfile(
     name="bios_obj",
     srcs=["./apple2e.S"],
+#    cflags=["-DAPPLE2E"],
+    cflags=["-DAPPLE2PLUS"],
     deps=["include", "src/lib+bioslib"],
 )
 
