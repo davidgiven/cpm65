@@ -46,7 +46,8 @@ llvmrawprogram(
 
 zip(
     name="diskimage",
-    items={
+    items={"CPM65.NEO": ".+bios", "A/CCP.SYS": "src+ccp"}
+    | {
         re.sub("^0:", "A/", k).upper(): v
         for k, v in (
             MINIMAL_APPS
@@ -56,7 +57,5 @@ zip(
             | SCREEN_APPS
             | SCREEN_APPS_SRCS
         ).items()
-    }
-    | {"cpm65.neo": ".+bios"},
+    },
 )
-

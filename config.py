@@ -15,6 +15,7 @@ MINIMAL_APPS = {
 }
 
 MINIMAL_APPS_SRCS = {
+    "0:bedit.asm": "apps/bedit.asm",
     "0:dump.asm": "apps/dump.asm",
     "0:ls.asm": "apps/ls.asm",
     "0:cpm65.inc": "apps/cpm65.inc",

@@ -92,14 +92,6 @@ _start:
 
 .global internal_READSEQUENTIAL
 
-.global bdos_UNIMPLEMENTED, bdos_LOGINDRIVE, bdos_OPENFILE, bdos_CLOSEFILE
-.global bdos_FINDFIRST, bdos_FINDNEXT, bdos_DELETEFILE, bdos_READSEQUENTIAL
-.global bdos_WRITESEQUENTIAL, bdos_CREATEFILE, bdos_RENAMEFILE, bdos_GETLOGINBITMAP
-.global bdos_GETALLOCATIONBITMAP, bdos_SETDRIVEREADONLY
-.global bdos_GETREADONLYBITMAP, bdos_SETFILEATTRS, bdos_GETDPB
-.global bdos_READRANDOM, bdos_WRITERANDOM, bdos_COMPUTEFILESIZE, bdos_COMPUTEPOINTER
-.global bdos_RESETDISK, bdos_WRITERANDOMFILLED
-
 zproc internal_RESETFILESYSTEM
 	; Close all files.
 
@@ -135,11 +127,11 @@ zproc internal_RESETFILESYSTEM
 	rts
 zendproc
 
-.global internal_BEGINSYS, internal_ENDSYS, bdos_LOGINDRIVE
-internal_BEGINSYS:
-internal_ENDSYS:
-bdos_LOGINDRIVE:
+zproc internal_BEGINSYS
+zproc internal_ENDSYS
+zproc bdos_LOGINDRIVE
 	rts
+zendproc
 
 zproc bdos_OPENFILE
 	jsr get_and_reopen_file_table_entry
@@ -444,27 +436,32 @@ zproc bdos_FINDNEXT
 	rts
 zendproc
 
-bdos_SETFILEATTRS:
+zproc bdos_SETFILEATTRS
 	.byte 3
+zendproc
 
-bdos_GETLOGINBITMAP:
+zproc bdos_GETLOGINBITMAP
 	lda #0xff
 	ldx #0xff
-bdos_RESETDISK:
+zendproc
+	; fall through
+zproc bdos_RESETDISK
 	clc
 	rts
+zendproc
 
-bdos_SETDRIVEREADONLY:
-bdos_UNIMPLEMENTED:
-bdos_GETALLOCATIONBITMAP:
-bdos_GETREADONLYBITMAP:
-bdos_GETDPB:
+zproc bdos_SETDRIVEREADONLY
+zproc bdos_UNIMPLEMENTED
+zproc bdos_GETALLOCATIONBITMAP
+zproc bdos_GETREADONLYBITMAP
+zproc bdos_GETDPB
 	lda #<unimplemented_string
 	ldx #>unimplemented_string
 	jmp harderror
 unimplemented_string:
 	.ascii "Unimplemented"
 	.byte 0
+zendproc
 
 zproc bdos_GETBIOS
     lda #<biosentry
@@ -1077,7 +1074,7 @@ zproc do_open_file_table_entry
 		inc file_table+FT_INUSE, x
 	zendif
 
-	rts
+	jmp update_rc_field
 zendproc
 
 NOINIT
@@ -1115,6 +1112,8 @@ file_table: .fill FT__SIZE * NUM_FILES
 .global drvtop
 ; This must point at the _last_ driver.
 drvtop: .word drv_TTY
+
+; --- SCREEN driver ---------------------------------------------------------
 
 defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
 
@@ -1160,6 +1159,10 @@ zendproc
 zproc tty_conout
 	cmp #'\n'
 	zif_ne
+		cmp #127
+		zif_eq
+			lda #8
+		zendif
 		sta CP_PARAM + 0
 		lda #FUNC_TTY_WRITECH
 		jsr neo_tty_func
