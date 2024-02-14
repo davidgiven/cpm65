@@ -99,7 +99,12 @@ MAINLOOP:
         lda cmdline, x
         zcontinueif_eq
 
-        ; Parse it.
+        ; Monitor command?
+
+        cmp #'@'
+        beq monitor_command
+
+        ; Otherwise parse it as a normal command.
 
         lda #<cmdfcb
         ldx #>cmdfcb
@@ -138,6 +143,96 @@ commands_hi:
     jmptabhi entry_REN
     jmptabhi entry_USER
     jmptabhi entry_TRANSIENT
+
+zproc monitor_command
+    lda #0
+    sta temp+0
+    sta temp+1
+    sta temp2
+monitor_nextchar:
+    zrepeat
+        inc cmdoffset
+        ldx cmdoffset
+        lda cmdline, x
+        zif_eq
+            jmp MAINLOOP
+        zendif
+
+        cmp #' '
+    zuntil_ne
+
+    cmp #'A'
+    zif_cs
+        cmp #'F'+1
+        zif_cc
+            clc
+            adc #(10 - 'A') & 0xff
+            jmp monitor_digit
+        zendif
+    zendif
+
+    cmp #'0'
+    zif_cs
+        cmp #'9'+1
+        zif_cc
+            sec
+            sbc #'0'
+            jmp monitor_digit
+        zendif
+    zendif
+
+    cmp #'R'
+    zif_eq
+        jsr monitor_read
+    monitor_exit:
+        jsr newline
+        jmp monitor_nextchar
+    zendif
+
+    cmp #'W'
+    zif_eq
+        jsr monitor_read
+        jsr space
+        ldy #0
+        lda temp2
+        sta (temp), y
+        jsr print_hex_number
+        jmp monitor_exit
+    zendif
+
+    cmp #'G'
+    zif_eq
+        jmp (temp)
+    zendif
+    
+    jsr bdos_CONOUT
+    lda #'?'
+    jsr bdos_CONOUT
+    jsr newline
+    jmp MAINLOOP
+        
+monitor_read:
+    lda temp+0
+    ldx temp+1
+    jsr print_hex16_number
+    jsr space
+    ldy #0
+    lda (temp), y
+    jsr print_hex_number
+    rts
+
+monitor_digit:
+    ldx #3
+    zrepeat
+        asl temp+0
+        rol temp+1
+        rol temp2+2
+        dex
+    zuntil_mi
+    ora temp+0
+    sta temp+0
+    jmp monitor_nextchar
+zendproc
 
 zproc read_command_from_keyboard
     ; Read from keyboard.
