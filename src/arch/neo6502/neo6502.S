@@ -11,10 +11,19 @@ CP_ERRNO    = CP + 2
 CP_INFO     = CP + 3
 CP_PARAM    = CP + 4
 
-GROUP_TTY        = 2
-FUNC_TTY_READCH  = 1
-FUNC_TTY_POLLCH  = 2
-FUNC_TTY_WRITECH = 6
+GROUP_TTY              = 2
+FUNC_TTY_READCH        = 1
+FUNC_TTY_POLLCH        = 2
+FUNC_TTY_WRITECH       = 6
+FUNC_TTY_SETCURSOR     = 7
+FUNC_TTY_GETSIZE       = 9
+FUNC_TTY_INSERTLINE    = 10
+FUNC_TTY_DELETELINE    = 11
+FUNC_TTY_CLEAR         = 12
+FUNC_TTY_GETCURSOR     = 13
+FUNC_TTY_CLEARAREA     = 14
+FUNC_TTY_SETCOLOURS    = 15
+FUNC_TTY_REVERSECURSOR = 16
 
 GROUP_FILE		  = 3
 FUNC_FILE_OPEN	  = 4
@@ -84,7 +93,26 @@ _start:
     zendloop
 
     jsr initdrivers
+
+	jsr screen_clear
+	jsr set_normal_text
+
+    ldy #banner_end - banner
+    zrepeat
+        tya
+        pha
+        lda banner-1, y
+        jsr tty_conout
+        pla
+        tay
+        dey
+    zuntil_eq
+
 	jmp bdos_core
+
+banner: ; reversed!
+	.ascii "\r\rsuehproM/2056oen eht rof 56-M/PC"
+banner_end:
 
 ; ===========================================================================
 ;                            BDOS IMPLEMENTATION
@@ -1115,7 +1143,166 @@ drvtop: .word drv_TTY
 
 ; --- SCREEN driver ---------------------------------------------------------
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
+
+screen_jmptable_lo:
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo fail_read_write
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo screen_setstyle
+screen_jmptable_hi:
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi fail_read_write
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi screen_setstyle
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+	lda #FUNC_TTY_GETSIZE
+	jsr neo_tty_func_blocking
+	lda CP_PARAM+0
+	dec a
+	ldx CP_PARAM+1
+	dex
+    rts
+zendproc
+
+zproc screen_clear
+	lda #FUNC_TTY_CLEAR
+	jmp neo_tty_func
+zendproc
+
+zproc screen_setcursor
+	sta CP_PARAM+0
+	stx CP_PARAM+1
+	lda #FUNC_TTY_SETCURSOR
+	jmp neo_tty_func
+zendproc
+
+zproc screen_getcursor
+	lda #FUNC_TTY_GETCURSOR
+	jsr neo_tty_func_blocking
+	lda CP_PARAM+0
+	ldx CP_PARAM+1
+    rts
+zendproc
+
+zproc screen_getchar
+	lda #FUNC_TTY_REVERSECURSOR
+	jsr neo_tty_func
+
+	zrepeat
+		lda #FUNC_TTY_READCH
+		jsr neo_tty_func_blocking
+		lda CP_PARAM + 0
+	zuntil_ne
+	
+	pha
+	lda #FUNC_TTY_REVERSECURSOR
+	jsr neo_tty_func
+	pla
+	
+	clc
+	rts
+zendproc
+
+zproc screen_putchar
+	sta CP_PARAM+0
+	lda #FUNC_TTY_WRITECH
+	jmp neo_tty_func
+zendproc
+
+zproc screen_putstring
+    sta ptr+0
+    stx ptr+1
+    ldy #0
+    zrepeat
+        lda (ptr), y
+        zbreakif_eq
+        jsr screen_putchar
+        iny
+    zuntil_eq ; never 0
+    clc
+    rts
+zendproc
+
+zproc screen_scrollup
+	stz CP_PARAM+0
+	lda #FUNC_TTY_DELETELINE
+	jmp neo_tty_func
+zendproc
+
+zproc screen_scrolldown
+	stz CP_PARAM+0
+	lda #FUNC_TTY_INSERTLINE
+	jmp neo_tty_func
+zendproc
+
+zproc screen_cleartoeol
+	jsr screen_getsize
+	pha					; ...width
+
+	jsr screen_getcursor ; leaves cursor position in params 0/a and 1/x
+	pla
+	sta CP_PARAM+2
+	stx CP_PARAM+3
+
+	lda #FUNC_TTY_CLEARAREA
+	jmp neo_tty_func
+zendproc
+
+zproc set_normal_text
+	lda #0x0f
+	sta CP_PARAM+0
+	stz CP_PARAM+1
+	lda #FUNC_TTY_SETCOLOURS
+	jmp neo_tty_func
+zendproc
+
+zproc screen_setstyle
+	and #STYLE_REVERSE
+	beq set_normal_text
+zendproc
+	; fall through
+zproc set_reverse_text
+	stz CP_PARAM+0
+	lda #0x0f
+	sta CP_PARAM+1
+	lda #FUNC_TTY_SETCOLOURS
+	jmp neo_tty_func
+zendproc
+
+; --- TTY driver ------------------------------------------------------------
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -1124,11 +1311,11 @@ zproc drvstrat_TTY
 
 jmptable_lo:
     jmptablo tty_const
-    jmptablo tty_conin
+    jmptablo screen_getchar
     jmptablo tty_conout
 jmptable_hi:
     jmptabhi tty_const
-    jmptabhi tty_conin
+    jmptabhi screen_getchar
     jmptabhi tty_conout
 zendproc
 
@@ -1138,18 +1325,6 @@ zproc tty_const
 	lda #FUNC_TTY_POLLCH
 	jsr neo_tty_func_blocking
 	lda CP_PARAM+0
-	clc
-	rts
-zendproc
-
-; Blocks and reads a character into A.
-
-zproc tty_conin
-	zrepeat
-		lda #FUNC_TTY_READCH
-		jsr neo_tty_func_blocking
-		lda CP_PARAM + 0
-	zuntil_ne
 	clc
 	rts
 zendproc
