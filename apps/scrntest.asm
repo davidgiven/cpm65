@@ -13,11 +13,16 @@
 .zp max_y, 1
 .zp cur_vis, 1
 .zp style, 1
+.zp ptr1, 2
+.zp ptr2, 2
 .label string_init
 .label string_a
 .label BIOS
 .label SCREEN
 .label update_cursor
+.label printi
+.label print16
+.label putchar
 
 .zproc start
 
@@ -57,6 +62,23 @@ help:
     \ Clear screen and print help
     ldy #SCREEN_CLEAR
     jsr SCREEN
+
+    jsr printi
+    .byte "CP/M-65 Screen driver tester\r\n\r\nScreen size: ", 0
+
+    lda max_x
+    ldx #0
+    jsr print16
+
+    jsr printi
+    .byte ", ", 0
+
+    lda max_y
+    ldx #0
+    jsr print16
+
+    jsr printi
+    .byte "\r\n", 0
 
     lda #<string_init
     ldx #>string_init
@@ -242,8 +264,116 @@ SCREEN:
     rts
 .zendproc
 
+\ Prints an inline string. The text string must immediately follow the
+\ subroutine call.
+
+.zproc printi
+    pla
+    sta ptr1+0
+    pla
+    sta ptr1+1
+
+    .zloop
+        ldy #1
+        lda (ptr1), y
+        .zbreak eq
+        .zbreak mi
+        jsr putchar
+
+        inc ptr1+0
+        .zif eq
+            inc ptr1+1
+        .zendif
+    .zendloop
+
+    inc ptr1+0
+    .zif eq
+        inc ptr1+1
+    .zendif
+    inc ptr1+0
+    .zif eq
+        inc ptr1+1
+    .zendif
+
+    jmp (ptr1)
+.zendproc
+
+\ Prints XA in decimal. Y is the padding char or 0 for no padding.
+
+.zproc print16
+    ldy #0
+.zendproc
+\ falls through
+.zproc print16padded
+    sta ptr1+0
+    stx ptr1+1
+    sty ptr2+0
+
+    .label dec_table
+    .label skip
+    .label justprint
+
+    ldy #8
+    .zrepeat
+        ldx #0xff
+        sec
+        .zrepeat
+            lda ptr1+0
+            sbc dec_table+0, y
+            sta ptr1+0
+
+            lda ptr1+1
+            sbc dec_table+1, y
+            sta ptr1+1
+
+            inx
+        .zuntil cc
+
+        lda ptr1+0
+        adc dec_table+0, y
+        sta ptr1+0
+
+        lda ptr1+1
+        adc dec_table+1, y
+        sta ptr1+1
+
+        tya
+        pha
+        txa
+        pha
+
+        .zif eq                     \ if digit is zero, check padding
+            lda ptr2+0              \ get the padding character
+            beq skip                \ if zero, no padding
+            bne justprint           \ otherwise, use it
+        .zendif
+
+        ldx #'0'                    \ printing a digit, so reset padding
+        stx ptr2+0
+        ora #'0'                    \ convert to ASCII
+    justprint:
+        jsr putchar
+    skip:
+        pla
+        tax
+        pla
+        tay
+
+        dey
+        dey
+    .zuntil mi
+    rts
+
+dec_table:
+   .word 1, 10, 100, 1000, 10000
+.zendproc
+
+.zproc putchar
+    ldy #BDOS_CONIO
+    jmp BDOS
+.zendproc
+
 string_init:
-    .byte "CP/M-65 Screen driver tester\r\n\r\n"
     .byte "W,A,S,D - Move cursor\r\n"
     .byte "C - Put character\r\n"
     .byte "P - Put string\r\n"
