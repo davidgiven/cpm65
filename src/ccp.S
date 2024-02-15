@@ -675,7 +675,7 @@ zproc entry_TRANSIENT
     cmp #' '
     zif_eq
         lda cmdfcb + FCB_DR
-        zif_eq
+        zif_ne
             sec
             sbc #1
             sta drive
