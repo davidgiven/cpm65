@@ -491,8 +491,8 @@ zproc entry_FREE
     jsr printi
     .ascii ", CCP\xa0"
 
-    lda #<main
-    ldx #>main
+    lda #<(BDOS-4)
+    ldx #>(BDOS-4)
     jsr print_hex16_number
 
     jsr printi
@@ -507,13 +507,13 @@ printsizes:
     .ascii "ZP\xa0"
 
     jsr bios_GETZP
-    jsr print_range
+    jsr print_zp_range
 
     jsr printi
     .ascii ". TPA\xa0"
 
     jsr bios_GETTPA
-    jsr print_range
+    jsr print_tpa_range
 
     jsr printi
     .ascii ". Free:\xa0"
@@ -522,9 +522,10 @@ printsizes:
     sec
     sbc temp+0
     jsr print_hex_number
+    jsr print_00
     jmp newline
 
-print_range:
+print_zp_range:
     sta temp+0
     stx temp+1
     jsr print_hex_number
@@ -534,6 +535,22 @@ print_range:
 
     lda temp+1
     jmp print_hex_number
+
+print_tpa_range:
+    sta temp+0
+    stx temp+1
+    jsr print_hex_number
+
+    jsr printi
+    .ascii "00"
+    .byte '-'|0x80
+
+    lda temp+1
+    jsr print_hex_number
+print_00:
+    jsr printi
+    .byte '0', '0'|0x80
+    rts
 zendproc
 
 zproc entry_REN
