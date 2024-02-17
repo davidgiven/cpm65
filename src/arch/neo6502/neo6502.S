@@ -384,7 +384,7 @@ zproc bdos_FINDNEXT
 			lda #' '
 		zendif
 	
-		jsr toupper
+		jsr uppercase
 		sta (user_dma), y
 
 		iny
