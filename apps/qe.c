@@ -115,6 +115,17 @@ char* strcat(char* dest, const char* src)
     return NULL;
 }
 
+static void my_strrev(char *str)
+{
+	size_t len = strlen(str);
+	for (size_t i = 0, j = len - 1; i < j; i++, j--)
+	{
+		uint8_t a = str[i];
+		str[i] = str[j];
+		str[j] = a;
+	}
+}
+
 void itoa(uint16_t val, char* buf)
 {
     uint8_t i = 0;
@@ -125,7 +136,7 @@ void itoa(uint16_t val, char* buf)
         val /= 10;
     } while (val);
     buf[i] = '\0';
-    strrev(buf);
+    my_strrev(buf);
 }
 
 /* ======================================================================= */
