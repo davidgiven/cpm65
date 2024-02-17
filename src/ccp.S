@@ -294,8 +294,6 @@ zproc entry_DIR
     ; Set the drive.
 
     ldx userfcb+FCB_DR
-
-
     dex
     zif_mi
         ldx drive
@@ -773,7 +771,7 @@ calltemp:
 read_command_sector:
     lda temp+0
     ldx temp+1
-    jsr bdos_SETDMAIs this the expected behavior, i.e. is it up to the application to reset the active drive before exiting? Or should CCP reset the active drive when the transient program exits?
+    jsr bdos_SETDMA
     lda #<cmdfcb
     ldx #>cmdfcb
     jsr bdos_READSEQUENTIAL
