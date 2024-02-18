@@ -29,6 +29,7 @@ for prog in [
     "dump",
     "ls",
     "scrntest",
+    "kbdtest",
     "xrecv",
     "xsend",
     "vt52drv",
