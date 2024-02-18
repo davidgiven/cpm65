@@ -1225,6 +1225,11 @@ zproc screen_getchar
 		lda CP_PARAM + 0
 	zuntil_ne
 	
+	cmp #8
+	zif_eq
+		lda #127
+	zendif
+	
 	pha
 	lda #FUNC_TTY_REVERSECURSOR
 	jsr neo_tty_func
