@@ -1,0 +1,33 @@
+; Apple ][ OS defines
+
+SCREEN_80STOREOFF = 0xc000
+SCREEN_80STOREON  = 0xc001
+SCREEN_80COLOFF   = 0xc00c
+SCREEN_80COLON    = 0xc00d
+SCREEN_PAGE2OFF   = 0xc054
+SCREEN_PAGE2ON    = 0xc055
+
+KBD_READ        = 0xc000
+KBD_STROBERESET = 0xc010
+
+//#define APPLE2
+//#define APPLE2PLUS
+//#define APPLE2EUROPLUS
+//#define APPLE2JPLUS
+//#define APPLE2E
+//#define APPLE2EENHANCED
+//#define APPLE2C
+//#define APPLE2GS
+
+#define TTY_MODE_40COLUMNS 1
+#define TTY_MODE_80COLUMNS 2
+#if defined APPLE2GS || defined APPLE2EENHANCED || defined APPLE2E
+#define TTY_MODE TTY_MODE_80COLUMNS
+SCREEN_WIDTH = 80
+#elif defined APPLE2C || defined APPLE2JPLUS || defined APPLE2EUROPLUS || defined APPLE2PLUS || defined APPLE2
+#define TTY_MODE TTY_MODE_40COLUMNS
+SCREEN_WIDTH = 40
+#else
+#error Unknown Apple II model
+#endif
+SCREEN_HEIGHT = 24

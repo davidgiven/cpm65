@@ -1,5 +1,5 @@
 from tools.build import mkcpmfs, shuffle, mametest
-from build.llvm import llvmrawprogram, llvmcfile
+from build.llvm import llvmrawprogram, llvmcfile, llvmclibrary
 from config import (
     MINIMAL_APPS,
     MINIMAL_APPS_SRCS,
@@ -9,18 +9,29 @@ from config import (
     SCREEN_APPS_SRCS,
 )
 
+llvmclibrary(
+    name="common",
+    srcs="./common.S",
+    hdrs={"apple2e.inc": "./apple2e.inc"},
+    deps=["include"],
+#    cflags=["-DAPPLE2E"],
+    cflags=["-DAPPLE2PLUS"],
+)
+
 llvmcfile(
     name="bios_obj",
     srcs=["./apple2e.S"],
-    cflags=["-DAPPLE2E"],
-#    cflags=["-DAPPLE2PLUS"],
+#    cflags=["-DAPPLE2E"],
+    cflags=["-DAPPLE2PLUS"],
     deps=["include", "src/lib+bioslib"],
 )
 
 llvmrawprogram(
     name="bios_prelink",
     srcs=[".+bios_obj"],
-    deps=["src/lib+bioslib"],
+    deps=["src/lib+bioslib", "src/arch/apple2e+common"],
+#    cflags=["-DAPPLE2E"],
+    cflags=["-DAPPLE2PLUS"],
     linkscript="./apple2e-prelink.ld",
     ldflags=["--defsym=BIOS_SIZE=0x4000"],
 )
@@ -32,6 +43,7 @@ llvmrawprogram(
         ".+bios_prelink",
         "scripts/size.awk",
         "src/lib+bioslib",
+        "src/arch/apple2e+common",
     ],
     linkscript="./apple2e.ld",
     ldflags=[
@@ -53,7 +65,11 @@ mkcpmfs(
     format="appleiie",
     bootimage=".+bios_shuffled",
     size=143360,
-    items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
+    items={
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src/bdos",
+        "0:scrndrv.com": "src/arch/apple2e/utils+scrndrv",
+    }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
