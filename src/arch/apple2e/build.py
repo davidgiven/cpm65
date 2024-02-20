@@ -11,7 +11,6 @@ from config import (
 
 llvmclibrary(
     name="common",
-    srcs="./common.S",
     hdrs={"apple2e.inc": "./apple2e.inc"},
     deps=["include"],
 #    cflags=["-DAPPLE2E"],
@@ -29,7 +28,7 @@ llvmcfile(
 llvmrawprogram(
     name="bios_prelink",
     srcs=[".+bios_obj"],
-    deps=["src/lib+bioslib", "src/arch/apple2e+common"],
+    deps=["src/lib+bioslib"],
 #    cflags=["-DAPPLE2E"],
     cflags=["-DAPPLE2PLUS"],
     linkscript="./apple2e-prelink.ld",
@@ -43,7 +42,6 @@ llvmrawprogram(
         ".+bios_prelink",
         "scripts/size.awk",
         "src/lib+bioslib",
-        "src/arch/apple2e+common",
     ],
     linkscript="./apple2e.ld",
     ldflags=[
