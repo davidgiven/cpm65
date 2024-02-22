@@ -34,6 +34,7 @@ SCREEN_APPS = {
     "0:cls.com": "apps+cls",
     "0:life.com": "apps+life",
     "0:qe.com": "apps+qe",
+    "0:tetris.com": "apps+tetris",
     "0:vt52drv.com": "apps+vt52drv",
     "0:vt52test.com": "apps+vt52test",
 }

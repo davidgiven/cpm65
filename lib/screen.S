@@ -68,6 +68,13 @@ zproc screen_clear_to_eol, .text.screen_clear_to_eol
     jmp _call_screen
 zendproc
 
+zproc screen_getchar, .text.screen_getchar
+    ; TODO: A,X as timeout from timeout_cs
+    ldy #SCREEN_GETCHAR
+    jsr _call_screen
+    rts
+zendproc
+
 zproc screen_waitchar, .text.screen_waitchar
     zrepeat
         lda #0xff
