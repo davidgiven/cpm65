@@ -25,20 +25,22 @@ FUNC_TTY_CLEARAREA     = 14
 FUNC_TTY_SETCOLOURS    = 15
 FUNC_TTY_REVERSECURSOR = 16
 
-GROUP_FILE		  = 3
-FUNC_FILE_OPEN	  = 4
-FUNC_FILE_CLOSE	  = 5
-FUNC_FILE_SEEK    = 6
-FUNC_FILE_TELL    = 7
-FUNC_FILE_READH   = 8
-FUNC_FILE_WRITEH  = 9
-FUNC_FILE_GETSIZE = 10
-FUNC_FILE_SETSIZE = 11
-FUNC_FILE_RENAME  = 12
-FUNC_FILE_DELETE  = 13
-FUNC_FILE_STAT    = 16
-FUNC_FILE_OPENDIR = 17
-FUNC_FILE_READDIR = 18
+GROUP_FILE	       = 3
+FUNC_FILE_OPEN	   = 4
+FUNC_FILE_CLOSE	   = 5
+FUNC_FILE_SEEK     = 6
+FUNC_FILE_TELL     = 7
+FUNC_FILE_READH    = 8
+FUNC_FILE_WRITEH   = 9
+FUNC_FILE_GETSIZE  = 10
+FUNC_FILE_SETSIZE  = 11
+FUNC_FILE_RENAME   = 12
+FUNC_FILE_DELETE   = 13
+FUNC_FILE_STAT     = 16
+FUNC_FILE_OPENDIR  = 17
+FUNC_FILE_READDIR  = 18
+FUNC_FILE_CLOSEDIR = 19
+FUNC_FILE_COPY     = 20
 
 FIOMODE_RDONLY 	    = 0
 FIOMODE_WRONLY      = 1
@@ -111,7 +113,7 @@ _start:
 	jmp bdos_core
 
 banner: ; reversed!
-	.ascii "\r\rsuehproM/2056oen eht rof 56-M/PC"
+	.ascii "\rsuehproM/2056oen eht rof 56-M/PC"
 banner_end:
 
 ; ===========================================================================
@@ -1229,7 +1231,7 @@ zproc screen_getchar
 	zif_eq
 		lda #127
 	zendif
-	
+
 	pha
 	lda #FUNC_TTY_REVERSECURSOR
 	jsr neo_tty_func

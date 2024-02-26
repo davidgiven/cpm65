@@ -23,7 +23,11 @@ llvmcfile(
 llvmrawprogram(
     name="bios_prelink",
     srcs=[".+bios_obj"],
-    deps=["src/lib+bioslib", "src/bdos+bdoslib"],
+    deps=[
+        "src/lib+bioslib",
+        "src/bdos+bdoslib",
+        "./neo6502-common.ld",
+    ],
     linkscript="./neo6502-prelink.ld",
     ldflags=["--defsym=BIOS_SIZE=0x4000"],
 )
@@ -36,6 +40,7 @@ llvmrawprogram(
         "scripts/size.awk",
         "src/lib+bioslib",
         "src/bdos+bdoslib",
+        "./neo6502-common.ld",
     ],
     linkscript="./neo6502.ld",
     ldflags=[
@@ -46,7 +51,7 @@ llvmrawprogram(
 
 zip(
     name="diskimage",
-    items={"CPM65.NEO": ".+bios", "A/CCP.SYS": "src+ccp"}
+    items={"CPM65.NEO": ".+bios", "A/CCP.SYS": "src+ccp", "A/NCOPY.COM": "src/arch/neo6502/utils+ncopy"}
     | {
         re.sub("^0:", "A/", k).upper(): v
         for k, v in (
