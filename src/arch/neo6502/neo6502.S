@@ -1004,10 +1004,12 @@ zproc get_file_table_entry
 			cmp temp_file_entry, y
 			zbreakif_ne
 
+			cpy temp_file_entry+FT_FILENAMELEN
+			zbreakif_eq
+
 			inx
 			iny
-			cpy temp_file_entry+FT_FILENAMELEN
-		zuntil_eq
+		zuntil_ne ; always true
 		zif_eq
 			plx
 			bra found_matching_filetab
