@@ -419,28 +419,27 @@ zproc bdos_FINDNEXT
 	ldx #0				; offset into DOS filename
 	ldy #FCB_F1			; offset into FCB
 	zrepeat
-		lda temp_file_entry+1, x
-		cmp #'.'
-		zif_eq
-			cpy #FCB_T1
+	  	lda #' '
+	 	cpx temp_file_entry
+		zif_ne
+			lda temp_file_entry+1, x
+			jsr uppercase
+			cmp #'.'
 			zif_eq
-				inx
-				zcontinue
+				cpy #FCB_T1
+				zif_eq
+					inx
+					zcontinue
+				zendif
+				dex
+				lda #' '
 			zendif
-			dex
-			lda #' '
+		
+			inx
 		zendif
-		cpx temp_file_entry
-		zif_eq
-			dex
-			lda #' '
-		zendif
-	
-		jsr uppercase
 		sta (user_dma), y
 
 		iny
-		inx
 		cpy #FCB_T3+1
 	zuntil_eq
 
