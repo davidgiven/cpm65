@@ -279,19 +279,69 @@ zendproc
 ; TODO: this needs to take a wildcard
 
 zproc bdos_DELETEFILE
-	jsr convert_filename
+	; Save old user_dma.
 
-	lda #<(temp_file_entry + FT_FILENAMELEN)
-	sta CP_PARAM+0
-	lda #>(temp_file_entry + FT_FILENAMELEN)
-	sta CP_PARAM+1
+	lda user_dma+0
+	pha
+	lda user_dma+1
+	pha
 
-	lda #FUNC_FILE_DELETE
-	jsr neo_file_func_blocking
-	lda CP_ERRNO
-	bne fail_read_write
+	lda param+0
+	sta delete_saved_param_lo
+	lda param+1
+	sta delete_saved_param_hi
 
+	lda #<temp_fcb
+	sta user_dma+0
+	lda #>temp_fcb
+	sta user_dma+1
+
+	jsr bdos_FINDFIRST
+	bcs delete_success
+	zrepeat
+		; Found a matching file.
+
+		lda user_dma+0
+		sta param+0
+		lda user_dma+1
+		sta param+1
+
+		jsr convert_filename
+
+		lda #<(temp_file_entry + FT_FILENAMELEN)
+		sta CP_PARAM+0
+		lda #>(temp_file_entry + FT_FILENAMELEN)
+		sta CP_PARAM+1
+
+		lda #FUNC_FILE_DELETE
+		jsr neo_file_func_blocking
+		lda CP_ERRNO
+		zbreakif_ne
+
+		; Find the next file.
+
+	delete_saved_param_lo = . + 1
+		lda #0
+		sta param+0
+	delete_saved_param_hi = . + 1
+		lda #0
+		sta param+1
+
+		jsr bdos_FINDNEXT
+	zuntil_cs
+	
+	; Something went wrong.
+
+	sec
+	bra delete_exit
+
+delete_success:
 	clc
+delete_exit:
+	pla
+	sta user_dma+1
+	pla
+	sta user_dma+0
 	rts
 zendproc
 
@@ -1107,11 +1157,6 @@ zproc do_open_file_table_entry
 	jmp update_rc_field
 zendproc
 
-NOINIT
-
-temp_file_entry:
-	.fill FT__SIZE
-
 ; Execute RP2040 operation in A. Don't wait.
 
 zproc neo_file_func
@@ -1129,10 +1174,6 @@ zproc neo_file_func_blocking
 	jsr neo_file_func
 	jmp wait_for_command
 zendproc
-
-.data
-
-file_table: .fill FT__SIZE * NUM_FILES
 
 ; ===========================================================================
 ;                            BIOS IMPLEMENTATION
@@ -1444,4 +1485,14 @@ mem_base:   .byte __TPA0_START__@mos16hi, __TPA0_START__@mos16hi
 mem_end:    .byte __TPA0_END__@mos16hi,   __TPA0_END__@mos16hi
 
 file_table_lru: .fill NUM_FILES
+
+NOINIT
+
+; Currently used only by bdos_DELETE, which is a bit of a waste.
+temp_fcb:		 .fill FCB__SIZE
+
+; Used everywhere.
+temp_file_entry: .fill FT__SIZE
+file_table: 	 .fill FT__SIZE * NUM_FILES
+
 
