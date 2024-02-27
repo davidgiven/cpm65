@@ -10,6 +10,16 @@ BIOS_TOP = 0xff00;
 } >zp
 
 .loader : {
+    __header_start = .;
+    LONG(0x4f454e03);                   // magic number
+    SHORT(0);                           // firmware version
+    SHORT(_start);                      // execute address
+    BYTE(0);                            // control byte
+    SHORT(_start);                     // load address
+    SHORT(SIZEOF(.loader) + SIZEOF(.data) + SIZEOF(.text) - (__header_end - __header_start)); // length
+    BYTE(0);                            // ASCIIZ comment (empty)
+    __header_end = .;
+    
     *(loader)
     *loader.o(.text .text.*)
 	BIOS_LOAD_ADDR = .;
