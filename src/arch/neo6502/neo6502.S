@@ -47,9 +47,15 @@ FIOMODE_WRONLY      = 1
 FIOMODE_RDWR        = 2
 FIOMODE_RDWR_CREATE = 3
 
+FIOATTR_DIR         = 1<<0
+FIOATTR_SYSTEM      = 1<<1
+FIOATTR_ARCHIVE     = 1<<2
+FIOATTR_READONLY    = 1<<3
+FIOATTR_HIDDEN      = 1<<4
+
 ; Filenames are of the form: "/A10/ABCDEFGH.XYZ"
 
-FT_INUSE          = 0
+FT_ATTRIBS        = 0 ; top bit indicate file is in use
 FT_FILENAMELEN    = 1
 FT_FILENAME       = 2
 FT__SIZE          = 20
@@ -134,7 +140,7 @@ zproc internal_RESETFILESYSTEM
 
 	ldx #0
 	zrepeat
-		stz file_table+FT_INUSE, x
+		stz file_table+FT_ATTRIBS, x
 
 		txa
 		clc
@@ -211,7 +217,7 @@ zproc bdos_CREATEFILE
 zendproc
 
 zproc bdos_READRANDOM
-	jsr update_fcb_for_record_number
+	jsr update_fcb_to_current_random_record
 zendproc
 	; fall through
 .global internal_READSEQUENTIAL
@@ -238,7 +244,7 @@ zendproc
 .global bdos_WRITERANDOMFILLED
 bdos_WRITERANDOMFILLED:
 zproc bdos_WRITERANDOM
-	jsr update_fcb_for_record_number
+	jsr update_fcb_to_current_random_record
 zendproc
 	; fall through
 zproc bdos_WRITESEQUENTIAL
@@ -359,7 +365,7 @@ zproc bdos_CLOSEFILE
 	lda CP_ERRNO
 	bne fail_read_write
 
-	stz file_table+FT_INUSE, x
+	stz file_table+FT_ATTRIBS, x
 	clc
 	rts
 zendproc
@@ -510,6 +516,16 @@ zproc bdos_FINDNEXT
 		cpy #FCB_T3+1
 	zuntil_eq
 
+	; Success. But, remember to fill out the file attributes.
+
+	lda user_dma+0
+	sta param+0
+	lda user_dma+1
+	sta param+1
+
+	lda CP_PARAM+6
+	jsr update_fcb_attributes
+	
 	lda #0
 	clc
 	rts
@@ -712,7 +728,7 @@ zendproc
 
 ; Changes the FCB to point at the current random record.
 
-zproc update_fcb_for_record_number
+zproc update_fcb_to_current_random_record
 	ldy #FCB_RC
 	lda (param), y
 	cmp #0x80
@@ -794,7 +810,8 @@ zproc update_rc_field
 	ora (param), y
 	sta temp+0
 
-	; Fetch the real length of the file into ptr.
+	; Fetch the real length of the file into ptr. We can't use stat for this
+	; because it might not be correct if the file is already open.
 	;
 	;  +4        +3        +2        +1
 	;  --------- --------- --------- ---------
@@ -803,9 +820,9 @@ zproc update_rc_field
 	lda #FUNC_FILE_GETSIZE
 	jsr neo_file_func_blocking
 
-	lda CP_PARAM+2
+	lda CP_PARAM+0
 	sta ptr+0
-	lda CP_PARAM+3
+	lda CP_PARAM+1
 	ldx #6
 	zrepeat
 		lsr a
@@ -823,14 +840,14 @@ zproc update_rc_field
 		ldx ptr+0
 		cpx temp+0
 		zif_eq
-			lda CP_PARAM+1
+			lda CP_PARAM+0
 			asl a
-			lda CP_PARAM+2
+			lda CP_PARAM+1
 			rol a
 			and #0x7f
 
 			tay
-			lda CP_PARAM+1
+			lda CP_PARAM+0
 			and #0x7f
 			zif_ne
 				iny
@@ -841,6 +858,38 @@ zproc update_rc_field
 
 	ldy #FCB_RC
 	sta (param), y
+
+ #if 0
+	; Now we want to update the attribute bits. First, stat the file.
+
+	lda #<(temp_file_entry+FT_FILENAMELEN)
+	sta CP_PARAM+0
+	lda #>(temp_file_entry+FT_FILENAMELEN)
+	sta CP_PARAM+1
+	
+	lda #FUNC_FILE_STAT
+	jsr neo_file_func_blocking
+
+	ldy #FCB_T1
+	lda #FIOATTR_READONLY
+	jsr set_attr_bit
+
+	lda #FIOATTR_SYSTEM
+	jsr set_attr_bit
+
+	lda #FIOATTR_ARCHIVE
+	jsr set_attr_bit
+	#endif
+	rts
+	
+set_attr_bit:
+	bit CP_PARAM+4
+	zif_ne
+		lda #0x80
+		ora (param), y
+		sta (param), y
+	zendif
+	iny
 	rts
 zendproc
 
@@ -917,7 +966,7 @@ zendproc
 ; in temp_file_entry.
 
 zproc convert_filename
-	stz temp_file_entry+FT_INUSE
+	stz temp_file_entry+FT_ATTRIBS
 
 	lda #'/'
 	sta temp_file_entry+FT_FILENAME+0
@@ -1027,7 +1076,7 @@ zproc get_file_table_entry
 	ldx #0
 	stx ptr+0
 	zrepeat
-		lda file_table+FT_INUSE, x
+		lda file_table+FT_ATTRIBS, x
 		beq found_empty_slot
 
 		inc ptr+0
@@ -1048,7 +1097,7 @@ zproc get_file_table_entry
 	lda file_table_offsets, y
 	tax
 
-	lda file_table+FT_INUSE, x
+	lda file_table+FT_ATTRIBS, x
 	zif_ne
 		; Yes; it needs closing.
 
@@ -1103,7 +1152,7 @@ zproc open_file_table_entry
 	phx
 
 	stz CP_ERRNO
-	lda file_table+FT_INUSE, x
+	lda file_table+FT_ATTRIBS, x
 	zif_eq
 		; This file has not been opened.
 
@@ -1152,10 +1201,56 @@ zproc do_open_file_table_entry
 
 	lda CP_ERRNO
 	zif_eq
-		inc file_table+FT_INUSE, x
+		lda CP_PARAM+0
+		pha
+
+		lda CP_PARAM+1
+		sta CP_PARAM+0
+		lda CP_PARAM+2
+		sta CP_PARAM+1
+
+		lda #FUNC_FILE_STAT
+		jsr neo_file_func_blocking
+		lda CP_PARAM+4
+		ora #0x80
+		sta file_table+FT_ATTRIBS, x
+		jsr update_fcb_attributes
+
+		pla
+		sta CP_PARAM+0
 	zendif
 
 	jmp update_rc_field
+zendproc
+
+; Updates the file attribute bits in the current FCB to the value in A.
+
+zproc update_fcb_attributes
+	ror a     	 	; discard FIOATTR_DIR
+	sta temp+0
+
+	ldy #FCB_T2
+	lda (param), y
+	asl a
+	ror temp+0		; SYSTEM -> C
+	ror a
+	sta (param), y
+
+	iny				; -> FCB_T3
+	lda (param), y
+	asl a
+	ror temp+0		; ARCHIVE -> C
+	ror a
+	sta (param), y
+
+	ldy #FCB_T1
+	lda (param), y
+	asl a
+	ror temp+0		; READONLY -> C
+	ror a
+	sta (param), y
+	
+	rts
 zendproc
 
 ; Execute RP2040 operation in A. Don't wait.
