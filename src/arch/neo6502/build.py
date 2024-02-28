@@ -4,6 +4,7 @@ from build.zip import zip
 from config import (
     MINIMAL_APPS,
     MINIMAL_APPS_SRCS,
+    CPM_FILESYSTEM_APP_NAMES,
     BIG_APPS,
     BIG_APPS_SRCS,
     SCREEN_APPS,
@@ -51,11 +52,19 @@ llvmrawprogram(
 
 zip(
     name="diskimage",
-    items={"CPM65.NEO": ".+bios", "A/CCP.SYS": "src+ccp", "A/NCOPY.COM": "src/arch/neo6502/utils+ncopy"}
+    items={
+        "CPM65.NEO": ".+bios",
+        "A/CCP.SYS": "src+ccp",
+        "A/NCOPY.COM": "src/arch/neo6502/utils+ncopy",
+    }
     | {
         re.sub("^0:", "A/", k).upper(): v
         for k, v in (
-            MINIMAL_APPS
+            {
+                k: v
+                for k, v in MINIMAL_APPS.items()
+                if k not in CPM_FILESYSTEM_APP_NAMES
+            }
             | MINIMAL_APPS_SRCS
             | BIG_APPS
             | BIG_APPS_SRCS

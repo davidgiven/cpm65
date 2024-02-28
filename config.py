@@ -14,6 +14,9 @@ MINIMAL_APPS = {
     "0:xsend.com": "apps+xsend",
 }
 
+# Programs which only work on a real CP/M filesystem (not emulation).
+CPM_FILESYSTEM_APP_NAMES = {"0:dinfo.com", "0:stat.com"}
+
 MINIMAL_APPS_SRCS = {
     "0:bedit.asm": "apps/bedit.asm",
     "0:dump.asm": "apps/dump.asm",
