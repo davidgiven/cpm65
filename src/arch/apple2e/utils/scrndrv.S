@@ -19,6 +19,7 @@ drv_zp_begin:
 
 ptr:    .word 0
 ptr1:   .word 0
+ptr2:   .word 0
 
 drv_zp_end:
 
@@ -57,12 +58,13 @@ zproc tty_const
 zendproc
 
 zproc tty_conin
+    jsr cursor_on
     ; Display the cursor.
-    jsr prepare_for_screen_write
-    lda (ptr), y
-    sta cursork
-    lda #0x60           ; flashing block
-    sta (ptr), y
+    ;~ jsr prepare_for_screen_write
+    ;~ lda (ptr), y
+    ;~ sta cursork
+    ;~ lda #0x60           ; flashing block
+    ;~ sta (ptr), y
 
     ; Wait for the key.
 
@@ -71,13 +73,15 @@ zproc tty_conin
     zuntil_mi
     sta KBD_STROBERESET
     and #0x7f
+    
+    jsr cursor_off
     clc
 
     ; Cursor off again.
-    tax
-    lda cursork
-    sta (ptr), y
-    txa
+    ;~ tax
+    ;~ lda cursork
+    ;~ sta (ptr), y
+    ;~ txa
 
     rts
 zendproc
@@ -428,23 +432,26 @@ zproc screen_getcursor
 zendproc
 
 zproc screen_getchar
+    sta ptr2
+    stx ptr2+1
     jsr cursor_on
     
-    ; A,X contain the timeout, TODO: respect timeout
-    
-    zrepeat
-        lda KBD_READ
-    zuntil_mi
-    bpl nokey
-    sta KBD_STROBERESET
-    and #0x7f
-   
-nokey:
+_inner_loop:
+    lda KBD_READ
+    zif_mi
+        sta KBD_STROBERESET
+        and #0x7f
+        jsr cursor_off
+        clc
+        rts       
+    zendif
+    dec ptr2
+    bne _inner_loop
+    dec ptr2
+    dec ptr2+1
+    bne _inner_loop
     jsr cursor_off
-    
-    ; return character in A
-    ; TODO: carry clear on keyboard event, carry set on timeout?
-    clc
+    sec
     rts
 zendproc
 

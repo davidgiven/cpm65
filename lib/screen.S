@@ -69,9 +69,11 @@ zproc screen_clear_to_eol, .text.screen_clear_to_eol
 zendproc
 
 zproc screen_getchar, .text.screen_getchar
-    ; TODO: A,X as timeout from timeout_cs
     ldy #SCREEN_GETCHAR
     jsr _call_screen
+    zif_cs
+        lda #0 ; is this a good way to report the timeout?
+    zendif
     rts
 zendproc
 

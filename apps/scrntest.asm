@@ -70,11 +70,13 @@ mainloop:
     sta cur_x
     stx cur_y
 
+timeout:
     \ Get and parse command
     lda #10
     ldx #00
     ldy #SCREEN_GETCHAR
     jsr SCREEN
+    bcs timeout \ make sure we don't have consecutive key presses because of short timeouts
     
     \ Convert to uppercase
     cmp #0x61

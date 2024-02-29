@@ -299,5 +299,7 @@ int main()
 		field_print(score);
 	} while (key != 27);
 
+	screen_showcursor(1);		// visible cursor
+
 	end(score);
 }
