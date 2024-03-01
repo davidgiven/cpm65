@@ -8,6 +8,12 @@
 #define CP_INFO     *(CP + 3)
 #define CP_PARAM    (CP + 4)
 
+#define FIOATTR_DIR      (1<<0)
+#define FIOATTR_SYSTEM   (1<<1)
+#define FIOATTR_ARCHIVE  (1<<2)
+#define FIOATTR_READONLY (1<<3)
+#define FIOATTR_HIDDEN   (1<<4)
+
 #define GROUP_TTY              2
 #define FUNC_TTY_READCH        1
 #define FUNC_TTY_POLLCH        2
@@ -38,6 +44,7 @@
 #define FUNC_FILE_READDIR      18
 #define FUNC_FILE_CLOSEDIR     19
 #define FUNC_FILE_COPY         20
+#define FUNC_FILE_SETATTRS     21
 
 #define FIOMODE_RDONLY 	       0
 #define FIOMODE_WRONLY         1
