@@ -455,17 +455,19 @@ zproc bdos_FINDNEXT
 
 	; Set the M/E/R length.
 	;
-	;  +4        +3        +2        +1
+	;  +5        +4        +3        +2
 	;  --------- --------- --------- ---------
 	;  0000 0000 MMMM MEEE EERR RRRR RXXX XXXX
 
-	lda CP_PARAM+1
-	asl a
+	; Number of records in the last extent.
+	
 	lda CP_PARAM+2
+	asl a
+	lda CP_PARAM+3
 	rol a
 	and #0x7f
 	tax
-	lda CP_PARAM+1
+	lda CP_PARAM+2
 	and #0x7f
 	zif_ne
 		inx
@@ -474,16 +476,20 @@ zproc bdos_FINDNEXT
 	ldy #FCB_RC
 	sta (user_dma), y
 
-	lda CP_PARAM+2
+	; Extent byte.
+
+	lda CP_PARAM+3
 	asl a
 	sta temp+0
-	lda CP_PARAM+3
+	lda CP_PARAM+4
 	rol a
 	asl temp+0
 	rol a
 	and #0b00011111
 	ldy #FCB_EX
 	sta (user_dma), y
+
+	; Module byte.
 
 	lda CP_PARAM+3
 	lsr a
@@ -820,9 +826,11 @@ zproc update_rc_field
 	lda #FUNC_FILE_GETSIZE
 	jsr neo_file_func_blocking
 
-	lda CP_PARAM+0
+	; Get the extent count.
+
+	lda CP_PARAM+2
 	sta ptr+0
-	lda CP_PARAM+1
+	lda CP_PARAM+3
 	ldx #6
 	zrepeat
 		lsr a
@@ -830,8 +838,8 @@ zproc update_rc_field
 		dex
 	zuntil_eq
 
-	; If they're the same, we're looking at the last extent.
-	; Otherwise, it's RC.
+	; If we're looking at the last extent, compute the number of records.
+	; Otherwise, it's 128.
 
 	tax
 	lda #0x80
@@ -840,14 +848,14 @@ zproc update_rc_field
 		ldx ptr+0
 		cpx temp+0
 		zif_eq
-			lda CP_PARAM+0
-			asl a
 			lda CP_PARAM+1
+			asl a
+			lda CP_PARAM+2
 			rol a
 			and #0x7f
 
 			tay
-			lda CP_PARAM+0
+			lda CP_PARAM+1
 			and #0x7f
 			zif_ne
 				iny
