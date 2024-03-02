@@ -79,12 +79,12 @@ int main(int argc, const char* argv[])
             buffer[buffer[0] + 1] = 0;
             cpm_printstring(buffer + 1);
 
-            for (int i=buffer[0]; i<WIDTH; i++)
+            for (int i = buffer[0]; i < WIDTH; i++)
                 cpm_conout(' ');
-            
+
             printattrs(CP_PARAM[6]);
 
-            uint32_t size = *(volatile uint32_t*)(CP_PARAM+2);
+            uint32_t size = *(volatile uint32_t*)(CP_PARAM + 2);
             print_d32(size);
             cpm_printstring("\r\n");
         }

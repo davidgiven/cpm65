@@ -10,7 +10,8 @@ llvmclibrary(
 PROGRAMS = [
     "ncopy",
     "nattr",
-    "ndir"
+    "ndir",
+    "ntrunc",
 ]
 
 for p in PROGRAMS:

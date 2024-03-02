@@ -58,6 +58,7 @@ zip(
         "A/NCOPY.COM": "src/arch/neo6502/utils+ncopy",
         "A/NATTR.COM": "src/arch/neo6502/utils+nattr",
         "A/NDIR.COM": "src/arch/neo6502/utils+ndir",
+        "A/NTRUNC.COM": "src/arch/neo6502/utils+ntrunc",
     }
     | {
         re.sub("^0:", "A/", k).upper(): v
