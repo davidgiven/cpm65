@@ -858,38 +858,6 @@ zproc update_rc_field
 
 	ldy #FCB_RC
 	sta (param), y
-
- #if 0
-	; Now we want to update the attribute bits. First, stat the file.
-
-	lda #<(temp_file_entry+FT_FILENAMELEN)
-	sta CP_PARAM+0
-	lda #>(temp_file_entry+FT_FILENAMELEN)
-	sta CP_PARAM+1
-	
-	lda #FUNC_FILE_STAT
-	jsr neo_file_func_blocking
-
-	ldy #FCB_T1
-	lda #FIOATTR_READONLY
-	jsr set_attr_bit
-
-	lda #FIOATTR_SYSTEM
-	jsr set_attr_bit
-
-	lda #FIOATTR_ARCHIVE
-	jsr set_attr_bit
-	#endif
-	rts
-	
-set_attr_bit:
-	bit CP_PARAM+4
-	zif_ne
-		lda #0x80
-		ora (param), y
-		sta (param), y
-	zendif
-	iny
 	rts
 zendproc
 
@@ -1045,19 +1013,17 @@ zproc get_file_table_entry
 	stz ptr+0			; file handle
 	zrepeat
 		phx
-		inx
-		ldy #FT_FILENAMELEN
+		ldy #FT_FILENAMELEN-1
 		zrepeat
+			inx
+			iny
+
 			lda file_table, x
 			cmp temp_file_entry, y
 			zbreakif_ne
 
 			cpy temp_file_entry+FT_FILENAMELEN
-			zbreakif_eq
-
-			inx
-			iny
-		zuntil_ne ; always true
+		zuntil_eq
 		zif_eq
 			plx
 			bra found_matching_filetab
