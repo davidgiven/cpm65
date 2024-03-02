@@ -165,6 +165,9 @@ int main(int argc, char* argv[])
     gargc = argc;
     gargv = argv;
 
+    if (cpm_fcb2.f[0] != ' ')
+        memcpy(&out_fcb, &cpm_fcb2, 16);
+
 	cpm_fcb.cr = 0;
     memcpy(&cpm_fcb.f[8], "SUB", 3);
     if (cpm_open_file(&cpm_fcb))
