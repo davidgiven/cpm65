@@ -1,17 +1,24 @@
-from build.llvm import llvmprogram
+from build.llvm import llvmprogram, llvmclibrary
 
-llvmprogram(
-    name="ncopy",
-    srcs=["./ncopy.c", "./neo6502.h"],
-    deps=[
-        "include",
-    ],
+llvmclibrary(
+    name="neo6502",
+    srcs=["./neo6502.c", "./neo6502.h"],
+    hdrs={"neo6502.h": "./neo6502.h"},
+    deps=["include"]
 )
 
-llvmprogram(
-    name="nattr",
-    srcs=["./nattr.c", "./neo6502.h"],
-    deps=[
-        "include",
-    ],
-)
+PROGRAMS = [
+    "ncopy",
+    "nattr",
+    "ndir"
+]
+
+for p in PROGRAMS:
+    llvmprogram(
+        name=p,
+        srcs=["./"+p+".c"],
+        deps=[
+            "include",
+            ".+neo6502",
+        ],
+    )

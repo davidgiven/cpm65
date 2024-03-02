@@ -4,39 +4,6 @@
 #include <cpm.h>
 #include "neo6502.h"
 
-static char* cmdptr = cpm_cmdline;
-
-static const char* getword()
-{
-    const char* word = cmdptr;
-    if (!*cmdptr)
-        return NULL;
-
-    for (;;)
-    {
-        char c = *cmdptr;
-        if (!c)
-            break;
-        if (c == ' ')
-        {
-            *cmdptr++ = '\0';
-            break;
-        }
-
-        cmdptr++;
-    }
-
-    return word;
-}
-
-static void printattrs(uint8_t attrbits)
-{
-    cpm_printstring((attrbits & FIOATTR_READONLY) ? "R " : "!R ");
-    cpm_printstring((attrbits & FIOATTR_SYSTEM) ? "S " : "!S ");
-    cpm_printstring((attrbits & FIOATTR_ARCHIVE) ? "A " : "!A ");
-    cpm_printstring((attrbits & FIOATTR_HIDDEN) ? "H " : "!H ");
-}
-
 static uint8_t getattrs(const char* filename)
 {
     int filenamelen = strlen(filename);

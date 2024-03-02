@@ -4,30 +4,6 @@
 #include <cpm.h>
 #include "neo6502.h"
 
-static char* cmdptr = cpm_cmdline;
-
-static const char* getword()
-{
-    const char* word = cmdptr;
-    if (!*cmdptr)
-        return NULL;
-
-    for (;;) {
-        char c = *cmdptr;
-        if (!c)
-            break;
-        if (c == ' ')
-        {
-            *cmdptr++ = '\0';
-            break;
-        }
-
-        cmdptr++;
-    }
-
-    return word;
-}
-
 int main(int argc, const char* argv[])
 {
     cpm_cmdline[cpm_cmdlinelen] = 0;

@@ -50,3 +50,8 @@
 #define FIOMODE_WRONLY         1
 #define FIOMODE_RDWR           2
 #define FIOMODE_RDWR_CREATE    3
+
+extern char* cmdptr;
+extern const char* getword(void);
+extern void printattrs(uint8_t attrbits);
+extern void print_d32(uint32_t value);

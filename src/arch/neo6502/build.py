@@ -57,6 +57,7 @@ zip(
         "A/CCP.SYS": "src+ccp",
         "A/NCOPY.COM": "src/arch/neo6502/utils+ncopy",
         "A/NATTR.COM": "src/arch/neo6502/utils+nattr",
+        "A/NDIR.COM": "src/arch/neo6502/utils+ndir",
     }
     | {
         re.sub("^0:", "A/", k).upper(): v
