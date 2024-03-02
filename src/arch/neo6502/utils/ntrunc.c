@@ -35,7 +35,7 @@ static uint32_t getsize(const char* filename)
     return *(volatile uint32_t*)(CP_PARAM + 0);
 }
 
-static void truncate(const char* filename, uint32_t size)
+static void open(uint8_t channel, const char* filename, uint8_t mode)
 {
     int filenamelen = strlen(filename);
     char filenamep[filenamelen + 1];
@@ -45,9 +45,43 @@ static void truncate(const char* filename, uint32_t size)
     while (CP_GROUP)
         ;
 
+    CP_FUNCTION = FUNC_FILE_OPEN;
+    *(volatile uint8_t*)(CP_PARAM + 0) = channel;
+    *(volatile void**)(CP_PARAM + 1) = filenamep;
+    *(volatile uint32_t*)(CP_PARAM + 3) = mode;
+    CP_GROUP = GROUP_FILE;
+
+    while (CP_GROUP)
+        ;
+
+    if (CP_ERRNO)
+        fail();
+}
+
+static void close(uint8_t channel)
+{
+    while (CP_GROUP)
+        ;
+
+    CP_FUNCTION = FUNC_FILE_CLOSE;
+    *(volatile uint8_t*)(CP_PARAM + 0) = channel;
+    CP_GROUP = GROUP_FILE;
+
+    while (CP_GROUP)
+        ;
+
+    if (CP_ERRNO)
+        fail();
+}
+
+static void truncate(uint8_t channel, uint32_t size)
+{
+    while (CP_GROUP)
+        ;
+
     CP_FUNCTION = FUNC_FILE_SETSIZE;
-    *(volatile void**)(CP_PARAM + 0) = filenamep;
-    *(volatile uint32_t*)(CP_PARAM + 2) = size;
+    *(volatile uint8_t*)(CP_PARAM + 0) = channel;
+    *(volatile uint32_t*)(CP_PARAM + 1) = size;
     CP_GROUP = GROUP_FILE;
 
     while (CP_GROUP)
@@ -81,11 +115,17 @@ int main(int argc, const char* argv[])
         print_d32(size);
         cpm_printstring("\r\n");
 
-        truncate(path, size);
+        /* All file channels are used by CP/M, so this will screw up the file
+         * table big time.  Do not perform any CP/M file operations after here. */
+        close(0);
+        open(0, path, FIOMODE_RDWR);
+        truncate(0, size);
+        close(0);
 
         cpm_printstring("New size:    ");
         print_d32(getsize(path));
         cpm_printstring("\r\n");
     }
-    return 0;
+
+    cpm_warmboot();
 }
