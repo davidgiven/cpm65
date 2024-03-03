@@ -1,5 +1,6 @@
 MINIMAL_APPS = {
     "0:asm.com": "apps+asm",
+    "0:attr.com": "apps+attr",
     "0:bedit.com": "apps+bedit",
     "0:capsdrv.com": "apps+capsdrv",
     "0:copy.com": "apps+copy",
