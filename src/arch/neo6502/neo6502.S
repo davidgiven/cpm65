@@ -42,6 +42,7 @@ FUNC_FILE_OPENDIR   = 17
 FUNC_FILE_READDIR   = 18
 FUNC_FILE_CLOSEDIR  = 19
 FUNC_FILE_COPY      = 20
+FUNC_FILE_SETATTRS  = 21
 
 FIOMODE_RDONLY      = 0
 FIOMODE_WRONLY      = 1
@@ -208,7 +209,6 @@ zendproc
 zproc bdos_CREATEFILE
 	; See if the file itself exists.
 	
-	.byte 3
     jsr convert_filename
     lda #<(temp_file_entry + FT_FILENAMELEN)
     sta CP_PARAM+0
@@ -563,7 +563,53 @@ zproc truncate_filename_to_directory
 zendproc
 
 zproc bdos_SETFILEATTRS
-    .byte 3
+	jsr convert_filename
+	lda #<temp_file_entry+FT_FILENAMELEN
+	sta CP_PARAM+0
+	lda #>temp_file_entry+FT_FILENAMELEN
+	sta CP_PARAM+1
+	
+	; Compute the Morpheus file attributes.
+
+	lda #0
+	pha
+	ldy #FCB_T1
+	lda (param), y
+	zif_mi
+		pla
+		lda #FIOATTR_READONLY
+		pha
+	zendif
+	iny
+	lda (param), y
+	zif_mi
+		pla
+		ora #FIOATTR_SYSTEM
+		pha
+	zendif
+	iny
+	lda (param), y
+	zif_mi
+		pla
+		ora #FIOATTR_ARCHIVE
+		pha
+	zendif
+	pla
+
+	; Update the file.
+
+	sta CP_PARAM+2
+	lda #FUNC_FILE_SETATTRS
+	jsr neo_file_func_blocking
+	
+	; Check for errors.
+
+	clc
+	lda CP_ERRNO
+	zif_ne
+		sec
+	zendif
+	rts
 zendproc
 
 zproc bdos_GETLOGINBITMAP
