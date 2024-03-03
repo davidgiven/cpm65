@@ -1,4 +1,7 @@
 MINIMAL_APPS = {
+    "0:asm.txt": "cpmfs/asm.txt",
+    "0:hello.asm": "cpmfs/hello.asm",
+    "0:demo.sub": "cpmfs/demo.sub",
     "0:asm.com": "apps+asm",
     "0:attr.com": "apps+attr",
     "0:bedit.com": "apps+bedit",

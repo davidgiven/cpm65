@@ -29,7 +29,7 @@ to the 6502. So far it runs on:
 
   - Sorbus homebrew 6502-based computer.
   
-  - [Olimex' neo6502 6502-based computer](https://www.neo6502.com).
+  - Olimex' neo6502 6502-based computer.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -55,6 +55,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
 <a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
+<a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
 </div>
 
 
@@ -277,9 +278,14 @@ the same time.
     other ports will work if you install the appropriate emulation firmware
     package.)
 
+  - It is ridiculously fast.
+
   - To use, unzip the `cpm65.zip` file into the root directory of the USB stick
     or other storage card. Then enter `load "cpm65.neo"` at the prompt. CP/M-65
     will run.
+
+  - To run on the emulator, either load it as above, or boot it directly with
+    `neo cpm65.neo@8000 run@8010`.
 
   - This port uses an emulated BDOS, meaning that it stores its files as FAT
     files on the neo6502's USB stick. Most well-behaved CP/M-65 programs will
