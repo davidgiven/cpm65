@@ -170,7 +170,7 @@ zproc bdos_LOGINDRIVE
 zendproc
 
 zproc bdos_OPENFILE
-	jsr get_and_reopen_file_table_entry
+	jsr get_opened_file_table_entry
 	lda CP_ERRNO
 	zif_ne
 		sec
@@ -223,7 +223,7 @@ zendproc
 .global internal_READSEQUENTIAL
 internal_READSEQUENTIAL:
 zproc bdos_READSEQUENTIAL
-	jsr get_and_reopen_file_table_entry
+	jsr get_opened_file_table_entry
 	lda CP_ERRNO
 	bne fail_read_write
 
@@ -248,7 +248,7 @@ zproc bdos_WRITERANDOM
 zendproc
 	; fall through
 zproc bdos_WRITESEQUENTIAL
-	jsr get_and_reopen_file_table_entry
+	jsr get_opened_file_table_entry
 	lda CP_ERRNO
 	bne fail_read_write
 
@@ -312,7 +312,7 @@ zproc bdos_DELETEFILE
 		lda user_dma+1
 		sta param+1
 
-		jsr convert_filename
+		jsr get_closed_file_table_entry
 
 		lda #<(temp_file_entry + FT_FILENAMELEN)
 		sta CP_PARAM+0
@@ -352,7 +352,7 @@ delete_exit:
 zendproc
 
 zproc bdos_CLOSEFILE
-	jsr get_and_reopen_file_table_entry
+	jsr get_opened_file_table_entry
 	lda CP_ERRNO
 	bne fail_read_write
 	phx
@@ -573,7 +573,7 @@ zproc bdos_GETBIOS
 zendproc
 
 zproc bdos_COMPUTEFILESIZE
-	jsr get_and_reopen_file_table_entry
+	jsr get_opened_file_table_entry
 	lda CP_ERRNO
 	zif_ne
 		clc
@@ -636,7 +636,7 @@ zproc bdos_RENAMEFILE
 	; Old name: param+0
 	; New name: param+16
 
-	jsr get_file_table_entry
+	jsr get_closed_file_table_entry
 	phx
 
 	clc
@@ -647,7 +647,7 @@ zproc bdos_RENAMEFILE
 		inc param+1
 	zendif
 
-	jsr convert_filename
+	jsr get_closed_file_table_entry
 
 	pla
 	inc a
@@ -1008,33 +1008,39 @@ zproc convert_filename
 	rts
 zendproc
 
-; Finds or allocates a new file table slot
+; Finds an existing file table slot for the FCB in param.
+; On exit:
 ; A = index of entry (i.e. file handle)
 ; X = offset into file_table
+; C if no file table slot was found
 
-zproc get_file_table_entry
+zproc convert_and_find_file_table_entry
 	jsr convert_filename
 
-	; Now look for a matching slot.
+	; Look for a matching slot.
 
 	ldx #0              ; offset to FT being considered
 	stz ptr+0			; file handle
 	zrepeat
 		phx
-		ldy #FT_FILENAMELEN-1
-		zrepeat
-			inx
-			iny
+		lda file_table+FT_ATTRIBS, x
+		zif_ne			; skip empty slots
+			ldy #FT_FILENAMELEN-1
+			zrepeat
+				inx
+				iny
 
-			lda file_table, x
-			cmp temp_file_entry, y
-			zbreakif_ne
+				lda file_table, x
+				cmp temp_file_entry, y
+				zbreakif_ne
 
-			cpy temp_file_entry+FT_FILENAMELEN
-		zuntil_eq
-		zif_eq
-			plx
-			bra found_matching_filetab
+				cpy temp_file_entry+FT_FILENAMELEN
+			zuntil_eq
+			zif_eq
+				plx
+				clc
+				rts
+			zendif
 		zendif
 		pla
 		clc
@@ -1044,68 +1050,78 @@ zproc get_file_table_entry
 		inc ptr+0
 		cpx #FT__SIZE*NUM_FILES
 	zuntil_eq
+	sec
+	rts
+zendproc
 
-	; No slots match. Find an empty slot.
+; Finds or allocates a new file table slot
+; A = index of entry (i.e. file handle)
+; X = offset into file_table
 
-	ldx #0
-	stx ptr+0
-	zrepeat
-		lda file_table+FT_ATTRIBS, x
-		beq found_empty_slot
+zproc get_file_table_entry
+	jsr convert_and_find_file_table_entry
+	zif_cs
+		; No slots match. Find an empty slot.
 
-		inc ptr+0
+		ldx #0
+		stx ptr+0
+		zrepeat
+			lda file_table+FT_ATTRIBS, x
+			beq found_empty_slot
 
-		txa
-		clc
-		adc #FT__SIZE
+			inc ptr+0
+
+			txa
+			clc
+			adc #FT__SIZE
+			tax
+
+			cmp #FT__SIZE * NUM_FILES
+		zuntil_eq
+
+		; A file needs to be evicted.
+
+		lda file_table_lru+NUM_FILES-1
+		sta ptr+0
+		tay
+		lda file_table_offsets, y
 		tax
 
-		cmp #FT__SIZE * NUM_FILES
-	zuntil_eq
-
-	; A file needs to be evicted.
-
-	lda file_table_lru+NUM_FILES-1
-	sta ptr+0
-	tay
-	lda file_table_offsets, y
-	tax
-
-	lda file_table+FT_ATTRIBS, x
-	zif_ne
-		; Yes; it needs closing.
-
-		lda ptr+0
-		sta CP_PARAM+0
-
-		lda #FUNC_FILE_CLOSE
-		jsr neo_file_func_blocking
-		lda CP_ERRNO
+		lda file_table+FT_ATTRIBS, x
 		zif_ne
-			rts
+			; Yes; it needs closing.
+
+			lda ptr+0
+			sta CP_PARAM+0
+
+			lda #FUNC_FILE_CLOSE
+			jsr neo_file_func_blocking
+			lda CP_ERRNO
+			zif_ne
+				rts
+			zendif
 		zendif
+
+	found_empty_slot:
+		; X is the offset, ptr+0 is the handle.
+
+		lda temp_file_entry+FT_FILENAMELEN
+		inc a
+		inc a
+		sta ptr+1
+
+		phx
+		ldy #0
+		zrepeat
+			lda temp_file_entry, y
+			sta file_table, x
+			inx
+			iny
+			cpy ptr+1
+		zuntil_eq
+		plx
 	zendif
 
-found_empty_slot:
-	; X is the offset, ptr+0 is the handle.
-
-	lda temp_file_entry+FT_FILENAMELEN
-	inc a
-	inc a
-	sta ptr+1
-
-	phx
-	ldy #0
-	zrepeat
-		lda temp_file_entry, y
-		sta file_table, x
-		inx
-		iny
-		cpy ptr+1
-	zuntil_eq
-	plx
-
-found_matching_filetab:
 	lda ptr+0
 	sta CP_PARAM+0
 	rts
@@ -1118,7 +1134,22 @@ file_table_offsets:
 		offset = offset + 1
 	.endr
 
-zproc get_and_reopen_file_table_entry
+zproc get_closed_file_table_entry
+	jsr get_file_table_entry
+
+	lda file_table+FT_ATTRIBS, x
+	zif_ne
+		; This table entry is open.
+
+		lda #FUNC_FILE_CLOSE
+		jsr neo_file_func
+
+		stz file_table+FT_ATTRIBS
+	zendif
+	rts
+zendproc
+		
+zproc get_opened_file_table_entry
 	jsr get_file_table_entry
 zendproc
 	; fall through
