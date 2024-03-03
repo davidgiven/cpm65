@@ -282,7 +282,24 @@ zproc fail_read_write
 	rts
 zendproc
 
-; TODO: this needs to take a wildcard
+zproc bdos_CLOSEFILE
+	jsr get_opened_file_table_entry
+	lda CP_ERRNO
+	bne fail_read_write
+	phx
+
+	jsr flush_rc_count
+
+	lda #FUNC_FILE_CLOSE
+	jsr neo_file_func_blocking
+	plx
+	lda CP_ERRNO
+	bne fail_read_write
+
+	stz file_table+FT_ATTRIBS, x
+	clc
+	rts
+zendproc
 
 zproc bdos_DELETEFILE
 	; Save old user_dma.
@@ -348,25 +365,6 @@ delete_exit:
 	sta user_dma+1
 	pla
 	sta user_dma+0
-	rts
-zendproc
-
-zproc bdos_CLOSEFILE
-	jsr get_opened_file_table_entry
-	lda CP_ERRNO
-	bne fail_read_write
-	phx
-
-	jsr flush_rc_count
-
-	lda #FUNC_FILE_CLOSE
-	jsr neo_file_func_blocking
-	plx
-	lda CP_ERRNO
-	bne fail_read_write
-
-	stz file_table+FT_ATTRIBS, x
-	clc
 	rts
 zendproc
 
@@ -508,6 +506,7 @@ zproc bdos_FINDNEXT
 	ldy #FCB_F1
 	zrepeat
 		lda (param), y
+		and #0x7f
 		cmp #'?'
 		zif_ne
 			cmp (user_dma), y

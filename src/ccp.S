@@ -252,7 +252,9 @@ zproc read_command_from_submit_file
     zif_eq
         ; File empty --- delete it.
 
-        jsr remove_sub_file
+        lda #<submit_fcb
+        ldx #>submit_fcb
+        jsr xfcb_erase
 
         ; Mark the submit file as not used.
 
@@ -302,12 +304,6 @@ zproc read_command_from_submit_file
         inc temp
     zendloop
     jmp newline
-zendproc
-
-zproc remove_sub_file
-    lda #<submit_fcb
-    ldx #>submit_fcb
-    jmp xfcb_erase
 zendproc
 
 zproc parse_valid_userfcb
