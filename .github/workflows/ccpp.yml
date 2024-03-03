@@ -41,6 +41,7 @@ jobs:
           bbcmicro.ssd
           c64.d64
           diskdefs
+          neo6502.zip
           oric.dsk
           pet4032.d64
           pet8032.d64

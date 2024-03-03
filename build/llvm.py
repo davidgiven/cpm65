@@ -73,7 +73,10 @@ def llvmrawprogram(
 
 @Rule
 def llvmclibrary(
-    name, self, commands=["rm -f {outs[0]} && $(AR6502) cqs {outs[0]} {ins}"], **kwargs
+    name,
+    self,
+    commands=["rm -f {outs[0]} && $(AR6502) cqs {outs[0]} {ins}"],
+    **kwargs
 ):
     clibrary(
         replaces=self,
