@@ -287,6 +287,9 @@ the same time.
     `STAT` or `DINFO`. Files for each drive and user are stored in separate
     subdirectories. All 16 drives are supported (in directories `A` to `O`).
 
+  - Drive `B` (i.e. `/B/` on the storage device) contains some neo6502-specific
+    utilitied. This are in no way complete, or documented.
+
   - The console is 53x30. It has a SCREEN driver.
 
 ### Supported programs
