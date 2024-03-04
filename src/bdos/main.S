@@ -1,62 +1,34 @@
-; CP/M-65 Copyright © 2022 David Given
+; CP/M-65 Copyright © 2024 David Given
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
 #include "cpm65.inc"
 #include "zif.inc"
-#include "jumptables.inc"
+#include "bdos.inc"
 
-CPM_MACHINE_TYPE = $f ; 6502!
-CPM_SYSTEM_TYPE = 0
-CPM_VERSION = $22 ; CP/M 2.2 (compatible)
+; When called by the BIOS, it passes in the BIOS entrypoint address in XA.
 
-ZEROPAGE
-
-.global temp, tempb, user_dma, param
-
-param:            .word 0 ; current user input parameter
-user_dma:         .word 0 ; current user DMA address
-
-temp:             .fill 4 ; temporary storage
-tempb:            .byte 0 ; more temporary storage
-
-; --- Initialisation --------------------------------------------------------
-; TODO: figure out how to discard this.
-
-zproc bdos_main
-    ; Store BIOS entrypoint pointer.
-
+zproc main
     sta bios+0
     stx bios+1
 
-    ; Reset persistent state.
-
-    lda #0
-    sta current_user
-    sta current_drive
-
     ; Update memory region.
 
-    ldy #BIOS_SETBANK
     lda #BANK_EXTRA
-    jsr callbios
+    jsr bios_SETBANK
 
-    ldy #BIOS_GETZP
-    jsr callbios
+    jsr bios_GETZP
     clc
     adc cpm_header + COMHDR_ZP_USAGE
-    ldy #BIOS_SETZP
-    jsr callbios
+    jsr bios_SETZP
 
     jsr bios_GETTPA
     clc
     adc cpm_header + COMHDR_TPA_USAGE
-    ldy #BIOS_SETTPA
-    jsr callbios
-    jmp bdos_EXIT
-zendproc
+    jsr bios_SETTPA
 
-; --- Misc ------------------------------------------------------------------
+    jmp bdos_core
+zendproc
 
 zproc bdos_GETBIOS
     lda bios+0
@@ -66,70 +38,84 @@ zproc bdos_GETBIOS
     rts
 zendproc
 
-zproc bdos_GETVERSION
-    lda #CPM_VERSION
-    ldx #(CPM_MACHINE_TYPE<<4) | CPM_SYSTEM_TYPE
-    rts
+zproc bios_SETBANK
+    ldy #BIOS_SETBANK
+    jmp (bios)
 zendproc
 
-zproc bdos_GETIOBYTE
-    lda #0x94               ; %10010100
-    clc
-    rts
+zproc bios_NEWLINE
+    lda #13
+    jsr bios_CONOUT
+    lda #10
+zendproc
+    ; fall through
+zproc bios_CONOUT
+    ldy #BIOS_CONOUT
+    jmp (bios)
 zendproc
 
-; --- Reset disk system -----------------------------------------------------
-
-zproc bdos_RESET
-    jsr internal_RESETFILESYSTEM
-    lda #0
-    sta buffered_key
-    sta output_paused
-    sta entry_stack
-    rts
+zproc bios_CONIN
+    ldy #BIOS_CONIN
+    jmp (bios)
 zendproc
 
-zproc bdos_GETDRIVE
-    lda current_drive
-    sta param+0
-    rts
+zproc bios_CONST
+    ldy #BIOS_CONST
+    jmp (bios)
 zendproc
 
-zproc bdos_GETSETUSER
-    clc
-    lda param+0
-    zif_mi
-        lda current_user
-        rts
-    zendif
-    sta current_user
-    rts
+zproc bios_GETTPA
+    ldy #BIOS_GETTPA
+    jmp (bios)
 zendproc
 
-zproc bdos_SETDMAADDRESS
-    lda param+0
-    sta user_dma+0
-    lda param+1
-    sta user_dma+1
-    rts
+zproc bios_SETTPA
+    ldy #BIOS_SETTPA
+    jmp (bios)
 zendproc
 
-; --- Utilities -------------------------------------------------------------
+zproc bios_GETZP
+    ldy #BIOS_GETZP
+    jmp (bios)
+zendproc
+
+zproc bios_SETZP
+    ldy #BIOS_SETZP
+    jmp (bios)
+zendproc
+
+zproc bios_SETDMA
+    ldy #BIOS_SETDMA
+    jmp (bios)
+zendproc
+
+zproc bios_RELOCATE
+    ldy #BIOS_RELOCATE
+    jmp (bios)
+zendproc
+
+zproc bios_SETSEC
+    ldy #BIOS_SETSEC
+    jmp (bios)
+zendproc
+
+zproc bios_READ
+    ldy #BIOS_READ
+    jmp (bios)
+zendproc
+
+zproc bios_WRITE
+    ldy #BIOS_WRITE
+    jmp (bios)
+zendproc
+
+zproc bios_SELDSK
+    ldy #BIOS_SELDSK
+    jmp (bios)
+zendproc
 
 NOINIT
 
-; State preserved between BDOS invocations.
-
-.global current_drive, current_user
-current_drive:          .byte 0 ; current working drive
-current_user:           .byte 0 ; current working user
-
-; State used by BDOS invocation. Reset to zero every time the BDOS
-; is initialised.
-
-buffered_key:           .byte 0
-output_paused:          .byte 0 ; top bit set if paused
-entry_stack:            .byte 0 ; saved stack on system call entry
-
-; vim: filetype=asm sw=4 ts=4 et
+.global bios
+bios: .fill 2
 

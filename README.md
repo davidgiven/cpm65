@@ -28,6 +28,8 @@ to the 6502. So far it runs on:
     interface; TPA 44kB.
 
   - Sorbus homebrew 6502-based computer.
+  
+  - Olimex' neo6502 6502-based computer.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -53,6 +55,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
 <a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
+<a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
 </div>
 
 
@@ -264,6 +267,36 @@ the same time.
   - More info is available here:
     - [Homepage with lightning talk](https://xayax.net/sorbus/)
     - [Source code on github](https://github.com/SvOlli/sorbus)
+
+### neo6502 notes
+
+  - The neo6502 is a W65C02-based computer using emulated hardware implemented
+    by a RP2040. This can be programmed with various different firmware packages,
+    each emulating a different 6502-based microcomputer. This port is intended for
+    the native firmware package for the neo6502,
+    [Morpheus](https://github.com/paulscottrobson/neo6502-firmware/wiki). (The
+    other ports will work if you install the appropriate emulation firmware
+    package.)
+
+  - It is ridiculously fast.
+
+  - To use, unzip the `cpm65.zip` file into the root directory of the USB stick
+    or other storage card. Then enter `load "cpm65.neo"` at the prompt. CP/M-65
+    will run.
+
+  - To run on the emulator, either load it as above, or boot it directly with
+    `neo cpm65.neo@8000 run@8010`.
+
+  - This port uses an emulated BDOS, meaning that it stores its files as FAT
+    files on the neo6502's USB stick. Most well-behaved CP/M-65 programs will
+    work, but anything which tries to access the raw filesystem won't; such as
+    `STAT` or `DINFO`. Files for each drive and user are stored in separate
+    subdirectories. All 16 drives are supported (in directories `A` to `O`).
+
+  - Drive `B` (i.e. `/B/` on the storage device) contains some neo6502-specific
+    utilitied. This are in no way complete, or documented.
+
+  - The console is 53x30. It has a SCREEN driver.
 
 ### Supported programs
 

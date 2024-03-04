@@ -3,15 +3,13 @@ from build.llvm import llvmclibrary, llvmprogram
 llvmclibrary(
     name="bdoslib",
     srcs=[
-        "./main.S",
+        "./core.S",
         "./parsefcb.S",
         "./toupper.S",
         "./conio.S",
         "./dispatch.S",
         "./exit.S",
         "./utils.S",
-        "./bios.S",
-        "./filesystem.S",
     ],
     hdrs={"bdos.inc": "./bdos.inc"},
     deps=["include"],
@@ -19,6 +17,6 @@ llvmclibrary(
 
 llvmprogram(
     name="bdos",
+    srcs=["./filesystem.S", "./main.S"],
     deps=["include", ".+bdoslib"],
-    ldflags=["-Wl,--defsym=main=bdos_main"],
 )

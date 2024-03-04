@@ -4,7 +4,7 @@
 
 #include "zif.inc"
 
-zproc toupper
+zproc uppercase
     cmp #'a'
     zif_cs
         cmp #'z'+1
