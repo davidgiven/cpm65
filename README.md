@@ -74,10 +74,19 @@ It's [open source on GitHub!](https://github.com/davidgiven/cpm65)
 How?
 ----
 
-You will need the [llvm-mos](https://llvm-mos.org) toolchain. CP/M-65 support
-is available out of the box. Once installed, you should just be able to run the
-Makefile and you'll get bootable disk images for the Commodore 64 (with 1541
-drive) and BBC Micro (producing a 200kB SSSD DFS disk):
+You have two options:
+
+  - [Download a binary
+    release.](https://github.com/davidgiven/cpm65/releases/tag/dev) You can then
+    copy this onto a disk for booting on a real machine, or use it in an
+    emulator.
+
+  - or build it yourself.
+
+To build it, you will need the [llvm-mos](https://llvm-mos.org) toolchain.
+CP/M-65 support is available out of the box. Once installed, you should just be
+able to run the Makefile and you'll get bootable disk images for the Commodore
+64 (with 1541 drive) and BBC Micro (producing a 200kB SSSD DFS disk):
 
     make LLVM=<your llvm-mos bin directory here>/ -j$(nproc)
 
@@ -148,7 +157,8 @@ the same time.
 	  other file system are hidden. You get about 170kB on a normal disk.
 
   - Disk accesses are done using direct block access, so it _won't_ work on
-	  anything other than a 1541. Sorry.
+	  anything other than a 1541 (but it should be straightforward to add
+	  support for other drives). Sorry.
 
 ### VIC-20 notes
 
