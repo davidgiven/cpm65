@@ -24,7 +24,7 @@ coroutine.resume(coroutine.create(function()
     kbd:post_coded("asm test.asm test.com{ENTER}") wait_kbd()
     emu.wait(40)
     kbd:post_coded("test{ENTER}") wait_kbd()
-    emu.wait(3)
+    emu.wait(6)
 
     local cpu = manager.machine.devices[':maincpu']
     if (tostring(cpu.state.A) == "12") and (tostring(cpu.state.X) == "23") and (tostring(cpu.state.Y) == "34") then
