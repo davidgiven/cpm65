@@ -35,12 +35,22 @@ export(
     deps=[
         "src/arch/bbcmicro+mametest",
         "src/arch/commodore+c64_mametest",
-        "src/arch/commodore+pet4032_mametest",
-        "src/arch/commodore+pet8032_mametest",
+        
+        # MAME's ROM configuration is for the graphics keyboard, but MAME's
+        # hardware emulates the business keyboard, so we can't interact with the
+        # system.
+        #"src/arch/commodore+pet4032_mametest",
+
+        # MAME's ROM configuration is for the business keyboard, but MAME's
+        # hardware emulates the graphics keyboard...
+        #"src/arch/commodore+pet8032_mametest",
+
         # Works locally, but not on github CI.
         #"src/arch/apple2e+mametest",
+
         # Fails everywhere.
         #"src/arch/atari800+mametest",
+
         "src/arch/oric+mametest",
     ],
 )
