@@ -6,7 +6,6 @@ normalrule(
     name="pasc",
     ins=["./cpascalm2k1.pas"],
     outs=["pasc"],
-    deps=["./pascalmcompiler.inc"],
     commands=["chronic $(FPC) -Mdelphi -Os {ins[0]} -o{outs[0]}"],
     label="FREEPASCAL",
 )
