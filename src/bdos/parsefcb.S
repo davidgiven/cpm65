@@ -28,7 +28,7 @@ zproc bdos_PARSEFCB
         cmp #':'                    ; colon?
         zif_eq
             lda (param), y
-            jsr toupper
+            jsr uppercase
             sec
             sbc #'A'-1              ; to 1-based drive
             cmp #16
@@ -50,7 +50,7 @@ zproc bdos_PARSEFCB
     ldx #8
     zrepeat
         lda (param), y         ; get a character
-        jsr toupper
+        jsr uppercase
 
         jsr is_terminator_char
         zif_cs
@@ -98,7 +98,7 @@ zproc bdos_PARSEFCB
     ldx #3
     zrepeat
         lda (param), y          ; get a character
-        jsr toupper
+        jsr uppercase
 
         jsr is_terminator_char
         zif_cs

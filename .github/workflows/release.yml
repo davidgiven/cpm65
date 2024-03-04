@@ -50,7 +50,7 @@ jobs:
           atari800xlhd.atr
           bbcmicro.ssd
           c64.d64
-          cpm65.zip
+          neo6502.zip
           oricatmos.dsk
           pet4032.d64
           pet8032.d64
@@ -70,6 +70,7 @@ jobs:
           cpm65/atari800xlhd.atr
           cpm65/bbcmicro.ssd
           cpm65/c64.d64
+          cpm65/neo6502.zip
           cpm65/oric.dsk
           cpm65/pet4032.d64
           cpm65/pet8032.d64

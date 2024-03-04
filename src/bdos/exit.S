@@ -55,9 +55,8 @@ zproc bdos_EXIT
 
     ; Compute the load address.
 
-    ldy #BIOS_SETBANK
     lda #BANK_EXTRA
-    jsr callbios
+    jsr bios_SETBANK
 
     jsr bios_GETZP          ; top of ZP in X
     txa
@@ -124,14 +123,12 @@ zproc bdos_EXIT
     pla                     ; pop start zero page address, saved earlier
     tax
     lda temp+1              ; start of TPA, in pages
-    ldy #BIOS_RELOCATE
-    jsr callbios
+    jsr bios_RELOCATE
 
     ; Execute it.
 
-    ldy #BIOS_SETBANK
     lda #BANK_MAIN
-    jsr callbios
+    jsr bios_SETBANK
 
     lda #COMHDR_ENTRY      ; start address is 256-byte aligned
     sta temp+0
