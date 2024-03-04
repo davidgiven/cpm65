@@ -9,7 +9,7 @@ coroutine.resume(coroutine.create(function()
         end
     end
 
-    emu.wait(1)
+    emu.wait(3)
     kbd:post_coded("MODE 135{ENTER}*!boot{ENTER}") wait_kbd()
     emu.wait(11)
 

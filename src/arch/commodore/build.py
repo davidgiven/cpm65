@@ -128,7 +128,7 @@ mametest(
     target="c64",
     diskimage=".+c64_diskimage",
     imagetype=".d64",
-    script="./mame-test.lua",
+    script="./c64-mame-test.lua",
 )
 
 mametest(
