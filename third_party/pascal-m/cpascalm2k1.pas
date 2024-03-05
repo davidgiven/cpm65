@@ -371,6 +371,7 @@ var
   procedure EndLinelist  ;
   (* Ends line on listfile, takes care of pages, headings etc *)
   begin
+  {
     listlines := listlines + 1 ;
     (* new page needed ? *)
      if listlines > maxpage
@@ -386,6 +387,7 @@ var
            listpages := listpages + 1 ;
            listlines := 3
          end ;
+         }
    end ;(* EndLineList *)
 
  procedure BeginLine ;
@@ -410,7 +412,7 @@ var
           linelength := 0 ;
           linecount := linecount + 1 ;
           EndLineList ;
-          write(listfile, linecount:4, ': ');
+          { write(listfile, linecount:4, ': '); }
           while(NOT eoln(sourcefile))and
                (linelength < maxchcnt)do
             begin
@@ -430,11 +432,11 @@ var
                   end ;
               }
               read(sourcefile, kar);
-              write(listfile, kar)  ;
+              { write(listfile, kar)  ; }
               line[linelength] := kar ;
             end ;
           readln(sourcefile);
-          writeln(listfile);
+          { writeln(listfile); }
           chcnt := 0 ;
           linpos := 0
         end ;
@@ -1192,7 +1194,7 @@ writeln ;
  end ;(* HexOut *)
 
  procedure WriteOut ;
-(* writeP1-record with code buffer and checksum,
+(* write P1-record with code buffer and checksum,
    codebuffer empty and instruction-counter is updated *)
  var
    i : integer ;
@@ -5669,21 +5671,21 @@ begin
       begin
         writeln(errorfile,'Compilation errors ', filename ) ;
         EndLineList ;
-        writeln(listfile);
+        { writeln(listfile); }
         writeln(errorfile,' Pascal-M Compilation : ', errtot:4,' errors ');
         EndLineList ;
-        write(listfile, ' Pascal-M Compilation : ');
-        writeln(listfile, errtot:4,' errors ');
+        { write(listfile, ' Pascal-M Compilation : '); }
+        { writeln(listfile, errtot:4,' errors '); }
         writeln(objectfile,'P1010000');
         CompilePascalM := false ;
       end
     else
       begin
         EndLineList ;
-        writeln(listfile);
-        writeln(errorfile,'No compilation errors ', filename ) ;
+        { writeln(listfile); }
+        { writeln(errorfile,'No compilation errors ', filename ) ; }
         EndLineList ;
-        writeln(listfile, ' Pascal-M Compilation successful');
+        { writeln(listfile, ' Pascal-M Compilation successful'); }
         writeln(objectfile, 'P9');
         CompilePascalM := true ;
       end ;
@@ -5771,13 +5773,10 @@ begin
 end;
 
 begin (* main Mpascal *)
-  writeln ( 'Pascal-M compiler V2k1') ;
+  writeln ( '* Pascal-M compiler V2k1') ;
   Openfiles ;
-  if CompilePascalM(filename)
-    then
-      writeln('Compile OK')
-     else
-       writeln('Compile errors, see error file') ;
+  if (not CompilePascalM(filename)) then
+       writeln('* Compile errors, see error file') ;
    CloseFiles ;
   if ShowErrors
     then

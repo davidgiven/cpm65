@@ -26,6 +26,11 @@ llvmprogram(
     deps=["lib+cpm65", "lib+bdos", "include"],
 )
 
+llvmprogram(
+    name="loader",
+    srcs=["./loader.c"],
+    deps=["lib+cpm65"],
+)
 
 @Rule
 def pascalm_obp(self, name, src: Target):

@@ -90,26 +90,32 @@ SBD     =       $1742           ; for PB0 TTYout echo prevention
 CR      = $0D                   ; Carriage return
 LF      = $0A                   ; Linefeed
 
+BASE    = cpm_ram               ; where the m-code is loaded
+prcbuf  = BASE
+
 ; Interpreter 
 ;
 ; Initialize interpreter
 .text
 .global main
 main:
-        lda     #>mstart ; start of mcode 
-        sta     pc + 1
-        lda     #<mstart
-        sta     pc
-        lda     ldaddr          ; clear heap
-        sta     hp
-        lda     ldaddr + 1        
-        sta     hp + 1
-        lda     endcor          ; clear stack           ;
-        sta     stack
-        sta     mp      
-        lda     endcor + 1
-        sta     stack   + 1
-        sta     mp + 1
+        lda #>mstart ; start of mcode 
+        sta pc + 1
+        lda #<mstart
+        sta pc
+
+        lda BASE            ; clear heap
+        sta hp
+        lda BASE + 1        
+        sta hp + 1
+
+        jsr bdos_GETTPA     ; get end of memory
+        stx stack + 1
+        stx mp + 1
+        lda #0
+        sta stack
+        sta mp
+
 ;
 ; say hello
 ;
@@ -117,6 +123,39 @@ main:
         ldx #<msg002
         jsr prstrng
        
+;
+; load the program
+;
+
+        lda #<BASE
+        sta tmp2l2+0
+        lda #>BASE
+        sta tmp2l2+1
+
+        lda #<cpm_fcb
+        ldx #>cpm_fcb
+        jsr bdos_OPEN_FILE
+
+loadloop:
+        lda tmp2l2+0
+        ldx tmp2l2+1
+        jsr bdos_SET_DMA_ADDRESS
+
+        lda #<cpm_fcb
+        ldx #>cpm_fcb
+        jsr bdos_READ_SEQUENTIAL
+        bcs done_load
+
+        lda tmp2l2+0
+        clc
+        adc #0x80
+        sta tmp2l2+0
+        bcc noadd
+        inc tmp2l2+1
+noadd:
+        jmp loadloop
+done_load:
+
 ;
 ; initialize files
 ;        
@@ -208,6 +247,7 @@ push:   sta (stack,x)
 prstrng:sta strptr + 1  ; high part of address
         stx strptr
         jsr crlf        ; clear line
+        ldy #0
 strina: lda (strptr),Y
         cmp #$0d        ; test for CR
         beq stinb
@@ -1217,10 +1257,10 @@ cas:jsr setup1      ; case nr
         bcc casex       
 cas2:   clc
         lda tmp2l2      ; adjust address in tmp2 with
-        adc base
+        adc BASE
         sta pc
         lda tmp2l2 + 1
-        adc base + 1
+        adc BASE + 1
         sta pc + 1
         jmp interpr
 casex:  ldy #$05        ; test for otherwise
@@ -1329,7 +1369,7 @@ lca:ldy #$00
         ; 
         ; BD CSP
         ;
-csp:ldy #$00
+csp:    ldy #$00
         lda (pc),y          ; get csp number
         asl a           ; *2 for jump table index
         tay 
@@ -1406,9 +1446,12 @@ cupgo:  ldy #$00
         asl a               ; *2 as index for jumptable
         tax             ;
         lda prcbuf,x        ; 
+        clc
+        adc #<BASE
         sta pc
         inx
         lda prcbuf,x        ; pc from table
+        adc #>BASE
         sta pc + 1
         jmp interpr         ; jump to new procedure
         ;
@@ -1556,7 +1599,7 @@ wrc2:   jsr pull2           ; get char and dummy
 ;
 ; PROC 2 WRS
 ;
-wrs:jsr setup2          ; tmp2l2 contains actual length
+wrs:    jsr setup2          ; tmp2l2 contains actual length
         sec             ; and tmp2l2 actual length
         lda tmp2l2
         sbc tmp3l2          ; spaces := actual - specified
@@ -1572,12 +1615,14 @@ wrs1:   beq wrs2            ; nr of spaces = 0?
         dey
         bne wrs1
 wrs2:   jsr setup1          ; address of string
-        ldy #$00            ; y index into string
-wrs3:   lda (tmp2l2),y      ; get char
-        jsr wrt         ; print char
+        .byte 3
+        ldy #0
+wrs3:   dec tmp3l2
+        bmi wrs4
+        lda (tmp2l2),y      ; get char
+        jsr wrt             ; print char
         iny
-        dec tmp3l2          ; decrement actual
-        bne wrs3
+        jmp wrs3
 wrs4:   jmp interpr
         ;
         ; PROC 3 RDI
@@ -1729,7 +1774,7 @@ getch3: cmp #$17            ; CTRL/Z is EOF
         ;
         ; why push and pull, do it on the stack is faster?
         ;
-odd:jsr pull2           ; get integer from stack
+odd:    jsr pull2           ; get integer from stack
         tya             ; bit 0?
         and #$01            ; pos or neg?
         tay 
@@ -1987,6 +2032,8 @@ rdt:	sty ytmp
 ; Write one char to TTY
 ;
 wrt:	sty ytmp    
+        cmp #CR
+        beq crlf
         jsr bdos_CONOUT
         ldy ytmp
         rts
