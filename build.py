@@ -11,6 +11,7 @@ export(
         "bin/mads": "third_party/mads",
         "bin/atbasic.com": "third_party/altirrabasic",
         "bin/pasc": "third_party/pascal-m+pasc",
+        "bin/pasc.obp": "third_party/pascal-m+pasc-obp",
         "bin/pasdis": "third_party/pascal-m+pasdis",
         "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
         "oric.dsk": "src/arch/oric+diskimage",

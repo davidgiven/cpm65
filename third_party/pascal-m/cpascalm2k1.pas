@@ -26,11 +26,6 @@ program cpascalm2k1 ;
   SOFTWARE.
 }
 
-var
-   sourcefile, objectfile,listfile, errorfile : text ;
-   filename, namefile :  string ;
-   ShowErrors : boolean ;
-
 (* V1.0 Compiler based upon portable P2 compiler
     written by N.Wirth et al Zurich E.T.H.            *)
 
@@ -290,7 +285,7 @@ var
   linpos       : integer ;
   line         : packed array[1 .. maxchcnt] of char ;
   linecount    : integer ;
-  sourcename   : string ;
+  sourcename   : alphastring ;
   (* listing file counters *)
   listlines, listpages : integer ;
  (* Counters *)
@@ -367,6 +362,11 @@ var
   rop : array[0 .. 32]  of operator ;(* Reserved             *)
   sop : array[0 .. 127] of operator ;
   na  : array[0 .. 22]  of alpha    ;(* Standard proc/func's *)
+  
+  (* Used by the compiler driver itself. *)
+  sourcefile, objectfile,listfile, errorfile : text ;
+  filename, namefile :  alphastring ;
+  ShowErrors : boolean ;
 
   procedure EndLinelist  ;
   (* Ends line on listfile, takes care of pages, headings etc *)
@@ -540,11 +540,11 @@ procedure EndLine ;
      begin
        n := 0 ;
       (* walk through linked list until end *)
-       repeat
-         n := n + lvp^.slgth ;
-         lvp := lvp^.sptr      (* next cell *)
-       until lvp = nil ;
-       StringSize := n         (* return result *)
+        while lvp <> nil do begin
+          n := n + lvp^.slgth ;
+          lvp := lvp^.sptr      (* next cell *)
+        end ;
+      StringSize := n         (* return result *)
    end ;(* StringSize *)
 
  procedure InSymbol ;
@@ -746,8 +746,10 @@ procedure EndLine ;
                 val.ival := chstring[1](* only one character *)
               else
                (* create list-head pointer describing string *)
-                if lgth <> 0
+                if lgth = 0
                   then
+                    val.valp := nil
+                  else
                     begin
                       new(lvp1);
                       if lvp <> nil
@@ -2179,7 +2181,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
        while nxt <> nil do
          begin
            nxt^.idtype := lsp ;
-           if lsp^.form = files
+           if (lsp <> nil) and (lsp^.form = files)
              then
                begin
                  nxt^.vaddr := filenumber ;
@@ -2925,12 +2927,12 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
                        Bytegen(StringSize(gattr.cval.valp));
                        lvp := gattr.cval.valp ;
                       (* Put string following opcode *)
-                       repeat
+                       while lvp <> nil do begin
                          for i := 1 to lvp^.slgth do
                            Bytegen(lvp^.sval[i]);
                         (* walk through linked list of string parts *)
                          lvp := lvp^.sptr
-                       until lvp = nil
+                       end
                      end
                    else
                      Error(178)
@@ -5649,7 +5651,7 @@ begin
 end ; (* Compile program heading *)
 
 
-function CompilePascalM(filename : string): boolean ;
+function CompilePascalM(filename : alphastring): boolean ;
 begin
   Initialize ;
   sourcename := filename ;
@@ -5689,9 +5691,9 @@ end ;
 
  procedure OpenFiles ;
    var
-     i : integer ;
-     filenamepart : string ;
+     dot : integer ;
    begin
+   (*
      if paramcount = 0
        then
          begin
@@ -5712,27 +5714,22 @@ end ;
         writeln('V shows errors on console') ;
         halt(1)
       end;
+      *)
       
       { open file }
+      (* 
       filename := namefile ;
       assign (sourcefile, filename);
       reset(sourcefile) ;
 
-     { extract filename part }
-     filenamepart := '' ;
-     i := 1 ;
-     while filename[i] <> '.' do
-       begin
-         filenamepart := filenamepart + filename[i] ;
-         i := i + 1 ;
-       end ;
-     namefile := filenamepart + '.obp' ;
+     dot := pos('.', filename);
+     namefile := concat(copy(filename, 1, dot), 'obp');
      assign (objectfile, namefile) ;
      rewrite(objectfile) ;
-     namefile := filenamepart + '.lst' ;
+     namefile := concat(copy(filename, 1, dot), 'lst');
      assign( listfile, namefile) ;
      rewrite(listfile) ;
-     namefile := filenamepart + '.err' ;
+     namefile := concat(copy(filename, 1, dot), 'err');
      assign( errorfile, namefile) ;
      rewrite(errorfile) ;
      ShowErrors := false ;
@@ -5741,6 +5738,12 @@ end ;
          if (paramstr(2) = 'v') or (paramstr(2) = 'V')
            then
              ShowErrors := true ;
+             *)
+
+    sourcefile := input;
+    objectfile := output;
+    listfile := output;
+    errorfile := output;
    end ; (* OpenFiles *)
 
 procedure CloseFiles ;
@@ -5753,8 +5756,9 @@ procedure CloseFiles ;
 
 procedure DumpErrorFile ;
 var
-  line : string ;
+  line : alphastring ;
 begin
+(*
   assign( errorfile, namefile) ;
   reset(errorfile) ;
   while not eof(errorfile) do
@@ -5763,6 +5767,7 @@ begin
       writeln(line)
     end;
   close(errorfile) ;
+  *)
 end;
 
 begin (* main Mpascal *)
