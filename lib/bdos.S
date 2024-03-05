@@ -17,6 +17,7 @@
 
 bdos bdos_EXIT,            BDOS_EXIT_PROGRAM
 bdos bdos_SETDMA,          BDOS_SET_DMA_ADDRESS
+bdos bdos_CONIN,           BDOS_CONSOLE_INPUT
 bdos bdos_CONOUT,          BDOS_CONSOLE_OUTPUT
 bdos bdos_WRITESTRING,     BDOS_WRITE_STRING
 bdos bdos_READLINE,        BDOS_READ_LINE

@@ -1,4 +1,5 @@
 from build.ab import normalrule, emit, Rule, Targets, Target
+from build.llvm import llvmprogram
 
 emit("FPC ?= fpc")
 
@@ -19,19 +20,23 @@ normalrule(
     label="FREEPASCAL",
 )
 
+llvmprogram(
+    name="pint",
+    srcs=["./pascalmint2k1.S"],
+    deps=["lib+cpm65", "lib+bdos", "include"],
+)
+
+
 @Rule
-def pascalm_obp(self, name, src:Target):
+def pascalm_obp(self, name, src: Target):
     normalrule(
         replaces=self,
         ins=[src],
         deps=["third_party/pascal-m+pasc"],
-        outs=[name+".obp"],
-        commands=[
-            "{deps[0]} < {ins[0]} > {outs[0]}"
-        ],
-        label="PASCALM"
+        outs=[name + ".obp"],
+        commands=["{deps[0]} < {ins[0]} > {outs[0]}"],
+        label="PASCALM",
     )
 
-pascalm_obp(
-    name="pasc-obp",
-    src="./cpascalm2k1.pas")
+
+pascalm_obp(name="pasc-obp", src="./cpascalm2k1.pas")

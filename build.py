@@ -13,6 +13,7 @@ export(
         "bin/pasc": "third_party/pascal-m+pasc",
         "bin/pasc.obp": "third_party/pascal-m+pasc-obp",
         "bin/pasdis": "third_party/pascal-m+pasdis",
+        "bin/pint.com": "third_party/pascal-m+pint",
         "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
         "oric.dsk": "src/arch/oric+diskimage",
         "apple2e.po": "src/arch/apple2e+diskimage",
