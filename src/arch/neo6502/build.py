@@ -56,7 +56,7 @@ zip(
         "CPM65.NEO": ".+bios",
         "A/CCP.SYS": "src+ccp",
         "A/PINT.COM": "third_party/pascal-m+pint",
-        "A/TEST.OBB": "test.obb",
+        "A/PASC.OBB": "third_party/pascal-m+pasc-obb",
         "B/NCOPY.COM": "src/arch/neo6502/utils+ncopy",
         "B/NATTR.COM": "src/arch/neo6502/utils+nattr",
         "B/NDIR.COM": "src/arch/neo6502/utils+ndir",

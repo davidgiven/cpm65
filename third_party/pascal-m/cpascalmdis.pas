@@ -35,7 +35,7 @@ uses Sysutils ;
 
 
 const
-  defaultkim = $3000 ;
+  defaultkim = $0 ;
 
 var
   objectfilename,
@@ -145,7 +145,7 @@ procedure CloseFilesDisassembler ;
 
 
 begin(* main PasDis *)
-    write('Disassembler for Pascal-M 2K1');
+    writeln('Disassembler for Pascal-M 2K1');
     OpenFilesDisassembler ;
     if PascalmDisassembler
       then

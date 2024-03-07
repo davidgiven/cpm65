@@ -95,23 +95,23 @@ const
  maxaddr    = 32767 ;
  (* size in byte in core of variables *)
  (* 8 bytes for set, gives 64 possible members *)
- intsize    =     2 ;(* integer   *)
- charsize   =     1 ;(* character *)
- boolsize   =     1 ;(* boolean   *)
- setsize    =     8 ;(* set       *)
- ptrsize    =     2 ;(* pointer   *)
- strglgth   =     8 ;(* strings stored in blocks of 8 char's *)
- alphalen   =    40 ;(* general purpose string length *)
+ intsize          =     2 ;(* integer   *)
+ charsize         =     1 ;(* character *)
+ boolsize         =     1 ;(* boolean   *)
+ setsize          =     8 ;(* set       *)
+ ptrsize          =     2 ;(* pointer   *)
+ strglgth         =     8 ;(* strings stored in blocks of 8 char's *)
+ alphalen         =    40 ;(* general purpose string length *)
  lcaftermarkstack =     6 ;(* stack frame for interpreter *)
- maxint     = 32767 ;(* 16-bit's two's complement machine *)
- setmax     =    63 ;(* set has maximal 63 members *)
- maxstandrd =    12 ;(* number of standard functions/procedures *)
- maxcode    =    29 ;(* codebuffer maximum 30 bytes *)
- maxpage    =    56 ;(* maximum number of lines on listing file *)
- maxfiles   =     7 ;(* maximum number of files in use total *)
- maxchcnt   =   120 ;(* maximum input line-length *)
- maxerlines =    10 ;(* maximum number of errors in a line *)
- maxermsg   =   200 ;(* maximum number of error messages *)
+ maxint           = 32767 ;(* 16-bit's two's complement machine *)
+ setmax           =    63 ;(* set has maximal 63 members *)
+ maxstandrd       =    12 ;(* number of standard functions/procedures *)
+ maxcode          =    29 ;(* codebuffer maximum 30 bytes *)
+ maxpage          =    56 ;(* maximum number of lines on listing file *)
+ maxfiles         =     7 ;(* maximum number of files in use total *)
+ maxchcnt         =   120 ;(* maximum input line-length *)
+ maxerlines       =    10 ;(* maximum number of errors in a line *)
+ maxermsg         =   200 ;(* maximum number of error messages *)
 (* ASCII character Control Constants *)
  atab     = 9   ;(* tab-character  *)
 type
@@ -748,22 +748,19 @@ procedure EndLine ;
                 val.ival := chstring[1](* only one character *)
               else
                (* create list-head pointer describing string *)
-                if lgth = 0
-                  then
-                    val.valp := nil
-                  else
-                    begin
-                      new(lvp1);
-                      if lvp <> nil
-                        then
-                          lvp^.sptr := lvp1
-                        else
-                          val.valp := lvp1 ;
-                      lvp1^.sval := chstring ;
-                      lvp1^.slgth := lgth  ;
-                      lvp1^.sptr := nil ;
-                      lgth := StringSize(val.valp);
-                    end
+                if lgth <> 0 then
+                  begin
+                    new(lvp1);
+                    if lvp <> nil
+                      then
+                        lvp^.sptr := lvp1
+                      else
+                        val.valp := lvp1 ;
+                    lvp1^.sval := chstring ;
+                    lvp1^.slgth := lgth  ;
+                    lvp1^.sptr := nil ;
+                    lgth := StringSize(val.valp);
+                  end
           end
 
       else if ch = ':'
@@ -5564,11 +5561,14 @@ procedure Initialize ;
    rsy[28] := forwardsy ; rsy[29] := progsy   ;
    rsy[30] := funcsy    ; rsy[31] := procsy   ;
    rsy[32] := elsesy    ;
+   write(9);
    for i :=0 to 127 do
      begin
+     writeln(i);
        ssy[i]  := othersy ;
        sop[i]  := noop
      end ;
+     write(8);
    ssy[ord('+')] := addop     ;
    ssy[ord('-')] := addop     ;
    ssy[ord('*')] := mulop     ;
@@ -5751,6 +5751,7 @@ end ;
 procedure CloseFiles ;
   begin
     close(sourcefile) ;
+    write(objectfile, chr(26));
     close(objectfile) ;
     close(listfile) ;
     close(errorfile) ;

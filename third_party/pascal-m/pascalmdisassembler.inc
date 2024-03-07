@@ -33,7 +33,7 @@
 
 CONST
   alphalength = 80 ;
-  maxstore = 32767 ;
+  maxstore = 65535 ;
   maxproc  = 99   ;
   maxpage  =  56   ;
   {
@@ -143,8 +143,8 @@ var
 	Fillgrinstruction(6,'LOD2 ',1)       ;
 	Fillgrinstruction(7,'STR1 ',1)       ;
 	Fillgrinstruction(8,'STR2 ',1)       ;
-        fillinstruct($90,'LEQ2 ',0)      ;
-	fillinstruct($91,'for  ',0)      ;
+  fillinstruct($90,'LEQ2 ',0)      ;
+	fillinstruct($91,'MFOR ',2)      ;
 	fillinstruct($92,'LEQM ',2)      ;
 	fillinstruct($93,'LES2 ',0)      ;
 	fillinstruct($94,'LEQ8 ',0)      ;
@@ -428,8 +428,8 @@ procedure WriteLevelInstruction(opcode  : integer ; var dpc : integer);
   var
     i, level : integer ;
   begin
-     level := opcode mod 256 ;
-     opcode := opcode div 256 ;
+     level := opcode mod 16 ;
+     opcode := opcode div 16 ;
      assemblerline := assemblerline + grinstruction[opcode].name +
       ' ' + WriteHex(level);
      for i := 1 to grinstruction[opcode].arg do
@@ -642,7 +642,8 @@ procedure WriteInstruction(opcode  : integer ;
             write(listfile, ' loop back to body ');
             i := store[dpc + 1] * 256 + store[dpc + 2] + loadaddress ;
             WriteHex(i div 256);
-            WriteHex(i mod 256)
+            WriteHex(i mod 256);
+            writeln(listfile)
           end
       else if(opcode = $BD)(* CSP *)
        (* should be symbol output for assembler *)

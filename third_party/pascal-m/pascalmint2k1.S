@@ -57,6 +57,7 @@
 
 ZEROPAGE
 
+sentinel: .fill 1
 pc:     .fill 2 ; program counter
 stack:  .fill 2 ; software stack pointer
 hp:     .fill 2 ; heap pointer
@@ -99,22 +100,13 @@ prcbuf  = BASE
 .text
 .global main
 main:
+        lda #0
+        sta sentinel
+
         lda #>mstart ; start of mcode 
         sta pc + 1
         lda #<mstart
         sta pc
-
-        lda BASE            ; clear heap
-        sta hp
-        lda BASE + 1        
-        sta hp + 1
-
-        jsr bdos_GETTPA     ; get end of memory
-        stx stack + 1
-        stx mp + 1
-        lda #0
-        sta stack
-        sta mp
 
 ;
 ; say hello
@@ -127,18 +119,21 @@ main:
 ; load the program
 ;
 
-        lda #<BASE
-        sta tmp2l2+0
-        lda #>BASE
-        sta tmp2l2+1
+        lda #0
+        sta cpm_fcb+FCB_CR
+        
+        lda #<BASE              ; heap starts at the beginning of program workspace
+        sta hp+0
+        ldx #>BASE
+        stx hp+1
 
         lda #<cpm_fcb
         ldx #>cpm_fcb
         jsr bdos_OPEN_FILE
 
 loadloop:
-        lda tmp2l2+0
-        ldx tmp2l2+1
+        lda hp+0
+        ldx hp+1
         jsr bdos_SET_DMA_ADDRESS
 
         lda #<cpm_fcb
@@ -146,15 +141,21 @@ loadloop:
         jsr bdos_READ_SEQUENTIAL
         bcs done_load
 
-        lda tmp2l2+0
-        clc
-        adc #0x80
-        sta tmp2l2+0
-        bcc noadd
-        inc tmp2l2+1
+        lda hp+0
+        eor #0x80
+        sta hp+0
+        bmi noadd
+        inc hp+1
 noadd:
         jmp loadloop
-done_load:
+done_load:                          ; heap has been advanced past the program
+
+        jsr bdos_GETTPA     ; get end of memory
+        stx stack + 1
+        stx mp + 1
+        lda #0
+        sta stack
+        sta mp
 
 ;
 ; initialize files
@@ -1203,7 +1204,7 @@ incb:   jsr setup1
         ;
         ; B5 ENT
         ;
-ent:ldy #$01        ; index to low part of bytes
+ent:    ldy #$01        ; index to low part of bytes
         lda stack       ; nr of bytes to reserve on stack
         sec
         sbc (pc),y
@@ -1256,11 +1257,12 @@ cas:jsr setup1      ; case nr
         bne cas2        ; if no nill pointer
         bcc casex       
 cas2:   clc
-        lda tmp2l2      ; adjust address in tmp2 with
-        adc BASE
+        brk
+        lda tmp2l2      ; adjust address in tmp2 with BASE
+        adc #<BASE
         sta pc
         lda tmp2l2 + 1
-        adc BASE + 1
+        adc #>BASE
         sta pc + 1
         jmp interpr
 casex:  ldy #$05        ; test for otherwise
@@ -1279,12 +1281,12 @@ casex:  ldy #$05        ; test for otherwise
         ;
         ; B7 MOV
         ;
-mov:jsr setup2          ; tmp2l2 is to and tmp3l2 is from
+mov:    jsr setup2          ; tmp2l2 is to and tmp3l2 is from
         ldy #$00
         lda (pc),y
         sta tmp1l8 + 1
         ldx #pc
-        jsr     incr
+        jsr incr
         lda (pc),y
         sta tmp1l8
         ldx #pc
@@ -1478,7 +1480,7 @@ lnsx1:  lda #$08
 ;
 ; PROC 0 WRI
         ;
-wri:jsr setup2          ; tmp3 is length to write
+wri:    jsr setup2          ; tmp3 is length to write
         lda tmp2l2 + 1      ; tmp2 is intger to write
         sta tmp1l8 + 1      ; save for sign
         bpl wri1            ; not to be complemented
@@ -1615,7 +1617,6 @@ wrs1:   beq wrs2            ; nr of spaces = 0?
         dey
         bne wrs1
 wrs2:   jsr setup1          ; address of string
-        .byte 3
         ldy #0
 wrs3:   dec tmp3l2
         bmi wrs4
@@ -1869,7 +1870,7 @@ cvdec8: lda tmp2l2
         ;
 forin:  ldy #$05
         lda (stack),y
-        sta tmp3l2          ; initial interpr coount
+        sta tmp3l2          ; initial interpr count
         iny
         lda (stack),y
         sta tmp3l2 + 1
@@ -2043,8 +2044,7 @@ wrt:	sty ytmp
 crlf:   lda #CR
         jsr bdos_CONOUT
         lda #LF
-        jsr bdos_CONOUT
-        rts
+        jmp bdos_CONOUT
 ;
 ; messages
 ;
