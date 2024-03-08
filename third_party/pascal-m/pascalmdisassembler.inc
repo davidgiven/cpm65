@@ -196,7 +196,9 @@ var
 	fillinstruct($C2,'SFA  ',0)      ;
 	fillinstruct($C3,'GFA  ',0)      ;
 	fillinstruct($C4,'MVB  ',4)      ;
-	for i := $C5 to $FF do
+  fillinstruct($C5,'SHL  ',0)      ;
+  fillinstruct($C6,'SHR  ',0)      ;
+	for i := $C7 to $FF do
 	  begin
 	    instruction[i].name := 'NOP  '  ;
             instruction[i].arg  := 0        ;

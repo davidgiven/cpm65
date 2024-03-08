@@ -70,7 +70,7 @@ eolb:   .fill 1 ; end of input line boolean
 eofb:   .fill 1 ; end of file boolean
 op:     .fill 1 ; last op code
 fa:     .fill 1 ; file address handle (ignored in this version)
-;
+
 tmp1l8: .fill 8 ; 8 byte temp field
 tmp2l2: .fill 2 ; 2 byte temp
 tmp3l2: .fill 2 ; 2 byte temp
@@ -378,6 +378,9 @@ jtab:   .word   leq2    ; 2 bytes less than or equal test
         .word   lns     ; load null set
         .word   sfa     ; set file handle
         .word   gfa     ; get file handle
+        .word   notimp  ; unimplemented?
+        .word   shl     ; shift left
+        .word   shr     ; shift right
 ;
 ; additional addresses for routines
 ;
@@ -429,11 +432,11 @@ interpr:ldx #0
         inc pc
         bne intrpr1
         inc pc + 1
-intrpr1:cmp #$C3
+intrpr1:cmp #$C5
         bcc intrpr2     ; opcode in range
-        lda #>msg003
-        ldx #<msg003
-        jmp string
+notimp: lda #>msg007
+        ldx #<msg007
+        jmp string      ; not implemented message, fatal
 intrpr2:cmp #$90        ; test if direct op
         bcs pacop       ; packed opcode
         lsr a
@@ -456,10 +459,6 @@ pacop:  sbc #$90        ; carry was set
         lda jtab,y
         sta jtabp + 1
         jmp (jtabp)     ; jump 
-;     
-notimp: lda #>msg007
-        ldx #<msg007
-        jmp string      ; not implemented message, fatal
 ;
 ; setup1 and setup2 are subroutines to setup 
 ;
@@ -480,20 +479,6 @@ setup1: jsr pull2       ; next item goes into tmp2l2
 ldcis:  ldy op      ; load small scalar constant
         lda #0      ; push single byte value 0
         jsr push2
-        jmp interpr
-;
-; GFA
-;
-gfa:    ldy fa      ; load file handle constant
-        lda #0      ; push single byte value 0
-        jsr push2
-        jmp interpr
-
-;
-; SFA
-;
-sfa:    jsr pull2               ; get file handle constant
-        sty fa                  ; store fa
         jmp interpr
 ;
 ;
@@ -1218,7 +1203,7 @@ ent:    ldy #$01        ; index to low part of bytes
         ;
         ; B6 CAS
         ;
-cas:jsr setup1      ; case nr
+cas:    jsr setup1      ; case nr
         ldy #$01
         sec 
         lda tmp2l2      ; test for less than
@@ -1257,12 +1242,11 @@ cas:jsr setup1      ; case nr
         bne cas2        ; if no nill pointer
         bcc casex       
 cas2:   clc
-        brk
         lda tmp2l2      ; adjust address in tmp2 with BASE
-        adc #<BASE
+        adc pc
         sta pc
         lda tmp2l2 + 1
-        adc #>BASE
+        adc pc + 1
         sta pc + 1
         jmp interpr
 casex:  ldy #$05        ; test for otherwise
@@ -1428,11 +1412,11 @@ cup2:   jsr pull2           ; complex call with function room
         sta mp + 1
 cupgo:  ldy #$00
         lda (pc),y          ; get procedure number
-        pha             ; save on stack
-        ldx #pc         ; pc := pc + 1
+        pha                 ; save on stack
+        ldx #pc             ; pc := pc + 1
         jsr incr
         sec
-        lda mp          ; get right place to store PC
+        lda mp              ; get right place to store PC
         sbc #$05
         sta tmp2l2
         lda mp + 1
@@ -1441,13 +1425,13 @@ cupgo:  ldy #$00
         ldy #$01            ; index into mark package
         lda pc + 1          ; high part PC
         sta (tmp2l2),y      ; store in frame
-        dey             ; next ell
+        dey                 ; next ell
         lda pc
         sta (tmp2l2),y      ; low part pc
-        pla             ; index
+        pla                 ; index
         asl a               ; *2 as index for jumptable
-        tax             ;
-        lda prcbuf,x        ; 
+        tax            
+        lda prcbuf,x  
         clc
         adc #<BASE
         sta pc
@@ -1473,6 +1457,52 @@ lnsx1:  lda #$08
         dey             ; interpr
         bne lnsx1
         jmp tststk
+        ;
+        ; C2 SFA
+        ;
+sfa:    jsr pull2               ; get file handle constant
+        sty fa                  ; store fa
+        jmp interpr
+        ;
+        ; C3 GFA
+        ;
+gfa:    ldy fa      ; load file handle constant
+        lda #0      ; push single byte value 0
+        jsr push2
+        jmp interpr
+        ;
+        ; C5 SHL
+        ;
+shl:    jsr setup2      ; shift left two 16-bit numbers on the stack
+        lda tmp2l2
+        ldx tmp3l2      ; shift amount
+shl1:   beq shl2        ; do nothing if shift is zero
+        asl a
+        rol tmp2l2+1
+        dex
+        bne shl1
+shl2:   tay             ; result low into Y
+        lda tmp2l2+1
+        jsr push2
+        jmp interpr
+        ;
+        ; C6 SHR
+        ;
+shr:    jsr setup2      ; shift right two 16-bit numbers on the stack
+        lda tmp2l2+1
+        ldx tmp3l2      ; shift amount
+shr1:   beq shl2        ; do nothing if shift is zero
+        tay
+        rol a
+        tya
+        ror a
+        ror tmp2l2
+        dex
+        bne shl1
+shr2:   ldy tmp2l2
+        jsr push2
+        jmp interpr
+
 ;
 ; end of m-code machine instructions
 ;

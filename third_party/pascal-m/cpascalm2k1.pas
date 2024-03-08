@@ -112,6 +112,8 @@ const
  maxchcnt         =   120 ;(* maximum input line-length *)
  maxerlines       =    10 ;(* maximum number of errors in a line *)
  maxermsg         =   200 ;(* maximum number of error messages *)
+ maxops           =    34 ;(* maximum number of operators *)
+ maxopsp1         =    35 ;(* maximum number of operators plus one... *)
 (* ASCII character Control Constants *)
  atab     = 9   ;(* tab-character  *)
 type
@@ -166,6 +168,8 @@ type
               andop,
               idiv,
               imod,
+              shrop,
+              shlop,
               plus,
               minus,
               orop,
@@ -355,11 +359,11 @@ var
   facbegsys,
   statbegsys,
   typedels         : setofsys ;
-  rw  : array[0 .. 32]  of alpha    ;(* Reserved words       *)
-  frw : array[0 .. 8 ]  of 0 .. 33  ;(* no res wrds          *)
-  rsy : array[0 .. 32]  of symbol   ;(* Reserved symbols     *)
+  rw  : array[0 .. maxops]  of alpha    ;(* Reserved words       *)
+  rop : array[0 .. maxops]  of operator ;(* Reserved             *)
+  rsy : array[0 .. maxops]  of symbol   ;(* Reserved symbols     *)
+  frw : array[0 .. 8 ]  of 0 .. maxopsp1  ;(* no res wrds          *)
   ssy : array[0 .. 127] of symbol   ;(* Not reserved symbols *)
-  rop : array[0 .. 32]  of operator ;(* Reserved             *)
   sop : array[0 .. 127] of operator ;
   na  : array[0 .. 22]  of alpha    ;(* Standard proc/func's *)
   
@@ -1229,10 +1233,18 @@ writeln ;
      icn := icn + 1
    end ;(* Bytegen *)
 
-   procedure Addrgen(addr : integer);
-  (* put addr as two bytes in codebuffer *)
+   procedure Wordgen(word : integer);
+  (* put word as two bytes in codebuffer *)
    begin
-     Bytegen(addr div 256);
+     Bytegen(word shr 8);
+     Bytegen(word mod 256)
+   end ;(* Wordgen *)
+
+   procedure Addrgen(addr : integer);
+  (* put word as two bytes in codebuffer *)
+   begin
+     addr := addr - (ic + icn);
+     Bytegen(addr shr 8);
      Bytegen(addr mod 256)
    end ;(* Addrgen *)
 
@@ -1243,37 +1255,41 @@ writeln ;
      Addrgen(word)
    end ;(* GenUJPent *)
 
-   procedure PlantAddress(location, value : integer);
+   procedure PlantWord(location, value : integer);
   (* plant value at location in code ,
       generate P2-record if loc not in codebuffer *)
    begin
-     if value <> 0
-       then
-         if(location >= ic)and(location - ic < icn)
-           then
-             begin
-              (* place in codebuffer *)
-              (* correct for offset in codebuffer *)
-               location := location - ic ;
-               codebuf[location] := value div 256 ;
-               codebuf[location + 1] := value mod 256
-             end
-           else
-             begin
-              (* Generate P2-record with location and value *)
-               WriteOut ;
-               write(objectfile, 'P2');
-               sumcheck := 0 ;
-              (* first location *)
-               HexOut(location div 256);
-               HexOut(location mod 256);
-              (* next value to be planted *)
-               HexOut(value div 256);
-               HexOut(value mod 256);
-               HexOut((16383 - sumcheck)mod 256);
-               writeln(objectfile)
-             end ;
-   end ;(* PlantAddress *)
+    if(location >= ic)and(location - ic < icn)
+      then
+        begin
+        (* place in codebuffer *)
+        (* correct for offset in codebuffer *)
+          location := location - ic ;
+          codebuf[location] := value shr 8 ;
+          codebuf[location + 1] := value mod 256
+        end
+      else
+        begin
+        (* Generate P2-record with location and value *)
+          WriteOut ;
+          write(objectfile, 'P2');
+          sumcheck := 0 ;
+        (* first location *)
+          HexOut(location shr 8);
+          HexOut(location mod 256);
+        (* next value to be planted *)
+          HexOut(value shr 8);
+          HexOut(value mod 256);
+          HexOut((16383 - sumcheck)mod 256);
+          writeln(objectfile)
+        end
+   end ;
+
+   procedure PlantAddr(location, value : integer);
+   (* plant relative address at locaiton in code. *)
+   begin
+     PlantWord(location, value - location)
+   end;
 
    procedure Skip(fsys : setofsys);
   (* Skip input chstring until relevant symbol found *)
@@ -2665,7 +2681,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
            else                          (* lda  *)
              begin
                Bytegen(32 + level);
-               Addrgen(dplmt)
+               Wordgen(dplmt)
              end
        end ;(* LDAgen *)
 
@@ -2707,7 +2723,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
               (* LES2(= $93)to LESM(= $95)*)
               (* EQU2(= $96)to EQUM(= $98)*)
                Bytegen(fop + 2);
-               Addrgen(fattr.typtr^.size)
+               Wordgen(fattr.typtr^.size)
              end
          else if fattr.typtr^.size = 1
            then
@@ -2742,12 +2758,12 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
            then
              begin
                Bytegen(176);              (* LNC *)
-               Addrgen(-value)
+               Wordgen(-value)
              end
          else
            begin
              Bytegen(160);                (* LDC *)
-             Addrgen(value)
+             Wordgen(value)
            end
        end ;(* LDCIgen *)
 
@@ -2830,12 +2846,12 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
                  then
                    begin
                      Bytegen(180);          (* inc *)
-                     Addrgen(inc)
+                     Wordgen(inc)
                    end
                  else
                    begin
                      Bytegen(179);          (* dec *)
-                     Addrgen(- inc)
+                     Wordgen(- inc)
                    end
        end ;(* INCgen *)
 
@@ -3861,7 +3877,7 @@ proc/func-ident -----(()-----! expression !-----())------>
              (* external procedure/function *)
               LDCIgen(locpar);
               Bytegen(187);               (* cap *)
-              Addrgen(fcp^.pfname)
+              Wordgen(fcp^.pfname)
             end
           else
             CallUserProcGen(locpar, fcp^.pfname);
@@ -4275,6 +4291,12 @@ proc/func-ident -----(()-----! expression !-----())------>
                       else if lop = andop
                         then
                           OPgen(lattr, 0, 163,  0  )(* and *)
+                      else if lop = shlop
+                        then
+                          OPgen(lattr, $c5, 0, 0  )(* shl *)
+                      else if lop = shrop
+                        then
+                          OPgen(lattr, $c6, 0, 0  )(* shr *)
                     end
                   else
                     gattr.typtr := nil
@@ -4530,7 +4552,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                              then
                                begin
                                  Bytegen(183);           (* mov *)
-                                 Addrgen(lattr.typtr^.size)
+                                 Wordgen(lattr.typtr^.size)
                                end
                              else
                                Store(lattr)
@@ -4539,19 +4561,19 @@ proc/func-ident -----(()-----! expression !-----())------>
                      else if(isstring(lattr.typtr))
                          and(isstring(gattr.typtr))
                        then
-       		  begin
+                    begin
                            if lattr.typtr^.size < gattr.typtr^.size
                              then
                                begin
                                  Bytegen(183);           (* mov *)
-                                 Addrgen(lattr.typtr^.size)
+                                 Wordgen(lattr.typtr^.size)
                                end
                              else
                                begin
                                 (* less to move, add blanks to end *)
                                  Bytegen(196);          (* mvb *)
-                                 Addrgen(gattr.typtr^.size);
-                                 Addrgen(lattr.typtr^.size -
+                                 Wordgen(gattr.typtr^.size);
+                                 Wordgen(lattr.typtr^.size -
                                            gattr.typtr^.size)
                                end
                          end
@@ -4559,10 +4581,10 @@ proc/func-ident -----(()-----! expression !-----())------>
                      else if(isstring(lattr.typtr))
                          and(gattr.typtr = charptr)
                        then
-       		  begin
+                    begin
                            Bytegen(196);          (* mvb *)
-                           Addrgen(1);
-                           Addrgen(lattr.typtr^.size - 1)
+                           Wordgen(1);
+                           Wordgen(lattr.typtr^.size - 1)
                          end
                        else
                          Error(129)
@@ -4625,15 +4647,15 @@ if ->--!expression!--(then)--!statement!--!                     -->
                icix2 := ic + icn ;
                GenUJPent(178 , 0);    (* ujp *)
               (* fill in address of cond jump if result is false *)
-               PlantAddress( icix1, ic + icn);
+               PlantAddr( icix1, ic + icn);
                InSymbol ;
                Statement(fsys);
               (* we know now end of else part *)
-               PlantAddress(icix2 + 1, ic + icn)
+               PlantAddr(icix2 + 1, ic + icn)
              end
            else
             (* no else part, fill in conditional jump address *)
-             PlantAddress(icix1, ic + icn)
+             PlantAddr(icix1, ic + icn)
         end ;(* IfStatement *)
 
        procedure CaseStatement ;
@@ -4758,7 +4780,7 @@ case->----! expression !---(OF)---->---
              then
                InSymbol ;
          until test or(sy = endsy)or(sy = elsesy);
-         PlantAddress(lcix + 1 , ic + icn);
+         PlantAddr(lcix + 1 , ic + icn);
          if fstptr <> nil
            then
              begin
@@ -4774,14 +4796,14 @@ case->----! expression !---(OF)---->---
                until lpt1 = nil ;
                lmin := fstptr^.cslab ;
                Bytegen(182) ;         (* CAS *)
-               Addrgen(lmin);
-               Addrgen(lmax);
+               Wordgen(lmin);
+               Wordgen(lmax);
                lcix1 := ic + icn ;
-               Addrgen(0);
+               Wordgen(0);
                repeat
                  while fstptr ^.cslab > lmin do
                    begin
-                     Addrgen(0);
+                     Wordgen(0);
                      lmin := lmin + 1 ;
                    end ;
                  Addrgen(fstptr^.csstart);
@@ -4795,13 +4817,13 @@ case->----! expression !---(OF)---->---
            then
              begin
                InSymbol ;
-               PlantAddress(lcix1, ic + icn);
+               PlantAddr(lcix1, ic + icn);
                repeat
                  Statement(fsys +[semicolon])
                until not(sy in statbegsys);
                GenUJPent(178 , lcix + 3)
              end ;
-         PlantAddress(lcix + 4, ic + icn);
+         PlantAddr(lcix + 4, ic + icn);
          Intest(endsy, 13)
 
        end ;(* CaseStatement *)
@@ -4868,7 +4890,7 @@ while ->----! expression !---------(do)----!statement !--->
         (* Unconditional jump back to begin of loop *)
          GenUJPent(178, laddr);    (* ujp *)
         (* address for jump out of loop now known *)
-         PlantAddress(lcix + 1 , ic + icn);
+         PlantAddr(lcix + 1 , ic + icn);
        end ;(* WhileStatement *)
 
        procedure ForStatement ;
@@ -4996,7 +5018,7 @@ for ->--! var-ident !--(:=)---! expression !--->
         (* statement *)
          Statement(fsys);
         (* now we know address of end of for loop *)
-         PlantAddress(laddr + 1 , ic + icn);
+         PlantAddr(laddr + 1 , ic + icn);
          GenUJPent(145 , laddr + 3) ;            (* for *)
        end ;(* ForStatement *)
 
@@ -5102,7 +5124,7 @@ for ->--! var-ident !--(:=)---! expression !--->
                              Bytegen(96);(* LOD *)
                              Bytegen(llc1);
                              Bytegen(183);    (* mov *)
-                             Addrgen(lcp^.idtype^.size)
+                             Wordgen(lcp^.idtype^.size)
                            end
                      end
                    else
@@ -5122,7 +5144,7 @@ for ->--! var-ident !--(:=)---! expression !--->
      until test ;
      Intest(endsy, 13);
      Bytegen(161);               (* retp *)
-     PlantAddress(segsize + 1 , lcmax - lcaftermarkstack);
+     PlantWord(segsize + 1 , lcmax - lcaftermarkstack);
    end ;(* body *)
 
  begin(* Block*)
@@ -5523,26 +5545,27 @@ procedure Initialize ;
    rw[ 6] := 'end     ' ; rw[ 7] := 'for     ' ;
    rw[ 8] := 'var     ' ; rw[ 9] := 'div     ' ;
    rw[10] := 'mod     ' ; rw[11] := 'set     ' ;
-   rw[12] := 'and     ' ; rw[13] := 'not     ' ;
-   rw[14] := 'then    ' ; rw[15] := 'else    ' ;
-   rw[16] := 'type    ' ; rw[17] := 'case    ' ;
-   rw[18] := 'begin   ' ; rw[19] := 'until   ' ;
-   rw[20] := 'while   ' ; rw[21] := 'array   ' ;
-   rw[22] := 'const   ' ; rw[23] := 'repeat  ' ;
-   rw[24] := 'record  ' ; rw[25] := 'packed  ' ;
-   rw[26] := 'extern  ' ; rw[27] := 'downto  ' ;
-   rw[28] := 'forward ' ; rw[29] := 'program ' ;
-   rw[30] := 'function' ; rw[31] := 'procedur' ;
-   rw[32] := 'otherwis' ;
+   rw[12] := 'shl     ' ; rw[13] := 'shr     ' ;
+   rw[14] := 'and     ' ; rw[15] := 'not     ' ;
+   rw[16] := 'then    ' ; rw[17] := 'else    ' ;
+   rw[18] := 'type    ' ; rw[19] := 'case    ' ;
+   rw[20] := 'begin   ' ; rw[21] := 'until   ' ;
+   rw[22] := 'while   ' ; rw[23] := 'array   ' ;
+   rw[24] := 'const   ' ; rw[25] := 'repeat  ' ;
+   rw[26] := 'record  ' ; rw[27] := 'packed  ' ;
+   rw[28] := 'extern  ' ; rw[29] := 'downto  ' ;
+   rw[30] := 'forward ' ; rw[31] := 'program ' ;
+   rw[32] := 'function' ; rw[33] := 'procedur' ;
+   rw[34] := 'otherwis' ;
    frw[0] := 0   ;
    frw[1] := 0   ;
    frw[2] := 6   ;
-   frw[3] := 14  ;
-   frw[4] := 18  ;
-   frw[5] := 23  ;
-   frw[6] := 28  ;
-   frw[7] := 30  ;
-   frw[8] := 33  ;
+   frw[3] := 16  ;
+   frw[4] := 20  ;
+   frw[5] := 25  ;
+   frw[6] := 30  ;
+   frw[7] := 32  ;
+   frw[8] := 35  ;
   (* Initialize symbols *)
    rsy[ 0] := ifsy      ; rsy[ 1] := dosy     ;
    rsy[ 2] := ofsy      ; rsy[ 3] := relop    ;
@@ -5550,25 +5573,23 @@ procedure Initialize ;
    rsy[ 6] := endsy     ; rsy[ 7] := forsy    ;
    rsy[ 8] := varsy     ; rsy[ 9] := mulop    ;
    rsy[10] := mulop     ; rsy[11] := setsy    ;
-   rsy[12] := mulop     ; rsy[13] := notsy    ;
-   rsy[14] := thensy    ; rsy[15] := elsesy   ;
-   rsy[16] := typesy    ; rsy[17] := casesy   ;
-   rsy[18] := beginsy   ; rsy[19] := untilsy  ;
-   rsy[20] := whilesy   ; rsy[21] := arraysy  ;
-   rsy[22] := constsy   ; rsy[23] := repeatsy ;
-   rsy[24] := recordsy  ; rsy[25] := packedsy ;
-   rsy[26] := externsy  ; rsy[27] := downtosy ;
-   rsy[28] := forwardsy ; rsy[29] := progsy   ;
-   rsy[30] := funcsy    ; rsy[31] := procsy   ;
-   rsy[32] := elsesy    ;
-   write(9);
+   rsy[12] := mulop     ; rsy[13] := mulop    ;
+   rsy[14] := mulop     ; rsy[15] := notsy    ;
+   rsy[16] := thensy    ; rsy[17] := elsesy   ;
+   rsy[18] := typesy    ; rsy[19] := casesy   ;
+   rsy[20] := beginsy   ; rsy[21] := untilsy  ;
+   rsy[22] := whilesy   ; rsy[23] := arraysy  ;
+   rsy[24] := constsy   ; rsy[25] := repeatsy ;
+   rsy[26] := recordsy  ; rsy[27] := packedsy ;
+   rsy[28] := externsy  ; rsy[29] := downtosy ;
+   rsy[30] := forwardsy ; rsy[31] := progsy   ;
+   rsy[32] := funcsy    ; rsy[33] := procsy   ;
+   rsy[34] := elsesy    ;
    for i :=0 to 127 do
      begin
-     writeln(i);
        ssy[i]  := othersy ;
        sop[i]  := noop
      end ;
-     write(8);
    ssy[ord('+')] := addop     ;
    ssy[ord('-')] := addop     ;
    ssy[ord('*')] := mulop     ;
@@ -5595,7 +5616,9 @@ procedure Initialize ;
    rop[ 4] := orop  ;
    rop[ 9] := idiv  ;
    rop[10] := imod  ;
-   rop[12] := andop ;
+   rop[12] := shlop ;
+   rop[13] := shrop ;
+   rop[14] := andop ;
    sop[ord('+')] := plus  ;
    sop[ord('-')] := minus ;
    sop[ord('*')] := mul   ;
