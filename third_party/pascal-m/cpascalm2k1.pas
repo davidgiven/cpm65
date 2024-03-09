@@ -363,12 +363,12 @@ var
   na  : array[0 .. 23]  of alpha    ;(* Standard proc/func's *)
   
   (* Used by the compiler driver itself. *)
-  sourcefile, objectfile,listfile, errorfile : text ;
+  sourcefile, objectfile,listfile, errorfile : ^text ;
   filename, namefile :  alphastring ;
   ShowErrors : boolean ;
 
   procedure EndLinelist  ;
-  (* Ends line on listfile, takes care of pages, headings etc *)
+  (* Ends line on listfile^, takes care of pages, headings etc *)
   begin
   {
     listlines := listlines + 1 ;
@@ -377,12 +377,12 @@ var
        then
          begin
           (* writeformfeed and header *)
-           writeln(listfile);
-           write(listfile, 'Pascal-M V1.4 Source listing     ');
-           write(listfile, sourcename);
-           writeln(listfile, '               Page ', listpages:4);
-           writeln(listfile);
-           writeln(listfile);
+           writeln(listfile^);
+           write(listfile^, 'Pascal-M V1.4 Source listing     ');
+           write(listfile^, sourcename);
+           writeln(listfile^, '               Page ', listpages:4);
+           writeln(listfile^);
+           writeln(listfile^);
            listpages := listpages + 1 ;
            listlines := 3
          end ;
@@ -394,16 +394,16 @@ var
    kar : char ;
 (* reads line from source into line *)
    begin
-    if eof(sourcefile)
+    if eof(sourcefile^)
       then
          begin
-           writeln(errorfile) ;
-           writeln(errorfile,'Premature end of source file');
+           writeln(errorfile^) ;
+           writeln(errorfile^,'Premature end of source file');
            EndLineList ;
-           writeln(listfile);
+           writeln(listfile^);
            EndLineList ;
-           writeln(listfile,'Premature end of source file');
-           writeln(objectfile,'P1010000');
+           writeln(listfile^,'Premature end of source file');
+           writeln(objectfile^,'P1010000');
            errflag := true ;
          end
       else
@@ -411,31 +411,31 @@ var
           linelength := 0 ;
           linecount := linecount + 1 ;
           EndLineList ;
-          { write(listfile, linecount:4, ': '); }
-          while(NOT eoln(sourcefile))and
+          { write(listfile^, linecount:4, ': '); }
+          while(NOT eoln(sourcefile^))and
                (linelength < maxchcnt)do
             begin
               linelength := linelength + 1 ;
               {
-              if status(sourcefile)<> 0
+              if status(sourcefile^)<> 0
                 then
                   begin
-                    writeln(errorfile);
+                    writeln(errorfile^);
                     writeln('Premature end of source file');
                     EndLineList ;
-                    writeln(listfile);
+                    writeln(listfile^);
                     EndLineList ;
-                    writeln(listfile,'Premature end of source file');
-                    writeln(objectfile,'P1010000');
+                    writeln(listfile^,'Premature end of source file');
+                    writeln(objectfile^,'P1010000');
                     linelength := $EXIT
                   end ;
               }
-              read(sourcefile, kar);
-              { write(listfile, kar)  ; }
+              read(sourcefile^, kar);
+              { write(listfile^, kar)  ; }
               line[linelength] := kar ;
             end ;
-          readln(sourcefile);
-          { writeln(listfile); }
+          readln(sourcefile^);
+          { writeln(listfile^); }
           chcnt := 0 ;
           linpos := 0
         end ;
@@ -455,14 +455,14 @@ procedure EndLine ;
     IF errinx > 0
       then
         begin
-          writeln(errorfile) ;
+          writeln(errorfile^) ;
           EndLineList ;
-          write(errorfile, ' ', linecount:4, ': ' ) ;
+          write(errorfile^, ' Errors at ', linecount:4, ': ' ) ;
           for k := 1 to linelength DO
-            write(errorfile, line [ k ] ) ;
-          writeln(errorfile) ;
-          write(errorfile,' **** ') ;
-          write(listfile, ' **** ') ;
+            write(errorfile^, line [ k ] ) ;
+          writeln(errorfile^) ;
+          write(errorfile^,' **** ') ;
+          write(listfile^, ' **** ') ;
           lastpos := 0 ;
           freepos := 1 ;
           for k :=1 to errinx DO
@@ -472,19 +472,19 @@ procedure EndLine ;
               IF currpos <= lastpos
                 then
                   begin
-                    write(errorfile,',')  ;
-                    write(listfile, ',')
+                    write(errorfile^,',')  ;
+                    write(listfile^, ',')
                   END
                 else
                   begin
                     while  freepos < currpos DO
                       begin
-                        write(errorfile,' ') ;
-                        write(listfile, ' ') ;
+                        write(errorfile^,' ') ;
+                        write(listfile^, ' ') ;
                         freepos := freepos + 1 ;
                       end ;
-                    write(errorfile,'^') ;
-                    write(listfile, '^') ;
+                    write(errorfile^,'^') ;
+                    write(listfile^, '^') ;
                     lastpos := currpos ;
                   end ;
                 IF currnmr < 10
@@ -496,20 +496,20 @@ procedure EndLine ;
                         f := 2
                       else
                         f := 3 ;
-                write(errorfile, currnmr:f) ;
-                write(listfile, currnmr:f) ;
+                write(errorfile^, currnmr:f) ;
+                write(listfile^, currnmr:f) ;
                 freepos := freepos + f + 1 ;
             end ;
-          writeln (listfile ) ;
-          writeln(errorfile) ;
+          writeln (listfile^ ) ;
+          writeln(errorfile^) ;
           (* Display the meaning of the error-numbers *)
-          writeln(listfile, 'Errors on line: ', errlist[1].pos);
+          writeln(listfile^, 'Errors on line: ', errlist[1].pos);
           for k := 1 to errinx DO
             begin
               currnmr := errlist[k].nmr ;
               EndLineList ;
-              writeln (errorfile, ' ':11, currnmr:3, ' = ',cmperror[currnmr] ) ;
-              writeln ( listfile, ' ':13, currnmr:3, ' = ',cmperror[currnmr])
+              writeln (errorfile^, ' ':11, currnmr:3, ' = ',cmperror[currnmr] ) ;
+              writeln ( listfile^, ' ':13, currnmr:3, ' = ',cmperror[currnmr])
             end ;
           errinx := 0 ;
         END
@@ -1180,14 +1180,14 @@ writeln ;
    word := word mod 16 ;
    if k < 10
      then
-       write(objectfile, chr(ord('0')+ k))
+       write(objectfile^, chr(ord('0')+ k))
      else
-       write(objectfile, chr(ord('A')+ k - 10));
+       write(objectfile^, chr(ord('A')+ k - 10));
    if word < 10
      then
-       write(objectfile, chr(ord('0')+ word))
+       write(objectfile^, chr(ord('0')+ word))
      else
-       write(objectfile, chr(ord('A')+ word  - 10));
+       write(objectfile^, chr(ord('A')+ word  - 10));
  end ;(* HexOut *)
 
  procedure WriteOut ;
@@ -1199,13 +1199,13 @@ writeln ;
    if icn <> 0
      then
        begin
-         write(objectfile, 'P1');
+         write(objectfile^, 'P1');
          sumcheck := 0 ;
          HexOut(icn + 1);
          for i := 0 to icn - 1 do
            HexOut(codebuf[i]);
          HexOut((16383 - sumcheck)mod 256);
-         writeln(objectfile)
+         writeln(objectfile^)
        end ;
    ic := ic + icn ;
    icn := 0
@@ -1268,7 +1268,7 @@ writeln ;
         begin
         (* Generate P2-record with location and value *)
           WriteOut ;
-          write(objectfile, 'P2');
+          write(objectfile^, 'P2');
           sumcheck := 0 ;
         (* first location *)
           HexOut(location shr 8);
@@ -1277,7 +1277,7 @@ writeln ;
           HexOut(value shr 8);
           HexOut(value mod 256);
           HexOut((16383 - sumcheck)mod 256);
-          writeln(objectfile)
+          writeln(objectfile^)
         end
    end ;
 
@@ -2130,12 +2130,12 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
        then
          begin
            Error(117);
-           writeln(errorfile) ;
-           writeln(listfile);
+           writeln(errorfile^) ;
+           writeln(listfile^);
            repeat
-             writeln(errorfile,' type-id ', fwptr^.name);
+             writeln(errorfile^,' type-id ', fwptr^.name);
              EndLineList ;
-             writeln(listfile, ' type-id ', fwptr^.name);
+             writeln(listfile^, ' type-id ', fwptr^.name);
              fwptr := fwptr^.next
            until fwptr = nil ;
          end
@@ -2213,12 +2213,12 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
        then
          begin
            Error(118);
-           writeln(errorfile) ;
-           writeln(listfile);
+           writeln(errorfile^) ;
+           writeln(listfile^);
            repeat
-             writeln(errorfile, 'type-id ', fwptr^.name);
+             writeln(errorfile^, 'type-id ', fwptr^.name);
              EndLineList ;
-             writeln(listfile, 'type-id ', fwptr^.name);
+             writeln(listfile^, 'type-id ', fwptr^.name);
              fwptr := fwptr^.next ;
            until fwptr = nil ;
          end
@@ -3261,39 +3261,6 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
          Selector(fsys, lcp)
        end ;(* Variable *)
 
-       function CheckFileAddress: boolean;
-      (* Checks if first argument supplied in read or write
-          is a file-identifier.
-          If declared(as variable or predeclared input or output)
-          then the the address of it is pushed. *)
-          var
-            fcp : identptr ;
-          begin
-            fcp := nil ;
-            CheckFileAddress := false ;
-            if sy = ident
-              then
-                begin
-                  prterr := false ;
-                  Searchid([vars], fcp);
-                  prterr := true ;
-                  if fcp <> nil
-                    then
-                      if fcp^.idtype <> nil
-                        then
-                          if fcp^.idtype^.form = files
-                            then
-                              begin
-                                Expression(fsys +[comma, colon, rparent]);
-                                LoadAddress;
-                                CheckFileAddress := true;
-                                if sy = comma
-                                  then
-                                    Insymbol
-                              end
-              end
-           end ;(* CheckFileAddress *)
-
        procedure ReadProc ;
       (* Generate code for standard procedure Read and Readln
 
@@ -3330,21 +3297,35 @@ read -->----------------( ( )----( file-ident )------          !
              end
            else
              begin
-               InSymbol ;
-               if (not CheckFileAddress)
-                 then
-                   LDCIGen(1) ; (* default to input *)
-              (* Set file address instruction *)
-               ByteGen(194);
-               if sy = ident
-                 then
-                   begin
-                     repeat
-                       Variable(fsys +[comma,rparent]);
+                Intest(lparent, 9);
+                Expression(fsys +[comma, rparent]);
+                if gattr.typtr^.form <> files then
+                begin
+                  (* The first expression is not a file type, which means it
+                  must be something to write out. Default to output. *)
+                  LDCIGen(2);
+                  ByteGen(194); (* SFA *)
+                end
+                else
+                begin
+                  (* The first parameter is a file type, which means it's the
+                  destination stream. *)
+                  LoadAddress;
+                  ByteGen(194); (* SFA *)
+                  if (sy = comma) then
+                  begin
+                  InSymbol;
+                  Expression(fsys +[comma, rparent])
+                  end
+                end;
+                    while (sy <> rparent) do
+                    begin
+                      if (gattr.kind <> varbl) then
+                         Error(154);
                       (* place address of variable
                           on stack for rdc or rdi *)
                        LoadAddress ;
-                       if gattr.typtr <> nil
+                       if (gattr.typtr <> nil)
                          then
                            begin
                              if gattr.typtr^.form <= subrange
@@ -3366,12 +3347,13 @@ read -->----------------( ( )----( file-ident )------          !
                          else
                           (* error in type of standard procedure *)
                            Error(116);
-                      test := sy <> comma ;
-                      if not test
-                        then
-                          InSymbol
-                    until test ;
-                  end ;
+
+                      if (sy = comma) then
+                      begin
+                        InSymbol;
+                        Expression(fsys +[comma, rparent]);
+                      end
+                    end;
                Intest(rparent, 4)
              end  ;
            if lkey = 5
@@ -3423,93 +3405,109 @@ v                                                             !
            else
              begin
                InSymbol ;
-               if (not CheckFileAddress)
-                 then
-                   LDCIGen(2); (* default to output *)
-              (* Set file address instruction *)
-               ByteGen(194);
-               if sy in facbegsys
-                then
+                Expression(fsys +[comma, colon, rparent]);
+                if gattr.typtr^.form <> files then
+                begin
+                  (* The first expression is not a file type, which means it
+                  must be something to write out. Default to output. *)
+                  LDCIGen(2);
+                  ByteGen(194); (* SFA *)
+                end
+                else
+                begin
+                  (* The first parameter is a file type, which means it's the
+                  destination stream. *)
+                  LoadAddress;
+                  ByteGen(194); (* SFA *)
+                  if sy <> rparent then
                   begin
-                    repeat
-                      Expression(fsys +[comma, colon, rparent]);
-                      lsp := gattr.typtr ;
-                      if lsp <> nil
-                        then
-                         (* put variable or address of
-                             variable on stack *)
-                          if lsp^.form <= subrange
-                            then
-                              Load
-                            else
-                              LoadAddress ;
-                     (* if colon then no default, load
-                         expression as nr of characters *)
-                      if sy = colon
-                        then
-                          begin
-                            InSymbol ;
-                            Expression(fsys +[comma, rparent]);
-                            if gattr.typtr <> nil
+                    InSymbol;
+                    Expression(fsys +[comma, colon, rparent]);
+                  end
+                end;
+                  begin
+                    if sy <> rparent then
+                      repeat
+                        lsp := gattr.typtr ;
+                        if lsp <> nil
+                          then
+                          (* put variable or address of
+                              variable on stack *)
+                            if lsp^.form <= subrange
                               then
-                                begin
-                                  if not Comptypes(gattr.typtr,intptr)
-                                    then
-                                      Error(116)
-                                end
+                                Load
                               else
-                                Error(116);
-                            Load ;
-                            default := false
-                          end
-                        else
-                          default := true ;
-                      if Comptypes(lsp, intptr)
-                        then
+                                LoadAddress ;
+                      (* if colon then no default, load
+                          expression as nr of characters *)
+                        if sy = colon
+                          then
+                            begin
+                              InSymbol ;
+                              Expression(fsys +[comma, rparent]);
+                              if gattr.typtr <> nil
+                                then
+                                  begin
+                                    if not Comptypes(gattr.typtr,intptr)
+                                      then
+                                        Error(116)
+                                  end
+                                else
+                                  Error(116);
+                              Load ;
+                              default := false
+                            end
+                          else
+                            default := true ;
+                        if Comptypes(lsp, intptr)
+                          then
+                            begin
+                              if default
+                                then
+                                (* default integer in 6 char field *)
+                                  LDCIgen(6);
+                              CSPgen(0)        (* wri *)
+                            end
+                        else if Comptypes(lsp, charptr)
+                          then
+                            begin
+                              if default
+                                then
+                                (* default character in 1 char field *)
+                                  LDCIgen(1);
+                              CSPgen(1)        (* wrc *)
+                            end
+                        else if lsp <> nil
+                          then
+                            begin
+                              if lsp^.form = scalar
+                                then
+                                  Error(177)
+                              else if IsString(lsp)
+                                then
+                                  begin
+                                    len := lsp^.size ;
+                                    if default
+                                      then
+                                      (* default length of string *)
+                                        LDCIgen(len);
+                                    LDCIgen(len);
+                                    CSPgen(2)   (* wrs *)
+                                  end
+                              else
+                                Error(116)
+                            end ;
+                        test := sy <> comma ;
+                        if not test
+                          then
                           begin
-                            if default
-                              then
-                               (* default integer in 6 char field *)
-                                LDCIgen(6);
-                            CSPgen(0)        (* wri *)
-                          end
-                      else if Comptypes(lsp, charptr)
-                        then
-                          begin
-                            if default
-                              then
-                               (* default character in 1 char field *)
-                                LDCIgen(1);
-                            CSPgen(1)        (* wrc *)
-                          end
-                      else if lsp <> nil
-                        then
-                          begin
-                            if lsp^.form = scalar
-                              then
-                                Error(177)
-                            else if IsString(lsp)
-                              then
-                                begin
-                                  len := lsp^.size ;
-                                  if default
-                                    then
-                                     (* default length of string *)
-                                      LDCIgen(len);
-                                  LDCIgen(len);
-                                  CSPgen(2)   (* wrs *)
-                                end
-                            else
-                              Error(116)
-                          end ;
-                      test := sy <> comma ;
-                      if not test
-                        then
-                          InSymbol
-                    until test ;
+                            InSymbol;
+                            Expression(fsys +[comma, colon, rparent])
+                          end;
+                      until test ;
                   end ;
                 Intest(rparent, 4)
-             end ;
+              end;
         if llkey = 6
           then
             CSPgen(6)                    (* wln *)
@@ -3694,10 +3692,16 @@ v                                                             !
           then
             begin
               Insymbol ;
-              if (not CheckFileaddress)
-                then
-                  LDCIGen(1); (* default to input *)
-              InTest(rparent,4)
+              if sy = rparent then
+                  LDCIGen(1) (* default to input *)
+              else
+              begin
+                Expression(fsys +[rparent]);
+                if gattr.typtr^.form <> files then
+                  Error(22);
+                LoadAddress;
+                InTest(rparent,4)
+              end;
             end ;
         ByteGen(194);                (* SFA *)
         if lkey = 8
@@ -5036,15 +5040,15 @@ for ->--! var-ident !--(:=)---! expression !--->
     (* empty code buffer *)
      WriteOut ;
      sumcheck := 0 ;
-     write(objectfile,'P4');
+     write(objectfile^,'P4');
      HexOut(entname);
      for i := 1 to 8 do
        begin
-         write(objectfile, fprocp^.name[i]);
+         write(objectfile^, fprocp^.name[i]);
          sumcheck := sumcheck + ord(fprocp^.name[i])
        end ;
      HexOut((16383 - sumcheck)mod 256);
-     writeln(objectfile);
+     writeln(objectfile^);
     (* remember where to put nr of bytes for local variables *)
      segsize := ic + icn ;
      GenUJPent(181 , 0);              (* ENT *)
@@ -5281,24 +5285,23 @@ for ->--! var-ident !--(:=)---! expression !--->
            cp^.key := i - 14 ;
        Enterid(cp)
      end ;
-     {
   (* files input and output and keyboard *)
    new(cp);
-   cp^.name := 'input   ' ;
+   cp^.name := 'input' ;
    cp^.idtype := fileptr ;
    cp^.next := nil ;
    cp^.klass := vars ;
    cp^.vkind := actual ;
-   cp^.vaddr := 1 ;       (* filenumber 1 = input *)
+   cp^.vaddr := $ff01 ;       (* ff01 = input *)
    cp^.vlev := 0 ;
    Enterid(cp);
    new(cp);
-   cp^.name := 'output  ' ;
+   cp^.name := 'output' ;
    cp^.idtype := fileptr ;
    cp^.next := nil ;
    cp^.klass := vars ;
    cp^.vkind := actual ;
-   cp^.vaddr := 2 ;       (* filenumber 2 = output *)
+   cp^.vaddr := $ff02 ;       (* ff02 = output *)
    cp^.vlev := 0 ;
    Enterid(cp);
    new(cp);
@@ -5307,10 +5310,9 @@ for ->--! var-ident !--(:=)---! expression !--->
    cp^.next := nil ;
    cp^.klass := vars ;
    cp^.vkind := actual ;
-   cp^.vaddr := 3 ;       (* filenumber 3 = keyboard *)
+   cp^.vaddr := $ff03 ;       (* ff03 = keyboard *)
    cp^.vlev := 0 ;
    Enterid(cp);
-   }
   end ;(* Enterstnames *)
 
  procedure Enterundecl ;
@@ -5628,7 +5630,7 @@ begin
   Initialize ;
   sourcename := filename ;
   {
-  writeln(errorfile, 'Compilation of ',filename) ;
+  writeln(errorfile^, 'Compilation of ',filename) ;
   }
 
   (* Compile program-heading *)
@@ -5641,24 +5643,24 @@ begin
   if errflag
     then
       begin
-        writeln(errorfile,'Compilation errors ', filename ) ;
+        writeln(errorfile^,'Compilation errors ', filename ) ;
         EndLineList ;
-        { writeln(listfile); }
-        writeln(errorfile,' Pascal-M Compilation : ', errtot:4,' errors ');
+        { writeln(listfile^); }
+        writeln(errorfile^,' Pascal-M Compilation : ', errtot:4,' errors ');
         EndLineList ;
-        { write(listfile, ' Pascal-M Compilation : '); }
-        { writeln(listfile, errtot:4,' errors '); }
-        writeln(objectfile,'P1010000');
+        { write(listfile^, ' Pascal-M Compilation : '); }
+        { writeln(listfile^, errtot:4,' errors '); }
+        writeln(objectfile^,'P1010000');
         CompilePascalM := false ;
       end
     else
       begin
         EndLineList ;
-        { writeln(listfile); }
-        { writeln(errorfile,'No compilation errors ', filename ) ; }
+        { writeln(listfile^); }
+        { writeln(errorfile^,'No compilation errors ', filename ) ; }
         EndLineList ;
-        { writeln(listfile, ' Pascal-M Compilation successful'); }
-        writeln(objectfile, 'P9');
+        { writeln(listfile^, ' Pascal-M Compilation successful'); }
+        writeln(objectfile^, 'P9');
         CompilePascalM := true ;
       end ;
 end ;
@@ -5683,8 +5685,8 @@ end ;
         (namefile = '-h')
     then
       begin
-        writeln('Syntax: cpascalm2k1 <sourcefile> [V]');
-        writeln('produces sourcefile.err (status) and sourcefile.obp (object) files') ;
+        writeln('Syntax: cpascalm2k1 <sourcefile^> [V]');
+        writeln('produces sourcefile^.err (status) and sourcefile^.obp (object) files') ;
         writeln('V shows errors on console') ;
         halt(1)
       end;
@@ -5693,19 +5695,19 @@ end ;
       { open file }
       (* 
       filename := namefile ;
-      assign (sourcefile, filename);
-      reset(sourcefile) ;
+      assign (sourcefile^, filename);
+      reset(sourcefile^) ;
 
      dot := pos('.', filename);
      namefile := concat(copy(filename, 1, dot), 'obp');
-     assign (objectfile, namefile) ;
-     rewrite(objectfile) ;
+     assign (objectfile^, namefile) ;
+     rewrite(objectfile^) ;
      namefile := concat(copy(filename, 1, dot), 'lst');
-     assign( listfile, namefile) ;
-     rewrite(listfile) ;
+     assign( listfile^, namefile) ;
+     rewrite(listfile^) ;
      namefile := concat(copy(filename, 1, dot), 'err');
-     assign( errorfile, namefile) ;
-     rewrite(errorfile) ;
+     assign( errorfile^, namefile) ;
+     rewrite(errorfile^) ;
      ShowErrors := false ;
      if paramcount > 1
        then
@@ -5714,41 +5716,45 @@ end ;
              ShowErrors := true ;
              *)
 
-    assign(sourcefile, '/dev/stdin');
-    reset(sourcefile);
+    new(sourcefile);
+    assign(sourcefile^, '/dev/stdin');
+    reset(sourcefile^);
 
-    assign(objectfile, '/dev/stdout');
-    rewrite(objectfile);
+    new(objectfile);
+    assign(objectfile^, '/dev/stdout');
+    rewrite(objectfile^);
 
-    assign(listfile, '/dev/stdout');
-    rewrite(listfile);
+    new(listfile);
+    assign(listfile^, '/dev/stdout');
+    rewrite(listfile^);
 
-    assign(errorfile, '/dev/stderr');
-    rewrite(errorfile);
+    new(errorfile);
+    assign(errorfile^, '/dev/stderr');
+    rewrite(errorfile^);
    end ; (* OpenFiles *)
 
 procedure CloseFiles ;
   begin
-    close(sourcefile) ;
-    write(objectfile, chr(26));
-    close(objectfile) ;
-    close(listfile) ;
-    close(errorfile) ;
+    close(sourcefile^) ;
+    write(objectfile^, chr(26));
+    close(objectfile^) ;
+    close(listfile^) ;
+    close(errorfile^) ;
   end  ; (* CloseFiles *)
 
-procedure DumpErrorFile ;
+procedure Dumperrorfile ;
 var
   line : alphastring ;
 begin
 (*
-  assign( errorfile, namefile) ;
-  reset(errorfile) ;
-  while not eof(errorfile) do
+  assign( errorfile^, namefile) ;
+  reset(errorfile^) ;
+  while not eof(errorfile^) do
     begin
-      readln(errorfile, line) ;
+      readln(errorfile^, line) ;
       writeln(line)
     end;
-  close(errorfile) ;
+  close(errorfile^) ;
   *)
 end;
 
@@ -5760,6 +5766,6 @@ begin (* main Mpascal *)
    CloseFiles ;
   if ShowErrors
     then
-      DumpErrorfile ;
+      Dumperrorfile ;
 end.
 
