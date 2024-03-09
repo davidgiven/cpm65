@@ -1,4 +1,4 @@
-﻿program cpascalm2k1 ;
+program cpascalm2k1 ;
 
   { Compiles Pascal-M program to Px record object }
 
@@ -105,7 +105,7 @@ const
   lcaftermarkstack =     6 ;(* stack frame for interpreter *)
   maxint           = 32767 ;(* 16-bit's two's complement machine *)
   setmax           =    63 ;(* set has maximal 63 members *)
-  maxstandrd       =    12 ;(* number of standard functions/procedures *)
+  maxstandrd       =    13 ;(* number of standard functions/procedures *)
   maxcode          =    29 ;(* codebuffer maximum 30 bytes *)
   maxpage          =    56 ;(* maximum number of lines on listing file *)
   maxfiles         =     7 ;(* maximum number of files in use total *)
@@ -5277,7 +5277,7 @@ begin
   cp^.next := nil ;
   cp^.klass := vars ;
   cp^.vkind := actual ;
-  cp^.vaddr := $ff01 ;       (* ff01 = input *)
+  cp^.vaddr := 1 ;       (* 1 = input *)
   cp^.vlev := 0 ;
   Enterid(cp);
   new(cp);
@@ -5286,7 +5286,7 @@ begin
   cp^.next := nil ;
   cp^.klass := vars ;
   cp^.vkind := actual ;
-  cp^.vaddr := $ff02 ;       (* ff02 = output *)
+  cp^.vaddr := 2 ;       (* 2 = output *)
   cp^.vlev := 0 ;
   Enterid(cp);
   new(cp);
@@ -5295,7 +5295,7 @@ begin
   cp^.next := nil ;
   cp^.klass := vars ;
   cp^.vkind := actual ;
-  cp^.vaddr := $ff03 ;       (* ff03 = keyboard *)
+  cp^.vaddr := 3 ;       (* 3 = keyboard *)
   cp^.vlev := 0 ;
   Enterid(cp);
 end ;(* Enterstnames *)
@@ -5580,7 +5580,6 @@ end ;(* Initialize *)
 
 
 procedure CompileHeading ;
-
 begin
   BeginLine ;
   InSymbol ;
@@ -5591,9 +5590,8 @@ begin
   progptr^.pfdeckind := declared ;
   progptr^.pfname := 0 ;
   progptr^.name := '        ' ;
-  if sy = progsy
-  then
-    begin
+  if sy = progsy then
+  begin
     (* program name *)
     InSymbol ;
     if sy <> ident
