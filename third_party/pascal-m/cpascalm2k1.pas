@@ -3626,9 +3626,9 @@ v                                                             !
             end ;
         if llkey = 7
           then
-            CSPGEN(13)      (* Reset RSF *)
+            CSPGEN(13)      (* reset file *)
           else
-            CSPGEN(14);     (* RewriteRWW *)
+            CSPGEN(14);     (* rewrite file *)
       end ;(* ResetRewriteProc *)
 
       procedure CloseProc ;
@@ -3646,7 +3646,7 @@ v                                                             !
             end ;
         LDCIGen(fileaddr);
         ByteGen(194);                (* SFA *)
-        CSPGEN(16)                   (* CLO *)
+        CSPGEN(16)                   (* close file *)
       end ;(* CloseProc *)
 
       procedure OrdFunc ;
@@ -3743,16 +3743,16 @@ v                                                             !
           then
             begin
               gattr.typtr := intptr ;
-              CSPGEN(15)             (* STT *)
+              CSPGEN(15)             (* get file status *)
             end
           else
             begin
               gattr.typtr := boolptr ;
               if lkey = 6
                 then
-                  CSPgen(10)         (* eoln *)
+                  CSPgen(10)         (* test if end of line *)
                 else
-                  CSPgen(8);         (* eof *)
+                  CSPgen(8);         (* test if end of file *)
             end
       end ;(* EofEolnStatusFunc *)
 
@@ -5492,7 +5492,7 @@ procedure FillErrorMessages ;
    cmperror[161] := 'Again forward declared                  ' ;
    cmperror[169] := 'SET element not in range 0 .. 63        ' ;
    cmperror[170] := 'String constant must not exceed one line' ;
-   cmperror[171] := 'Integer constant exceeds range(32767) ' ;
+   cmperror[171] := 'Integer constant exceeds range(32767)   ' ;
    cmperror[172] := 'Too many nested scopes of identifiers   ' ;
    cmperror[173] := 'Too many nested procedures/functions    ' ;
    cmperror[174] := 'Index expression out of bounds          ' ;

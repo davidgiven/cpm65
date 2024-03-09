@@ -378,7 +378,7 @@ jtab:   .word   leq2    ; 2 bytes less than or equal test
         .word   lns     ; load null set
         .word   sfa     ; set file handle
         .word   gfa     ; get file handle
-        .word   notimp  ; unimplemented?
+        .word   mvb     ; move and blank
         .word   shl     ; shift left
         .word   shr     ; shift right
 ;
@@ -432,8 +432,9 @@ interpr:ldx #0
         inc pc
         bne intrpr1
         inc pc + 1
-intrpr1:cmp #$C5
+intrpr1:cmp #$C7
         bcc intrpr2     ; opcode in range
+        brk
 notimp: lda #>msg007
         ldx #<msg007
         jmp string      ; not implemented message, fatal
@@ -1224,21 +1225,21 @@ cas:    jsr setup1      ; case nr
         bmi casex       ; if larger than max
         asl tmp3l2      ; multiply by two for dual word index
         rol tmp3l2 + 1
-        clc         ; case of
+        clc             ; case of
         lda tmp3l2
         adc pc
-        sta tmp3l2      ; add index to PC to look into
+        adc #6
+        sta pc          ; PC points to offset
         lda tmp3l2 + 1
         adc pc + 1
-        sta tmp3l2 + 1
-        ldy     #$07        ; offset in table
-        lda (tmp3l2),y
+        sta pc + 1
+        ldy #1
+        lda (pc),y
         sta tmp2l2      ; lower part of new PC
         dey 
-        lda (tmp3l2),y
+        lda (pc),y
         sta tmp2l2 + 1
-        clc
-        adc tmp2l2
+        ora tmp2l2
         bne cas2        ; if no nill pointer
         bcc casex       
 cas2:   clc
@@ -1259,13 +1260,19 @@ casex:  ldy #$05        ; test for otherwise
         adc tmp2l2      ; test for nil
         bne cas2
         bcs cas2
+        brk
         lda #>msg006
         ldx #<msg006
         jmp string
         ;
         ; B7 MOV
         ;
-mov:    jsr setup2          ; tmp2l2 is to and tmp3l2 is from
+mov:    jsr mover
+        jmp interpr
+        ; 
+        ; Helper which does a MOV. This is also used by MVB.
+        ;
+mover:  jsr setup2          ; tmp2l2 is to and tmp3l2 is from
         ldy #$00
         lda (pc),y
         sta tmp1l8 + 1
@@ -1287,7 +1294,7 @@ mov1:   lda (tmp3l2),y      ;
         bne mov1            ; interpr
         lda tmp1l8 + 1
         bne mov1 
-        jmp interpr
+        rts
         ;
         ; B8 DEC1
         ;
@@ -1324,7 +1331,7 @@ ldcs1:  lda (pc),y          ; get char
         ; 
         ; BB CAP
         ;
-cap:ldx #$00
+cap:    ldx #$00
         lda (pc,x)
         sta tmp2l2 + 1
         ldx #pc
@@ -1336,7 +1343,7 @@ cap:ldx #$00
         jmp (tmp2l2)        ; jump to new address
         ;
         ; BC LCA
-lca:ldy #$00
+lca:    ldy #$00
         lda (pc),y          ; nr of bytes as string length
         pha
         ldx #pc
@@ -1369,20 +1376,23 @@ csp:    ldy #$00
         jmp (jtabp)         ; jump to procedure
         ;
         ; standard procedure table
-csptab: .word   wri         ; write integer
-        .word   wrc         ; write character
-        .word   wrs         ; write string
-        .word   rdi         ; read integer
-        .word   rln         ; read end of line
-        .word   rdc         ; read character
-        .word   wln         ; write end of line
-        .word   new         ; new pointer
-        .word   eof         ; check for end of file
-        .word   rst         ; reset heap pointer
-        .word   eln         ; test if end of line
-        .word   stp         ; stop pascal program
-        .word   odd         ; check if number on stack is odd
-        .word   rset            ; reset eof boolean
+csptab: .word   wri         ;  0 write integer
+        .word   wrc         ;  1 write character
+        .word   wrs         ;  2 write string
+        .word   rdi         ;  3 read integer
+        .word   rln         ;  4 read end of line
+        .word   rdc         ;  5 read character
+        .word   wln         ;  6 write end of line
+        .word   new         ;  7 new pointer
+        .word   eof         ;  8 check for end of file
+        .word   rst         ;  9 reset heap pointer
+        .word   eln         ;  a test if end of line
+        .word   stp         ;  b stop pascal program
+        .word   odd         ;  c check if number on stack is odd
+        .word   rstf        ;  d reset file
+        .word   rwrf        ;  e rewrite file
+        .word   stsf        ;  f status file
+        .word   clsf        ; 10 close file
         ;
         ; BE CUP1
         ;
@@ -1469,6 +1479,31 @@ sfa:    jsr pull2               ; get file handle constant
 gfa:    ldy fa      ; load file handle constant
         lda #0      ; push single byte value 0
         jsr push2
+        jmp interpr
+        ;
+        ; C4 MVB
+        ;
+mvb:    jsr mover           ; performs a normal move
+        ; leaves tmp2l2 to where the blanks should go
+        ; and Y=0
+        lda (pc),y
+        sta tmp1l8 + 1
+        ldx #pc
+        jsr incr
+        lda (pc),y
+        sta tmp1l8
+        ldx #pc
+        jsr incr            ; pc is now next instruction; tmp1l8 contains the number of blanks
+mvb1:   lda #' '            ;
+        sta (tmp2l2),y      ; move the data
+        ldx #tmp2l2
+        jsr incr            ; next to
+        ldx #tmp1l8
+        jsr decr            ; how many?
+        lda tmp1l8
+        bne mvb1            ; interpr
+        lda tmp1l8 + 1
+        bne mvb1 
         jmp interpr
         ;
         ; C5 SHL
@@ -1813,11 +1848,25 @@ odd:    jsr pull2           ; get integer from stack
         jsr push2           ; push boolean on stack
         jmp interpr
         ;
-        ; PROC D RSET
+        ; PROC D reset file
         ;
-rset:   lda #$00            ; false
-        sta eofb
+rstf:   jmp interpr
+        ;
+        ; PROC E rewrite file
+        ;
+rwrf:   jmp interpr
+        ;
+        ; PROC F status file
+        ;
+stsf:   lda #0
+        tay
+        jsr push2
         jmp interpr
+        ;
+        ; PROC 10 close file
+        ;
+clsf:   jmp interpr
+        
         ;
         ; MUL10 multiply tmp1l8 by 10
 mul10:  asl tmp1l8
