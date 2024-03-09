@@ -203,7 +203,7 @@ type
       1 :(valp : constptr    )
   end ;
   (* data structures *)
-  levrange  = 0 .. maxlevel ;
+  levrange  = -1 .. maxlevel ;
   addrrange = 0 .. maxaddr  ;
   structform =(  scalar,
     subrange,
@@ -2657,39 +2657,67 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
     lcmax, llc1 : addrrange ;
     lcp : identptr;
 
-    procedure LDAgen (level : integer ; dplmt : addrrange);
+    procedure LDCIgen(value : integer);
+      (* Generate instructions to load constant
+          16 bit value on stack *)
+    begin
+      if(value < 16)and(value >= 0)
+      then
+        Bytegen(value)
+      else if value < 0
+      then
+      begin
+        Bytegen(176);              (* LNC *)
+        Wordgen(-value);
+      end
+      else
+      begin
+        Bytegen(160);                (* LDC *)
+        Wordgen(value);
+      end;
+    end ;(* LDCIgen *)
+
+    procedure LDAgen (thislevel, varlevel : integer ; dplmt : addrrange);
     (* generate instructions to load offset address dplmt
         for level on stack, optimize if short range *)
+    var
+      level: integer;
+
     begin
-      if dplmt < 256
-      then                          (* ldas *)
+      if varlevel = -1 then
+        LDCIgen(dplmt)
+      else
       begin
-        Bytegen(16  + level);
-        Bytegen(dplmt);
+        level := thislevel - varlevel;
+        if dplmt < 256
+        then                          (* ldas *)
+        begin
+          Bytegen(16 + level);
+          Bytegen(dplmt);
+        end
+        else                          (* lda  *)
+        begin
+          Bytegen(32 + level);
+          Wordgen(dplmt)
+        end
       end
-      else                          (* lda  *)
-      begin
-        Bytegen(32 + level);
-        Wordgen(dplmt);
-      end;
     end ;(* LDAgen *)
 
-    procedure LODgen(level : integer ; var fattr : attr);
+    procedure LODgen(thislevel, varlevel : integer ; var fattr : attr);
     (* load variable value on stack of level *)
     begin
       (* short range and small variable *)
-      if(fattr.typtr^.size <= 2)and
-        (fattr.dplmt < 256)
+      if (fattr.typtr^.size <= 2) and (fattr.dplmt < 256)
       then
       begin
         (* LOD1, LOD2 or LOD8 byte instructions *)
-        Bytegen(64 + 16 * fattr.typtr^.size + level);
+        Bytegen(64 + 16 * fattr.typtr^.size + thislevel - varlevel);
         Bytegen(fattr.dplmt);
       end
       else
       begin
         (* put address on stack of data item from level *)
-        LDAgen(level, fattr.dplmt);
+        LDAgen(thislevel, varlevel, fattr.dplmt);
         (* Indirectly load data on stack *)
         case fattr.typtr^.size of
           1 : Bytegen(154); (* IND1 *)
@@ -2735,26 +2763,6 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
       else
         Error(179);         (* wrong size *)
     end ;(* Condgen *)
-
-    procedure LDCIgen(value : integer);
-      (* Generate instructions to load constant
-          16 bit value on stack *)
-    begin
-      if(value < 16)and(value >= 0)
-      then
-        Bytegen(value)
-      else if value < 0
-      then
-      begin
-        Bytegen(176);              (* LNC *)
-        Wordgen(-value);
-      end
-      else
-      begin
-        Bytegen(160);                (* LDC *)
-        Wordgen(value);
-      end;
-    end ;(* LDCIgen *)
 
     procedure LoadSetConstant(setconst : intset);
     (* generate instruction to
@@ -2870,7 +2878,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         then
           if gattr.access = drct
           then
-            LODgen(level - gattr.level,gattr)
+            LODgen(level, gattr.level,gattr)
           else
           begin
             (* put address of data item on stack *)
@@ -2904,11 +2912,15 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         then
           Error(178)
         else
+        begin
+          if fattr.typtr^.form = files then
+            Error(178);
           case fattr.typtr^.size of
             1 : Bytegen(157);         (* Sto1 *)
             2 : Bytegen(158);         (* Sto2 *)
             8 : Bytegen(159);         (* Sto8 *)
           end;
+        end;
     end ;(* Store *)
 
     procedure LoadAddress ;
@@ -2946,7 +2958,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         then
           if gattr.access = drct
           then
-            LDAgen(level - gattr.level, gattr.dplmt)
+            LDAgen(level, gattr.level, gattr.dplmt)
           else
             INCgen(gattr.dplmt)
         else
@@ -3045,11 +3057,13 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
               if fcp^.vkind = formal
               then
               begin
-                Bytegen(96 + level - fcp^.vlev);
+                if (fcp^.vlev = -1) then
+                  Error(178);
+                Bytegen($60 + level - fcp^.vlev);
                 Bytegen(fcp^.vaddr);
               end
               else
-                LDAgen(level - fcp^.vlev, fcp^.vaddr);
+                LDAgen(level, fcp^.vlev, fcp^.vaddr);
             end;
         end
         else if fcp^.klass = func
@@ -3389,9 +3403,90 @@ v                                                             !
      -----------------                                            *)
         var
           lsp : structptr ;
-          default : boolean ;
           llkey : 1 .. maxstandrd ;
+
+        procedure ProcessTerms;
+        var
+          default : boolean ;
           len : addrrange ;
+
+        begin
+          repeat
+            lsp := gattr.typtr ;
+            if lsp <> nil
+            then
+              (* put variable or address of variable on stack *)
+              if lsp^.form <= subrange
+              then
+                Load
+              else
+                LoadAddress ;
+            (* if colon then no default, load expression as nr of characters *)
+            if sy = colon
+            then
+            begin
+              InSymbol ;
+              Expression(fsys +[comma, rparent]);
+              if gattr.typtr <> nil
+              then
+              begin
+                if not Comptypes(gattr.typtr,intptr)
+                then
+                  Error(116);
+              end
+              else
+                Error(116);
+              Load ;
+              default := false;
+            end
+            else
+              default := true ;
+            if Comptypes(lsp, intptr)
+            then
+            begin
+              if default
+              then
+                (* default integer in 6 char field *)
+                LDCIgen(6);
+              CSPgen(0);        (* wri *)
+            end
+            else if Comptypes(lsp, charptr)
+            then
+            begin
+              if default
+              then
+                (* default character in 1 char field *)
+                LDCIgen(1);
+              CSPgen(1);        (* wrc *)
+            end
+            else if lsp <> nil
+            then
+              if lsp^.form = scalar
+              then
+                Error(177)
+              else if IsString(lsp)
+              then
+              begin
+                len := lsp^.size ;
+                if default
+                then
+                  (* default length of string *)
+                  LDCIgen(len);
+                LDCIgen(len);
+                CSPgen(2);   (* wrs *)
+              end
+              else
+                Error(116) ;
+            test := sy <> comma ;
+            if not test
+            then
+            begin
+              InSymbol;
+              Expression(fsys +[comma, colon, rparent]);
+            end;
+          until test ;
+        end;
+
         begin
           llkey := lkey ;
           if sy <> lparent
@@ -3412,6 +3507,7 @@ v                                                             !
                   must be something to write out. Default to output. *)
               LDCIGen(2);
               ByteGen(194); (* SFA *)
+              ProcessTerms;
             end
             else
             begin
@@ -3423,87 +3519,9 @@ v                                                             !
               begin
                 InSymbol;
                 Expression(fsys +[comma, colon, rparent]);
+                ProcessTerms;
               end;
             end;
-            begin
-              if sy <> rparent then
-                repeat
-                  lsp := gattr.typtr ;
-                  if lsp <> nil
-                  then
-                          (* put variable or address of
-                              variable on stack *)
-                    if lsp^.form <= subrange
-                    then
-                      Load
-                    else
-                      LoadAddress ;
-                      (* if colon then no default, load
-                          expression as nr of characters *)
-                  if sy = colon
-                  then
-                  begin
-                    InSymbol ;
-                    Expression(fsys +[comma, rparent]);
-                    if gattr.typtr <> nil
-                    then
-                    begin
-                      if not Comptypes(gattr.typtr,intptr)
-                      then
-                        Error(116);
-                    end
-                    else
-                      Error(116);
-                    Load ;
-                    default := false;
-                  end
-                  else
-                    default := true ;
-                  if Comptypes(lsp, intptr)
-                  then
-                  begin
-                    if default
-                    then
-                      (* default integer in 6 char field *)
-                      LDCIgen(6);
-                    CSPgen(0);        (* wri *)
-                  end
-                  else if Comptypes(lsp, charptr)
-                  then
-                  begin
-                    if default
-                    then
-                      (* default character in 1 char field *)
-                      LDCIgen(1);
-                    CSPgen(1);        (* wrc *)
-                  end
-                  else if lsp <> nil
-                  then
-                    if lsp^.form = scalar
-                    then
-                      Error(177)
-                    else if IsString(lsp)
-                    then
-                    begin
-                      len := lsp^.size ;
-                      if default
-                      then
-                        (* default length of string *)
-                        LDCIgen(len);
-                      LDCIgen(len);
-                      CSPgen(2);   (* wrs *)
-                    end
-                    else
-                      Error(116) ;
-                  test := sy <> comma ;
-                  if not test
-                  then
-                  begin
-                    InSymbol;
-                    Expression(fsys +[comma, colon, rparent]);
-                  end;
-                until test ;
-            end ;
             Intest(rparent, 4);
           end;
           if llkey = 6
@@ -3575,7 +3593,6 @@ v                                                             !
           LoadAddress;
 
           ByteGen(194);                (* SFA *)
-          CSPGEN(16);                  (* close file *)
 
           if llkey = 7
           then
@@ -3787,10 +3804,10 @@ proc/func-ident -----(()-----! expression !-----())------>
                         then
                         begin
                           Load ;
-                          LODgen(0, gattr);
+                          LODgen(0, 0, gattr);
                           lc := lc +
                             gattr.typtr^.size ;
-                          LDAgen(0, lc);
+                          LDAgen(0, 0, lc);
                           if lcmax < lc
                           then
                             lcmax := lc ;
@@ -4858,7 +4875,7 @@ for ->--! var-ident !--(:=)---! expression !--->
           lattr.kind := varbl ;
           if lcp^.vkind = actual
           then
-            LDAgen(level - lcp^.vlev, lcp^.vaddr)
+            LDAgen(level, lcp^.vlev, lcp^.vaddr)
           else
           begin
             Error(155);
@@ -5055,7 +5072,7 @@ for ->--! var-ident !--(:=)---! expression !--->
             then
             begin
               (* copy record or array *)
-              LDAgen(0, lcp^.vaddr);
+              LDAgen(0, 0, lcp^.vaddr);
               Bytegen(96);(* LOD *)
               Bytegen(llc1);
               Bytegen(183);    (* mov *)
@@ -5272,22 +5289,22 @@ begin
   end ;
   (* files input and output and keyboard *)
   new(cp);
-  cp^.name := 'input' ;
+  cp^.name := 'input   ' ;
   cp^.idtype := fileptr ;
   cp^.next := nil ;
   cp^.klass := vars ;
   cp^.vkind := actual ;
   cp^.vaddr := 1 ;       (* 1 = input *)
-  cp^.vlev := 0 ;
+  cp^.vlev := -1 ;
   Enterid(cp);
   new(cp);
-  cp^.name := 'output' ;
+  cp^.name := 'output  ' ;
   cp^.idtype := fileptr ;
   cp^.next := nil ;
   cp^.klass := vars ;
   cp^.vkind := actual ;
   cp^.vaddr := 2 ;       (* 2 = output *)
-  cp^.vlev := 0 ;
+  cp^.vlev := -1 ;
   Enterid(cp);
   new(cp);
   cp^.name := 'keyboard' ;
@@ -5296,7 +5313,7 @@ begin
   cp^.klass := vars ;
   cp^.vkind := actual ;
   cp^.vaddr := 3 ;       (* 3 = keyboard *)
-  cp^.vlev := 0 ;
+  cp^.vlev := -1 ;
   Enterid(cp);
 end ;(* Enterstnames *)
 
