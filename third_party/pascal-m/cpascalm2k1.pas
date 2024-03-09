@@ -327,11 +327,6 @@ var
   disx    : disprange ;   (* Level of last ID searched by Searchid*)
   top     : disprange ;   (* Top of display *)
   savetop : disprange ;   (* Save top of display *)
- (* Files are given a number internal to compiler and interpreter,
-     stored in identifier description vaddr-field.
-     Input and output predeclared with filenumbers resp 1 and 2
-     User-files start with 3 as declared in Initialize           *)
-  filenumber :integer ;
  (* Symbol-table is organized as binary tree's per level.
      Each entry in display-array points to unbalanced binary tree,
      array-index is level of current procedure/function       *)
@@ -365,7 +360,7 @@ var
   frw : array[0 .. 8 ]  of 0 .. maxopsp1  ;(* no res wrds          *)
   ssy : array[0 .. 127] of symbol   ;(* Not reserved symbols *)
   sop : array[0 .. 127] of operator ;
-  na  : array[0 .. 22]  of alpha    ;(* Standard proc/func's *)
+  na  : array[0 .. 23]  of alpha    ;(* Standard proc/func's *)
   
   (* Used by the compiler driver itself. *)
   sourcefile, objectfile,listfile, errorfile : text ;
@@ -508,6 +503,7 @@ procedure EndLine ;
           writeln (listfile ) ;
           writeln(errorfile) ;
           (* Display the meaning of the error-numbers *)
+          writeln(listfile, 'Errors on line: ', errlist[1].pos);
           for k := 1 to errinx DO
             begin
               currnmr := errlist[k].nmr ;
@@ -2196,16 +2192,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
        while nxt <> nil do
          begin
            nxt^.idtype := lsp ;
-           if (lsp <> nil) and (lsp^.form = files)
+           if (lsp <> nil)
              then
-               begin
-                 nxt^.vaddr := filenumber ;
-                 if filenumber > maxfiles
-                   then
-                     error(180);
-                  filenumber := filenumber + 1
-                end
-              else
                 begin
                   lc := lc + lsize ;
                   nxt^.vaddr := lc ;
@@ -3273,16 +3261,16 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
          Selector(fsys, lcp)
        end ;(* Variable *)
 
-       procedure CheckFileAddress(var fileaddr : integer);
+       function CheckFileAddress: boolean;
       (* Checks if first argument supplied in read or write
           is a file-identifier.
           If declared(as variable or predeclared input or output)
-          then the file-number is returned else zero *)
+          then the the address of it is pushed. *)
           var
             fcp : identptr ;
           begin
             fcp := nil ;
-            fileaddr := 0 ;
+            CheckFileAddress := false ;
             if sy = ident
               then
                 begin
@@ -3296,8 +3284,9 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
                           if fcp^.idtype^.form = files
                             then
                               begin
-                                fileaddr := fcp^.vaddr ;
-                                Insymbol ;
+                                Expression(fsys +[comma, colon, rparent]);
+                                LoadAddress;
+                                CheckFileAddress := true;
                                 if sy = comma
                                   then
                                     Insymbol
@@ -3330,10 +3319,7 @@ read -->----------------( ( )----( file-ident )------          !
                        !      --------------------     !
                        !                               !
                         --------------<----------------          *)
-       var
-         fileaddr : integer ;
        begin
-         fileaddr := 0 ;
          if sy <> lparent
            then
              begin
@@ -3345,12 +3331,9 @@ read -->----------------( ( )----( file-ident )------          !
            else
              begin
                InSymbol ;
-               CheckFileAddress(fileaddr);
-              (* generate instruction to load filenumber on stack *)
-               if fileaddr = 0
+               if (not CheckFileAddress)
                  then
-                   fileaddr := 1 ; (* default to input *)
-               LDCIGen(fileaddr);
+                   LDCIGen(1) ; (* default to input *)
               (* Set file address instruction *)
                ByteGen(194);
                if sy = ident
@@ -3427,9 +3410,7 @@ v                                                             !
         default : boolean ;
         llkey : 1 .. maxstandrd ;
         len : addrrange ;
-        fileaddr : integer ;
        begin
-         fileaddr := 0 ;
          llkey := lkey ;
          if sy <> lparent
            then
@@ -3442,12 +3423,9 @@ v                                                             !
            else
              begin
                InSymbol ;
-               CheckFileAddress(fileaddr);
-              (* generate instruction to load filenumber on stack *)
-               if fileaddr = 0
+               if (not CheckFileAddress)
                  then
-                   fileaddr := 2 ;
-               LDCIGen(fileaddr);
+                   LDCIGen(2); (* default to output *)
               (* Set file address instruction *)
                ByteGen(194);
                if sy in facbegsys
@@ -3591,39 +3569,18 @@ v                                                             !
                                                    -! string-var ident!--
                                                      -----------------      *)
       var
-         fileaddr,llkey  : integer ;
+         llkey  : integer ;
        begin
-         fileaddr := 0 ;
          llkey := lkey ;
-        CheckFileAddress(fileaddr);
-        if fileaddr = 0
-          then
-            error(22)
-          else
-            begin
-              LDCIGen(fileaddr);
-              ByteGen(194)         (* SFA *)
-            end ;
-        if not(sy in facbegsys)
-          then
-            begin
-              error(4);
-              insymbol
-            end
-          else
-            begin
-              Expression(fsys +[rparent]);
-              if Isstring(gattr.typtr)
-                then
-                  begin
-                   (* address of string on stack *)
-                    LoadAddress ;
-                   (* length of string on stack *)
-                    LDCIGen(gattr.typtr^.size)
-                  end
-                else
-                  error(23)
-            end ;
+
+         Expression(fsys +[comma, colon, rparent]);
+         if gattr.typtr^.form <> files then
+           Error(22);
+         LoadAddress;
+
+         ByteGen(194);                (* SFA *)
+         CSPGEN(16);                  (* close file *)
+
         if llkey = 7
           then
             CSPGEN(13)      (* reset file *)
@@ -3633,21 +3590,33 @@ v                                                             !
 
       procedure CloseProc ;
      (* generate code for standard procedure Close *)
-      var
-        fileaddr : integer ;
       begin
-       fileaddr := 0 ;
-        CheckFileaddress(fileaddr);
-        if fileaddr = 0
-          then
-            begin
-              error(22);
-              fileaddr := 1
-            end ;
-        LDCIGen(fileaddr);
+        Expression(fsys +[comma, colon, rparent]);
+        if gattr.typtr^.form <> files then
+          Error(22);
+        LoadAddress;
+
         ByteGen(194);                (* SFA *)
         CSPGEN(16)                   (* close file *)
       end ;(* CloseProc *)
+
+      procedure AssignProc ;
+      (* generate code for standard procedure Assign *)
+      begin
+        Expression(fsys +[comma]);
+        if gattr.typtr^.form <> files then
+          Error(22);
+        LoadAddress;
+        ByteGen(194);                 (* SFA *)
+
+        InSymbol;
+        Expression(fsys +[rparent]);
+        if (not IsString(gattr.typtr)) then
+          Error(177);
+        LoadAddress;
+
+        CSPGEN(17)                    (* assign file *)
+      end;
 
       procedure OrdFunc ;
      (* generate code for standard function Ord
@@ -3719,25 +3688,17 @@ v                                                             !
       procedure EofEolnStatusFunc ;
      (* generate code for standard function Eof, Eoln and Status,
          result is boolean *)
-      var
-        fileaddr : integer ;
       begin
        (* default to input *)
-        fileaddr := 1 ;
         if sy = lparent
           then
             begin
               Insymbol ;
-              CheckFileaddress(fileaddr);
-              if fileaddr = 0
+              if (not CheckFileaddress)
                 then
-                  begin
-                    fileaddr := 1 ;
-                    error(22)
-                  end ;
+                  LDCIGen(1); (* default to input *)
               InTest(rparent,4)
             end ;
-        LDCIGen(fileaddr);
         ByteGen(194);                (* SFA *)
         if lkey = 8
           then
@@ -3903,41 +3864,26 @@ proc/func-ident -----(()-----! expression !-----())------>
               if fcp^.klass = proc
                 then
                  (* standard procedures *)
-                  begin
-                    if lkey = 9
-                      then
-                       (* EXIT *)
-                        Bytegen(161)          (* retp *)
-                    else if lkey = 10
-                      then
-                       (* HALT standard procedure *)
-                         CSPgen(11)
-                    else if(lkey = 1)or(lkey = 5)
-                      then
-                        ReadProc
-                    else if(lkey = 2)or(lkey = 6)
-                      then
-                        WriteProc
-                    else
-                      begin
-                       (* arguments for procedure required *)
-                        Intest(lparent, 9);
-                        if lkey = 3
-                          then
-                            NewStatement
-                        else if lkey= 4
-                          then
-                            ReleaseStatement
-                        else if(lkey = 7)or(lkey = 8)
-                          then
-                            ResetRewriteProc
-                        else if lkey = 11
-                          then
-                            CloseProc
-                        else
-                          Error(178);
-                        Intest(rparent, 4)
-                      end
+                  case lkey of
+                    1, 5: ReadProc;
+                    2, 6: WriteProc;
+                    9: Bytegen(161); (* retp *)
+                    10: CSPgen(11); (* HALT standard procedure *)
+                    otherwise
+                    begin
+                      (* arguments for procedure required *)
+                      Intest(lparent, 9);
+                      case lkey of
+                        3: NewStatement;
+                        4: ReleaseStatement;
+                        7, 8: ResetRewriteProc;
+                        11: CloseProc;
+                        13: AssignProc;
+                        otherwise
+                          Error(178)
+                      end;
+                      Intest(rparent, 4)
+                    end
                   end
                 else
                  (* standard functions *)
@@ -5196,12 +5142,12 @@ for ->--! var-ident !--(:=)---! expression !--->
     na[ 3] := 'write   ' ; na[ 4] := 'new     ' ; na[ 5] := 'release ' ;
     na[ 6] := 'readln  ' ; na[ 7] := 'writeln ' ; na[ 8] := 'reset   ' ;
     na[ 9] := 'rewrite ' ; na[10] := 'exit    ' ; na[11] := 'halt    ' ;
-    na[12] := 'close   ' ; na[13] := 'writemem' ;
+    na[12] := 'close   ' ; na[13] := 'writemem' ; na[14] := 'assign  ' ;
    (* standard functions *)
-    na[14] := 'ord     ' ; na[15] := 'chr     ' ; 
-    na[16] := 'odd     ' ; na[17] := 'succ    ' ; na[18] := 'pred    ' ; 
-    na[19] := 'eoln    ' ; na[20] := 'eof     ' ; na[21] := 'status  ' ;
-    na[22] := 'readmem ' ;
+    na[15] := 'ord     ' ; na[16] := 'chr     ' ; 
+    na[17] := 'odd     ' ; na[18] := 'succ    ' ; na[19] := 'pred    ' ; 
+    na[20] := 'eoln    ' ; na[21] := 'eof     ' ; na[22] := 'status  ' ;
+    na[23] := 'readmem ' ;
  end ;(* StdNames *)
 
  procedure Enterstdtypes ;
@@ -5227,8 +5173,8 @@ for ->--! var-ident !--(:=)---! expression !--->
    nilptr^.form  := pointer ;
    nilptr^.stype := nil     ;
    (* file *)
-    new(fileptr);
-   fileptr^.size  := 0       ;
+   new(fileptr);
+   fileptr^.size  := 128     ;
    fileptr^.stype := nil     ;
    fileptr^.form  := files   ;
   end ;(* Enterstdtypes *)
@@ -5275,7 +5221,7 @@ for ->--! var-ident !--(:=)---! expression !--->
        cp^.idtype := boolptr ;
        cp^.next := cp1 ;
        cp^.klass := konst ;
-         cp^.values.ival := i ;
+       cp^.values.ival := i ;
        Enterid(cp);
        cp1 := cp
      end ;
@@ -5300,8 +5246,9 @@ for ->--! var-ident !--(:=)---! expression !--->
       key 10 = halt
       key 11 = close
       key 12 = writemem
+      key 13 = assign
 *)
-   for i := 2 to 13 do
+   for i := 2 to 14 do
      begin
        new(cp);
        cp^.name := na[i] ;
@@ -5323,7 +5270,7 @@ for ->--! var-ident !--(:=)---! expression !--->
        key 8 = status 
        key 9 = readmem  *)
 
-   for i := 14 to 22 do
+   for i := 15 to 23 do
      begin
        new(cp);
        cp^.name := na[i] ;
@@ -5331,18 +5278,19 @@ for ->--! var-ident !--(:=)---! expression !--->
        cp^.next := nil ;
        cp^.klass := func ;
          cp^.pfdeckind := standard ;
-           cp^.key := i - 13 ;
+           cp^.key := i - 14 ;
        Enterid(cp)
      end ;
+     {
   (* files input and output and keyboard *)
    new(cp);
    cp^.name := 'input   ' ;
    cp^.idtype := fileptr ;
    cp^.next := nil ;
    cp^.klass := vars ;
-     cp^.vkind := actual ;
-     cp^.vaddr := 1 ;       (* filenumber 1 = input *)
-     cp^.vlev := 0 ;
+   cp^.vkind := actual ;
+   cp^.vaddr := 1 ;       (* filenumber 1 = input *)
+   cp^.vlev := 0 ;
    Enterid(cp);
    new(cp);
    cp^.name := 'output  ' ;
@@ -5362,6 +5310,7 @@ for ->--! var-ident !--(:=)---! expression !--->
    cp^.vaddr := 3 ;       (* filenumber 3 = keyboard *)
    cp^.vlev := 0 ;
    Enterid(cp);
+   }
   end ;(* Enterstnames *)
 
  procedure Enterundecl ;
@@ -5638,8 +5587,6 @@ procedure Initialize ;
    top := 1 ;
    level := 1 ;
    savetop := 1 ;
-  (* filenumber start with 4 : input = 1, output = 2, keyboard := 3 *)
-   filenumber := 4 ;
   (* Fill error-message table *)
    FillErrorMessages ;
  end ;(* Initialize *)
@@ -5680,7 +5627,9 @@ function CompilePascalM(filename : alphastring): boolean ;
 begin
   Initialize ;
   sourcename := filename ;
+  {
   writeln(errorfile, 'Compilation of ',filename) ;
+  }
 
   (* Compile program-heading *)
   CompileHeading ;
@@ -5765,10 +5714,17 @@ end ;
              ShowErrors := true ;
              *)
 
-    sourcefile := input;
-    objectfile := output;
-    listfile := output;
-    errorfile := output;
+    assign(sourcefile, '/dev/stdin');
+    reset(sourcefile);
+
+    assign(objectfile, '/dev/stdout');
+    rewrite(objectfile);
+
+    assign(listfile, '/dev/stdout');
+    rewrite(listfile);
+
+    assign(errorfile, '/dev/stderr');
+    rewrite(errorfile);
    end ; (* OpenFiles *)
 
 procedure CloseFiles ;
