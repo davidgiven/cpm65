@@ -72,19 +72,6 @@ static void fatal(char* msg)
 	cpm_warmboot();
 }
 
-static uint8_t rnd;
-
-void srand(uint8_t seed)
-{
-	rnd = seed;
-}
-
-uint8_t rand(void)
-{
-	rnd = rnd * 5 + 17;
-	return rnd;
-}
-
 int init()
 {
 	// Init screen
