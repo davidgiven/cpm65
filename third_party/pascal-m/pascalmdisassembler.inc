@@ -39,7 +39,7 @@ CONST
   {
   maxlabel = 3000  ;
   }
-  maxstandardprocedures = 17 ;
+  maxstandardprocedures = 18 ;
   strglgth = 8 ;(* length of ident, procedure/program name *)
 
 type
@@ -221,6 +221,7 @@ var
         standardproc[15] := 'STATE' ;
         standardproc[16] := 'CLOSE' ;
         standardproc[17] := 'ASSIGN' ;
+        standardproc[18] := 'GETCLI' ;
         standardcproc[0] := 'write integer'  ;
         standardcproc[1] := 'write character' ;
         standardcproc[2] := 'write string'  ;
@@ -239,6 +240,7 @@ var
         standardcproc[15] := 'status file' ;
         standardcproc[16] := 'close file'  ;
         standardcproc[17] := 'assign file' ;
+        standardcproc[18] := 'get command line' ;
     end  ;(* FillInstructions *)
 
   procedure Loader(loadaddress : integer) ;

@@ -101,11 +101,11 @@ const
   setsize          =     8 ;(* set       *)
   ptrsize          =     2 ;(* pointer   *)
   strglgth         =     8 ;(* strings stored in blocks of 8 char's *)
-  alphalen         =    40 ;(* general purpose string length *)
+  alphalen         =    80 ;(* general purpose string length *)
   lcaftermarkstack =     6 ;(* stack frame for interpreter *)
   maxint           = 32767 ;(* 16-bit's two's complement machine *)
   setmax           =    63 ;(* set has maximal 63 members *)
-  maxstandrd       =    13 ;(* number of standard functions/procedures *)
+  maxstandrd       =    14 ;(* number of standard functions/procedures *)
   maxcode          =    29 ;(* codebuffer maximum 30 bytes *)
   maxpage          =    56 ;(* maximum number of lines on listing file *)
   maxfiles         =     7 ;(* maximum number of files in use total *)
@@ -289,7 +289,7 @@ var
   linpos       : integer ;
   line         : packed array[1 .. maxchcnt] of char ;
   linecount    : integer ;
-  sourcename   : alphastring ;
+  sourcename, destname : alphastring ;
   (* listing file counters *)
   listlines, listpages : integer ;
   (* Counters *)
@@ -360,17 +360,18 @@ var
   frw : array[0 .. 8 ]  of 0 .. maxopsp1  ;(* no res wrds          *)
   ssy : array[0 .. 127] of symbol   ;(* Not reserved symbols *)
   sop : array[0 .. 127] of operatortype ;
-  na  : array[0 .. 23]  of alpha    ;(* Standard proc/func's *)
+  nap : array[0 .. 15]  of alpha    ;(* Standard procedures *)
+  naf : array[0 .. 8 ]  of alpha    ;(* Standard functions *)
   
   (* Used by the compiler driver itself. *)
   sourcefile, objectfile,listfile, errorfile : ^text ;
-  filename, namefile :  alphastring ;
   ShowErrors : boolean ;
 
 procedure EndLinelist  ;
 (* Ends line on listfile^, takes care of pages, headings etc *)
 begin
-  {
+    if listfile <> nil then
+    begin
     listlines := listlines + 1 ;
     (* new page needed ? *)
      if listlines > maxpage
@@ -386,7 +387,7 @@ begin
            listpages := listpages + 1 ;
            listlines := 3
          end ;
-         }
+        end;
 end ;(* EndLineList *)
 
 procedure BeginLine ;
@@ -399,10 +400,13 @@ begin
   begin
     writeln(errorfile^) ;
     writeln(errorfile^,'Premature end of source file');
-    EndLineList ;
-    writeln(listfile^);
-    EndLineList ;
-    writeln(listfile^,'Premature end of source file');
+    if listfile <> nil then
+    begin
+      EndLineList ;
+      writeln(listfile^);
+      EndLineList ;
+      writeln(listfile^,'Premature end of source file');
+    end;
     writeln(objectfile^,'P1010000');
     errflag := true ;
   end
@@ -411,7 +415,8 @@ begin
     linelength := 0 ;
     linecount := linecount + 1 ;
     EndLineList ;
-    { write(listfile^, linecount:4, ': '); }
+    if listfile <> nil then
+      write(listfile^, linecount:4, ': ');
     while(not eoln(sourcefile^))and
       (linelength < maxchcnt)do
     begin
@@ -431,11 +436,13 @@ begin
                   end ;
               }
       read(sourcefile^, kar);
-      { write(listfile^, kar)  ; }
+      if listfile <> nil then
+        write(listfile^, kar)  ;
       line[linelength] := kar ;
     end ;
     readln(sourcefile^);
-    { writeln(listfile^); }
+    if listfile <> nil then
+      writeln(listfile^);
     chcnt := 0 ;
     linpos := 0;
   end ;
@@ -462,7 +469,8 @@ begin
       write(errorfile^, line [ k ] ) ;
     writeln(errorfile^) ;
     write(errorfile^,' **** ') ;
-    write(listfile^, ' **** ') ;
+    if listfile <> nil then
+      write(listfile^, ' **** ') ;
     lastpos := 0 ;
     freepos := 1 ;
     for k :=1 to errinx do
@@ -473,18 +481,21 @@ begin
       then
       begin
         write(errorfile^,',')  ;
-        write(listfile^, ',');
+        if listfile <> nil then
+          write(listfile^, ',');
       end
       else
       begin
         while  freepos < currpos do
         begin
           write(errorfile^,' ') ;
-          write(listfile^, ' ') ;
+          if listfile <> nil then
+            write(listfile^, ' ') ;
           freepos := freepos + 1 ;
         end ;
         write(errorfile^,'^') ;
-        write(listfile^, '^') ;
+        if listfile <> nil then
+          write(listfile^, '^') ;
         lastpos := currpos ;
       end ;
       if currnmr < 10
@@ -497,19 +508,23 @@ begin
       else
         f := 3 ;
       write(errorfile^, currnmr:f) ;
-      write(listfile^, currnmr:f) ;
+      if listfile <> nil then
+        write(listfile^, currnmr:f) ;
       freepos := freepos + f + 1 ;
     end ;
-    writeln (listfile^ ) ;
+    if listfile <> nil then
+      writeln (listfile^ ) ;
     writeln(errorfile^) ;
     (* Display the meaning of the error-numbers *)
-    writeln(listfile^, 'Errors on line: ', errlist[1].pos);
+    if listfile <> nil then
+      writeln(listfile^, 'Errors on line: ', errlist[1].pos);
     for k := 1 to errinx do
     begin
       currnmr := errlist[k].nmr ;
       EndLineList ;
       writeln (errorfile^, ' ':11, currnmr:3, ' = ',cmperror[currnmr] ) ;
-      writeln ( listfile^, ' ':13, currnmr:3, ' = ',cmperror[currnmr]);
+      if listfile <> nil then
+        writeln ( listfile^, ' ':13, currnmr:3, ' = ',cmperror[currnmr]);
     end ;
     errinx := 0 ;
   end;
@@ -717,6 +732,7 @@ begin (* InSymbol *)
       op := noop ;
       lvp := nil ;
       quotechar := ch ;(* start and end with same quote *)
+      val.valp := nil;
       repeat
         repeat
           if(chcnt > linelength)
@@ -2132,11 +2148,13 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
     begin
       Error(117);
       writeln(errorfile^) ;
-      writeln(listfile^);
+      if listfile <> nil then
+        writeln(listfile^);
       repeat
         writeln(errorfile^,' type-id ', fwptr^.name);
         EndLineList ;
-        writeln(listfile^, ' type-id ', fwptr^.name);
+        if listfile <> nil then
+          writeln(listfile^, ' type-id ', fwptr^.name);
         fwptr := fwptr^.next
       until fwptr = nil ;
     end;
@@ -2215,11 +2233,13 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
     begin
       Error(118);
       writeln(errorfile^) ;
-      writeln(listfile^);
+      if listfile <> nil then
+        writeln(listfile^);
       repeat
         writeln(errorfile^, 'type-id ', fwptr^.name);
         EndLineList ;
-        writeln(listfile^, 'type-id ', fwptr^.name);
+        if listfile <> nil then
+          writeln(listfile^, 'type-id ', fwptr^.name);
         fwptr := fwptr^.next ;
       until fwptr = nil ;
     end;
@@ -3631,6 +3651,16 @@ v                                                             !
           CSPGEN(17);                    (* assign file *)
         end;
 
+        procedure GetCommandLineProc ;
+        (* generate code for standard procedure Assign *)
+        begin
+          Variable(fsys +[rparent]);
+          if (not IsString(gattr.typtr)) then
+            Error(138);
+
+          CSPgen(17);                    (* assign file *)
+        end;
+
         procedure OrdFunc ;
      (* generate code for standard function Ord
          result is integer *)
@@ -3892,6 +3922,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                   7, 8: ResetRewriteProc;
                   11: CloseProc;
                   13: AssignProc;
+                  14: GetCommandLineProc;
                   otherwise
                     Error(178)
                 end;
@@ -5144,16 +5175,17 @@ end ;(* Block*)
 procedure StdNames ;
 begin
   (* standard procedures *)
-  na[ 0] := 'false   ' ; na[ 1] := 'true    ' ; na[ 2] := 'read    ' ;
-  na[ 3] := 'write   ' ; na[ 4] := 'new     ' ; na[ 5] := 'release ' ;
-  na[ 6] := 'readln  ' ; na[ 7] := 'writeln ' ; na[ 8] := 'reset   ' ;
-  na[ 9] := 'rewrite ' ; na[10] := 'exit    ' ; na[11] := 'halt    ' ;
-  na[12] := 'close   ' ; na[13] := 'writemem' ; na[14] := 'assign  ' ;
+  nap[ 0] := 'false   ' ; nap[ 1] := 'true    ' ; nap[ 2] := 'read    ' ;
+  nap[ 3] := 'write   ' ; nap[ 4] := 'new     ' ; nap[ 5] := 'release ' ;
+  nap[ 6] := 'readln  ' ; nap[ 7] := 'writeln ' ; nap[ 8] := 'reset   ' ;
+  nap[ 9] := 'rewrite ' ; nap[10] := 'exit    ' ; nap[11] := 'halt    ' ;
+  nap[12] := 'close   ' ; nap[13] := 'writemem' ; nap[14] := 'assign  ' ;
+  nap[15] := 'getcomma' ;
   (* standard functions *)
-  na[15] := 'ord     ' ; na[16] := 'chr     ' ; 
-  na[17] := 'odd     ' ; na[18] := 'succ    ' ; na[19] := 'pred    ' ; 
-  na[20] := 'eoln    ' ; na[21] := 'eof     ' ; na[22] := 'status  ' ;
-  na[23] := 'readmem ' ;
+  naf[ 0] := 'ord     ' ; naf[ 1] := 'chr     ' ; 
+  naf[ 2] := 'odd     ' ; naf[ 3] := 'succ    ' ; naf[ 4] := 'pred    ' ; 
+  naf[ 5] := 'eoln    ' ; naf[ 6] := 'eof     ' ; naf[ 7] := 'status  ' ;
+  naf[ 8] := 'readmem ' ;
 end ;(* StdNames *)
 
 procedure Enterstdtypes ;
@@ -5223,7 +5255,7 @@ begin
   for i := 0 to 1 do
   begin
     new(cp);
-    cp^.name := na[i] ;
+    cp^.name := nap[i] ;
     cp^.idtype := boolptr ;
     cp^.next := cp1 ;
     cp^.klass := konst ;
@@ -5253,11 +5285,12 @@ begin
       key 11 = close
       key 12 = writemem
       key 13 = assign
+      key 14 = getcommandline
 *)
-  for i := 2 to 14 do
+  for i := 2 to 15 do
   begin
     new(cp);
-    cp^.name := na[i] ;
+    cp^.name := nap[i] ;
     cp^.idtype := nil ;
     cp^.next := nil ;
     cp^.klass := proc ;
@@ -5276,15 +5309,15 @@ begin
        key 8 = status 
        key 9 = readmem  *)
 
-  for i := 15 to 23 do
+  for i := 0 to 8 do
   begin
     new(cp);
-    cp^.name := na[i] ;
+    cp^.name := naf[i] ;
     cp^.idtype := nil ;
     cp^.next := nil ;
     cp^.klass := func ;
     cp^.pfdeckind := standard ;
-    cp^.key := i - 14 ;
+    cp^.key := i + 1 ;
     Enterid(cp);
   end ;
   (* files input and output and keyboard *)
@@ -5625,10 +5658,9 @@ begin
 end ; (* Compile program heading *)
 
 
-function CompilePascalM(filename : alphastring): boolean ;
+function CompilePascalM: boolean ;
 begin
   Initialize ;
-  sourcename := filename ;
   {
   writeln(errorfile^, 'Compilation of ',filename) ;
   }
@@ -5643,23 +5675,29 @@ begin
   if errflag
   then
   begin
-    writeln(errorfile^,'Compilation errors ', filename ) ;
-    EndLineList ;
-    { writeln(listfile^); }
+    writeln(errorfile^,'Compilation errors ', sourcename ) ;
     writeln(errorfile^,' Pascal-M Compilation : ', errtot:4,' errors ');
-    EndLineList ;
-    { write(listfile^, ' Pascal-M Compilation : '); }
-    { writeln(listfile^, errtot:4,' errors '); }
+    if listfile <> nil then
+    begin
+      EndLineList ;
+      writeln(listfile^) ;
+      EndLineList ;
+      write(listfile^, ' Pascal-M Compilation : ');
+      writeln(listfile^, errtot:4,' errors ');
+    end;
     writeln(objectfile^,'P1010000');
     CompilePascalM := false ;
   end
   else
   begin
-    EndLineList ;
-    { writeln(listfile^); }
-    { writeln(errorfile^,'No compilation errors ', filename ) ; }
-    EndLineList ;
-    { writeln(listfile^, ' Pascal-M Compilation successful'); }
+    if listfile <> nil then
+    begin
+      EndLineList ;
+      writeln(listfile^);
+      EndLineList ;
+      writeln(listfile^, ' Pascal-M Compilation successful');
+    end;
+    writeln(errorfile^,'No compilation errors ', sourcename ) ;
     writeln(objectfile^, 'P9');
     CompilePascalM := true ;
   end ;
@@ -5667,15 +5705,78 @@ end ;
 
 procedure OpenFiles ;
 var
-  dot : integer ;
+  parameters : packed array[0..127] of char;
+  len, i, j : integer;
+
+  procedure SkipSpaces;
+  begin
+    while (i <= len) and (parameters[i] = ' ') do
+      i := i + 1;
+  end;
+
+  procedure GetWord(var s: alphastring);
+  begin
+    SkipSpaces;
+    j := 0;
+    s := '';
+    while (i <= len) and (parameters[i] <> ' ') and (ord(parameters[i]) <> 0) do
+    begin
+      s[j+1] := parameters[i];
+      i := i + 1;
+      j := j + 1;
+    end;
+  end;
+
+  function FindEnd(var s: alphastring): integer;
+  var
+    len: integer;
+    i: integer;
+  begin
+    i := alphalen;
+    while (i <> -1) and ((s[i] = ' ') or (ord(s[i]) = 0)) do
+      i := i - 1;
+    FindEnd := i;
+  end;
 begin
-   (*
-     if paramcount = 0
-       then
+  GetCommandLine(parameters);
+  len := ord(parameters[0]);
+
+  i := 1;
+  GetWord(sourcename);
+  GetWord(destname);
+
+  new(sourcefile);
+  assign(sourcefile^, sourcename);
+  reset(sourcefile^);
+
+  new(objectfile);
+  assign(objectfile^, destname);
+  rewrite(objectfile^);
+
+  i := FindEnd(destname);
+  destname[i-2] := 'l';
+  destname[i-1] := 's';
+  destname[i-0] := 't';
+  new(listfile);
+  assign(listfile^, destname);
+  rewrite(listfile^);
+
+  i := FindEnd(destname);
+  destname[i-2] := 'e';
+  destname[i-1] := 'r';
+  destname[i-0] := 'r';
+  new(errorfile);
+  assign(errorfile^, destname);
+  rewrite(errorfile^);
+
+  (*
+  if len = 0 then
          begin
            write('Pascal-M source> ') ;
-           readln(namefile)
-         end
+           readln(sourcename)
+         end;
+         *)
+       (*
        else
          namefile := paramstr(1) ;
      if (namefile = '?') or
@@ -5715,22 +5816,7 @@ begin
            then
              ShowErrors := true ;
              *)
-
-  new(sourcefile);
-  assign(sourcefile^, '/dev/stdin');
-  reset(sourcefile^);
-
-  new(objectfile);
-  assign(objectfile^, '/dev/stdout');
-  rewrite(objectfile^);
-
-  new(listfile);
-  assign(listfile^, '/dev/stdout');
-  rewrite(listfile^);
-
-  new(errorfile);
-  assign(errorfile^, '/dev/stderr');
-  rewrite(errorfile^);
+      ShowErrors := true
 end ; (* OpenFiles *)
 
 procedure CloseFiles ;
@@ -5738,7 +5824,12 @@ begin
   close(sourcefile^) ;
   write(objectfile^, chr(26));
   close(objectfile^) ;
-  close(listfile^) ;
+  if listfile <> nil then
+  begin
+    write(listfile^, chr(26));
+    close(listfile^) ;
+  end;
+  write(errorfile^, chr(26));
   close(errorfile^) ;
 end  ; (* CloseFiles *)
 
@@ -5746,25 +5837,25 @@ procedure Dumperrorfile ;
 var
   line : alphastring ;
 begin
-(*
-  assign( errorfile^, namefile) ;
+  assign( errorfile^, destname) ;
   reset(errorfile^) ;
   while not eof(errorfile^) do
     begin
+      line := '';
       readln(errorfile^, line) ;
       writeln(line)
     end;
   close(errorfile^) ;
-  *)
 end;
 
 begin (* main Mpascal *)
-  writeln ( '* Pascal-M compiler V2k1') ;
+  writeln ( 'Pascal-M compiler V2k1') ;
   Openfiles ;
-  if (not CompilePascalM(filename)) then
-    writeln('* Compile errors, see error file') ;
+  if (not CompilePascalM) then
+    writeln('Compile errors, see error file') ;
   CloseFiles ;
-  if ShowErrors
-  then
+  if ShowErrors then
     Dumperrorfile ;
+  if errflag then
+    halt
 end.

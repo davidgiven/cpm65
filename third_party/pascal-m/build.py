@@ -7,7 +7,8 @@ normalrule(
     name="pasc-cross",
     ins=["./cpascalm2k1.pas"],
     outs=["pasc"],
-    commands=["chronic $(FPC) -g -Mdelphi -Os {ins[0]} -o{outs[0]}"],
+    deps=["./cpm.pas"],
+    commands=["chronic $(FPC) -g -Mdelphi -Facpm -Os {ins[0]} -o{outs[0]}"],
     label="FREEPASCAL",
 )
 
@@ -39,7 +40,7 @@ def pascalm_obp(self, name, src: Target):
         ins=[src],
         deps=["third_party/pascal-m+pasc-cross"],
         outs=["out.obp"],
-        commands=["{deps[0]} < {ins[0]} > {outs[0]}"],
+        commands=["{deps[0]} {ins[0]} {outs[0]}"],
         label="PASCALM-COMPILE",
     )
 
