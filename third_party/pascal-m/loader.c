@@ -86,6 +86,7 @@ void main()
     }
 
     cpm_printstring("Opening input file...\r\n");
+    infile.cr = 0;
     if (cpm_open_file(&infile) != 0)
     {
         cpm_printstring("Failed.\r\n");
@@ -94,6 +95,7 @@ void main()
 
     cpm_printstring("Opening output file...\r\n");
     cpm_delete_file(&outfile);
+    outfile.cr = 0;
     if (cpm_make_file(&outfile) != 0)
     {
         cpm_printstring("Failed.\r\n");
