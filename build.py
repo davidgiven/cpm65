@@ -13,8 +13,6 @@ export(
         "bin/pasc": "third_party/pascal-m+pasc-cross",
         "bin/pasc.obp": "third_party/pascal-m+pasc-obp",
         "bin/pasc.obb": "third_party/pascal-m+pasc-obb",
-        "test.obp": "third_party/pascal-m+test-obp",
-        "test.obb": "third_party/pascal-m+test-obb",
         "bin/pasdis": "third_party/pascal-m+pasdis",
         "bin/pint.com": "third_party/pascal-m+pint",
         "bin/loader.com": "third_party/pascal-m+loader",
