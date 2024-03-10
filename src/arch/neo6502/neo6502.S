@@ -1096,21 +1096,24 @@ zproc convert_and_find_file_table_entry
         phx
         lda file_table+FT_ATTRIBS, x
         zif_ne          ; skip empty slots
-            ldy #FT_FILENAMELEN-1
-            zrepeat
-                inx
-                iny
-
-                lda file_table, x
-                cmp temp_file_entry, y
-                zbreakif_ne
-
-                cpy temp_file_entry+FT_FILENAMELEN
-            zuntil_eq
+            lda file_table+FT_FILENAMELEN, x
+            cmp temp_file_entry+FT_FILENAMELEN
             zif_eq
-                plx
-                clc
-                rts
+                ldy #0
+                zrepeat
+                    lda file_table+FT_FILENAME, x
+                    cmp temp_file_entry+FT_FILENAME, y
+                    zbreakif_ne
+
+                    inx
+                    iny
+                    cpy temp_file_entry+FT_FILENAMELEN
+                zuntil_eq
+                zif_eq
+                    plx
+                    clc
+                    rts
+                zendif
             zendif
         zendif
         pla
