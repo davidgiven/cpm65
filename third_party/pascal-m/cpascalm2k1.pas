@@ -3320,6 +3320,44 @@ read -->----------------( ( )----( file-ident )------          !
                        !      --------------------     !
                        !                               !
                         --------------<----------------          *)
+          procedure ProcessTerms;
+          var
+            test: boolean;
+
+          begin
+            repeat
+              begin
+                if (gattr.kind <> varbl) then
+                  Error(154);
+                      (* place address of variable
+                          on stack for rdc or rdi *)
+                LoadAddress ;
+                if (gattr.typtr <> nil)
+                then
+                begin
+                  if CompTypes(intptr, gattr.typtr) then
+                    CSPgen(3) (* rdi *)
+                  else if CompTypes(charptr, gattr.typtr) then
+                    CSPgen(5) (* rdc *)
+                  else if IsString(gattr.typtr) then
+                    CSPgen(4) (* rdn *)
+                  else
+                    Error(177);
+                end
+                else
+                  (* error in type of standard procedure *)
+                  Error(116);
+
+                test := sy = comma;
+                if test then
+                begin
+                  InSymbol;
+                  Expression(fsys +[comma, rparent]);
+                end;
+              end;
+            until (not test);
+          end;
+
         begin
           if sy <> lparent
           then
@@ -3332,13 +3370,14 @@ read -->----------------( ( )----( file-ident )------          !
           else
           begin
             Intest(lparent, 9);
-            Expression(fsys +[comma, rparent]);
+            Expression(fsys + [comma, rparent]);
             if gattr.typtr^.form <> files then
             begin
                   (* The first expression is not a file type, which means it
                   must be something to write out. Default to output. *)
               LDCIGen(2);
               ByteGen(194); (* SFA *)
+              ProcessTerms;
             end
             else
             begin
@@ -3346,54 +3385,18 @@ read -->----------------( ( )----( file-ident )------          !
                   destination stream. *)
               LoadAddress;
               ByteGen(194); (* SFA *)
-              if (sy = comma) then
+              if sy = comma then
               begin
                 InSymbol;
-                Expression(fsys +[comma, rparent]);
-              end;
-            end;
-            while (sy <> rparent) do
-            begin
-              if (gattr.kind <> varbl) then
-                Error(154);
-                      (* place address of variable
-                          on stack for rdc or rdi *)
-              LoadAddress ;
-              if (gattr.typtr <> nil)
-              then
-              begin
-                if gattr.typtr^.form <= subrange
-                then
-                begin
-                  if CompTypes(intptr, gattr.typtr)
-                  then
-                    CSPgen(3)          (* rdi *)
-                  else if CompTypes(charptr, gattr.typtr)
-                  then
-                    CSPgen(5)          (* rdc *)
-                  else
-                    Error(177);
-                end
-                else
-                  (* error in type of standard procedure *)
-                  Error(116);
-              end
-              else
-                (* error in type of standard procedure *)
-                Error(116);
-
-              if (sy = comma) then
-              begin
-                InSymbol;
-                Expression(fsys +[comma, rparent]);
+                Expression(fsys + [comma, rparent]);
+                ProcessTerms;
               end;
             end;
             Intest(rparent, 4);
           end  ;
-          if lkey = 5
-          then
+          if lkey = 5 then
             CSPgen(4);              (* rln *)
-        end ;(* ReadProc *)
+        end;
 
         procedure WriteProc ;
         (* Generate code for standard procedure Write and Writeln *)
@@ -3658,7 +3661,7 @@ v                                                             !
           if (not IsString(gattr.typtr)) then
             Error(138);
 
-          CSPgen(17);                    (* assign file *)
+          CSPgen(18);                    (* get command line *)
         end;
 
         procedure OrdFunc ;
@@ -5080,6 +5083,7 @@ for ->--! var-ident !--(:=)---! expression !--->
       write(objectfile^, fprocp^.name[i]);
       sumcheck := sumcheck + ord(fprocp^.name[i]);
     end ;
+    writeln(fprocp^.name);
     HexOut((16383 - sumcheck)mod 256);
     writeln(objectfile^);
     (* remember where to put nr of bytes for local variables *)
@@ -5212,7 +5216,7 @@ begin
   nilptr^.stype := nil     ;
   (* file *)
   new(fileptr);
-  fileptr^.size  := 128     ;
+  fileptr^.size  := 128 + 36 + 1; (* buffer + fcb + position byte *)
   fileptr^.stype := nil     ;
   fileptr^.form  := files   ;
 end ;(* Enterstdtypes *)
@@ -5736,6 +5740,7 @@ var
     FindEnd := i;
   end;
 begin
+  parameters := '';
   GetCommandLine(parameters);
   len := ord(parameters[0]);
 
@@ -5751,6 +5756,7 @@ begin
   assign(objectfile^, destname);
   rewrite(objectfile^);
 
+  {
   i := FindEnd(destname);
   destname[i-2] := 'l';
   destname[i-1] := 's';
@@ -5758,6 +5764,8 @@ begin
   new(listfile);
   assign(listfile^, destname);
   rewrite(listfile^);
+  }
+  listfile := nil;
 
   i := FindEnd(destname);
   destname[i-2] := 'e';
@@ -5849,7 +5857,9 @@ end;
 begin (* main Mpascal *)
   writeln ( 'Pascal-M compiler V2k1') ;
   Openfiles ;
-  if (not CompilePascalM) then
+  if CompilePascalM then
+    writeln('Compilation successful.')
+  else
     writeln('Compile errors, see error file') ;
   CloseFiles ;
   if ShowErrors then
