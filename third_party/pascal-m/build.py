@@ -40,7 +40,7 @@ def pascalm_obp(self, name, src: Target):
         ins=[src],
         deps=["third_party/pascal-m+pasc-cross"],
         outs=["out.obp"],
-        commands=["{deps[0]} {ins[0]} {outs[0]}"],
+        commands=["chronic {deps[0]} {ins[0]} {outs[0]}"],
         label="PASCALM-COMPILE",
     )
 

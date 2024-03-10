@@ -5741,6 +5741,8 @@ begin
   assign(objectfile^, destname);
   rewrite(objectfile^);
 
+  listfile := nil;
+  (*
   i := FindEnd(destname);
   destname[i-2] := 'l';
   destname[i-1] := 's';
@@ -5748,6 +5750,7 @@ begin
   new(listfile);
   assign(listfile^, destname);
   rewrite(listfile^);
+  *)
 
   i := FindEnd(destname);
   destname[i-2] := 'e';
@@ -5756,54 +5759,7 @@ begin
   new(errorfile);
   assign(errorfile^, destname);
   rewrite(errorfile^);
-
-  (*
-  if len = 0 then
-         begin
-           write('Pascal-M source> ') ;
-           readln(sourcename)
-         end;
-         *)
-       (*
-       else
-         namefile := paramstr(1) ;
-     if (namefile = '?') or
-        (namefile = 'h') or
-        (namefile = 'H') or
-        (namefile = '/h') or
-        (namefile = '-h')
-    then
-      begin
-        writeln('Syntax: cpascalm2k1 <sourcefile^> [V]');
-        writeln('produces sourcefile^.err (status) and sourcefile^.obp (object) files') ;
-        writeln('V shows errors on console') ;
-        halt(1)
-      end;
-      *)
-      
-  { open file }
-      (* 
-      filename := namefile ;
-      assign (sourcefile^, filename);
-      reset(sourcefile^) ;
-
-     dot := pos('.', filename);
-     namefile := concat(copy(filename, 1, dot), 'obp');
-     assign (objectfile^, namefile) ;
-     rewrite(objectfile^) ;
-     namefile := concat(copy(filename, 1, dot), 'lst');
-     assign( listfile^, namefile) ;
-     rewrite(listfile^) ;
-     namefile := concat(copy(filename, 1, dot), 'err');
-     assign( errorfile^, namefile) ;
-     rewrite(errorfile^) ;
-     ShowErrors := false ;
-     if paramcount > 1
-       then
-         if (paramstr(2) = 'v') or (paramstr(2) = 'V')
-           then
-             ShowErrors := true ;
-             *)
+  
   ShowErrors := true;
 end ; (* OpenFiles *)
 
