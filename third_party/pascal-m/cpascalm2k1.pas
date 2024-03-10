@@ -1236,7 +1236,7 @@ var
   lsy : symbol ;
   test : boolean ;
 
-  procedure Bytegen (byte : integer);
+  procedure ByteGen (byte : integer);
   (* add byte to codebuffer, empty codebuffer if necessary *)
   begin
     if icn = maxcode + 1
@@ -1244,28 +1244,20 @@ var
       WriteOut ;
     codebuf[icn] := byte ;
     icn := icn + 1;
-  end ;(* Bytegen *)
+  end ;(* ByteGen *)
 
-  procedure Wordgen(word : integer);
+  procedure WordGen(word : integer);
   (* put word as two bytes in codebuffer *)
   begin
-    Bytegen(word shr 8);
-    Bytegen(word mod 256);
-  end ;(* Wordgen *)
-
-  procedure Addrgen(addr : integer);
-  (* put word as two bytes in codebuffer *)
-  begin
-    addr := addr - (ic + icn);
-    Bytegen(addr shr 8);
-    Bytegen(addr mod 256);
-  end ;(* Addrgen *)
+    ByteGen(word shr 8);
+    ByteGen(word mod 256);
+  end ;(* WordGen *)
 
   procedure GenUJPent(fop : oprange ; word : integer);
   (* generate fop instruction, followed by fp2 as word *)
   begin
-    Bytegen(fop);
-    Addrgen(word);
+    ByteGen(fop);
+    WordGen(word);
   end ;(* GenUJPent *)
 
   procedure PlantWord(location, value : integer);
@@ -1297,12 +1289,6 @@ var
       writeln(objectfile^);
     end;
   end ;
-
-  procedure PlantAddr(location, value : integer);
-  (* plant relative address at locaiton in code. *)
-  begin
-    PlantWord(location, value - location);
-  end;
 
   procedure Skip(fsys : setofsys);
   (* Skip input chstring until relevant symbol found *)
@@ -2683,17 +2669,17 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
     begin
       if(value < 16)and(value >= 0)
       then
-        Bytegen(value)
+        ByteGen(value)
       else if value < 0
       then
       begin
-        Bytegen(176);              (* LNC *)
-        Wordgen(-value);
+        ByteGen(176);              (* LNC *)
+        WordGen(-value);
       end
       else
       begin
-        Bytegen(160);                (* LDC *)
-        Wordgen(value);
+        ByteGen(160);                (* LDC *)
+        WordGen(value);
       end;
     end ;(* LDCIgen *)
 
@@ -2712,13 +2698,13 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         if dplmt < 256
         then                          (* ldas *)
         begin
-          Bytegen(16 + level);
-          Bytegen(dplmt);
+          ByteGen(16 + level);
+          ByteGen(dplmt);
         end
         else                          (* lda  *)
         begin
-          Bytegen(32 + level);
-          Wordgen(dplmt);
+          ByteGen(32 + level);
+          WordGen(dplmt);
         end;
       end;
     end ;(* LDAgen *)
@@ -2731,8 +2717,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
       then
       begin
         (* LOD1, LOD2 or LOD8 byte instructions *)
-        Bytegen(64 + 16 * fattr.typtr^.size + thislevel - varlevel);
-        Bytegen(fattr.dplmt);
+        ByteGen(64 + 16 * fattr.typtr^.size + thislevel - varlevel);
+        ByteGen(fattr.dplmt);
       end
       else
       begin
@@ -2740,9 +2726,9 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         LDAgen(thislevel, varlevel, fattr.dplmt);
         (* Indirectly load data on stack *)
         case fattr.typtr^.size of
-          1 : Bytegen(154); (* IND1 *)
-          2 : Bytegen(155); (* IND2 *)
-          3 : Bytegen(156)  (* IND8 *)
+          1 : ByteGen(154); (* IND1 *)
+          2 : ByteGen(155); (* IND2 *)
+          3 : ByteGen(156)  (* IND8 *)
         end;
       end;
     end ;(* LODgen *)
@@ -2759,8 +2745,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         (* LEQ2(= $90)to LEQM(= $92)*)
         (* LES2(= $93)to LESM(= $95)*)
         (* EQU2(= $96)to EQUM(= $98)*)
-        Bytegen(fop + 2);
-        Wordgen(fattr.typtr^.size);
+        ByteGen(fop + 2);
+        WordGen(fattr.typtr^.size);
       end
       else if fattr.typtr^.size = 1
       then
@@ -2768,18 +2754,18 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         (* LEQ2(= $90)*)
         (* LES2(= $93)*)
         (* EQU2(= $96)*)
-        Bytegen(fop)
+        ByteGen(fop)
       else if fattr.typtr^.size = 2
       then
         (* LEQ2(= $90)*)
         (* LES2(= $93)*)
         (* EQU2(= $96)*)
-        Bytegen(fop)
+        ByteGen(fop)
       else if fattr.typtr^.size = 8
       then
         (* sets, only equal operatortype *)
         (* EQU2(= $96)to EQUM(= $99)*)
-        Bytegen(fop + 3)
+        ByteGen(fop + 3)
       else
         Error(179);         (* wrong size *)
     end ;(* Condgen *)
@@ -2799,7 +2785,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
           n := n + 1 ;
       if n = 0
       then
-        Bytegen(193)          (* Load empty set lns *)
+        ByteGen(193)          (* Load empty set lns *)
       else if n < 4
       then
       begin
@@ -2808,16 +2794,16 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
           then
           begin
             LDCIgen(i);
-            Bytegen(174);     (* sgs *)
+            ByteGen(174);     (* sgs *)
             if b
             then
-              Bytegen(175); (* uni *)
+              ByteGen(175); (* uni *)
             b := true;
           end;
       end
       else        (* n >= 4 *)
       begin
-        Bytegen(186);               (* LDCS *)
+        ByteGen(186);               (* LDCS *)
         l := 0 ;
         k := 128 ;
         for i := 0 to setmax do
@@ -2826,7 +2812,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
           then
           begin
             k := 128 ;
-            Bytegen(l);
+            ByteGen(l);
             l := 0;
           end ;
           if i in setconst
@@ -2835,15 +2821,15 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
           (* shift *)
           k := k div 2;
         end ;
-        Bytegen(l);
+        ByteGen(l);
       end;
     end ;(* LoadSetConstant *)
 
     procedure CSPgen(stpr : integer);
     (* generate instruction to call standard procedure stpr *)
     begin
-      Bytegen(189 );
-      Bytegen(stpr);
+      ByteGen(189 );
+      ByteGen(stpr);
     end ;(* CSPgen *)
 
     procedure INCgen(inc : integer);
@@ -2854,21 +2840,21 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
       then
         if inc = 1
         then
-          Bytegen(185)               (* inc1 *)
+          ByteGen(185)               (* inc1 *)
         else if inc = -1
         then
-          Bytegen(184)               (* dec1 *)
+          ByteGen(184)               (* dec1 *)
         else
         if inc > 0
         then
         begin
-          Bytegen(180);          (* inc *)
-          Wordgen(inc);
+          ByteGen(180);          (* inc *)
+          WordGen(inc);
         end
         else
         begin
-          Bytegen(179);          (* dec *)
-          Wordgen(- inc);
+          ByteGen(179);          (* dec *)
+          WordGen(- inc);
         end;
     end ;(* INCgen *)
 
@@ -2889,7 +2875,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
           else if gattr.typtr = nilptr
           then
             (* load zero on stack *)
-            Bytegen(0)
+            ByteGen(0)
           else
             (* load constant set on stack *)
             LoadSetConstant(gattr.cval.valp^.pval);
@@ -2905,9 +2891,9 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
             INCgen(gattr.dplmt);
             (* Indirectly load data item on stack *)
             case gattr.typtr^.size of
-              1 : Bytegen(154);   (* IND1 *)
-              2 : Bytegen(155);   (* IND2 *)
-              8 : Bytegen(156);   (* IND8 *)
+              1 : ByteGen(154);   (* IND1 *)
+              2 : ByteGen(155);   (* IND2 *)
+              8 : ByteGen(156);   (* IND8 *)
             end;
           end ;
         gattr.kind := expr;
@@ -2923,9 +2909,9 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         then
         begin
           (* STR1 or LOD2 *)
-          Bytegen(96 + 16 * fattr.typtr^.size
+          ByteGen(96 + 16 * fattr.typtr^.size
             + level - fattr.level);
-          Bytegen(fattr.dplmt);
+          ByteGen(fattr.dplmt);
         end
         else
         if fattr.dplmt <> 0
@@ -2936,9 +2922,9 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
           if fattr.typtr^.form = files then
             Error(178);
           case fattr.typtr^.size of
-            1 : Bytegen(157);         (* Sto1 *)
-            2 : Bytegen(158);         (* Sto2 *)
-            8 : Bytegen(159);         (* Sto8 *)
+            1 : ByteGen(157);         (* Sto1 *)
+            2 : ByteGen(158);         (* Sto2 *)
+            8 : ByteGen(159);         (* Sto8 *)
           end;
         end;
     end ;(* Store *)
@@ -2959,14 +2945,14 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
           then
           begin
             (* Put address of string on stack *)
-            Bytegen(188);        (* LCA *)
-            Bytegen(StringSize(gattr.cval.valp));
+            ByteGen(188);        (* LCA *)
+            ByteGen(StringSize(gattr.cval.valp));
             lvp := gattr.cval.valp ;
             (* Put string following opcode *)
             while lvp <> nil do
             begin
               for i := 1 to lvp^.slgth do
-                Bytegen(lvp^.sval[i]);
+                ByteGen(lvp^.sval[i]);
               (* walk through linked list of string parts *)
               lvp := lvp^.sptr;
             end;
@@ -3001,8 +2987,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         then
           (* must have boolean result on stack *)
           Error(144);
-      Bytegen(177)  ;          (* FJP *)
-      Addrgen(faddr);
+      ByteGen(177)  ;          (* FJP *)
+      WordGen(faddr);
     end ;(* FalseJumpGen *)
 
     procedure CallUserProcGen(fp1, fp2 : integer);
@@ -3012,12 +2998,12 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
       if pfcttest
       then
       begin
-        Bytegen(fp1);
-        Bytegen(191);       (* CUP2 *)
+        ByteGen(fp1);
+        ByteGen(191);       (* CUP2 *)
       end
       else
-        Bytegen(190);        (* CUP1 *)
-      Bytegen(fp2);
+        ByteGen(190);        (* CUP1 *)
+      ByteGen(fp2);
     end ;(* CallUserProcGen *)
 
     procedure Statement(fsys : setofsys);
@@ -3079,8 +3065,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
               begin
                 if (fcp^.vlev = -1) then
                   Error(178);
-                Bytegen($60 + level - fcp^.vlev);
-                Bytegen(fcp^.vaddr);
+                ByteGen($60 + level - fcp^.vlev);
+                ByteGen(fcp^.vaddr);
               end
               else
                 LDAgen(level, fcp^.vlev, fcp^.vaddr);
@@ -3186,9 +3172,9 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
                   then
                   begin
                     LDCIgen(gattr.typtr^.size);
-                    Bytegen(170); (* mpi *)
+                    ByteGen(170); (* mpi *)
                   end ;
-                Bytegen(162);   (* adi *)
+                ByteGen(162);   (* adi *)
                 gattr.kind := varbl ;
                 gattr.access := indrct ;
                 gattr.dplmt := 0;
@@ -3552,9 +3538,8 @@ v                                                             !
             CSPgen(6);                    (* wln *)
         end ;(* WriteProc *)
 
-        procedure Newstatement ;
-     (* generate code for stand procedure New,
-         argument of new is pointer *)
+        procedure NewStatement ;
+        (* generate code for stand procedure New, argument of new is pointer *)
         var
           lsize : addrrange ;
         begin
@@ -3686,7 +3671,7 @@ v                                                             !
             then
               Error(125)
             else
-              Bytegen(185);(* inc1 *)
+              ByteGen(185);(* inc1 *)
         end ;(* SuccFunc *)
 
         procedure PredFunc ;
@@ -3699,7 +3684,7 @@ v                                                             !
             then
               Error(125)
             else
-              Bytegen(184);(* dec1 *)
+              ByteGen(184);(* dec1 *)
         end ;(* PredFunc *)
 
         procedure ChrFunc ;
@@ -3792,12 +3777,12 @@ proc/func-ident -----(()-----! expression !-----())------>
             if fcp^.klass = proc
             then
               (* procedure needs no space for result *)
-              Bytegen(48 + level - fcp^.pflev)     (* msto *)
+              ByteGen(48 + level - fcp^.pflev)     (* msto *)
             else
             begin
               (* function has result mark stack with return-bytes MSTN *)
-              Bytegen(64 + level - fcp^.pflev);
-              Bytegen(fcp^.idtype^.size);       (* ret value *)
+              ByteGen(64 + level - fcp^.pflev);
+              ByteGen(fcp^.idtype^.size);       (* ret value *)
             end ;
           (* parse parameter-list *)
           if sy = lparent
@@ -3883,8 +3868,8 @@ proc/func-ident -----(()-----! expression !-----())------>
           begin
             (* external procedure/function *)
             LDCIgen(locpar);
-            Bytegen(187);               (* cap *)
-            Wordgen(fcp^.pfname);
+            ByteGen(187);               (* cap *)
+            WordGen(fcp^.pfname);
           end
           else
             CallUserProcGen(locpar, fcp^.pfname);
@@ -3893,7 +3878,7 @@ proc/func-ident -----(()-----! expression !-----())------>
             if fcp^.idtype^.size = 1
             then
               (* result fixed to 2 bytes *)
-              Bytegen(192);             (* fix21 *)
+              ByteGen(192);             (* fix21 *)
           pfcttest := true ;
           gattr.typtr := fcp^.idtype;
         end ;(* Callnonstandard *)
@@ -3913,7 +3898,7 @@ proc/func-ident -----(()-----! expression !-----())------>
             case lkey of
               1, 5: ReadProc;
               2, 6: WriteProc;
-              9: Bytegen(161); (* retp *)
+              9: ByteGen(161); (* retp *)
               10: CSPgen(11); (* HALT standard procedure *)
             else
             begin
@@ -3985,7 +3970,7 @@ proc/func-ident -----(()-----! expression !-----())------>
               then
               begin
                 test := true ;
-                Bytegen(opi);
+                ByteGen(opi);
               end;
             end
             else if CompTypes(lattr.typtr, boolptr)and
@@ -3996,7 +3981,7 @@ proc/func-ident -----(()-----! expression !-----())------>
               then
               begin
                 test := true ;
-                Bytegen(opb);
+                ByteGen(opb);
               end;
             end
             else if(lattr.typtr^.form = power)and
@@ -4006,7 +3991,7 @@ proc/func-ident -----(()-----! expression !-----())------>
               then
               begin
                 test := true ;
-                Bytegen(ops);
+                ByteGen(ops);
               end ;
             if not test
             then
@@ -4089,10 +4074,10 @@ proc/func-ident -----(()-----! expression !-----())------>
                         else
                         begin
                           Load ;
-                          Bytegen(174);(* sgs *)
+                          ByteGen(174);(* sgs *)
                           if varpart
                           then           (* uni *)
-                            Bytegen(175)
+                            ByteGen(175)
                           else
                             varpart := true;
                         end ;
@@ -4115,7 +4100,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                   then
                   begin
                     LoadSetConstant(cstpart);
-                    Bytegen(175);        (* uni *)
+                    ByteGen(175);        (* uni *)
                     gattr.kind := expr;
                   end;
                 end
@@ -4227,7 +4212,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                     InSymbol ;
                     Factor(fsys);
                     Load ;
-                    Bytegen(172);     (* not *)
+                    ByteGen(172);     (* not *)
                     if gattr.typtr <> nil
                     then
                       if not CompTypes(gattr.typtr, boolptr)
@@ -4326,7 +4311,7 @@ proc/func-ident -----(()-----! expression !-----())------>
             Load ;
             if CompTypes(gattr.typtr, intptr)
             then
-              Bytegen(171)               (* ngi *)
+              ByteGen(171)               (* ngi *)
             else
             begin
               Error(134);
@@ -4411,7 +4396,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                 if CompTypes(lattr.typtr,
                   gattr.typtr^.stype)
                 then
-                  Bytegen(166)            (* inn *)
+                  ByteGen(166)            (* inn *)
                 else
                 begin
                   Error(129);
@@ -4484,7 +4469,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                 else if lop = neop
                 then
                   Condgen(150,lattr)(* equ *);
-                Bytegen(172);       (* not *)
+                ByteGen(172);       (* not *)
               end;
             end
             else
@@ -4538,8 +4523,8 @@ proc/func-ident -----(()-----! expression !-----())------>
               if lattr.typtr^.form in[arrays, records]
               then
               begin
-                Bytegen(183);           (* mov *)
-                Wordgen(lattr.typtr^.size);
+                ByteGen(183);           (* mov *)
+                WordGen(lattr.typtr^.size);
               end
               else
                 Store(lattr);
@@ -4552,15 +4537,15 @@ proc/func-ident -----(()-----! expression !-----())------>
               if lattr.typtr^.size < gattr.typtr^.size
               then
               begin
-                Bytegen(183);           (* mov *)
-                Wordgen(lattr.typtr^.size);
+                ByteGen(183);           (* mov *)
+                WordGen(lattr.typtr^.size);
               end
               else
               begin
                 (* less to move, add blanks to end *)
-                Bytegen(196);          (* mvb *)
-                Wordgen(gattr.typtr^.size);
-                Wordgen(lattr.typtr^.size -
+                ByteGen(196);          (* mvb *)
+                WordGen(gattr.typtr^.size);
+                WordGen(lattr.typtr^.size -
                   gattr.typtr^.size);
               end;
             end
@@ -4569,9 +4554,9 @@ proc/func-ident -----(()-----! expression !-----())------>
               and(gattr.typtr = charptr)
             then
             begin
-              Bytegen(196);          (* mvb *)
-              Wordgen(1);
-              Wordgen(lattr.typtr^.size - 1);
+              ByteGen(196);          (* mvb *)
+              WordGen(1);
+              WordGen(lattr.typtr^.size - 1);
             end
             else
               Error(129);
@@ -4633,15 +4618,15 @@ if ->--!expression!--(then)--!statement!--!                     -->
           icix2 := ic + icn ;
           GenUJPent(178 , 0);    (* ujp *)
           (* fill in address of cond jump if result is false *)
-          PlantAddr( icix1, ic + icn);
+          PlantWord( icix1, ic + icn);
           InSymbol ;
           Statement(fsys);
           (* we know now end of else part *)
-          PlantAddr(icix2 + 1, ic + icn);
+          PlantWord(icix2 + 1, ic + icn);
         end
         else
           (* no else part, fill in conditional jump address *)
-          PlantAddr(icix1, ic + icn);
+          PlantWord(icix1, ic + icn);
       end ;(* IfStatement *)
 
       procedure CaseStatement ;
@@ -4766,7 +4751,7 @@ case->----! expression !---(OF)---->---
           then
             InSymbol ;
         until test or(sy = endsy)or(sy = elsesy);
-        PlantAddr(lcix + 1 , ic + icn);
+        PlantWord(lcix + 1 , ic + icn);
         if fstptr <> nil
         then
         begin
@@ -4781,18 +4766,18 @@ case->----! expression !---(OF)---->---
             lpt1 := lpt2
           until lpt1 = nil ;
           lmin := fstptr^.cslab ;
-          Bytegen(182) ;         (* CAS *)
-          Wordgen(lmin);
-          Wordgen(lmax);
+          ByteGen(182) ;         (* CAS *)
+          WordGen(lmin);
+          WordGen(lmax);
           lcix1 := ic + icn ;
-          Wordgen(0);
+          WordGen(0);
           repeat
             while fstptr ^.cslab > lmin do
             begin
-              Wordgen(0);
+              WordGen(0);
               lmin := lmin + 1 ;
             end ;
-            Addrgen(fstptr^.csstart);
+            WordGen(fstptr^.csstart);
             fstptr := fstptr^.casenext ;
             lmin := lmin + 1
           until fstptr = nil;
@@ -4803,13 +4788,13 @@ case->----! expression !---(OF)---->---
         then
         begin
           InSymbol ;
-          PlantAddr(lcix1, ic + icn);
+          PlantWord(lcix1, ic + icn);
           repeat
             Statement(fsys +[semicolon])
           until not(sy in statbegsys);
           GenUJPent(178 , lcix + 3);
         end ;
-        PlantAddr(lcix + 4, ic + icn);
+        PlantWord(lcix + 4, ic + icn);
         Intest(endsy, 13);
 
       end ;(* CaseStatement *)
@@ -4876,7 +4861,7 @@ while ->----! expression !---------(do)----!statement !--->
         (* Unconditional jump back to begin of loop *)
         GenUJPent(178, laddr);    (* ujp *)
         (* address for jump out of loop now known *)
-        PlantAddr(lcix + 1 , ic + icn);
+        PlantWord(lcix + 1 , ic + icn);
       end ;(* WhileStatement *)
 
       procedure ForStatement ;
@@ -4983,7 +4968,7 @@ for ->--! var-ident !--(:=)---! expression !--->
               then
                 lcix := lcix + 4 ;
               (* stepsize on stack *)
-              Bytegen(lcix);
+              ByteGen(lcix);
               laddr := ic + icn ;
               (* generate jump instruction to for statement *)
               GenUJPent(178, 0);    (* ujp *)
@@ -5004,7 +4989,7 @@ for ->--! var-ident !--(:=)---! expression !--->
         (* statement *)
         Statement(fsys);
         (* now we know address of end of for loop *)
-        PlantAddr(laddr + 1 , ic + icn);
+        PlantWord(laddr + 1 , ic + icn);
         GenUJPent(145 , laddr + 3) ;            (* for *)
       end ;(* ForStatement *)
 
@@ -5083,7 +5068,7 @@ for ->--! var-ident !--(:=)---! expression !--->
       write(objectfile^, fprocp^.name[i]);
       sumcheck := sumcheck + ord(fprocp^.name[i]);
     end ;
-    writeln(fprocp^.name);
+    writeln('Processing: ', fprocp^.name);
     HexOut((16383 - sumcheck)mod 256);
     writeln(objectfile^);
     (* remember where to put nr of bytes for local variables *)
@@ -5108,10 +5093,10 @@ for ->--! var-ident !--(:=)---! expression !--->
             begin
               (* copy record or array *)
               LDAgen(0, 0, lcp^.vaddr);
-              Bytegen(96);(* LOD *)
-              Bytegen(llc1);
-              Bytegen(183);    (* mov *)
-              Wordgen(lcp^.idtype^.size);
+              ByteGen(96);(* LOD *)
+              ByteGen(llc1);
+              ByteGen(183);    (* mov *)
+              WordGen(lcp^.idtype^.size);
             end;
           end
           else
@@ -5130,7 +5115,7 @@ for ->--! var-ident !--(:=)---! expression !--->
         InSymbol
     until test ;
     Intest(endsy, 13);
-    Bytegen(161);               (* retp *)
+    ByteGen(161);               (* retp *)
     PlantWord(segsize + 1 , lcmax - lcaftermarkstack);
   end ;(* body *)
 
@@ -5756,7 +5741,6 @@ begin
   assign(objectfile^, destname);
   rewrite(objectfile^);
 
-  {
   i := FindEnd(destname);
   destname[i-2] := 'l';
   destname[i-1] := 's';
@@ -5764,8 +5748,6 @@ begin
   new(listfile);
   assign(listfile^, destname);
   rewrite(listfile^);
-  }
-  listfile := nil;
 
   i := FindEnd(destname);
   destname[i-2] := 'e';

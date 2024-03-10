@@ -218,6 +218,7 @@ finished_read:;
     cpm_printstring("Writing output file...\r\n");
 
     memset(cpm_default_dma, 0, 128);
+    writeword(proccount*2 + 2); /* offset to mcode start */
     for (int i=0; i<proccount; i++)
         writeword(procedures[i] + proccount*2);
 

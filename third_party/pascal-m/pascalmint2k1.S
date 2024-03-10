@@ -63,6 +63,7 @@ stack:  .fill 2 ; software stack pointer
 hp:     .fill 2 ; heap pointer
 mp:     .fill 2 
 mpsave: .fill 2 
+progbase: .fill 2 ; start of use m-code
 jtabp:  .fill 2 ; jump table pointer
 jtab2p: .fill 2 ; jump table 2
 strptr: .fill 1 ; string print pointer
@@ -91,7 +92,7 @@ CR      = $0D                   ; Carriage return
 LF      = $0A                   ; Linefeed
 
 BASE    = cpm_ram               ; where the m-code is loaded
-prcbuf  = BASE
+prcbuf  = BASE + 2
 
 ; Interpreter 
 ;
@@ -156,6 +157,18 @@ done_load:                          ; heap has been advanced past the program
         lda #0
         sta stack
         sta mp
+
+        ;
+        ; compute the base of use mcode
+        ;
+
+        clc
+        lda BASE+0
+        adc #<BASE
+        sta progbase+0
+        lda BASE+1
+        adc #>BASE
+        sta progbase+1
 
         ;
         ; locate the command line parameters
@@ -272,8 +285,6 @@ strina: lda (strptr),Y
         bne strina      ; interpr 
 stinb:  jsr crlf
         rts
-string: jsr prstrng     ; print string 
-        jmp bdos_EXIT   ; leave 
         ;
         ; Compute base address of level (op-x)
         ; leave result in tmp2l2
@@ -431,8 +442,8 @@ tststk: sec         ; test if stack and heap will meet
         lda stack + 1
         sbc hp + 1
         bcs tst1x1      ; overflow already
-ovfl:   lda #>msg005    ; send message and fatal error exit
-        ldx #<msg005
+ovfl:   ldx #>msg005    ; send message and fatal error exit
+        lda #<msg005
         jmp string
 tst1x1: bne interpr
         lda tmp2l2
@@ -441,7 +452,7 @@ tst1x1: bne interpr
 ;
 ; main interpr starts here
 ;
-interpr:ldx #0
+interpr: ldx #0
         lda (pc,x)
         sta op
         inc pc
@@ -449,8 +460,8 @@ interpr:ldx #0
         inc pc + 1
 intrpr1:cmp #$C7
         bcc intrpr2     ; opcode in range
-notimp: lda #>msg007
-        ldx #<msg007
+notimp: ldx #>msg007
+        lda #<msg007
         jmp string      ; not implemented message, fatal
 intrpr2:cmp #$90        ; test if direct op
         bcs pacop       ; packed opcode
@@ -1239,43 +1250,57 @@ cas:    jsr setup1      ; case nr
         bmi casex       ; if larger than max
         asl tmp3l2      ; multiply by two for dual word index
         rol tmp3l2 + 1
-        clc             ; case of
-        lda tmp3l2
-        adc pc
+        
+        clc
+        lda pc
+        adc tmp3l2
         adc #6
-        sta pc          ; PC points to offset
-        lda tmp3l2 + 1
-        adc pc + 1
-        sta pc + 1
-        ldy #1
-        lda (pc),y
-        sta tmp2l2      ; lower part of new PC
-        dey 
-        lda (pc),y
+        sta tmp3l2
+        lda pc+1
+        adc tmp3l2+1
+        sta tmp3l2+1    ; tmp3l2 is now the address of the jump word
+
+        ldy #0
+        lda (tmp3l2), y
+        iny
+        ora (tmp3l2), y
+        beq casex       ; no target, do ELSE
+
+        lda (tmp3l2), y
+        sta tmp2l2
+        dey
+        lda (tmp3l2), y
         sta tmp2l2 + 1
-        ora tmp2l2
-        bne cas2        ; if no nill pointer
-        bcc casex       
+        
 cas2:   clc
-        lda tmp2l2      ; adjust address in tmp2 with BASE
-        adc pc
+        lda tmp2l2      ; adjust address in tmp2 with progbase
+        adc progbase
         sta pc
         lda tmp2l2 + 1
-        adc pc + 1
+        adc progbase + 1
         sta pc + 1
         jmp interpr
+
 casex:  ldy #$05        ; test for otherwise
         lda (pc),y
         sta tmp2l2
         dey
         lda (pc),y
         sta tmp2l2 + 1
+
         clc
-        adc tmp2l2      ; test for nil
+        lda pc
+        adc #4
+        sta pc
+        bcc casex1
+        inc pc+1
+casex1:
+
+        lda tmp2l2+1
+        ora tmp2l2
         bne cas2
-        bcs cas2
-        lda #>msg006
-        ldx #<msg006
+        ldx #>msg006
+        lda #<msg006
         jmp string
         ;
         ; B7 MOV
@@ -1460,11 +1485,11 @@ cupgo:  ldy #$00
         tax            
         lda prcbuf,x  
         clc
-        adc #<BASE
+        adc #<(BASE+2)
         sta pc
         inx
         lda prcbuf,x        ; pc from table
-        adc #>BASE
+        adc #>(BASE+2)
         sta pc + 1
         jmp interpr         ; jump to new procedure
         ;
@@ -1822,9 +1847,7 @@ eln:    ldy eolb            ; get EOLN boolean
         ;
         ; PROC B STP
         ;
-stp:    lda #>msg002
-        ldx #<msg002
-        jmp string          ; Print End pascal and stop
+stp:    jmp bdos_EXIT       ; just stop
         ;
         ; TODO: new standard procedures 
 ;      12 : ODDM ;
@@ -2135,8 +2158,8 @@ div1:   sec
         rol tmp1l8 + 1
         cpy #$10            ; more than 16 times?
         bne div1
-        ldx #<msg008        ; divison by zero, stop
-        lda #>msg008
+        lda #<msg008        ; divison by zero, stop
+        ldx #>msg008
         jmp string
 div2:   sty tmp1l8 + 7
 div3:   sec
@@ -2297,7 +2320,7 @@ ttyout1:jsr bdos_CONOUT
         rts
 
 ;
-; Sets the CP/M DMA pointer this file's buffer.
+; Sets the CP/M DMA pointer to this file's buffer.
 
 setdma: clc
         lda fa
@@ -2316,11 +2339,64 @@ crlf:   lda #CR
         lda #LF
         jmp wrt
 ;
+; Print hex byte to console
+;
+phex2:  sed
+        tax
+        and #$0f
+        cmp #9+1
+        adc #$30
+        tay
+        txa
+        lsr
+        lsr
+        lsr
+        lsr
+        cmp #9+1
+        adc #$30
+        cld
+
+        sty ytmp
+        jsr bdos_CONOUT
+        lda ytmp
+        jmp bdos_CONOUT
+;
+; Emergency halt
+;
+string: jsr bdos_WRITESTRING
+abend:  lda #<abend_msg
+        ldx #>abend_msg
+        jsr bdos_WRITESTRING
+
+        jsr writepc
+
+        lda #<crlf_msg
+        ldx #>crlf_msg
+        jsr bdos_WRITESTRING
+        jmp bdos_EXIT
+
+writepc: lda #' '
+        jsr bdos_CONOUT
+        sec
+        lda pc
+        sbc progbase
+        pha
+        lda pc+1
+        sbc progbase+1
+
+        jsr phex2
+        pla
+        jmp phex2
+
+
+abend_msg: .asciz " at"
+crlf_msg:  .byte 13, 10, 0
+;
 ; messages
 ;
-msg005: .ascii " Out of stack\r"
-msg006: .ascii " Case index\r"
-msg007: .ascii " Not implemented\r"
-msg008: .ascii " Div by zero\r"
+msg005: .asciz "Out of stack"
+msg006: .asciz "Case index"
+msg007: .asciz "Not implemented"
+msg008: .asciz "Div by zero"
 msg003:
 msg002: .ascii "Pascal-M\r"
