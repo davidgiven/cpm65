@@ -112,8 +112,8 @@ const
   maxchcnt         =   120 ;(* maximum input line-length *)
   maxerlines       =    10 ;(* maximum number of errors in a line *)
   maxermsg         =   200 ;(* maximum number of error messages *)
-  maxops           =    34 ;(* maximum number of operators *)
-  maxopsp1         =    35 ;(* maximum number of operators plus one... *)
+  maxops           =    33 ;(* maximum number of operators *)
+  maxopsp1         =    34 ;(* maximum number of operators plus one... *)
   (* ASCII character Control Constants *)
   atab     = 9   ;(* tab-character  *)
 type
@@ -370,24 +370,24 @@ var
 procedure EndLinelist  ;
 (* Ends line on listfile^, takes care of pages, headings etc *)
 begin
-    if listfile <> nil then
-    begin
+  if listfile <> nil then
+  begin
     listlines := listlines + 1 ;
     (* new page needed ? *)
-     if listlines > maxpage
-       then
-         begin
-          (* writeformfeed and header *)
-           writeln(listfile^);
-           write(listfile^, 'Pascal-M V1.4 Source listing     ');
-           write(listfile^, sourcename);
-           writeln(listfile^, '               Page ', listpages:4);
-           writeln(listfile^);
-           writeln(listfile^);
-           listpages := listpages + 1 ;
-           listlines := 3
-         end ;
-        end;
+    if listlines > maxpage
+    then
+    begin
+      (* writeformfeed and header *)
+      writeln(listfile^);
+      write(listfile^, 'Pascal-M V1.4 Source listing     ');
+      write(listfile^, sourcename);
+      writeln(listfile^, '               Page ', listpages:4);
+      writeln(listfile^);
+      writeln(listfile^);
+      listpages := listpages + 1 ;
+      listlines := 3;
+    end ;
+  end;
 end ;(* EndLineList *)
 
 procedure BeginLine ;
@@ -2718,9 +2718,9 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         else                          (* lda  *)
         begin
           Bytegen(32 + level);
-          Wordgen(dplmt)
-        end
-      end
+          Wordgen(dplmt);
+        end;
+      end;
     end ;(* LDAgen *)
 
     procedure LODgen(thislevel, varlevel : integer ; var fattr : attr);
@@ -3425,87 +3425,87 @@ v                                                             !
           lsp : structptr ;
           llkey : 1 .. maxstandrd ;
 
-        procedure ProcessTerms;
-        var
-          default : boolean ;
-          len : addrrange ;
+          procedure ProcessTerms;
+          var
+            default : boolean ;
+            len : addrrange ;
 
-        begin
-          repeat
-            lsp := gattr.typtr ;
-            if lsp <> nil
-            then
-              (* put variable or address of variable on stack *)
-              if lsp^.form <= subrange
+          begin
+            repeat
+              lsp := gattr.typtr ;
+              if lsp <> nil
               then
-                Load
-              else
-                LoadAddress ;
-            (* if colon then no default, load expression as nr of characters *)
-            if sy = colon
-            then
-            begin
-              InSymbol ;
-              Expression(fsys +[comma, rparent]);
-              if gattr.typtr <> nil
+                (* put variable or address of variable on stack *)
+                if lsp^.form <= subrange
+                then
+                  Load
+                else
+                  LoadAddress ;
+              (* if colon then no default, load expression as nr of characters *)
+              if sy = colon
               then
               begin
-                if not Comptypes(gattr.typtr,intptr)
+                InSymbol ;
+                Expression(fsys +[comma, rparent]);
+                if gattr.typtr <> nil
                 then
+                begin
+                  if not Comptypes(gattr.typtr,intptr)
+                  then
+                    Error(116);
+                end
+                else
                   Error(116);
+                Load ;
+                default := false;
               end
               else
-                Error(116);
-              Load ;
-              default := false;
-            end
-            else
-              default := true ;
-            if Comptypes(lsp, intptr)
-            then
-            begin
-              if default
-              then
-                (* default integer in 6 char field *)
-                LDCIgen(6);
-              CSPgen(0);        (* wri *)
-            end
-            else if Comptypes(lsp, charptr)
-            then
-            begin
-              if default
-              then
-                (* default character in 1 char field *)
-                LDCIgen(1);
-              CSPgen(1);        (* wrc *)
-            end
-            else if lsp <> nil
-            then
-              if lsp^.form = scalar
-              then
-                Error(177)
-              else if IsString(lsp)
+                default := true ;
+              if Comptypes(lsp, intptr)
               then
               begin
-                len := lsp^.size ;
                 if default
                 then
-                  (* default length of string *)
-                  LDCIgen(len);
-                LDCIgen(len);
-                CSPgen(2);   (* wrs *)
+                  (* default integer in 6 char field *)
+                  LDCIgen(6);
+                CSPgen(0);        (* wri *)
               end
-              else
-                Error(116) ;
-            test := sy <> comma ;
-            if not test
-            then
-            begin
-              InSymbol;
-              Expression(fsys +[comma, colon, rparent]);
-            end;
-          until test ;
-        end;
+              else if Comptypes(lsp, charptr)
+              then
+              begin
+                if default
+                then
+                  (* default character in 1 char field *)
+                  LDCIgen(1);
+                CSPgen(1);        (* wrc *)
+              end
+              else if lsp <> nil
+              then
+                if lsp^.form = scalar
+                then
+                  Error(177)
+                else if IsString(lsp)
+                then
+                begin
+                  len := lsp^.size ;
+                  if default
+                  then
+                    (* default length of string *)
+                    LDCIgen(len);
+                  LDCIgen(len);
+                  CSPgen(2);   (* wrs *)
+                end
+                else
+                  Error(116) ;
+              test := sy <> comma ;
+              if not test
+              then
+              begin
+                InSymbol;
+                Expression(fsys +[comma, colon, rparent]);
+              end;
+            until test ;
+          end;
 
         begin
           llkey := lkey ;
@@ -3912,22 +3912,22 @@ proc/func-ident -----(()-----! expression !-----())------>
               2, 6: WriteProc;
               9: Bytegen(161); (* retp *)
               10: CSPgen(11); (* HALT standard procedure *)
-              otherwise
-              begin
-                (* arguments for procedure required *)
-                Intest(lparent, 9);
-                case lkey of
-                  3: NewStatement;
-                  4: ReleaseStatement;
-                  7, 8: ResetRewriteProc;
-                  11: CloseProc;
-                  13: AssignProc;
-                  14: GetCommandLineProc;
-                  otherwise
-                    Error(178)
-                end;
-                Intest(rparent, 4);
-              end
+            else
+            begin
+              (* arguments for procedure required *)
+              Intest(lparent, 9);
+              case lkey of
+                3: NewStatement;
+                4: ReleaseStatement;
+                7, 8: ResetRewriteProc;
+                11: CloseProc;
+                13: AssignProc;
+                14: GetCommandLineProc;
+              else
+                Error(178)
+              end;
+              Intest(rparent, 4);
+            end
             end
           else
           (* standard functions *)
@@ -4669,7 +4669,7 @@ case->----! expression !---(OF)---->---
    ---->----!                 !-->-! statement ! -->-------->
   !         !                 !     -----------         !
   !         !   -----------   !                         !
-  !          --(OTHERWISE)--                            ^
+  !          --(ELSE)      --                           ^
   !             -----------                             !
   !                                                     !
    ---->------------------------------------------------  *)
@@ -5542,7 +5542,6 @@ begin
   rw[28] := 'extern  ' ; rw[29] := 'downto  ' ;
   rw[30] := 'forward ' ; rw[31] := 'program ' ;
   rw[32] := 'function' ; rw[33] := 'procedur' ;
-  rw[34] := 'otherwis' ;
   frw[0] := 0   ;
   frw[1] := 0   ;
   frw[2] := 6   ;
@@ -5551,7 +5550,7 @@ begin
   frw[5] := 25  ;
   frw[6] := 30  ;
   frw[7] := 32  ;
-  frw[8] := 35  ;
+  frw[8] := 34  ;
   (* Initialize symbols *)
   rsy[ 0] := ifsy      ; rsy[ 1] := dosy     ;
   rsy[ 2] := ofsy      ; rsy[ 3] := relop    ;
@@ -5570,7 +5569,6 @@ begin
   rsy[28] := externsy  ; rsy[29] := downtosy ;
   rsy[30] := forwardsy ; rsy[31] := progsy   ;
   rsy[32] := funcsy    ; rsy[33] := procsy   ;
-  rsy[34] := elsesy    ;
   for i :=0 to 127 do
   begin
     ssy[i]  := othersy ;
@@ -5816,7 +5814,7 @@ begin
            then
              ShowErrors := true ;
              *)
-      ShowErrors := true
+  ShowErrors := true;
 end ; (* OpenFiles *)
 
 procedure CloseFiles ;
@@ -5840,11 +5838,11 @@ begin
   assign( errorfile^, destname) ;
   reset(errorfile^) ;
   while not eof(errorfile^) do
-    begin
-      line := '';
-      readln(errorfile^, line) ;
-      writeln(line)
-    end;
+  begin
+    line := '';
+    readln(errorfile^, line) ;
+    writeln(line);
+  end;
   close(errorfile^) ;
 end;
 
@@ -5857,5 +5855,5 @@ begin (* main Mpascal *)
   if ShowErrors then
     Dumperrorfile ;
   if errflag then
-    halt
+    halt;
 end.
