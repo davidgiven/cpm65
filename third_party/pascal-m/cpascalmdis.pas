@@ -34,9 +34,6 @@ program cpascalmdis ;
 uses Sysutils ;
 
 
-const
-  defaultkim = $0 ;
-
 var
   objectfilename,
   errorfilename,
@@ -78,13 +75,13 @@ begin(* Openfiles *)
       end
     else
       objectfilename := paramstr(1);
-  loadaddress := defaultkim ;
+  loadaddress := 0 ;
   if paramcount = 2
     then
       loadaddress := HexToDec(paramstr(2));
   if loadaddress > 32767
     then
-      loadaddress := defaultkim ;
+      loadaddress := 0 ;
   if (objectfilename = '?') or
      (objectfilename = 'h') or
      (objectfilename = 'H') or

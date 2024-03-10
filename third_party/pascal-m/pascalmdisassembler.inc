@@ -156,9 +156,9 @@ var
 	fillinstruct($9A,'IND1 ',0)      ;
 	fillinstruct($9B,'IND2 ',0)      ;
 	fillinstruct($9C,'IND8 ',0)      ;
-	fillinstruct($9D,'Sto1 ',0)      ;
-	fillinstruct($9E,'ST02 ',0)      ;
-	fillinstruct($9F,'Sto8 ',0)      ;
+	fillinstruct($9D,'STO1 ',0)      ;
+	fillinstruct($9E,'STO2 ',0)      ;
+	fillinstruct($9F,'STO8 ',0)      ;
 	fillinstruct($A0,'LDC  ',2)      ;
 	fillinstruct($A1,'RETP ',0)      ;
 	fillinstruct($A2,'ADI  ',0)      ;
@@ -181,7 +181,7 @@ var
 	fillinstruct($B3,'DEC  ',2)      ;
 	fillinstruct($B4,'INC  ',2)      ;
 	fillinstruct($B5,'ENT  ',2)      ;
-	fillinstruct($B6,'CAS  ',0)      ;
+	fillinstruct($B6,'CAS  ',5)      ;(* 5 if flag for special handling *)
 	fillinstruct($B7,'MOV  ',2)      ;
 	fillinstruct($B8,'DEC1 ',0)      ;
 	fillinstruct($B9,'INC1 ',0)      ;
@@ -428,6 +428,10 @@ function WriteHex(hexbyte : integer): string ;
     WriteHex := hexstring ;
   end  ;(* WriteHex *)
 
+function WriteHex4(hexword : integer): string;
+  begin
+    WriteHex4 := WriteHex(hexword shr 8) + WriteHex(hexword mod 256)
+  end;
 
 procedure WriteLevelInstruction(opcode  : integer ; var dpc : integer);
    (* Prints instruction mnemonic and if necessary arguments as numbers *)
@@ -520,46 +524,42 @@ procedure WriteInstruction(opcode  : integer ;
   procedure PRCASE ;
    (* dump CASE structure in code *)
     var
-      i,j, nrlabels, startvalue : integer ;
+      i,j,k, nrlabels, startvalue : integer ;
+      offset : int16;
     begin
       writeln(listfile);
       EndLineList ;
-      WriteHex((dpc + 1)div 256);
-      WriteHex((dpc + 1)mod 256);
+      write(listfile, WriteHex4(dpc + 1));
       write(listfile, ' : ');
-      WriteHex(store[dpc + 1]);
+      write(listfile, WriteHex(store[dpc + 1]));
       write(listfile, ' ');
-      WriteHex(store[dpc + 2]);
+      write(listfile, WriteHex(store[dpc + 2]));
       write(listfile, '    start value case label = ');
       write(listfile,(store[dpc + 1] * 256 + store[dpc + 2]):3);
       writeln(listfile);
       EndLineList ;
-      WriteHex((dpc + 3)div 256);
-      WriteHex((dpc + 3)mod 256);
+      write(listfile, WriteHex4(dpc + 3));
       write(listfile, ' : ');
-      WriteHex(store[dpc + 3]);
+      write(listfile, WriteHex(store[dpc + 3]));
       write(listfile, ' ');
-      WriteHex(store[dpc + 4]);
+      write(listfile, WriteHex(store[dpc + 4]));
       write(listfile, '      end value case label = ');
       write(listfile,(store[dpc + 3] * 256 + store[dpc + 4]):3);
       writeln(listfile);
       EndLineList ;
-      WriteHex((dpc + 5)div 256);
-      WriteHex((dpc + 5)mod 256);
+      write(listfile, WriteHex4(dpc + 5));
       write(listfile, ' : ');
-      WriteHex(store[dpc + 5]);
+      write(listfile, WriteHex(store[dpc + 5]));
       write(listfile, ' ');
-      WriteHex(store[dpc + 6]);
-      j := store[dpc + 5] * 256 + store[dpc + 6] ;
-      if j = 0
+      write(listfile, WriteHex(store[dpc + 6]));
+      offset := store[dpc + 5] * 256 + store[dpc + 6] ;
+      if offset = 0
         then
           write(listfile, '    no otherwise part in case')
         else
           begin
             write(listfile, '    address of otherwise part = ');
-            j := j + loadaddress ;
-            WriteHex(j div 256);
-            WriteHex(j mod 256)
+            write(listfile, WriteHex4(offset + dpc + loadaddress + 5));
           end  ;
       startvalue := store[dpc + 1] * 256 + store[dpc + 2] ;
       nrlabels := store[dpc + 3] * 256 + store[dpc + 4] -
@@ -569,26 +569,24 @@ procedure WriteInstruction(opcode  : integer ;
           writeln(listfile);
           j := dpc + 2*i + 7 ;
           EndLineList ;
-          WriteHex(j div 256);
-          WriteHex(j mod 256);
+          write(listfile, WriteHex4(j));
           write(listfile,  ' : ');
-          WriteHex(store[j]);
+          write(listfile, WriteHex(store[j]));
           write(listfile, ' ');
-          WriteHex(store[j + 1]);
+          write(listfile, WriteHex(store[j + 1]));
           write(listfile, '    case label value ');
           write(listfile,(i + startvalue):3);
-          j := store[j] * 256 + store[j + 1] ;
-          if j = 0
+          offset := (store[j] shl 8) + store[j + 1] ;
+          if offset = 0
             then
               write(listfile, ' not used')
             else
               begin
                 write(listfile, ' at address = ');
-                j := j + loadaddress ;
-                WriteHex(j div 256);
-                WriteHex(j mod 256)
+                write(listfile, WriteHex4(j + offset + loadaddress));
               end  ;
         end  ;
+      writeln(listfile);
       nrargs := 7 +(nrlabels + 1)* 2 ;
     end  ;(* PRCASE *)
 
@@ -621,7 +619,10 @@ procedure WriteInstruction(opcode  : integer ;
       assemblerline := assemblerline + instruction[opcode].name ;
       if nrargs = 5
         then
-          PrStringLCA
+          case opcode of
+            $b6: PrCase;
+            $bc: PrStringLCA;
+          end
         else
           if opcode <> $BD
             then
