@@ -69,21 +69,20 @@ strptr: .fill 1 ; string print pointer
 eolb:   .fill 1 ; end of input line boolean
 eofb:   .fill 1 ; end of file boolean
 op:     .fill 1 ; last op code
-fa:     .fill 1 ; file address handle (ignored in this version)
+fa:     .fill 2 ; file object pointer
 
 tmp1l8: .fill 8 ; 8 byte temp field
 tmp2l2: .fill 2 ; 2 byte temp
 tmp3l2: .fill 2 ; 2 byte temp
 ytmp:   .fill 1 ; temporary Y save
+cmdline: .fill 1 ; command line offset
 
-#if 0
 ;
-; KIM-1 monitor definitions
-        ;
-ttyin   =   $1e5a           ; character in from keyboard with echo
-ttyout  =   $1ea0           ; character to video
-SBD     =       $1742           ; for PB0 TTYout echo prevention
-#endif
+; file structure layout
+;
+FP_FCB    = 0
+FP_POS    = 36
+FP_BUFFER = 37
 
 ;
 ; constants
@@ -102,6 +101,7 @@ prcbuf  = BASE
 main:
         lda #0
         sta sentinel
+        sta fa+1
 
         lda #>mstart ; start of mcode 
         sta pc + 1
@@ -157,14 +157,29 @@ done_load:                          ; heap has been advanced past the program
         sta stack
         sta mp
 
-;
-; initialize files
+        ;
+        ; locate the command line parameters
+        ;
+
+        ldx #0
+param_loop:
+        cpx cpm_cmdlinelen
+        beq done_params
+        lda cpm_cmdline, x
+        inx
+        cmp #' '
+        bne param_loop
+done_params:
+        stx cmdline
+
+        ;
+        ; initialize files
+        ;        
+        lda #0              ; clear file flags
+        sta eolb
+        sta eofb
 ;        
-        lda     #0              ; clear file flags
-        sta     eolb
-        sta     eofb
-;        
-        jmp     interpr            ; start interpreting
+        jmp interpr            ; start interpreting
 
         ;
         ; useful routines
@@ -434,7 +449,6 @@ interpr:ldx #0
         inc pc + 1
 intrpr1:cmp #$C7
         bcc intrpr2     ; opcode in range
-        brk
 notimp: lda #>msg007
         ldx #<msg007
         jmp string      ; not implemented message, fatal
@@ -1260,7 +1274,6 @@ casex:  ldy #$05        ; test for otherwise
         adc tmp2l2      ; test for nil
         bne cas2
         bcs cas2
-        brk
         lda #>msg006
         ldx #<msg006
         jmp string
@@ -1282,6 +1295,9 @@ mover:  jsr setup2          ; tmp2l2 is to and tmp3l2 is from
         sta tmp1l8
         ldx #pc
         jsr incr            ; pc is now next instruction
+        lda tmp1l8          ; check for zero length moves
+        ora tmp1l8+1
+        beq mov2
 mov1:   lda (tmp3l2),y      ;
         sta (tmp2l2),y      ; move the data
         ldx #tmp2l2
@@ -1291,10 +1307,9 @@ mov1:   lda (tmp3l2),y      ;
         ldx #tmp1l8
         jsr decr            ; how many?
         lda tmp1l8
-        bne mov1            ; interpr
-        lda tmp1l8 + 1
+        ora tmp1l8 + 1
         bne mov1 
-        rts
+mov2:   rts
         ;
         ; B8 DEC1
         ;
@@ -1393,6 +1408,8 @@ csptab: .word   wri         ;  0 write integer
         .word   rwrf        ;  e rewrite file
         .word   stsf        ;  f status file
         .word   clsf        ; 10 close file
+        .word   asnf        ; 11 assign file
+        .word   getparams   ; 12 get command line parameters
         ;
         ; BE CUP1
         ;
@@ -1471,13 +1488,14 @@ lnsx1:  lda #$08
         ; C2 SFA
         ;
 sfa:    jsr pull2               ; get file handle constant
-        sty fa                  ; store fa
+        sta fa+1
+        sty fa+0                ; store
         jmp interpr
         ;
         ; C3 GFA
         ;
 gfa:    ldy fa      ; load file handle constant
-        lda #0      ; push single byte value 0
+        lda fa+1    ; push single byte value 0
         jsr push2
         jmp interpr
         ;
@@ -1494,16 +1512,16 @@ mvb:    jsr mover           ; performs a normal move
         sta tmp1l8
         ldx #pc
         jsr incr            ; pc is now next instruction; tmp1l8 contains the number of blanks
+        jmp mvb2
 mvb1:   lda #' '            ;
         sta (tmp2l2),y      ; move the data
         ldx #tmp2l2
         jsr incr            ; next to
         ldx #tmp1l8
         jsr decr            ; how many?
-        lda tmp1l8
-        bne mvb1            ; interpr
-        lda tmp1l8 + 1
-        bne mvb1 
+mvb2:   lda tmp1l8
+        ora tmp1l8+1
+        bne mvb1
         jmp interpr
         ;
         ; C5 SHL
@@ -1630,7 +1648,7 @@ wri4:   sec             ; subtract length
         beq wri5
         tay             ; y is nr of leading spaces
 wri4a:  lda #$20            ; blank
-        jsr     wrt
+        jsr wrt
         dec tmp3l2
         dey
         bne wri4a           ; print blanks 
@@ -1695,11 +1713,11 @@ wrs4:   jmp interpr
         ;
         ; this procedure is not checking overflow
         ;
-rdi:lda #$00            ; int = 0
+rdi:    lda #$00            ; int = 0
         sta tmp1l8
         sta tmp1l8 + 1      ;
         sta tmp1l8 + 2      ; sign = +
-rdi1:   jsr     getch           ; get a char
+rdi1:   jsr getch           ; get a char
         cmp #$20            ; skip spaces
         beq rdi1
         cmp #$2b            ; + sign?
@@ -1755,7 +1773,7 @@ rln1:   lda #$00            ; clear eoln
         ; PROC 5 RDC
         ;
 rdc:    jsr setup1
-        jsr     getch
+        jsr getch
         ldy #$00
         sta (tmp2l2),y      ; store char
         jmp interpr
@@ -1829,7 +1847,7 @@ getch2: cmp #$0D            ; CR, then fake space and EOLN true
         lda #$20
         ldy #$01
         bne getch1
-getch3: cmp #$17            ; CTRL/Z is EOF
+getch3: cmp #$1a            ; CTRL/Z is EOF
         bne getch
         ldy #$01
         sty eofb            ; set eof boolean
@@ -1850,11 +1868,39 @@ odd:    jsr pull2           ; get integer from stack
         ;
         ; PROC D reset file
         ;
-rstf:   jmp interpr
+rstf:   lda #0x00
+        ldy #FCB_CR
+        sta (fa), y
+        
+        lda #0x80
+        ldy #FP_POS
+        sta (fa), y
+
+        lda fa
+        ldx fa+1
+        ldy #BDOS_OPEN_FILE
+        jsr BDOS
+        jmp interpr
         ;
         ; PROC E rewrite file
         ;
-rwrf:   jmp interpr
+rwrf:   lda fa
+        ldx fa+1
+        ldy #BDOS_DELETE_FILE
+        jsr BDOS
+
+        lda #0x00
+        ldy #FCB_CR
+        sta (fa), y
+        
+        ldy #FP_POS
+        sta (fa), y
+
+        lda fa
+        ldx fa+1
+        ldy #BDOS_CREATE_FILE
+        jsr BDOS
+        jmp interpr
         ;
         ; PROC F status file
         ;
@@ -1865,8 +1911,58 @@ stsf:   lda #0
         ;
         ; PROC 10 close file
         ;
-clsf:   jmp interpr
+clsf:   ldy #FP_POS
+        lda (fa), y
+        cmp #$80
+        beq clsf1
+
+        jsr setdma
+        lda fa
+        ldx fa+1
+        ldy #BDOS_WRITE_SEQUENTIAL
+        jsr BDOS
+
+clsf1:  lda fa
+        ldx fa+1
+        ldy #BDOS_CLOSE_FILE
+        jsr BDOS
+        jmp interpr
+        ;
+        ; PROC 11 assign file
+        ;
+asnf:   jsr setup1              ; string in tmp2l2
         
+        lda fa
+        ldx fa+1
+        ldy #BDOS_SET_DMA_ADDRESS
+        jsr BDOS
+        
+        lda tmp2l2
+        ldx tmp2l2+1
+        ldy #BDOS_PARSEFILENAME
+        jsr BDOS
+
+        jmp interpr
+        ;
+        ; PROC 12 get command line parameters
+        ;
+getparams:
+        jsr setup1              ; destination address -> tmp2l2
+        ldx cmdline
+        ldy #1
+getparams1:
+        lda cpm_cmdline, x
+        sta (tmp2l2), y
+        inx
+        iny
+        cpx cpm_cmdlinelen
+        bne getparams1
+        sec
+        txa
+        sbc cmdline
+        ldy #0
+        sta (tmp2l2), y
+        jmp interpr
         ;
         ; MUL10 multiply tmp1l8 by 10
 mul10:  asl tmp1l8
@@ -2105,25 +2201,120 @@ compa4: ldx #tmp2l2
 ; Read one char from TTY without the KIM hardware echo
 ;
 rdt:	sty ytmp
-        jsr bdos_CONIN
+        lda fa+1
+        beq ttyin
+
+        ldy #FP_POS
+        lda (fa), y
+        cmp #0x80
+        bne rdt1
+
+        jsr setdma
+        lda fa
+        ldx fa+1
+        ldy #BDOS_READ_SEQUENTIAL
+        jsr BDOS
+        bcs rdeof
+        
+        lda #0
+        ldy #FP_POS
+        sta (fa), y
+        
+rdt1:   clc
+        adc #FP_BUFFER
+        tay
+        txa
+        lda (fa), y
+        pha
+        ldy #FP_POS
+        lda (fa), y
+        clc
+        adc #1
+        sta (fa), y
+        pla
+
+        ldy ytmp
+        rts
+
+rdeof:  lda #$1a
+        ldy ytmp
+        rts
+
+ttyin:  jsr bdos_CONIN
         ldy ytmp
         rts
 ; 
 ; Write one char to TTY
 ;
 wrt:	sty ytmp    
-        cmp #CR
-        beq crlf
-        jsr bdos_CONOUT
+        tax                     ; char to write
+        lda fa+1
+        beq ttyout
+
+        ldy #FP_POS
+        lda (fa), y
+        cmp #0x80
+        bne wrt1
+
+        txa
+        pha
+
+        jsr setdma
+        lda fa
+        ldx fa+1
+        ldy #BDOS_WRITE_SEQUENTIAL
+        jsr BDOS
+        
+        pla
+        tax
+
+        lda #0
+        ldy #FP_POS
+        sta (fa), y
+        
+wrt1:   clc
+        adc #FP_BUFFER
+        tay
+        txa
+        sta (fa), y
+        ldy #FP_POS
+        lda (fa), y
+        clc
+        adc #1
+        sta (fa), y
+
         ldy ytmp
         rts
+
+ttyout:
+        txa
+        cmp #CR
+        bne ttyout1
+        jsr bdos_CONOUT
+        lda #LF
+ttyout1:jsr bdos_CONOUT
+        ldy ytmp
+        rts
+
+;
+; Sets the CP/M DMA pointer this file's buffer.
+
+setdma: clc
+        lda fa
+        adc #FP_BUFFER
+        ldx fa+1
+        bcc setdma1
+        inx
+setdma1:
+        ldy #BDOS_SET_DMA_ADDRESS
+        jmp BDOS
 ;
 ; CRLF on output 
 ;
 crlf:   lda #CR
-        jsr bdos_CONOUT
+        jsr wrt
         lda #LF
-        jmp bdos_CONOUT
+        jmp wrt
 ;
 ; messages
 ;

@@ -60,6 +60,3 @@ def pascalm_load(self, name, src: Target):
 
 pascalm_obp(name="pasc-obp", src="./cpascalm2k1.pas")
 pascalm_load(name="pasc-obb", src=".+pasc-obp")
-
-pascalm_obp(name="test-obp", src="test.pas")
-pascalm_load(name="test-obb", src=".+test-obp")
