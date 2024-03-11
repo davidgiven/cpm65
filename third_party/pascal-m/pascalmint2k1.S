@@ -91,9 +91,6 @@ LF      = $0A                   ; Linefeed
 BASE    = cpm_ram               ; where the m-code is loaded
 prcbuf  = BASE + 2
 
-; vanilla: 26.124s
-; 1: 22.5
-
 .macro incr zp
         inc \zp + 0
         bne . + 4
@@ -114,6 +111,15 @@ prcbuf  = BASE + 2
         bne . + 4
         dec \zp + 1
         dec \zp + 0
+.endm
+
+.macro decr2 zp
+        sec
+        lda \zp + 0
+        sbc #2
+        sta \zp + 0
+        bcs . + 4
+        dec \zp + 1
 .endm
 
 ; Interpreter 
@@ -337,79 +343,92 @@ sadget: jsr basead
         bcs addg1
         dec tmp2l2 + 1
         bcc addg1       ; always taken
-;   
-; Jump table
+
 ;
-jtab:   .word   leq2    ; 2 bytes less than or equal test
-        .word   mfor    ; for interpr processing
-        .word   leqm    ; less or equal test for arrays
-        .word   les2    ; less than test for 2-byte data items
-        .word   leq8    ; is contained in test for sets
-        .word   lesm    ; less test
-        .word   equ2    ; equal test for 2 bytes
-        .word   geq8    ; contains test for sets
-        .word   equm    ; equal test for records and arrays
-        .word   equ8    ; equal test for sets
-        .word   ind1    ; indirectly load 1-byte data item
-        .word   ind2    ; indirectly load 2-byte data item
-        .word   ind8    ; indirectly load 8-byte data item
-        .word   sto1    ; store 1 byte
-        .word   sto2    ; store 2 byte
-        .word   sto8    ; store 8 byte
-        .word   ldc     ; load 2-byte constant
-        .word   retp    ; return from procedure or function
-        .word   adi     ; add integer
-        .word   andb    ; booelan and
-        .word   dif     ; set difference
-        .word   dvi     ; integer divide
-        .word   inn     ; test if element in set
-        .word   int     ; set interaction
-        .word   ior     ; inclusive or
-        .word   mod     ; modulus function
-        .word   mpi     ; integer multiply
-        .word   ngi     ; negate integer
-        .word   not     ; negate boolean
-        .word   sbi     ; subtract integer
-        .word   sgs     ; generate singleton set
-        .word   uni     ; set union
-        .word   lnc     ; load negative constant
-        .word   fjp     ; false jump
-        .word   ujp     ; unconditionally jump
-        .word   decb    ; decrement
-        .word   incb    ; increment
-        .word   ent     ; enter block
-        .word   cas     ; case statement processor
-        .word   mov     ; move storage
-        .word   dec1    ; decrement by 1
-        .word   inc1    ; increment by 1
-        .word   ldcs    ; load set constant (8 bytes)
-        .word   cap     ; call assembly procedure
-        .word   lca     ; load constant address
-        .word   csp     ; call standard procedure
-        .word   cup1    ; call user procedure simple
-        .word   cup2    ; complex call user procedure
-        .word   fix21   ; clean up stack  after call to single
-        .word   lns     ; load null set
-        .word   sfa     ; set file handle
-        .word   gfa     ; get file handle
-        .word   mvb     ; move and blank
-        .word   shl     ; shift left
-        .word   shr     ; shift right
+; Extended jump table.
 ;
-; additional addresses for routines
-;
-jtab2:  .word   ldcis   ; load small integer constant (0..15)
-        .word   ldas    ; load short address
-        .word   ldad    ; load address
-        .word   msto    ; mark stack without return bytes
-        .word   mstn    ; mark stack with return bytes
-        .word   lod1    ; load 1 byte data item on stack
-        .word   lod2    ; load 2 byte data item on stack
-        .word   str1    ; store 1 byte into memory
-        .word   str2    ; store 2 byte into memory
-;
-; no more can go into jtab2 because range 0-8
-;
+.macro emitxtab_entry op, val
+        .byte \val\()@mos16\op
+.endm
+
+.macro emitxtab_entry_16 op, val
+        .rept 16
+                emitxtab_entry \op, \val
+        .endr
+.endm
+
+.macro emitxtab op
+        emitxtab_entry_16 \op, ldcis ; load small integer constant (0..15)
+        emitxtab_entry_16 \op, ldas  ; load short address
+        emitxtab_entry_16 \op, ldad  ; load address
+        emitxtab_entry_16 \op, msto  ; mark stack without return bytes
+        emitxtab_entry_16 \op, mstn  ; mark stack with return bytes
+        emitxtab_entry_16 \op, lod1  ; load 1 byte data item on stack
+        emitxtab_entry_16 \op, lod2  ; load 2 byte data item on stack
+        emitxtab_entry_16 \op, str1  ; store 1 byte into memory
+        emitxtab_entry_16 \op, str2  ; store 2 byte into memory
+        emitxtab_entry \op, leq2     ; 2 bytes less than or equal test
+        emitxtab_entry \op, mfor     ; for interpr processing
+        emitxtab_entry \op, leqm     ; less or equal test for arrays
+        emitxtab_entry \op, les2     ; less than test for 2-byte data items
+        emitxtab_entry \op, leq8     ; is contained in test for sets
+        emitxtab_entry \op, lesm     ; less test
+        emitxtab_entry \op, equ2     ; equal test for 2 bytes
+        emitxtab_entry \op, geq8     ; contains test for sets
+        emitxtab_entry \op, equm     ; equal test for records and arrays
+        emitxtab_entry \op, equ8     ; equal test for sets
+        emitxtab_entry \op, ind1     ; indirectly load 1-byte data item
+        emitxtab_entry \op, ind2     ; indirectly load 2-byte data item
+        emitxtab_entry \op, ind8     ; indirectly load 8-byte data item
+        emitxtab_entry \op, sto1     ; store 1 byte
+        emitxtab_entry \op, sto2     ; store 2 byte
+        emitxtab_entry \op, sto8     ; store 8 byte
+        emitxtab_entry \op, ldc      ; load 2-byte constant
+        emitxtab_entry \op, retp     ; return from procedure or function
+        emitxtab_entry \op, adi      ; add integer
+        emitxtab_entry \op, andb     ; booelan and
+        emitxtab_entry \op, dif      ; set difference
+        emitxtab_entry \op, dvi      ; integer divide
+        emitxtab_entry \op, inn      ; test if element in set
+        emitxtab_entry \op, int      ; set interaction
+        emitxtab_entry \op, ior      ; inclusive or
+        emitxtab_entry \op, mod      ; modulus function
+        emitxtab_entry \op, mpi      ; integer multiply
+        emitxtab_entry \op, ngi      ; negate integer
+        emitxtab_entry \op, not      ; negate boolean
+        emitxtab_entry \op, sbi      ; subtract integer
+        emitxtab_entry \op, sgs      ; generate singleton set
+        emitxtab_entry \op, uni      ; set union
+        emitxtab_entry \op, lnc      ; load negative constant
+        emitxtab_entry \op, fjp      ; false jump
+        emitxtab_entry \op, ujp      ; unconditionally jump
+        emitxtab_entry \op, decb     ; decrement
+        emitxtab_entry \op, incb     ; increment
+        emitxtab_entry \op, ent      ; enter block
+        emitxtab_entry \op, cas      ; case statement processor
+        emitxtab_entry \op, mov      ; move storage
+        emitxtab_entry \op, dec1     ; decrement by 1
+        emitxtab_entry \op, inc1     ; increment by 1
+        emitxtab_entry \op, ldcs     ; load set constant (8 bytes)
+        emitxtab_entry \op, cap      ; call assembly procedure
+        emitxtab_entry \op, lca      ; load constant address
+        emitxtab_entry \op, csp      ; call standard procedure
+        emitxtab_entry \op, cup1     ; call user procedure simple
+        emitxtab_entry \op, cup2     ; complex call user procedure
+        emitxtab_entry \op, fix21    ; clean up stack after call to single
+        emitxtab_entry \op, lns      ; load null set
+        emitxtab_entry \op, sfa      ; set file handle
+        emitxtab_entry \op, gfa      ; get file handle
+        emitxtab_entry \op, mvb      ; move and blank
+        emitxtab_entry \op, shl      ; shift left
+        emitxtab_entry \op, shr      ; shift right
+.endm
+
+xtab_lo:
+        emitxtab lo
+xtab_hi:
+        emitxtab hi
+
 ;
 ;Standard M-code procedure to start M-code interpretation,
 ;
@@ -423,7 +442,6 @@ mstart: .byte   $30         ; MST0 mark stack
 ;
 ; test if stack will overflow
 ;
-        .fill 8
 tststk: sec         ; test if stack and heap will meet
         lda stack   
         sbc hp
@@ -465,31 +483,17 @@ xxx:
         sta op
         incr pc
         cmp #$C7
-        bcc intrpr2     ; opcode in range
-notimp: ldx #>msg007
-        lda #<msg007
-        jmp string      ; not implemented message, fatal
-intrpr2:cmp #$90        ; test if direct op
-        bcs pacop       ; packed opcode
-        lsr a
-        lsr a
-        lsr a
-        and #$1E
-        tay         ; use y for index
-        lda jtab2, y
+        bcs notimp      ; opcode out of range
+        tay
+        lda xtab_lo, y
         sta tmp2l2
-        lda jtab2+1, y
+        lda xtab_hi, y
         sta tmp2l2+1
         jmp (tmp2l2)
 
-pacop:  sbc #$90        ; carry was set
-        asl a
-        tay
-        lda jtab, y
-        sta tmp2l2
-        lda jtab+1, y
-        sta tmp2l2+1
-        jmp (tmp2l2)
+notimp: ldx #>msg007
+        lda #<msg007
+        jmp string      ; not implemented message, fatal
 
 ;
 ; setup1 and setup2 are subroutines to setup 
