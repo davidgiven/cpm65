@@ -93,6 +93,22 @@ LF      = $0A                   ; Linefeed
 BASE    = cpm_ram               ; where the m-code is loaded
 prcbuf  = BASE + 2
 
+; vanilla: 26.124s
+; 1: 22.5
+
+.macro incr zp
+        inc \zp + 0
+        bne . + 4
+        inc \zp + 1
+.endm
+
+.macro decr zp
+        lda \zp + 0
+        bne . + 4
+        dec \zp + 1
+        dec \zp + 0
+.endm
+
 ; Interpreter 
 ;
 ; Initialize interpreter
@@ -196,34 +212,6 @@ done_params:
         ; useful routines
        
         ;
-        ; increment a 16 bit pointer
-        ;
-
-incr:   clc
-        lda 0,x     ; X pointing to pointer
-        adc #01
-        sta 0,x         
-        bcc incr1       ; if no carry
-        lda 1,x
-        adc #00
-        sta 1,x
-incr1:  ldx #0      ; clear X
-        rts
-          
-        ;
-        ; decrement a 16 bit pointer
-        ;
-decr:   sec
-        lda 0,x     ; X pointing to pointer
-        sbc #$01
-        sta 0,x
-        bcs decr1       ; if carry set no adjust
-        lda 01,x
-        sbc #$00
-        sta 1,x
-decr1:  ldx #0
-        rts
-        ;
         ; Add fast 2 to PC
         ;
 incpc2: clc
@@ -231,11 +219,8 @@ incpc2: clc
         adc #$02
         sta pc
         bcc incpca      ; adjust upper?
-        lda pc + 1
-        adc #$00
-        sta pc + 1
-incpca: ldx #$00
-        rts
+        inc pc + 1
+incpca: rts
         ;
         ; to HEX
         ;
@@ -254,8 +239,8 @@ hexit1: rts
         ;
 pull2:  jsr pull        ; get Y first
         tay 
-pull:   ldx #stack
-        jsr incr
+pull:   incr stack
+        ldx #0
         lda (stack,x)
         rts
         ;
@@ -263,8 +248,7 @@ push2:  ldx #$00     ; clear X
         jsr push        ; save A
         tya 
 push:   sta (stack,x)
-        ldx #stack
-        jsr decr
+        decr stack
         rts
         ;
         ; fatal error message 
@@ -327,12 +311,10 @@ addget: jsr basead          ; get base address of proper level
         lda tmp2l2 + 1
         sbc (pc),y
         sta tmp2l2 + 1  ; tmp2l2 now points to address
-        ldx #pc
-        jsr incr
-addg1:  ldx #pc
-        jsr incr
-        ldx #tmp2l2     ; subtract 1 from address because LCAP
-        jsr incr        ; this is correct for all calls
+        incr pc
+addg1:  incr pc
+        incr tmp2l2     ; subtract 1 from address because LCAP
+                        ; this is correct for all calls
         rts         ; return
 ;
 ; Get small address of proper level (same as addget)
@@ -547,9 +529,8 @@ msto:   jsr basead      ; get base address of proper level X
 mstn:   ldy #$0
         lda (pc),y      ; get operand (nr of bytes to fill)
         tay 
-        ldx #pc     ; increment PC
-        jsr incr
-mstn1:  txa         ; get a zero in A reg
+        incr pc     ; increment PC
+mstn1:  lda #0
         jsr push        ; push a dummy onto stack
         dey 
         bne mstn1       ; not done yet
@@ -571,8 +552,8 @@ lod2:   jsr sadget      ; get address in tmp2l2 of item
         ldx #0      ; index 0
         lda (tmp2l2,x)  ; low part
         tay         ; save A in Y
-        ldx #tmp2l2     ; high part
-        jsr incr
+        incr tmp2l2     ; high part
+        ldx #0
         lda (tmp2l2,x)  ; get high part
         jsr push2       ; push all
         jmp tststk      ; 
@@ -592,8 +573,8 @@ str2:   jsr sadget      ; store 16 bits
         pha
         tya         ; store low part first
         sta (tmp2l2,x)
-        ldx #tmp2l2     ; decrement address on stack
-        jsr incr
+        incr tmp2l2     ; decrement address on stack
+        ldx #0
         pla         ; get high part
         sta (tmp2l2,x)  ; store high part
         jmp interpr
@@ -639,11 +620,9 @@ for1:   ldy #$07        ; get address of cell in tmp2
 for2:   lda (stack),y   ; y is still 1
         and #$04        ; to or downto test
         bne for3        ; down
-        ldx #tmp3l2
-        jsr incr        ; 16 bit increment by 1
+        incr tmp3l2
         jmp for4
-for3:   ldx #tmp3l2
-        jsr decr        ; 16 bit decrement 
+for3:   decr tmp3l2
 for4:   ldy #$00        ; save new interpr counter
         lda tmp3l2
         sta (tmp2l2),y
@@ -844,8 +823,8 @@ ind2:   jsr setup1      ; get address to 16 byte indirect op
         ldx #$00
         lda (tmp2l2,x)
         tay         ; setup for push
-        ldx #tmp2l2     ; increment pointer
-        jsr incr        ; point to upper part
+        incr tmp2l2     ; increment pointer
+        ldx #0
         lda (tmp2l2,x)
         jsr push2       ; push item onto stack
         jmp interpr
@@ -874,9 +853,9 @@ sto2:   jsr setup2      ; get 16 bit address in tmp3 and address
         ldx #$00
         lda tmp3l2
         sta (tmp2l2,x)
-        ldx #tmp2l2
-        jsr incr
+        incr tmp2l2
         lda tmp3l2 + 1  ; upper half
+        ldx #0
         sta (tmp2l2,x)
         jmp interpr
         ;
@@ -977,8 +956,7 @@ dvi:    jsr mdset       ; setup for divide
         lda tmp1l8 + 5
         eor #$FF
         sta tmp1l8 + 5
-        ldx #tmp1l8 + 4
-        jsr incr
+        incr tmp1l8 + 4
 dvi1:   ldy tmp1l8 + 4
         lda tmp1l8 + 5
         jsr push2
@@ -1047,8 +1025,7 @@ mod:    jsr mdset
         lda tmp1l8 + 3
         eor #$FF
         sta tmp1l8 + 3
-        ldx #tmp1l8 + 2
-        jsr incr
+        incr tmp1l8 + 2
 mod1:   ldy tmp1l8 + 2
         lda tmp1l8 + 3
         jsr push2
@@ -1067,8 +1044,7 @@ mpi:    jsr mdset
         lda tmp1l8 + 5
         eor #$FF
         sta tmp1l8 + 5
-        ldx #tmp1l8 + 4
-        jsr incr
+        incr tmp1l8 + 4
 mpi1:   ldy tmp1l8 + 4
         lda tmp1l8 + 5
         jsr push2
@@ -1083,8 +1059,7 @@ ngi:    jsr setup1      ; get number to complement
         lda tmp2l2 + 1
         eor #$FF
         sta tmp2l2 + 1
-        ldx #tmp2l2
-        jsr incr        ; ones complement
+        incr tmp2l2     ; ones complement
         ldy tmp2l2
         lda tmp2l2 + 1
         jsr push2
@@ -1161,8 +1136,7 @@ lnc:    ldy #$01
         lda (pc),y
         eor #$FF
         sta tmp2l2 + 1
-        ldx #tmp2l2
-        jsr incr
+        incr tmp2l2
         lda tmp2l2 + 1  ;
         jmp decx1       ; use common end
         ;
@@ -1287,16 +1261,7 @@ casex:  ldy #$05        ; test for otherwise
         dey
         lda (pc),y
         sta tmp2l2 + 1
-
-        clc
-        lda pc
-        adc #4
-        sta pc
-        bcc casex1
-        inc pc+1
-casex1:
-
-        lda tmp2l2+1
+        
         ora tmp2l2
         bne cas2
         ldx #>msg006
@@ -1314,23 +1279,18 @@ mover:  jsr setup2          ; tmp2l2 is to and tmp3l2 is from
         ldy #$00
         lda (pc),y
         sta tmp1l8 + 1
-        ldx #pc
-        jsr incr
+        incr pc
         lda (pc),y
         sta tmp1l8
-        ldx #pc
-        jsr incr            ; pc is now next instruction
+        incr pc             ; pc is now next instruction
         lda tmp1l8          ; check for zero length moves
         ora tmp1l8+1
         beq mov2
 mov1:   lda (tmp3l2),y      ;
         sta (tmp2l2),y      ; move the data
-        ldx #tmp2l2
-        jsr incr            ; next from
-        ldx #tmp3l2
-        jsr incr            ; next to
-        ldx #tmp1l8
-        jsr decr            ; how many?
+        incr tmp2l2         ; next from
+        incr tmp3l2         ; next to
+        decr tmp1l8         ; how many?
         lda tmp1l8
         ora tmp1l8 + 1
         bne mov1 
@@ -1339,8 +1299,7 @@ mov2:   rts
         ; B8 DEC1
         ;
 dec1:   jsr setup1          ; get operand in tmp2l2
-        ldx #tmp2l2
-        jsr decr            ; minus 1
+        decr tmp2l2         ; minus 1
 dec1a:  ldy tmp2l2          ; setup for push of result
         lda tmp2l2 + 1
         jsr push2           ; onto stack
@@ -1349,8 +1308,7 @@ dec1a:  ldy tmp2l2          ; setup for push of result
         ; B9 INC1
         ;
 inc1:   jsr setup1
-        ldx #tmp2l2
-        jsr incr
+        incr tmp2l2
         jmp dec1a           ; push on stack
         ;
         ; BA LDCS
@@ -1364,30 +1322,26 @@ ldcs1:  lda (pc),y          ; get char
         lda #$08            ; PC := pc + 8
         adc pc
         sta pc
-        lda pc + 1
-        adc     #$00
-        sta pc + 1
-        jmp tststk          
+        bcc ldcs2
+        inc pc + 1
+ldcs2:  jmp tststk          
         ; 
         ; BB CAP
         ;
 cap:    ldx #$00
         lda (pc,x)
         sta tmp2l2 + 1
-        ldx #pc
-        jsr incr            ; pc := pc + 1
+        incr pc
         lda (pc,x)
         sta tmp2l2
-        ldx #pc
-        jsr incr
+        incr pc
         jmp (tmp2l2)        ; jump to new address
         ;
         ; BC LCA
 lca:    ldy #$00
         lda (pc),y          ; nr of bytes as string length
         pha
-        ldx #pc
-        jsr incr
+        incr pc
         lda pc + 1
         ldy pc          ; address of string on stack
         jsr push2
@@ -1395,10 +1349,9 @@ lca:    ldy #$00
         pla
         adc pc          ; nr of bytes, add lenth to PC
         sta pc
-        lda #$00
-        adc pc + 1
-        sta pc + 1
-        jmp tststk
+        bcc lca1
+        inc pc + 1
+lca1:   jmp tststk
         ; 
         ; BD CSP
         ;
@@ -1406,8 +1359,7 @@ csp:    ldy #$00
         lda (pc),y          ; get csp number
         asl a           ; *2 for jump table index
         tay 
-        ldx #pc
-        jsr incr
+        incr pc
         lda csptab,y
         sta jtabp           ; indirect jump
         iny
@@ -1465,8 +1417,7 @@ cup2:   jsr pull2           ; complex call with function room
 cupgo:  ldy #$00
         lda (pc),y          ; get procedure number
         pha                 ; save on stack
-        ldx #pc             ; pc := pc + 1
-        jsr incr
+        incr pc             ; pc := pc + 1
         sec
         lda mp              ; get right place to store PC
         sbc #$05
@@ -1531,19 +1482,15 @@ mvb:    jsr mover           ; performs a normal move
         ; and Y=0
         lda (pc),y
         sta tmp1l8 + 1
-        ldx #pc
-        jsr incr
+        incr pc
         lda (pc),y
         sta tmp1l8
-        ldx #pc
-        jsr incr            ; pc is now next instruction; tmp1l8 contains the number of blanks
+        incr pc             ; pc is now next instruction; tmp1l8 contains the number of blanks
         jmp mvb2
 mvb1:   lda #' '            ;
         sta (tmp2l2),y      ; move the data
-        ldx #tmp2l2
-        jsr incr            ; next to
-        ldx #tmp1l8
-        jsr decr            ; how many?
+        incr tmp2l2
+        decr tmp1l8         ; how many?
 mvb2:   lda tmp1l8
         ora tmp1l8+1
         bne mvb1
@@ -1597,8 +1544,7 @@ wri:    jsr setup2          ; tmp3 is length to write
         lda tmp2l2
         eor #$FF            ; lower byte
         sta tmp2l2
-        ldx #tmp2l2
-        jsr incr            ; form ones complement
+        incr tmp2l2         ; form ones complement
 wri1:   ldy #$05
 wri1a:  ldx #$00
         stx tmp1l8 + 2, y
@@ -1776,8 +1722,7 @@ rdi4:   jsr setup1
         lda tmp1l8 + 1
         eor #$FF
         sta tmp1l8 + 1
-        ldx #tmp1l8
-        jsr incr
+        incr tmp1l8
 rdi5:   lda tmp1l8
         sta (tmp2l2),y
         iny
@@ -2128,8 +2073,7 @@ mdset:  jsr pull2           ; get divisor/multiplicant
         lda tmp1l8
         eor #$FF
         sta tmp1l8
-        ldx #tmp1l8
-        jsr incr
+        incr tmp1l8
         inc tmp1l8 + 6
 mdset1: lda tmp1l8 + 3      ; test sign
         bpl mdset2
@@ -2138,8 +2082,7 @@ mdset1: lda tmp1l8 + 3      ; test sign
         lda tmp1l8 + 2
         eor #$FF
         sta tmp1l8 + 2
-        ldx #tmp1l8 + 2
-        jsr incr
+        incr tmp1l8 + 2
         inc tmp1l8 + 6      ; adjust end sign
 mdset2: rts
         ;
@@ -2190,12 +2133,10 @@ compar: jsr setup2          ; tmp3 is right side of compare
         ldy #$00
         lda (pc),y          ; no to compare
         sta tmp1l8 + 1
-        ldx #pc
-        jsr incr
+        incr pc
         lda (pc),y
         sta tmp1l8
-        ldx #pc
-        jsr incr
+        incr pc
 compa1: sec
         lda (tmp2l2),y
         sbc (tmp3l2),y
@@ -2206,12 +2147,9 @@ compa1: sec
 compa2: iny
 compa3: sty tmp1l8          ; leave result
         rts
-compa4: ldx #tmp2l2
-        jsr incr
-        ldx #tmp3l2
-        jsr incr            ; next word to compare
-        ldx #tmp1l8         ; length to compare
-        jsr decr
+compa4: incr tmp2l2
+        incr tmp3l2         ; next word to compare
+        decr tmp1l8         ; length to compare
         lda tmp1l8
         bne compa1          ; done?
         lda tmp1l8 + 1
