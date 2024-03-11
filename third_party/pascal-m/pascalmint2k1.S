@@ -63,8 +63,6 @@ hp:     .fill 2 ; heap pointer
 mp:     .fill 2 
 mpsave: .fill 2 
 progbase: .fill 2 ; start of use m-code
-jtabp:  .fill 2 ; jump table pointer
-jtab2p: .fill 2 ; jump table 2
 strptr: .fill 1 ; string print pointer
 eolb:   .fill 1 ; end of input line boolean
 eofb:   .fill 1 ; end of file boolean
@@ -98,6 +96,15 @@ prcbuf  = BASE + 2
 
 .macro incr zp
         inc \zp + 0
+        bne . + 4
+        inc \zp + 1
+.endm
+
+.macro incr2 zp
+        clc
+        lda \zp + 0
+        adc #2
+        sta \zp + 0
         bne . + 4
         inc \zp + 1
 .endm
@@ -237,22 +244,30 @@ hexit1: rts
         ; enter or exit with val in A or A + Y
         ; A contains upper 8 bits , Y lower 8 bits
         ;
-pull2:  jsr pull        ; get Y first
-        tay 
-pull:   incr stack
+pull2:  incr stack
         ldx #0
-        lda (stack,x)
+        lda (stack, x)
+        tay
+pull:
+        incr stack
+        ldx #0
+        lda (stack, x)
         rts
-        ;
-push2:  ldx #$00     ; clear X
-        jsr push        ; save A
-        tya 
-push:   sta (stack,x)
+       
+push2:  ldx #0
+        sta (stack, x)
+        decr stack
+        tya
+push:
+        ldx #0
+        sta (stack, x)
         decr stack
         rts
+        
         ;
         ; fatal error message 
-        ; output string (max 256, with CRLF, end at CR
+        ; output string (max 256, with CRLF, end)
+
         ; exit to monitor after print
         ;
 prstrng:sta strptr + 1  ; high part of address
@@ -271,43 +286,37 @@ stinb:  jsr crlf
         ; Compute base address of level (op-x)
         ; leave result in tmp2l2
         ;
-basead: lda mp      ; Mark pointer is default
+basead: lda mp          ; Mark pointer is default
         sta tmp2l2
         lda mp + 1
         sta tmp2l2 + 1
-        lda op      ; check level
+        lda op          ; check level
         and #$0F        ; isolate level
         beq bas2        ; if level = 0 then finished
-        tax         ; x := level
-bas1:   sec         ; offset for mark pointrer in stack
-        lda tmp2l2
-        sbc #$01        ; point do base MP
-        sta tmp2l2
-        lda tmp2l2 + 1
-        sbc #$00        ; adjust upper address
-        sta tmp2l2 + 1
+        tax             ; x := level
+bas1:   decr tmp2l2     ; offset for mark pointrer in stack
         ldy #$01        ; point to upper part of inirect MP
         lda (tmp2l2),y  ; high part
-        pha         ; save on stack
+        pha             ; save on stack
         dey 
-        lda     (tmp2l2),Y  ; get low part
+        lda (tmp2l2),Y  ; get low part
         sta tmp2l2
         pla
-        sta     tmp2l2 + 1  ; high part
-        dex         ; level = level - 1
+        sta tmp2l2 + 1  ; high part
+        dex             ; level = level - 1
         bne bas1        ; not finished
-bas2:   rts         ; ready 
+bas2:   rts             ; ready 
 ;
 ;   
 ; Addget get a address of level X 16 bit
 ;
-addget: jsr basead          ; get base address of proper level
+addget: jsr basead      ; get base address of proper level
         ldy #$01        ; get low part of address
         sec
         lda tmp2l2      ; PC points to high part
         sbc (pc),y      ; low part add
         sta tmp2l2      ; replace
-        dey         ; get high part
+        dey             ; get high part
         lda tmp2l2 + 1
         sbc (pc),y
         sta tmp2l2 + 1  ; tmp2l2 now points to address
@@ -315,7 +324,7 @@ addget: jsr basead          ; get base address of proper level
 addg1:  incr pc
         incr tmp2l2     ; subtract 1 from address because LCAP
                         ; this is correct for all calls
-        rts         ; return
+        rts             ; return
 ;
 ; Get small address of proper level (same as addget)
 ;
@@ -325,10 +334,9 @@ sadget: jsr basead
         lda tmp2l2      ; get address pointer
         sbc (pc),y
         sta tmp2l2
-        lda tmp2l2 + 1
-        sbc #$00
-        sta tmp2l2 + 1
-        jmp addg1
+        bcs addg1
+        dec tmp2l2 + 1
+        bcc addg1       ; always taken
 ;   
 ; Jump table
 ;
@@ -415,6 +423,7 @@ mstart: .byte   $30         ; MST0 mark stack
 ;
 ; test if stack will overflow
 ;
+        .fill 8
 tststk: sec         ; test if stack and heap will meet
         lda stack   
         sbc hp
@@ -433,14 +442,29 @@ tst1x1: bne interpr
 ; main interpr starts here
 ;
 interpr:
-        ;jsr writepc
+#if 0                  // enable for tracing
+        jsr writepc
+        jsr writesp
+#endif
+#if 0                  // enable for bytecode breakpoints
+        sec
+        lda pc+0
+        sbc progbase
+        tay
+        lda pc+1
+        sbc progbase+1
+        cmp #$15        ; high
+        bne xxx
+        cpy #$a1        ; low
+        bne xxx
+        brk
+xxx:
+#endif
         ldx #0
         lda (pc,x)
         sta op
-        inc pc
-        bne intrpr1
-        inc pc + 1
-intrpr1:cmp #$C7
+        incr pc
+        cmp #$C7
         bcc intrpr2     ; opcode in range
 notimp: ldx #>msg007
         lda #<msg007
@@ -452,21 +476,21 @@ intrpr2:cmp #$90        ; test if direct op
         lsr a
         and #$1E
         tay         ; use y for index
-        lda jtab2,y
-        sta jtabp
-        iny
-        lda jtab2,y
-        sta jtabp + 1
-        jmp (jtabp)     ; enter routine
+        lda jtab2, y
+        sta tmp2l2
+        lda jtab2+1, y
+        sta tmp2l2+1
+        jmp (tmp2l2)
+
 pacop:  sbc #$90        ; carry was set
         asl a
         tay
-        lda jtab,y
-        sta jtabp
-        iny
-        lda jtab,y
-        sta jtabp + 1
-        jmp (jtabp)     ; jump 
+        lda jtab, y
+        sta tmp2l2
+        lda jtab+1, y
+        sta tmp2l2+1
+        jmp (tmp2l2)
+
 ;
 ; setup1 and setup2 are subroutines to setup 
 ;
@@ -519,7 +543,7 @@ msto:   jsr basead      ; get base address of proper level X
         lda mp + 1      ; save mark pointer
         ldy mp
         jsr push2
-        lda #0      ; push dummy for p counter save
+        lda #0          ; push dummy for p counter save
         tay  
         jsr push2
         jmp tststk      ; test for overflow
@@ -529,7 +553,7 @@ msto:   jsr basead      ; get base address of proper level X
 mstn:   ldy #$0
         lda (pc),y      ; get operand (nr of bytes to fill)
         tay 
-        incr pc     ; increment PC
+        incr pc         ; increment PC
 mstn1:  lda #0
         jsr push        ; push a dummy onto stack
         dey 
@@ -541,17 +565,17 @@ mstn1:  lda #0
 lod1:   jsr sadget      ; get item address in reserved stack
         ldx #0
         lda (tmp2l2,x)  ; load item
-        tay         ; low part
-        txa         ; push zero
+        tay             ; low part
+        txa             ; push zero
         jsr push2       ; all items on stack are 16 bit
         jmp tststk
         ;
         ; LOD2 (6X YY) load 2 byte data item
         ;
 lod2:   jsr sadget      ; get address in tmp2l2 of item
-        ldx #0      ; index 0
+        ldx #0          ; index 0
         lda (tmp2l2,x)  ; low part
-        tay         ; save A in Y
+        tay             ; save A in Y
         incr tmp2l2     ; high part
         ldx #0
         lda (tmp2l2,x)  ; get high part
@@ -562,7 +586,7 @@ lod2:   jsr sadget      ; get address in tmp2l2 of item
         ;
 str1:   jsr sadget
         jsr pull2       ; get 16 bit with 8 valid bit item
-        tya         ; low part, X is zero
+        tya             ; low part, X is zero
         sta (tmp2l2,x)  ; store in memory
         jmp interpr
 ;
@@ -571,11 +595,11 @@ str1:   jsr sadget
 str2:   jsr sadget      ; store 16 bits
         jsr pull2       ; high part in A
         pha
-        tya         ; store low part first
+        tya             ; store low part first
         sta (tmp2l2,x)
         incr tmp2l2     ; decrement address on stack
         ldx #0
-        pla         ; get high part
+        pla             ; get high part
         sta (tmp2l2,x)  ; store high part
         jmp interpr
 ;
@@ -607,7 +631,7 @@ for1:   ldy #$07        ; get address of cell in tmp2
         iny
         lda (stack),y   
         sta tmp2l2 + 1
-        ldy #0      ; get the interpr count
+        ldy #0          ; get the interpr count
         lda (tmp2l2),y
         sta tmp3l2
         iny
@@ -798,7 +822,7 @@ equ8x1: jsr pull        ; get a char in A to compare
         inc tmp2l2 + 1  ; not equal set switch
 equ8x2: dec tmp2l2
         bne equ8x1
-        jsr     pull2       ; clean up stack
+        jsr pull2       ; clean up stack
         jsr pull2
         jsr pull2
         jsr pull2
@@ -850,13 +874,12 @@ sto1:   jsr setup2
         ; 9E STO2
         ;
 sto2:   jsr setup2      ; get 16 bit address in tmp3 and address
-        ldx #$00
+        ldy #$00
         lda tmp3l2
-        sta (tmp2l2,x)
-        incr tmp2l2
+        sta (tmp2l2), y
+        iny
         lda tmp3l2 + 1  ; upper half
-        ldx #0
-        sta (tmp2l2,x)
+        sta (tmp2l2), y
         jmp interpr
         ;
         ; 9F STO8
@@ -1360,12 +1383,13 @@ csp:    ldy #$00
         asl a           ; *2 for jump table index
         tay 
         incr pc
-        lda csptab,y
-        sta jtabp           ; indirect jump
-        iny
-        lda csptab,y        ; page nr
-        sta jtabp + 1
-        jmp (jtabp)         ; jump to procedure
+        
+        lda csptab, y
+        sta tmp2l2
+        lda csptab+1, y
+        sta tmp2l2+1
+        jmp (tmp2l2)
+        
         ;
         ; standard procedure table
 csptab: .word   wri         ;  0 write integer
@@ -2320,6 +2344,19 @@ writepc: lda #' '
         sbc progbase
         pha
         lda pc+1
+        sbc progbase+1
+
+        jsr phex2
+        pla
+        jmp phex2
+
+writesp: lda #'~'
+        jsr bdos_CONOUT
+        sec
+        lda stack
+        sbc progbase
+        pha
+        lda stack+1
         sbc progbase+1
 
         jsr phex2
