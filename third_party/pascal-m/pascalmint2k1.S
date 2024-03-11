@@ -57,7 +57,6 @@
 
 ZEROPAGE
 
-sentinel: .fill 1
 pc:     .fill 2 ; program counter
 stack:  .fill 2 ; software stack pointer
 hp:     .fill 2 ; heap pointer
@@ -101,7 +100,6 @@ prcbuf  = BASE + 2
 .global main
 main:
         lda #0
-        sta sentinel
         sta fa+1
 
         lda #>mstart ; start of mcode 
@@ -452,7 +450,9 @@ tst1x1: bne interpr
 ;
 ; main interpr starts here
 ;
-interpr: ldx #0
+interpr:
+        ;jsr writepc
+        ldx #0
         lda (pc,x)
         sta op
         inc pc
@@ -1576,7 +1576,7 @@ shr1:   beq shl2        ; do nothing if shift is zero
         ror a
         ror tmp2l2
         dex
-        bne shl1
+        bne shr1
 shr2:   ldy tmp2l2
         jsr push2
         jmp interpr

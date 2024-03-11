@@ -1264,30 +1264,30 @@ var
   (* plant value at location in code ,
       generate P2-record if loc not in codebuffer *)
   begin
-    if(location >= ic)and(location - ic < icn)
-    then
-    begin
-      (* place in codebuffer *)
-      (* correct for offset in codebuffer *)
-      location := location - ic ;
-      codebuf[location] := value shr 8 ;
-      codebuf[location + 1] := value mod 256;
-    end
-    else
-    begin
-      (* Generate P2-record with location and value *)
-      WriteOut ;
-      write(objectfile^, 'P2');
-      sumcheck := 0 ;
-      (* first location *)
-      HexOut(location shr 8);
-      HexOut(location mod 256);
-      (* next value to be planted *)
-      HexOut(value shr 8);
-      HexOut(value mod 256);
-      HexOut((16383 - sumcheck)mod 256);
-      writeln(objectfile^);
-    end;
+    if value <> 0 then
+      if (location >= ic) and (location - ic < icn) then
+      begin
+        (* place in codebuffer *)
+        (* correct for offset in codebuffer *)
+        location := location - ic ;
+        codebuf[location] := value shr 8 ;
+        codebuf[location + 1] := value mod 256;
+      end
+      else
+      begin
+        (* Generate P2-record with location and value *)
+        WriteOut ;
+        write(objectfile^, 'P2');
+        sumcheck := 0 ;
+        (* first location *)
+        HexOut(location shr 8);
+        HexOut(location mod 256);
+        (* next value to be planted *)
+        HexOut(value shr 8);
+        HexOut(value mod 256);
+        HexOut((16383 - sumcheck)mod 256);
+        writeln(objectfile^);
+      end;
   end ;
 
   procedure Skip(fsys : setofsys);
@@ -5073,7 +5073,7 @@ for ->--! var-ident !--(:=)---! expression !--->
     writeln(objectfile^);
     (* remember where to put nr of bytes for local variables *)
     segsize := ic + icn ;
-    GenUJPent(181 , 0);              (* ENT *)
+    GenUJPent(181, 0);              (* ENT *)
     (* start with 6 bytes on stack *)
     llc1 := lcaftermarkstack ;
     (* parameter-list as linked list on next^ *)
