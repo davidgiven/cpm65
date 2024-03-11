@@ -9,6 +9,7 @@ from config import (
     BIG_APPS_SRCS,
     SCREEN_APPS,
     SCREEN_APPS_SRCS,
+    PASCAL_APPS,
 )
 import re
 
@@ -55,9 +56,6 @@ zip(
     items={
         "CPM65.NEO": ".+bios",
         "A/CCP.SYS": "src+ccp",
-        "A/PINT.COM": "third_party/pascal-m+pint",
-        "A/PASC.OBB": "third_party/pascal-m+pasc-obb",
-        "A/PLOAD.COM": "third_party/pascal-m+loader",
         "B/NCOPY.COM": "src/arch/neo6502/utils+ncopy",
         "B/NATTR.COM": "src/arch/neo6502/utils+nattr",
         "B/NDIR.COM": "src/arch/neo6502/utils+ndir",
@@ -76,6 +74,7 @@ zip(
             | BIG_APPS_SRCS
             | SCREEN_APPS
             | SCREEN_APPS_SRCS
+            | PASCAL_APPS
         ).items()
     },
 )

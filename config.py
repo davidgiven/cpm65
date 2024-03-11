@@ -48,3 +48,9 @@ SCREEN_APPS = {
 }
 
 SCREEN_APPS_SRCS = {"0:cls.asm": "apps/cls.asm"}
+
+PASCAL_APPS = {
+    "0:pint.com": "third_party/pascal-m+pint",
+    "0:pasc.obb": "third_party/pascal-m+pasc-obb",
+    "0:pload.com": "third_party/pascal-m+loader",
+}
