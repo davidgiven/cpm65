@@ -2,7 +2,11 @@ unit cpm;
 
 interface
 
+type
+    charp = ^char;
+
 procedure GetCommandLine(var commandLine: packed array of char);
+procedure release(p: charp);
 
 implementation
     procedure GetCommandLine(var commandLine: packed array of char);
@@ -21,6 +25,10 @@ implementation
         commandLine[0] := chr(Length(s));
         for i := 0 to Length(s)-1 do
             commandLine[i+1] := s[i+1];
+    end;
+
+    procedure release(p: charp);
+    begin
     end;
 end.
 

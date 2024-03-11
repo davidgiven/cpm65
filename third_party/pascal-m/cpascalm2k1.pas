@@ -2240,7 +2240,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
     forw : boolean ;
     oldtop : disprange ;
     llc,lcm : addrrange ;
-    {     markp : ^char ;       (* used for mark/release *)   }
+    markp : ^char ;       (* used for mark/release *)   
 
     procedure ParameterList(fsy  : setofsys ; var fpar : identptr);
    (* compiles parameter-list in a procedure or function
@@ -2630,8 +2630,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
       (* block *)
     begin
       lcp^.forwdecl := false ;
-{          (* remember heap with markpointer for release *)
-           new(markp);    }
+      (* remember heap with markpointer for release *)
+      new(markp);
       repeat
         Block(fsys, semicolon ,lcp);
         if sy <> semicolon
@@ -2649,7 +2649,7 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
         end ;
       until sy in[beginsy, procsy, funcsy] ;
       (* release heap from markpointer *)
-      (*          release(markp)*)
+      release(markp);
     end ;
     (* restore to old level and display *)
     level := oldlev ;
