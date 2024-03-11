@@ -290,8 +290,6 @@ var
   line         : packed array[1 .. maxchcnt] of char ;
   linecount    : integer ;
   sourcename, destname : alphastring ;
-  (* listing file counters *)
-  listlines, listpages : integer ;
   (* Counters *)
   lc,
   ic   : addrrange   ;    (* Data location and instruction counters *)
@@ -364,31 +362,8 @@ var
   naf : array[0 .. 8 ]  of alpha    ;(* Standard functions *)
   
   (* Used by the compiler driver itself. *)
-  sourcefile, objectfile,listfile, errorfile : ^text ;
+  sourcefile, objectfile, errorfile : ^text ;
   ShowErrors : boolean ;
-
-procedure EndLinelist  ;
-(* Ends line on listfile^, takes care of pages, headings etc *)
-begin
-  if listfile <> nil then
-  begin
-    listlines := listlines + 1 ;
-    (* new page needed ? *)
-    if listlines > maxpage
-    then
-    begin
-      (* writeformfeed and header *)
-      writeln(listfile^);
-      write(listfile^, 'Pascal-M V1.4 Source listing     ');
-      write(listfile^, sourcename);
-      writeln(listfile^, '               Page ', listpages:4);
-      writeln(listfile^);
-      writeln(listfile^);
-      listpages := listpages + 1 ;
-      listlines := 3;
-    end ;
-  end;
-end ;(* EndLineList *)
 
 procedure BeginLine ;
 var
@@ -400,13 +375,6 @@ begin
   begin
     writeln(errorfile^) ;
     writeln(errorfile^,'Premature end of source file');
-    if listfile <> nil then
-    begin
-      EndLineList ;
-      writeln(listfile^);
-      EndLineList ;
-      writeln(listfile^,'Premature end of source file');
-    end;
     writeln(objectfile^,'P1010000');
     errflag := true ;
   end
@@ -414,35 +382,14 @@ begin
   begin
     linelength := 0 ;
     linecount := linecount + 1 ;
-    EndLineList ;
-    if listfile <> nil then
-      write(listfile^, linecount:4, ': ');
     while(not eoln(sourcefile^))and
       (linelength < maxchcnt)do
     begin
       linelength := linelength + 1 ;
-              {
-              if status(sourcefile^)<> 0
-                then
-                  begin
-                    writeln(errorfile^);
-                    writeln('Premature end of source file');
-                    EndLineList ;
-                    writeln(listfile^);
-                    EndLineList ;
-                    writeln(listfile^,'Premature end of source file');
-                    writeln(objectfile^,'P1010000');
-                    linelength := $EXIT
-                  end ;
-              }
       read(sourcefile^, kar);
-      if listfile <> nil then
-        write(listfile^, kar)  ;
       line[linelength] := kar ;
     end ;
     readln(sourcefile^);
-    if listfile <> nil then
-      writeln(listfile^);
     chcnt := 0 ;
     linpos := 0;
   end ;
@@ -463,14 +410,11 @@ begin
   then
   begin
     writeln(errorfile^) ;
-    EndLineList ;
     write(errorfile^, ' Errors at ', linecount:4, ': ' ) ;
     for k := 1 to linelength do
       write(errorfile^, line [ k ] ) ;
     writeln(errorfile^) ;
     write(errorfile^,' **** ') ;
-    if listfile <> nil then
-      write(listfile^, ' **** ') ;
     lastpos := 0 ;
     freepos := 1 ;
     for k :=1 to errinx do
@@ -481,21 +425,15 @@ begin
       then
       begin
         write(errorfile^,',')  ;
-        if listfile <> nil then
-          write(listfile^, ',');
       end
       else
       begin
         while  freepos < currpos do
         begin
           write(errorfile^,' ') ;
-          if listfile <> nil then
-            write(listfile^, ' ') ;
           freepos := freepos + 1 ;
         end ;
         write(errorfile^,'^') ;
-        if listfile <> nil then
-          write(listfile^, '^') ;
         lastpos := currpos ;
       end ;
       if currnmr < 10
@@ -508,23 +446,14 @@ begin
       else
         f := 3 ;
       write(errorfile^, currnmr:f) ;
-      if listfile <> nil then
-        write(listfile^, currnmr:f) ;
       freepos := freepos + f + 1 ;
     end ;
-    if listfile <> nil then
-      writeln (listfile^ ) ;
     writeln(errorfile^) ;
     (* Display the meaning of the error-numbers *)
-    if listfile <> nil then
-      writeln(listfile^, 'Errors on line: ', errlist[1].pos);
     for k := 1 to errinx do
     begin
       currnmr := errlist[k].nmr ;
-      EndLineList ;
       writeln (errorfile^, ' ':11, currnmr:3, ' = ',cmperror[currnmr] ) ;
-      if listfile <> nil then
-        writeln ( listfile^, ' ':13, currnmr:3, ' = ',cmperror[currnmr]);
     end ;
     errinx := 0 ;
   end;
@@ -2134,13 +2063,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
     begin
       Error(117);
       writeln(errorfile^) ;
-      if listfile <> nil then
-        writeln(listfile^);
       repeat
         writeln(errorfile^,' type-id ', fwptr^.name);
-        EndLineList ;
-        if listfile <> nil then
-          writeln(listfile^, ' type-id ', fwptr^.name);
         fwptr := fwptr^.next
       until fwptr = nil ;
     end;
@@ -2219,13 +2143,8 @@ CONST --->---! ident !--------( = )----! constant !--->---( ; )-->
     begin
       Error(118);
       writeln(errorfile^) ;
-      if listfile <> nil then
-        writeln(listfile^);
       repeat
         writeln(errorfile^, 'type-id ', fwptr^.name);
-        EndLineList ;
-        if listfile <> nil then
-          writeln(listfile^, 'type-id ', fwptr^.name);
         fwptr := fwptr^.next ;
       until fwptr = nil ;
     end;
@@ -4681,8 +4600,8 @@ case->----! expression !---(OF)---->---
         Expression(fsys +[ofsy, comma, colon]);
         Load ;
         lcix := ic + icn ;
-        GenUJPent(178, 0);            (* ujp *)
-        GenUJPent(178, 0);            (* ujp *)
+        GenUJPent(178, 0); (* ujp to CAS instruction *)
+        GenUJPent(178, 0); (* ujp to exit *)
         lsp := gattr.typtr ;
         if lsp <> nil
         then
@@ -4693,6 +4612,8 @@ case->----! expression !---(OF)---->---
             lsp := nil;
           end ;
         Intest(ofsy, 8);
+
+        (* Process case statements *)
         fstptr := nil ;
         repeat
           lpt3 := nil ;
@@ -4750,8 +4671,10 @@ case->----! expression !---(OF)---->---
           if not test
           then
             InSymbol ;
-        until test or(sy = endsy)or(sy = elsesy);
+        until test or (sy = endsy) or (sy = elsesy);
         PlantWord(lcix + 1 , ic + icn);
+        
+        (* Emit CAS instruction and jump table. *)
         if fstptr <> nil
         then
         begin
@@ -4784,6 +4707,8 @@ case->----! expression !---(OF)---->---
         end(* fstptr <> nil *)
         else
           Error(157);
+          
+        (* Emit the ELSE clause, if there is one. *)
         if sy = elsesy
         then
         begin
@@ -4794,9 +4719,10 @@ case->----! expression !---(OF)---->---
           until not(sy in statbegsys);
           GenUJPent(178 , lcix + 3);
         end ;
+        
+        (* And exit. *)
         PlantWord(lcix + 4, ic + icn);
         Intest(endsy, 13);
-
       end ;(* CaseStatement *)
 
       procedure RepeatStatement ;
@@ -5496,8 +5422,6 @@ begin
   icn       := 0 ;
   ch        := ' ' ;
   ich       := 32 ;
-  listpages := 1 ;
-  listlines := maxpage + 1 ;
   mxintio := maxint ;
   nproc := 1 ;
   (* Initialize sets *)
@@ -5664,26 +5588,11 @@ begin
   begin
     writeln(errorfile^,'Compilation errors ', sourcename ) ;
     writeln(errorfile^,' Pascal-M Compilation : ', errtot:4,' errors ');
-    if listfile <> nil then
-    begin
-      EndLineList ;
-      writeln(listfile^) ;
-      EndLineList ;
-      write(listfile^, ' Pascal-M Compilation : ');
-      writeln(listfile^, errtot:4,' errors ');
-    end;
     writeln(objectfile^,'P1010000');
     CompilePascalM := false ;
   end
   else
   begin
-    if listfile <> nil then
-    begin
-      EndLineList ;
-      writeln(listfile^);
-      EndLineList ;
-      writeln(listfile^, ' Pascal-M Compilation successful');
-    end;
     writeln(errorfile^,'No compilation errors ', sourcename ) ;
     writeln(objectfile^, 'P9');
     CompilePascalM := true ;
@@ -5741,17 +5650,6 @@ begin
   assign(objectfile^, destname);
   rewrite(objectfile^);
 
-  listfile := nil;
-  (*
-  i := FindEnd(destname);
-  destname[i-2] := 'l';
-  destname[i-1] := 's';
-  destname[i-0] := 't';
-  new(listfile);
-  assign(listfile^, destname);
-  rewrite(listfile^);
-  *)
-
   i := FindEnd(destname);
   destname[i-2] := 'e';
   destname[i-1] := 'r';
@@ -5768,11 +5666,6 @@ begin
   close(sourcefile^) ;
   write(objectfile^, chr(26));
   close(objectfile^) ;
-  if listfile <> nil then
-  begin
-    write(listfile^, chr(26));
-    close(listfile^) ;
-  end;
   write(errorfile^, chr(26));
   close(errorfile^) ;
 end  ; (* CloseFiles *)
