@@ -587,7 +587,7 @@ procedure WriteInstruction(opcode  : integer ;
               end  ;
         end  ;
       writeln(listfile);
-      nrargs := 7 +(nrlabels + 1)* 2 ;
+      nrargs := 6 + (nrlabels + 1) * 2 ;
     end  ;(* PRCASE *)
 
   procedure PrStringLCA ;
