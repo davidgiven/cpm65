@@ -20,7 +20,7 @@ struct watchpoint
 };
 
 static struct watchpoint watchpoints[16];
-static bool tracing = false;
+bool tracing = false;
 static bool singlestepping = true;
 static bool bdosbreak = false;
 static bool bdoslog = false;

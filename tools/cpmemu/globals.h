@@ -14,6 +14,7 @@
 extern M6502* cpu;
 extern uint8_t ram[0x10000];
 extern uint16_t himem;
+extern bool tracing;
 
 extern void emulator_init(void);
 extern void emulator_run(void);
