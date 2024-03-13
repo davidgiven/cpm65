@@ -101,7 +101,8 @@ const
   setsize          =     8 ;(* set       *)
   ptrsize          =     2 ;(* pointer   *)
   strglgth         =     8 ;(* strings stored in blocks of 8 char's *)
-  alphalen         =    80 ;(* general purpose string length *)
+  pathlen          =    80 ;(* filename length *)
+  alphalen         =    40 ;(* general purpose string length *)
   lcaftermarkstack =     6 ;(* stack frame for interpreter *)
   maxint           = 32767 ;(* 16-bit's two's complement machine *)
   setmax           =    63 ;(* set has maximal 63 members *)
@@ -236,6 +237,7 @@ type
   idkind =( actual,
     formal     );
   alpha = packed array[1 .. strglgth] of char ;
+  pathstring = packed array[1 .. pathlen] of char ;
   alphastring = packed array[1 .. alphalen] of char ;
   identifier = packed record
     name   : alpha ;
@@ -289,7 +291,7 @@ var
   linpos       : integer ;
   line         : packed array[1 .. maxchcnt] of char ;
   linecount    : integer ;
-  sourcename, destname : alphastring ;
+  sourcename, destname : pathstring ;
   (* Counters *)
   lc,
   ic   : addrrange   ;    (* Data location and instruction counters *)
@@ -299,7 +301,6 @@ var
   nproc    : integer ;    (* Next procedure number *)
   mxintio  : integer ;
   (* Switches *)
-  {  declpart,   }(* Declaration part *)
   prterr  : boolean ;     (* To allow forward reference in pointer
                               type declaration by suppressing error
                               message    *)
@@ -1934,7 +1935,7 @@ var
           end
         end ;(* case *)
         (* return description *)
-        fsp := lsp;
+        fsp := lsp; (* XXX *)
       end ;
       Test1(fsys, 6);
     end ;
@@ -5046,7 +5047,6 @@ for ->--! var-ident !--(:=)---! expression !--->
   end ;(* body *)
 
 begin(* Block*)
-  {   declpart := true ; }
   repeat
     if sy = constsy
     then
@@ -5079,7 +5079,6 @@ begin(* Block*)
       Skip(fsys);
     end
   until sy in statbegsys ;
-  {   declpart := false ; }
   Intest(beginsy,17);
   repeat
     body(fsys);
@@ -5414,7 +5413,6 @@ begin
   errtot    := 0 ;
   linecount := 0 ;
   fwptr     := nil   ;
-  {   declpart  := true ; }
   prterr    := true ;
   errinx    := 0 ;
   lc        := lcaftermarkstack ;
@@ -5610,7 +5608,7 @@ var
       i := i + 1;
   end;
 
-  procedure GetWord(var s: alphastring);
+  procedure GetWord(var s: pathstring);
   begin
     SkipSpaces;
     j := 0;
@@ -5623,12 +5621,12 @@ var
     end;
   end;
 
-  function FindEnd(var s: alphastring): integer;
+  function FindEnd(var s: pathstring): integer;
   var
     len: integer;
     i: integer;
   begin
-    i := alphalen;
+    i := pathlen;
     while (i <> -1) and ((s[i] = ' ') or (ord(s[i]) = 0)) do
       i := i - 1;
     FindEnd := i;
@@ -5698,3 +5696,13 @@ begin (* main Mpascal *)
   if errflag then
     halt;
 end.
+             see error file') ;
+  CloseFiles ;
+  if ShowErrors then
+    Dumperrorfile ;
+  if errflag then
+    halt;
+end.
+             see error file') ;
+  CloseFiles ;
+  if           

@@ -728,7 +728,7 @@ begin
   EndLineList ;
   for count := 0 to procf do
     begin
-      write(listfile, ' ',count:3, '    ',
+      write(listfile, ' ',WriteHex(count):3, '    ',
                       hexstr(procbuffer[count].procaddress, 4));
       if procbuffer[count].procname[1] = ' '
         then

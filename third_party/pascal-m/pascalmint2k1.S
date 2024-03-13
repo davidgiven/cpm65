@@ -53,6 +53,8 @@
 ; - check if prcbuf is handled right in CUP2
 ; - align naming conventions with Pascal interpreter
 
+#define CHECK_NULLS 0           // check some null pointer dereferences
+
 #include "cpm65.inc"
 
 ZEROPAGE
@@ -61,19 +63,21 @@ pc:     .fill 2 ; program counter
 stack:  .fill 2 ; software stack pointer
 hp:     .fill 2 ; heap pointer
 mp:     .fill 2 
+
 mpsave: .fill 2 
-progbase: .fill 2 ; start of use m-code
+progbase: .fill 2 ; start of user m-code
 strptr: .fill 1 ; string print pointer
 eolb:   .fill 1 ; end of input line boolean
 eofb:   .fill 1 ; end of file boolean
 op:     .fill 1 ; last op code
-fa:     .fill 2 ; file object pointer
 
-tmp1l8: .fill 8 ; 8 byte temp field
+fa:     .fill 2 ; file object pointer
 tmp2l2: .fill 2 ; 2 byte temp
 tmp3l2: .fill 2 ; 2 byte temp
 ytmp:   .fill 1 ; temporary Y save
 cmdline: .fill 1 ; command line offset
+
+tmp1l8: .fill 8 ; 8 byte temp field
 
 ;
 ; file structure layout
@@ -130,18 +134,41 @@ prcbuf  = BASE + 2
 main:
         lda #0
         sta fa+1
+        sta eolb
+        sta eofb
 
         lda #>mstart ; start of mcode 
         sta pc + 1
         lda #<mstart
         sta pc
 
+        jsr bdos_GETTPA     ; get end of memory
+        dex                 ; the stack is post-decrement
+        stx stack + 1
+        stx mp + 1
+        lda #0xff
+        sta stack
+        sta mp
+
 ;
-; say hello
+; say hello and show the amount of free memory
 ;
-        lda #>msg002 ; send message and fatal error exit
-        ldx #<msg002
-        jsr prstrng
+
+        lda #<startup_msg
+        ldx #>startup_msg
+        jsr bdos_WRITESTRING
+        sec
+        lda stack+0
+        sbc #<BASE
+        pha
+        lda stack+1
+        sbc #>BASE
+        jsr phex2
+        pla
+        jsr phex2
+        lda #<free_msg
+        ldx #>free_msg
+        jsr bdos_WRITESTRING
        
 ;
 ; load the program
@@ -176,17 +203,10 @@ loadloop:
         inc hp+1
 noadd:
         jmp loadloop
-done_load:                          ; heap has been advanced past the program
-
-        jsr bdos_GETTPA     ; get end of memory
-        stx stack + 1
-        stx mp + 1
-        lda #0
-        sta stack
-        sta mp
+done_load:                  ; heap has been advanced past the program
 
         ;
-        ; compute the base of use mcode
+        ; compute the base of user mcode
         ;
 
         clc
@@ -211,15 +231,14 @@ param_loop:
         bne param_loop
 done_params:
         stx cmdline
-
-        ;
-        ; initialize files
-        ;        
-        lda #0              ; clear file flags
-        sta eolb
-        sta eofb
 ;        
         jmp interpr            ; start interpreting
+
+startup_msg:
+        .asciz "Pascal-M bytecode interpreter: "
+free_msg:
+        .ascii " bytes free"
+        .byte 13, 10, 0
 
         ;
         ; useful routines
@@ -386,7 +405,7 @@ sadget: jsr basead
         emitxtab_entry \op, ldc      ; load 2-byte constant
         emitxtab_entry \op, retp     ; return from procedure or function
         emitxtab_entry \op, adi      ; add integer
-        emitxtab_entry \op, andb     ; booelan and
+        emitxtab_entry \op, andb     ; boolean and
         emitxtab_entry \op, dif      ; set difference
         emitxtab_entry \op, dvi      ; integer divide
         emitxtab_entry \op, inn      ; test if element in set
@@ -435,7 +454,7 @@ xtab_hi:
 ;  CSP   11   Standard proc Stop 
 ; 
 mstart: .byte   $30         ; MST0 mark stack
-        .byte   $BE,0       ; CUP1  0    proc nr 0call procedure 0
+        .byte   $BE,0       ; CUP1  0    call procedure 0
         .byte   $BD,$0B     ; CSP   11   Standard procedure  Stop 
 ;
 ; Start of Pascal-M code interpreter
@@ -471,9 +490,9 @@ interpr:
         tay
         lda pc+1
         sbc progbase+1
-        cmp #$15        ; high
+        cmp #$3f        ; high
         bne xxx
-        cpy #$a1        ; low
+        cpy #$2b        ; low
         bne xxx
         brk
 xxx:
@@ -491,7 +510,8 @@ xxx:
         sta tmp2l2+1
         jmp (tmp2l2)
 
-notimp: ldx #>msg007
+notimp:
+        ldx #>msg007
         lda #<msg007
         jmp string      ; not implemented message, fatal
 
@@ -584,6 +604,18 @@ lod2:   jsr sadget      ; get address in tmp2l2 of item
         ldx #0
         lda (tmp2l2,x)  ; get high part
         jsr push2       ; push all
+
+        #if 0
+        lda #'='
+        jsr bdos_CONOUT
+        ldy #2
+        lda (stack), y
+        jsr phex2
+        ldy #1
+        lda (stack), y
+        jsr phex2
+        #endif
+        
         jmp tststk      ; 
         ;
         ; STR1 (7X YY) store 1 byte data item
@@ -612,10 +644,10 @@ str2:   jsr sadget      ; store 16 bits
 ; 90 LEQ2
 ;
 leq2:   jsr cmp2        ; compare next to top with top
-        bne leq2x1      ; false
-leq2x0: ldy #$01        ; true = 1
+        bne false       ; false
+true:   ldy #$01        ; true = 1
         bne leq2x2      ; always
-leq2x1: ldy #$00        ; false
+false:  ldy #$00        ; false
 leq2x2: lda #$00        ; dummy
         jsr push2       ; push boolean on stack
         jmp interpr
@@ -711,8 +743,9 @@ leqm2:  tay
         beq leqm1
         ;
         ; LES2
-les2:   jsr cmp2        ; same as leq2 without equal
-        jmp leq2x1      ; minus test should have been catched
+les2:   
+        jsr cmp2        ; same as leq2 without equal
+        jmp false       ; minus test should have been catched
         ;
 cmp2:   jsr setup2      ; first OP in tmp3, second in tmp2
         sec         
@@ -725,12 +758,12 @@ cmp2:   jsr setup2      ; first OP in tmp3, second in tmp2
         bne cmp2b       ; not equal high pat
         lda tmp2l2      ; possible high part equal
         rts
-cmp2a:  pla         ; full return address
+cmp2a:  pla             ; full return address
         pla
-        jmp leq2x0
+        jmp true
 cmp2b:  pla
         pla
-        jmp leq2x1
+        jmp false
         ;
         ; 94 LEQ8
         ;
@@ -751,8 +784,8 @@ leq8b:  dec tmp2l2      ; we did the interpr again
         jsr pull2   
         lda tmp3l2
         bne leq8c
-        jmp leq2x0      ; set was contained in
-leq8c:  jmp leq2x1      ; not contained in
+        jmp true      ; set was contained in
+leq8c:  jmp false      ; not contained in
         ;
         ; 95 LESM
         ; 
@@ -775,8 +808,8 @@ equ2:   jsr setup2      ; compare tmp2 and tmp3
         lda tmp3l2 + 1
         cmp tmp2l2 + 1
         bne equ2x1      ; not equal
-        jmp leq2x0      ; push 1
-equ2x1: jmp leq2x1
+        jmp true      ; push 1
+equ2x1: jmp false
         ;
         ; 97 GEQ8
         ;
@@ -799,8 +832,8 @@ geq8b:  dec tmp2l2
         jsr pull2
         lda tmp3l2
         bne geq8c
-        jmp leq2x1
-geq8c:  jmp leq2x1      ; send false
+        jmp false
+geq8c:  jmp false      ; send false
         ;
         ; 98 EQUM
         ;
@@ -832,8 +865,8 @@ equ8x2: dec tmp2l2
         jsr pull2
         lda tmp2l2 + 1
         bne equ8x3      ; if not equal
-        jmp leq2x0      ; send 1
-equ8x3: jmp leq2x1      ; send 0
+        jmp true       ; send 1
+equ8x3: jmp false      ; send 0
         ;
         ; 9A IND1
         ;
@@ -866,10 +899,26 @@ ind8x2: lda (tmp2l2),y  ; lineair move
         dey         ; point to upper part
         bpl ind8x2      ; repeat until 8 worrds done
         jmp tststk
+        
+#if CHECK_NULLS
+writezero:
+        ldx #>writezero_msg
+        lda #<writezero_msg
+        jmp string
+writezero_msg:
+        .asciz "Write to nil"
+#endif
+
         ;
         ; 9D STO1
         ;
 sto1:   jsr setup2
+        #if CHECK_NULLS
+                lda tmp2l2
+                ora tmp2l2+1
+                beq writezero
+        #endif
+        
         ldy #$00
         lda tmp3l2      ; op to store
         sta (tmp2l2),y
@@ -878,6 +927,12 @@ sto1:   jsr setup2
         ; 9E STO2
         ;
 sto2:   jsr setup2      ; get 16 bit address in tmp3 and address
+        #if CHECK_NULLS
+                lda tmp2l2
+                ora tmp2l2+1
+                beq writezero
+        #endif
+
         ldy #$00
         lda tmp3l2
         sta (tmp2l2), y
@@ -894,6 +949,12 @@ sto8:   ldy #$09        ; add 10 to stackpointer to read add
         iny 
         lda (stack),y
         sta tmp2l2 + 1
+        
+        #if CHECK_NULLS
+                ora tmp2l2
+                beq writezero
+        #endif
+        
         ldy #$00
 sto8x1: jsr pull        ; get item from stack
         sta (tmp2l2),y  ; linear move
@@ -1171,7 +1232,7 @@ lnc:    ldy #$01
         ;
 fjp:    jsr setup1      ; get boolean from stack
         lda tmp2l2
-        beq ujp     ; false jump
+        beq ujp         ; false jump
         jsr incpc2      ; next 
         jmp interpr
         ; 
@@ -1252,10 +1313,16 @@ cas:    jsr setup1      ; case nr
         asl tmp3l2      ; multiply by two for dual word index
         rol tmp3l2 + 1
         
+        clc             ; compensate for six-byte header
+        lda tmp3l2
+        adc #6
+        sta tmp3l2
+        bcc cas1
+        inc tmp3l2+1
+cas1:
         clc
         lda pc
         adc tmp3l2
-        adc #6
         sta tmp3l2
         lda pc+1
         adc tmp3l2+1
@@ -1291,9 +1358,10 @@ casex:  ldy #$05        ; test for otherwise
         
         ora tmp2l2
         bne cas2
-        ldx #>msg006
-        lda #<msg006
+        ldx #>caseindex_msg
+        lda #<caseindex_msg
         jmp string
+caseindex_msg: .asciz "Case index"
         ;
         ; B7 MOV
         ;
@@ -1482,7 +1550,7 @@ fix21:  jsr pull            ; get operand
         ; 
         ; C1 LNS
         ;
-lns:ldy #$08
+lns:    ldy #$08
 lnsx1:  lda #$08
         jsr push
         dey             ; interpr
@@ -1813,7 +1881,8 @@ rst:    jsr pull2           ; get old heap pointer
         ;
         ; PROC A ELN
         ;
-eln:    ldy eolb            ; get EOLN boolean
+eln:    
+        ldy eolb            ; get EOLN boolean
         lda #$00
         jsr push2           ; push EOLN boolean on stack
         jmp tststk
@@ -1830,7 +1899,8 @@ stp:    jmp bdos_EXIT       ; just stop
 ;      16 : CLS         
         ; routines
         ;
-getch:  jsr rdt         ; read from input
+getch:  
+        jsr rdt         ; read from input
         cmp #$20            ; printable?
         bcc getch2
         cmp #$7F
@@ -2212,8 +2282,8 @@ rdt:	sty ytmp
 rdt1:   clc
         adc #FP_BUFFER
         tay
-        txa
         lda (fa), y
+
         pha
         ldy #FP_POS
         lda (fa), y
@@ -2354,17 +2424,17 @@ writepc: lda #' '
         pla
         jmp phex2
 
+        lda #10
+        jsr bdos_CONOUT
+        lda #13
+        jmp bdos_CONOUT
+
 writesp: lda #'~'
         jsr bdos_CONOUT
-        sec
-        lda stack
-        sbc progbase
-        pha
-        lda stack+1
-        sbc progbase+1
 
+        lda stack+1
         jsr phex2
-        pla
+        lda stack
         jmp phex2
 
 
@@ -2374,8 +2444,6 @@ crlf_msg:  .byte 13, 10, 0
 ; messages
 ;
 msg005: .asciz "Out of stack"
-msg006: .asciz "Case index"
 msg007: .asciz "Not implemented"
 msg008: .asciz "Div by zero"
-msg003:
-msg002: .ascii "Pascal-M\r"
+
