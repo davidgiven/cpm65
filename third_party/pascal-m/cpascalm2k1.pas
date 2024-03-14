@@ -377,89 +377,89 @@ begin
     7: write(fp, 'Syntax: actual parameter list');
     8: write(fp, 'Syntax: OF expected');
     9: write(fp, 'Syntax: "(" expected');
-   10: write(fp, 'Syntax: type specfication expected');
-   11: write(fp, 'Syntax: "[" expected');
-   12: write(fp, 'Syntax: "]" expected');
-   13: write(fp, 'Syntax: end expected');
-   14: write(fp, 'Syntax: ";" expected');
-   15: write(fp, 'Syntax: integer expected');
-   16: write(fp, 'Syntax: "-" expected');
-   17: write(fp, 'Syntax: begin expected');
-   18: write(fp, 'Syntax: error in declaration part');
-   19: write(fp, 'Syntax: error in field list');
-   20: write(fp, 'Syntax: "," expected');
-   21: write(fp, 'Syntax: "*" expected');
-   50: write(fp, 'Syntax: "error in constant');
-   51: write(fp, 'Syntax: ":=" expected');
-   52: write(fp, 'Syntax: then expected');
-   53: write(fp, 'Syntax: until expected');
-   54: write(fp, 'Syntax: do expected');
-   55: write(fp, 'Syntax: to/downto expected');
-   56: write(fp, 'Syntax: if expected');
-   58: write(fp, 'Syntax: ill-formed expression');
-   59: write(fp, 'Syntax: error in variable');
-  101: write(fp, 'Identifier declared twice');
-  102: write(fp, 'Low bound exceeds high-bound');
-  103: write(fp, 'Identifier is not a type identifier');
-  104: write(fp, 'Identifier not declared');
-  105: write(fp, 'Sign not allowed');
-  106: write(fp, 'Number expected');
-  107: write(fp, 'Incompatible subrange types');
-  110: write(fp, 'Tag type must be an ordinal type');
-  111: write(fp, 'Incompatible with tag type');
-  113: write(fp, 'Index type must be an ordinal type');
-  115: write(fp, 'Base type must be scalar or subrange');
-  116: write(fp, 'Error in type of procedure parameter');
-  117: write(fp, 'Unsatisfied forward reference');
-  118: write(fp, 'Forward reference type identifier');
-  119: write(fp, 'Forward declared : repetition par. list');
-  120: write(fp, 'Function result: scalar,subrange,pointer');
-  122: write(fp, 'Forward declared: repetition result type');
-  123: write(fp, 'Missing result type in function declar.');
-  125: write(fp, 'Error in type of standard function par.');
-  126: write(fp, 'Number of parameters disagrees with decl');
-  129: write(fp, 'Incompatible operands');
-  130: write(fp, 'Expression is not of SET type');
-  131: write(fp, 'Test on equality allowed only');
-  132: write(fp, 'Inclusion not allowed in set comparisons');
-  134: write(fp, 'Illegal type of operands');
-  135: write(fp, 'Boolean operands required');
-  136: write(fp, 'Set element must be scalar or subrange');
-  137: write(fp, 'Set element types not compatible');
-  138: write(fp, 'Type must be array');
-  139: write(fp, 'Index type is not compatible with decl.');
-  140: write(fp, 'Type must be record');
-  141: write(fp, 'Type must be pointer');
-  142: write(fp, 'Illegal parameter substitution');
-  143: write(fp, 'Illegal type of loop control variable');
-  144: write(fp, 'Illegal type of expression');
-  145: write(fp, 'Type conflict');
-  147: write(fp, 'Case label and case expression not comp.');
-  148: write(fp, 'Subrange bounds must be scalar');
-  149: write(fp, 'Index type must not be an integer');
-  150: write(fp, 'Assignment to standard function illegal');
-  152: write(fp, 'No such field in this record');
-  154: write(fp, 'Actual parameter must be a variable');
-  155: write(fp, 'Control variable declared interm. level');
-  156: write(fp, 'Value already as a label in CASE');
-  157: write(fp, 'Too many cases in CASE statement');
-  160: write(fp, 'Previous declaration was not forward');
-  161: write(fp, 'Again forward declared');
-  169: write(fp, 'SET element not in range 0 .. 63');
-  170: write(fp, 'String constant must not exceed one line');
-  171: write(fp, 'Integer constant exceeds range(32767)');
-  172: write(fp, 'Too many nested scopes of identifiers');
-  173: write(fp, 'Too many nested procedures/functions');
-  174: write(fp, 'Index expression out of bounds');
-  175: write(fp, 'Internal compiler error : standard funct');
-  176: write(fp, 'Illegal character found');
-  177: write(fp, 'Error in type');
-  178: write(fp, 'Illegal reference to variable');
-  179: write(fp, 'Internal error : wrong size variable');
-  180: write(fp, 'Maximum number of files exceeded');
+    10: write(fp, 'Syntax: type specfication expected');
+    11: write(fp, 'Syntax: "[" expected');
+    12: write(fp, 'Syntax: "]" expected');
+    13: write(fp, 'Syntax: end expected');
+    14: write(fp, 'Syntax: ";" expected');
+    15: write(fp, 'Syntax: integer expected');
+    16: write(fp, 'Syntax: "-" expected');
+    17: write(fp, 'Syntax: begin expected');
+    18: write(fp, 'Syntax: error in declaration part');
+    19: write(fp, 'Syntax: error in field list');
+    20: write(fp, 'Syntax: "," expected');
+    21: write(fp, 'Syntax: "*" expected');
+    50: write(fp, 'Syntax: "error in constant');
+    51: write(fp, 'Syntax: ":=" expected');
+    52: write(fp, 'Syntax: then expected');
+    53: write(fp, 'Syntax: until expected');
+    54: write(fp, 'Syntax: do expected');
+    55: write(fp, 'Syntax: to/downto expected');
+    56: write(fp, 'Syntax: if expected');
+    58: write(fp, 'Syntax: ill-formed expression');
+    59: write(fp, 'Syntax: error in variable');
+    101: write(fp, 'Identifier declared twice');
+    102: write(fp, 'Low bound exceeds high-bound');
+    103: write(fp, 'Identifier is not a type identifier');
+    104: write(fp, 'Identifier not declared');
+    105: write(fp, 'Sign not allowed');
+    106: write(fp, 'Number expected');
+    107: write(fp, 'Incompatible subrange types');
+    110: write(fp, 'Tag type must be an ordinal type');
+    111: write(fp, 'Incompatible with tag type');
+    113: write(fp, 'Index type must be an ordinal type');
+    115: write(fp, 'Base type must be scalar or subrange');
+    116: write(fp, 'Error in type of procedure parameter');
+    117: write(fp, 'Unsatisfied forward reference');
+    118: write(fp, 'Forward reference type identifier');
+    119: write(fp, 'Forward declared : repetition par. list');
+    120: write(fp, 'Function result: scalar,subrange,pointer');
+    122: write(fp, 'Forward declared: repetition result type');
+    123: write(fp, 'Missing result type in function declar.');
+    125: write(fp, 'Error in type of standard function par.');
+    126: write(fp, 'Number of parameters disagrees with decl');
+    129: write(fp, 'Incompatible operands');
+    130: write(fp, 'Expression is not of SET type');
+    131: write(fp, 'Test on equality allowed only');
+    132: write(fp, 'Inclusion not allowed in set comparisons');
+    134: write(fp, 'Illegal type of operands');
+    135: write(fp, 'Boolean operands required');
+    136: write(fp, 'Set element must be scalar or subrange');
+    137: write(fp, 'Set element types not compatible');
+    138: write(fp, 'Type must be array');
+    139: write(fp, 'Index type is not compatible with decl.');
+    140: write(fp, 'Type must be record');
+    141: write(fp, 'Type must be pointer');
+    142: write(fp, 'Illegal parameter substitution');
+    143: write(fp, 'Illegal type of loop control variable');
+    144: write(fp, 'Illegal type of expression');
+    145: write(fp, 'Type conflict');
+    147: write(fp, 'Case label and case expression not comp.');
+    148: write(fp, 'Subrange bounds must be scalar');
+    149: write(fp, 'Index type must not be an integer');
+    150: write(fp, 'Assignment to standard function illegal');
+    152: write(fp, 'No such field in this record');
+    154: write(fp, 'Actual parameter must be a variable');
+    155: write(fp, 'Control variable declared interm. level');
+    156: write(fp, 'Value already as a label in CASE');
+    157: write(fp, 'Too many cases in CASE statement');
+    160: write(fp, 'Previous declaration was not forward');
+    161: write(fp, 'Again forward declared');
+    169: write(fp, 'SET element not in range 0 .. 63');
+    170: write(fp, 'String constant must not exceed one line');
+    171: write(fp, 'Integer constant exceeds range(32767)');
+    172: write(fp, 'Too many nested scopes of identifiers');
+    173: write(fp, 'Too many nested procedures/functions');
+    174: write(fp, 'Index expression out of bounds');
+    175: write(fp, 'Internal compiler error : standard funct');
+    176: write(fp, 'Illegal character found');
+    177: write(fp, 'Error in type');
+    178: write(fp, 'Illegal reference to variable');
+    179: write(fp, 'Internal error : wrong size variable');
+    180: write(fp, 'Maximum number of files exceeded');
   else
     write(fp, 'Unknown error ', err)
-  end
+  end;
 end ;(* FillErrorMessages *)
 
 procedure BeginLine ;
@@ -520,9 +520,7 @@ begin
       currnmr := errlist[k].nmr ;
       if currpos <= lastpos
       then
-      begin
-        write(errorfile^,',')  ;
-      end
+        write(errorfile^,',')
       else
       begin
         while  freepos < currpos do
@@ -3529,27 +3527,27 @@ v                                                             !
             InSymbol ;
             Expression(fsys +[comma, colon, rparent]);
             if gattr.typtr <> nil then
-            if gattr.typtr^.form <> files then
-            begin
+              if gattr.typtr^.form <> files then
+              begin
                   (* The first expression is not a file type, which means it
                   must be something to write out. Default to output. *)
-              LDCIGen(2);
-              ByteGen(194); (* SFA *)
-              ProcessTerms;
-            end
-            else
-            begin
+                LDCIGen(2);
+                ByteGen(194); (* SFA *)
+                ProcessTerms;
+              end
+              else
+              begin
                   (* The first parameter is a file type, which means it's the
                   destination stream. *)
-              LoadAddress;
-              ByteGen(194); (* SFA *)
-              if sy <> rparent then
-              begin
-                InSymbol;
-                Expression(fsys +[comma, colon, rparent]);
-                ProcessTerms;
+                LoadAddress;
+                ByteGen(194); (* SFA *)
+                if sy <> rparent then
+                begin
+                  InSymbol;
+                  Expression(fsys +[comma, colon, rparent]);
+                  ProcessTerms;
+                end;
               end;
-            end;
             Intest(rparent, 4);
           end;
           if llkey = 6
@@ -4128,7 +4126,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                 begin
                   new(lvp);
                   lvp^.pval := cstpart ;
-                  gattr.cval.valp := lvp
+                  gattr.cval.valp := lvp;
                 end;
               end ;(* SetExpression *)
 

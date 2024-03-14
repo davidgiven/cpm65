@@ -53,4 +53,5 @@ PASCAL_APPS = {
     "0:pint.com": "third_party/pascal-m+pint",
     "0:pasc.obb": "third_party/pascal-m+pasc-obb",
     "0:pload.com": "third_party/pascal-m+loader",
+    "0:hello.pas": "cpmfs/hello.pas",
 }

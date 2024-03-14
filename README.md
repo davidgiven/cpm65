@@ -38,8 +38,9 @@ programs at different base addresses.)
 
 Currently you can cross-assemble programs from a PC, as well as a working C
 toolchain with llvm-mos. For native development, there's a basic assembler, a
-couple of editors, and a BASIC.  You need about 20kB to run the assembler at
-all, and of course more memory the bigger the program.
+couple of editors, a BASIC, and a byte-compiled Pascal subset and interpreter.
+You need about 20kB to run the assembler at all, and of course more memory the
+bigger the program.
 
 No, it won't let you run 8080 programs on the 6502!
 
@@ -371,6 +372,43 @@ more comfortable to use than BEDIT, but is about five times the size, and will
 only run on systems with a SCREEN driver, as noted above (you can also use the
 `DEVICES` command to see what devices your system supports).
 
+### The Pascal
+
+Pascal-M is a Pascal subset intended for use on very small machines. It compiles
+to bytecode, M-code, which is then run with an interpreter. The compiler is
+itself written in Pascal-M and is capable of compiling itself (very slowly).
+There is a basic port to CP/M-65.
+
+To use it, you need to use the interpreter, `PINT`, to run the compiler to
+compile your program into an OBP file. This is then translated into an OBB file
+by `PLOAD` (not written in Pascal!). You can then run the resulting OBB file
+with `PINT`. For example:
+
+```
+A> PINT PASC.OBB HELLO.PAS HELLO.OBP
+A> PLOAD HELLO.OBP HELLO.OBB
+A> PINT HELLO.OBB
+```
+
+The compiler will also generate a `PROGRAM.ERR` file containing a copy of any
+error messages that result from the compilation process.
+
+Sadly, you need at least 36kB of free RAM to run the compiler, and also the disk
+images for various systems are full, so it's only included for a few platforms.
+
+Pascal-M is considerably simplified from the full Pascal language, with support
+for only 16-bit integers, but it does support records, sets, enumerations,
+pointers, nested functions and procedures, etc. Performance isn't brilliant but
+it does work. CP/M-65 is very basic, consisting of support for `text` files
+using the traditional `assign`/`reset`/`rewrite`/`close` API. You can have as
+many open at once as you like but you can't seek inside a file. In addition,
+while `new` is supported, there is no `dispose`.
+
+For more information on Pascal-M, see [Hans Otten's
+website](http://pascal.hansotten.com/px-descendants/pascal-m/pascal-m-2k1/).
+However, do not report bugs on the CP/M-65 port to him --- [file bug reports
+here](https://github.com/davidgiven/cpm65/issues/new) instead.
+
 ### Utilities
 
 `bin/cpmemu` contains a basic CP/M-65 user mode emulator and debugger. It'll run
@@ -419,3 +457,8 @@ See `third_party/tomsfonts/LICENSE` for the full text.
 `third_party/mads` contains a copy of Mad Assembler, which is © 2018-2023 Tomasz
 Biela and is available under the terms of the MIT license.  See
 `third_party/mads/LICENSE` for the full text.
+
+`third_party/pascal-m` contains a extremely hacked up copy of the Pascal-M
+bytecode compiler and interpreter, which is © 1978-2021 Niklaus Wirth, Mark
+Rustad and Hans Otten and is available under the terms of the MIT license. See
+`third_party/pascal-m/LICENSE` for the full text.

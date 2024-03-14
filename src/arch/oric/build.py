@@ -7,6 +7,7 @@ from config import (
     BIG_APPS_SRCS,
     SCREEN_APPS,
     SCREEN_APPS_SRCS,
+    PASCAL_APPS,
 )
 
 llvmcfile(
@@ -50,6 +51,7 @@ mkcpmfs(
     | BIG_APPS_SRCS
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
+    | PASCAL_APPS
 )
 
 mkoricdsk(name="diskimage", src=".+cpmfs")
