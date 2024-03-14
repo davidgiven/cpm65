@@ -336,8 +336,6 @@ var
   errinx : 0 .. 10 ;      (* Number of errors
                               in current source line *)
   errtot : integer ;      (* total number of errors *)
-  (* array to hold error messages from compiler *)
-  cmperror : array[1 .. maxermsg] of alphastring ;
   errlist :
   array[1 .. maxerlines] of
   packed record
@@ -367,6 +365,102 @@ var
   (* Used by the compiler driver itself. *)
   sourcefile, objectfile, errorfile : ^text ;
   ShowErrors : boolean ;
+
+procedure WriteErrorMessage(var fp: text; err: integer);
+begin
+  case err of
+    2: write(fp, 'Syntax: identifier expected');
+    3: write(fp, 'Syntax: Program expected');
+    4: write(fp, 'Syntax: ")" expected');
+    5: write(fp, 'Syntax: ":" exepected');
+    6: write(fp, 'Syntax: illegal symbol');
+    7: write(fp, 'Syntax: actual parameter list');
+    8: write(fp, 'Syntax: OF expected');
+    9: write(fp, 'Syntax: "(" expected');
+   10: write(fp, 'Syntax: type specfication expected');
+   11: write(fp, 'Syntax: "[" expected');
+   12: write(fp, 'Syntax: "]" expected');
+   13: write(fp, 'Syntax: end expected');
+   14: write(fp, 'Syntax: ";" expected');
+   15: write(fp, 'Syntax: integer expected');
+   16: write(fp, 'Syntax: "-" expected');
+   17: write(fp, 'Syntax: begin expected');
+   18: write(fp, 'Syntax: error in declaration part');
+   19: write(fp, 'Syntax: error in field list');
+   20: write(fp, 'Syntax: "," expected');
+   21: write(fp, 'Syntax: "*" expected');
+   50: write(fp, 'Syntax: "error in constant');
+   51: write(fp, 'Syntax: ":=" expected');
+   52: write(fp, 'Syntax: then expected');
+   53: write(fp, 'Syntax: until expected');
+   54: write(fp, 'Syntax: do expected');
+   55: write(fp, 'Syntax: to/downto expected');
+   56: write(fp, 'Syntax: if expected');
+   58: write(fp, 'Syntax: ill-formed expression');
+   59: write(fp, 'Syntax: error in variable');
+  101: write(fp, 'Identifier declared twice');
+  102: write(fp, 'Low bound exceeds high-bound');
+  103: write(fp, 'Identifier is not a type identifier');
+  104: write(fp, 'Identifier not declared');
+  105: write(fp, 'Sign not allowed');
+  106: write(fp, 'Number expected');
+  107: write(fp, 'Incompatible subrange types');
+  110: write(fp, 'Tag type must be an ordinal type');
+  111: write(fp, 'Incompatible with tag type');
+  113: write(fp, 'Index type must be an ordinal type');
+  115: write(fp, 'Base type must be scalar or subrange');
+  116: write(fp, 'Error in type of procedure parameter');
+  117: write(fp, 'Unsatisfied forward reference');
+  118: write(fp, 'Forward reference type identifier');
+  119: write(fp, 'Forward declared : repetition par. list');
+  120: write(fp, 'Function result: scalar,subrange,pointer');
+  122: write(fp, 'Forward declared: repetition result type');
+  123: write(fp, 'Missing result type in function declar.');
+  125: write(fp, 'Error in type of standard function par.');
+  126: write(fp, 'Number of parameters disagrees with decl');
+  129: write(fp, 'Incompatible operands');
+  130: write(fp, 'Expression is not of SET type');
+  131: write(fp, 'Test on equality allowed only');
+  132: write(fp, 'Inclusion not allowed in set comparisons');
+  134: write(fp, 'Illegal type of operands');
+  135: write(fp, 'Boolean operands required');
+  136: write(fp, 'Set element must be scalar or subrange');
+  137: write(fp, 'Set element types not compatible');
+  138: write(fp, 'Type must be array');
+  139: write(fp, 'Index type is not compatible with decl.');
+  140: write(fp, 'Type must be record');
+  141: write(fp, 'Type must be pointer');
+  142: write(fp, 'Illegal parameter substitution');
+  143: write(fp, 'Illegal type of loop control variable');
+  144: write(fp, 'Illegal type of expression');
+  145: write(fp, 'Type conflict');
+  147: write(fp, 'Case label and case expression not comp.');
+  148: write(fp, 'Subrange bounds must be scalar');
+  149: write(fp, 'Index type must not be an integer');
+  150: write(fp, 'Assignment to standard function illegal');
+  152: write(fp, 'No such field in this record');
+  154: write(fp, 'Actual parameter must be a variable');
+  155: write(fp, 'Control variable declared interm. level');
+  156: write(fp, 'Value already as a label in CASE');
+  157: write(fp, 'Too many cases in CASE statement');
+  160: write(fp, 'Previous declaration was not forward');
+  161: write(fp, 'Again forward declared');
+  169: write(fp, 'SET element not in range 0 .. 63');
+  170: write(fp, 'String constant must not exceed one line');
+  171: write(fp, 'Integer constant exceeds range(32767)');
+  172: write(fp, 'Too many nested scopes of identifiers');
+  173: write(fp, 'Too many nested procedures/functions');
+  174: write(fp, 'Index expression out of bounds');
+  175: write(fp, 'Internal compiler error : standard funct');
+  176: write(fp, 'Illegal character found');
+  177: write(fp, 'Error in type');
+  178: write(fp, 'Illegal reference to variable');
+  179: write(fp, 'Internal error : wrong size variable');
+  180: write(fp, 'Maximum number of files exceeded');
+  else
+    write(fp, 'Unknown error ', err)
+  end
+end ;(* FillErrorMessages *)
 
 procedure BeginLine ;
 var
@@ -456,7 +550,9 @@ begin
     for k := 1 to errinx do
     begin
       currnmr := errlist[k].nmr ;
-      writeln (errorfile^, ' ':11, currnmr:3, ' = ',cmperror[currnmr] ) ;
+      write(errorfile^, ' ':11, currnmr:3, ' = ');
+      WriteErrorMessage(errorfile^, currnmr);
+      writeln(errorfile^);
     end ;
     errinx := 0 ;
   end;
@@ -3936,7 +4032,6 @@ proc/func-ident -----(()-----! expression !-----())------>
               varpart : boolean ;
               cstpart : intset ;
               lsp : structptr ;
-              i   : integer ;
 
               procedure SetExpression ;
              (* structure parsed :
@@ -5317,98 +5412,6 @@ begin
   ufctptr^.externl := false ;
 end ;(* Enterundecl *)
 
-procedure FillErrorMessages ;
-begin
-  cmperror[  2] := 'Syntax: identifier expected             ' ;
-  cmperror[  3] := 'Syntax: Program expected                ' ;
-  cmperror[  4] := 'Syntax: ")" expected                    ' ;
-  cmperror[  5] := 'Syntax: ":" exepected                   ' ;
-  cmperror[  6] := 'Syntax: illegal symbol                  ' ;
-  cmperror[  7] := 'Syntax: actual parameter list           ' ;
-  cmperror[  8] := 'Syntax: OF expected                     ' ;
-  cmperror[  9] := 'Syntax: "(" expected                    ' ;
-  cmperror[ 10] := 'Syntax: type specfication expected      ' ;
-  cmperror[ 11] := 'Syntax: "[" expected                    ' ;
-  cmperror[ 12] := 'Syntax: "]" expected                    ' ;
-  cmperror[ 13] := 'Syntax: end expected                    ' ;
-  cmperror[ 14] := 'Syntax: ";" expected                    ' ;
-  cmperror[ 15] := 'Syntax: integer expected                ' ;
-  cmperror[ 16] := 'Syntax: "-" expected                    ' ;
-  cmperror[ 17] := 'Syntax: begin expected                  ' ;
-  cmperror[ 18] := 'Syntax: error in declaration part       ' ;
-  cmperror[ 19] := 'Syntax: error in field list             ' ;
-  cmperror[ 20] := 'Syntax: "," expected                    ' ;
-  cmperror[ 21] := 'Syntax: "*" expected                    ' ;
-  cmperror[ 50] := 'Syntax: "error in constant              ' ;
-  cmperror[ 51] := 'Syntax: ":=" expected                   ' ;
-  cmperror[ 52] := 'Syntax: then expected                   ' ;
-  cmperror[ 53] := 'Syntax: until expected                  ' ;
-  cmperror[ 54] := 'Syntax: do expected                     ' ;
-  cmperror[ 55] := 'Syntax: to/downto expected              ' ;
-  cmperror[ 56] := 'Syntax: if expected                     ' ;
-  cmperror[ 58] := 'Syntax: ill-formed expression           ' ;
-  cmperror[ 59] := 'Syntax: error in variable               ' ;
-  cmperror[101] := 'Identifier declared twice               ' ;
-  cmperror[102] := 'Low bound exceeds high-bound            ' ;
-  cmperror[103] := 'Identifier is not a type identifier     ' ;
-  cmperror[104] := 'Identifier not declared                 ' ;
-  cmperror[105] := 'Sign not allowed                        ' ;
-  cmperror[106] := 'Number expected                         ' ;
-  cmperror[107] := 'Incompatible subrange types             ' ;
-  cmperror[110] := 'Tag type must be an ordinal type        ' ;
-  cmperror[111] := 'Incompatible with tag type              ' ;
-  cmperror[113] := 'Index type must be an ordinal type      ' ;
-  cmperror[115] := 'Base type must be scalar or subrange    ' ;
-  cmperror[116] := 'Error in type of procedure parameter    ' ;
-  cmperror[117] := 'Unsatisfied forward reference           ' ;
-  cmperror[118] := 'Forward reference type identifier       ' ;
-  cmperror[119] := 'Forward declared : repetition par. list ' ;
-  cmperror[120] := 'Function result: scalar,subrange,pointer' ;
-  cmperror[122] := 'Forward declared: repetition result type' ;
-  cmperror[123] := 'Missing result type in function declar. ' ;
-  cmperror[125] := 'Error in type of standard function par. ' ;
-  cmperror[126] := 'Number of parameters disagrees with decl' ;
-  cmperror[129] := 'Incompatible operands                   ' ;
-  cmperror[130] := 'Expression is not of SET type           ' ;
-  cmperror[131] := 'Test on equality allowed only           ' ;
-  cmperror[132] := 'Inclusion not allowed in set comparisons' ;
-  cmperror[134] := 'Illegal type of operands                ' ;
-  cmperror[135] := 'Boolean operands required               ' ;
-  cmperror[136] := 'Set element must be scalar or subrange  ' ;
-  cmperror[137] := 'Set element types not compatible        ' ;
-  cmperror[138] := 'Type must be array                      ' ;
-  cmperror[139] := 'Index type is not compatible with decl. ' ;
-  cmperror[140] := 'Type must be record                     ' ;
-  cmperror[141] := 'Type must be pointer                    ' ;
-  cmperror[142] := 'Illegal parameter substitution          ' ;
-  cmperror[143] := 'Illegal type of loop control variable   ' ;
-  cmperror[144] := 'Illegal type of expression              ' ;
-  cmperror[145] := 'Type conflict                           ' ;
-  cmperror[147] := 'Case label and case expression not comp.' ;
-  cmperror[148] := 'Subrange bounds must be scalar          ' ;
-  cmperror[149] := 'Index type must not be an integer       ' ;
-  cmperror[150] := 'Assignment to standard function illegal ' ;
-  cmperror[152] := 'No such field in this record            ' ;
-  cmperror[154] := 'Actual parameter must be a variable     ' ;
-  cmperror[155] := 'Control variable declared interm. level ' ;
-  cmperror[156] := 'Value already as a label in CASE        ' ;
-  cmperror[157] := 'Too many cases in CASE statement        ' ;
-  cmperror[160] := 'Previous declaration was not forward    ' ;
-  cmperror[161] := 'Again forward declared                  ' ;
-  cmperror[169] := 'SET element not in range 0 .. 63        ' ;
-  cmperror[170] := 'String constant must not exceed one line' ;
-  cmperror[171] := 'Integer constant exceeds range(32767)   ' ;
-  cmperror[172] := 'Too many nested scopes of identifiers   ' ;
-  cmperror[173] := 'Too many nested procedures/functions    ' ;
-  cmperror[174] := 'Index expression out of bounds          ' ;
-  cmperror[175] := 'Internal compiler error : standard funct' ;
-  cmperror[176] := 'Illegal character found                 ' ;
-  cmperror[177] := 'Error in type                           ' ;
-  cmperror[178] := 'Illegal reference to variable           ' ;
-  cmperror[179] := 'Internal error : wrong size variable    ' ;
-  cmperror[180] := 'Maximum number of files exceeded        ' ;
-end ;(* FillErrorMessages *)
-
 procedure Initialize ;
 (* Fills all tables and counters etc with default values *)
 var
@@ -5538,8 +5541,6 @@ begin
   top := 1 ;
   level := 1 ;
   savetop := 1 ;
-  (* Fill error-message table *)
-  FillErrorMessages ;
 end ;(* Initialize *)
 
 
