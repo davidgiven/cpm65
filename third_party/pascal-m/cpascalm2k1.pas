@@ -5224,7 +5224,7 @@ begin
   nilptr^.stype := nil     ;
   (* file *)
   new(fileptr);
-  fileptr^.size  := 128 + 36 + 1; (* buffer + fcb + position byte *)
+  fileptr^.size  := 128 + 36 + 1 + 1; (* buffer + fcb + position byte + status flag *)
   fileptr^.stype := nil     ;
   fileptr^.form  := files   ;
 end ;(* Enterstdtypes *)

@@ -82,9 +82,10 @@ tmp1l8: .fill 8 ; 8 byte temp field
 ;
 ; file structure layout
 ;
-FP_FCB    = 0
-FP_POS    = 36
-FP_BUFFER = 37
+FP_FCB        = 0
+FP_POS        = 36
+FP_NEEDSFLUSH = 37
+FP_BUFFER     = 38
 
 ;
 ; constants
@@ -1944,6 +1945,8 @@ odd:    jsr pull2           ; get integer from stack
 rstf:   lda #0x00
         ldy #FCB_CR
         sta (fa), y
+        ldy #FP_NEEDSFLUSH
+        sta (fa), y
         
         lda #0x80
         ldy #FP_POS
@@ -1962,10 +1965,13 @@ rwrf:   lda fa
         ldy #BDOS_DELETE_FILE
         jsr BDOS
 
+        lda #0x01
+        ldy #FP_NEEDSFLUSH
+        sta (fa), y
+        
         lda #0x00
         ldy #FCB_CR
         sta (fa), y
-        
         ldy #FP_POS
         sta (fa), y
 
@@ -1984,7 +1990,11 @@ stsf:   lda #0
         ;
         ; PROC 10 close file
         ;
-clsf:   ldy #FP_POS
+clsf:   ldy #FP_NEEDSFLUSH
+        lda (fa), y
+        beq clsf1               ; file doesn't need flushing before close
+
+        ldy #FP_POS
         lda (fa), y
         cmp #$80
         beq clsf1
