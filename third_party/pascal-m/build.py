@@ -33,6 +33,7 @@ llvmprogram(
     deps=["lib+cpm65"],
 )
 
+
 @Rule
 def pascalm_obp(self, name, src: Target):
     normalrule(
@@ -44,6 +45,7 @@ def pascalm_obp(self, name, src: Target):
         label="PASCALM-COMPILE",
     )
 
+
 @Rule
 def pascalm_load(self, name, src: Target):
     normalrule(
@@ -52,11 +54,12 @@ def pascalm_load(self, name, src: Target):
         outs=["out.obb"],
         deps=["tools/cpmemu", "third_party/pascal-m+loader"],
         commands=[
-            "chronic sh -c \"{deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})"
-            + " a:$(notdir {ins[0]}) b:$(notdir {outs[0]}); test -f {outs[0]}\""
+            'chronic sh -c "{deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})'
+            + ' a:$(notdir {ins[0]}) b:$(notdir {outs[0]}); test -f {outs[0]}"'
         ],
         label="PASCALM-LOAD",
     )
+
 
 pascalm_obp(name="pasc-obp", src="./cpascalm2k1.pas")
 pascalm_load(name="pasc-obb", src=".+pasc-obp")
