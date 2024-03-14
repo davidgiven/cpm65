@@ -894,9 +894,9 @@ ind2:   jsr setup1      ; get address to 16 byte indirect op
         ;
 ind8:   jsr setup1      ; get indirect address
 ind8x1: ldy #$07
-ind8x2: lda (tmp2l2),y  ; lineair move
+ind8x2: lda (tmp2l2),y  ; linear move
         jsr push
-        dey         ; point to upper part
+        dey             ; point to upper part
         bpl ind8x2      ; repeat until 8 worrds done
         jmp tststk
         
@@ -943,7 +943,8 @@ sto2:   jsr setup2      ; get 16 bit address in tmp3 and address
         ;
         ; 9F STO8
         ;
-sto8:   ldy #$09        ; add 10 to stackpointer to read add
+sto8:   
+        ldy #$09        ; add 10 to stackpointer to read add
         lda (stack),y   ; lower part of address
         sta tmp2l2
         iny 
@@ -966,7 +967,7 @@ sto8x1: jsr pull        ; get item from stack
         ;
         ; A0 LDC
         ;
-ldc:lda (pc,x)      ; load 16 bit constant
+ldc:    lda (pc,x)      ; load 16 bit constant
         pha         ; save high part
         inc pc
         bne ldc1
@@ -1551,7 +1552,7 @@ fix21:  jsr pull            ; get operand
         ; C1 LNS
         ;
 lns:    ldy #$08
-lnsx1:  lda #$08
+lnsx1:  lda #$00
         jsr push
         dey             ; interpr
         bne lnsx1

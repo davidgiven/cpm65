@@ -88,6 +88,8 @@ program cpascalm2k1 ;
     - new function/procedure READMEM and WRITEMEM
       *)
 
+{$RangeChecks ON$}
+
 const
   displimit  =    15 ;
   maxlevel   =    12 ;
@@ -3430,6 +3432,7 @@ v                                                             !
           begin
             InSymbol ;
             Expression(fsys +[comma, colon, rparent]);
+            if gattr.typtr <> nil then
             if gattr.typtr^.form <> files then
             begin
                   (* The first expression is not a file type, which means it
@@ -3946,6 +3949,8 @@ proc/func-ident -----(()-----! expression !-----())------>
                     !          ---        v
                      ---------( , )-------
                                ---                     *)
+              var
+                i: integer;
               begin
                 InSymbol ;
                 (* empty set *)
@@ -4028,7 +4033,7 @@ proc/func-ident -----(()-----! expression !-----())------>
                 begin
                   new(lvp);
                   lvp^.pval := cstpart ;
-                  gattr.cval.valp := lvp;
+                  gattr.cval.valp := lvp
                 end;
               end ;(* SetExpression *)
 
@@ -5696,13 +5701,3 @@ begin (* main Mpascal *)
   if errflag then
     halt;
 end.
-             see error file') ;
-  CloseFiles ;
-  if ShowErrors then
-    Dumperrorfile ;
-  if errflag then
-    halt;
-end.
-             see error file') ;
-  CloseFiles ;
-  if           
