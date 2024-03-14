@@ -272,7 +272,7 @@ zproc read_command_from_submit_file
 
     lda #<cmdline
     ldx #>cmdline
-    jsr bdos_SETDMA
+    jsr bdos_SET_DMA_ADDRESS
 
     lda #<submit_fcb
     ldx #>submit_fcb
@@ -402,7 +402,7 @@ zproc entry_DIR
 
     lda #<cmdline
     ldx #>cmdline
-    jsr bdos_SETDMA
+    jsr bdos_SET_DMA_ADDRESS
 
     lda #<userfcb
     ldx #>userfcb
@@ -525,7 +525,7 @@ zproc entry_TYPE
     zloop
         lda #<cmdline
         ldx #>cmdline
-        jsr bdos_SETDMA
+        jsr bdos_SET_DMA_ADDRESS
 
         lda #<userfcb
         ldx #>userfcb
@@ -788,7 +788,7 @@ zproc entry_TRANSIENT
     lda #0
     stx temp+1
     sta temp+0
-    jsr bdos_SETDMA
+    jsr bdos_SET_DMA_ADDRESS
     jsr bios_GETZP
     tax                     ; ZP base
     lda temp+1              ; memory page number
@@ -879,10 +879,10 @@ calltemp:
 read_command_sector:
     lda temp+0
     ldx temp+1
-    jsr bdos_SETDMA
+    jsr bdos_SET_DMA_ADDRESS
     lda #<cmdfcb
     ldx #>cmdfcb
-    jsr bdos_READSEQUENTIAL
+    jsr bdos_READ_SEQUENTIAL
     bcs 1f
 
     lda temp+0
@@ -1001,7 +1001,7 @@ zproc parse_filename
 
     lda fcb+0
     ldx fcb+1
-    jsr bdos_SETDMA
+    jsr bdos_SET_DMA_ADDRESS
 
     lda #<cmdline
     ldx #>cmdline
