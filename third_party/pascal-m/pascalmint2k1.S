@@ -173,6 +173,9 @@ main:
 ;
 ; load the program
 ;
+        lda cpm_fcb+FCB_F1
+        cmp #' '
+        beq badload
 
         lda #0
         sta cpm_fcb+FCB_CR
@@ -233,6 +236,15 @@ done_params:
         stx cmdline
 ;        
         jmp interpr            ; start interpreting
+
+badload:
+        lda #<badload_msg
+        ldx #>badload_msg
+        jsr bdos_WRITESTRING
+        jmp con_cr
+badload_msg:
+        .ascii "No OBB specified"
+        .byte 13, 10, 0
 
 startup_msg:
         .asciz "Pascal-M bytecode interpreter: "
@@ -295,18 +307,14 @@ push:
 
         ; exit to monitor after print
         ;
-prstrng:sta strptr + 1  ; high part of address
-        stx strptr
-        jsr crlf        ; clear line
-        ldy #0
-strina: lda (strptr),Y
-        cmp #$0d        ; test for CR
-        beq stinb
-        jsr wrt         ; print char
-        iny 
-        bne strina      ; interpr 
-stinb:  jsr crlf
-        rts
+prstrng:
+        txa
+        tay
+        tax
+        jsr bdos_WRITESTRING
+        jsr con_cr
+        jmp bdos_EXIT
+        
         ;
         ; Compute base address of level (op-x)
         ; leave result in tmp2l2
@@ -450,9 +458,7 @@ xtab_hi:
 
 ;
 ;Standard M-code procedure to start M-code interpretation,
-;
-;  CSP   11   Standard proc Stop 
-; 
+
 mstart: .byte   $30         ; MST0 mark stack
         .byte   $BE,0       ; CUP1  0    call procedure 0
         .byte   $BD,$0B     ; CSP   11   Standard procedure  Stop 
@@ -2438,6 +2444,10 @@ writesp: lda #'~'
         lda stack
         jmp phex2
 
+con_cr:
+        lda #<crlf_msg
+        ldx #>crlf_msg
+        jmp bdos_WRITESTRING
 
 abend_msg: .asciz " at"
 crlf_msg:  .byte 13, 10, 0
