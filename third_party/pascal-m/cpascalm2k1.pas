@@ -5688,12 +5688,12 @@ begin
 end;
 
 begin (* main Mpascal *)
-  writeln ( 'Pascal-M compiler V2k1') ;
+  writeln ( 'Pascal-M compiler V2k1 for CP/M-65') ;
   Openfiles ;
   if CompilePascalM then
     writeln('Compilation successful.')
   else
-    writeln('Compile errors, see error file') ;
+    writeln('Compile errors, see error file!') ;
   CloseFiles ;
   if ShowErrors then
     Dumperrorfile ;

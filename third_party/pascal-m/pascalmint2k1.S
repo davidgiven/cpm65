@@ -247,7 +247,7 @@ badload_msg:
         .byte 13, 10, 0
 
 startup_msg:
-        .asciz "Pascal-M bytecode interpreter: "
+        .asciz "Pascal-M interpreter for CP/M-65: "
 free_msg:
         .ascii " bytes free"
         .byte 13, 10, 0
