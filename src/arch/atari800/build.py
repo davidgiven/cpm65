@@ -8,6 +8,7 @@ from config import (
     BIG_APPS_SRCS,
     SCREEN_APPS,
     SCREEN_APPS_SRCS,
+    PASCAL_APPS,
 )
 
 llvmclibrary(name="headers", hdrs={"atari800.inc": "./atari800.inc"})
@@ -79,7 +80,8 @@ mkcpmfs(
     | BIG_APPS
     | BIG_APPS_SRCS
     | SCREEN_APPS
-    | SCREEN_APPS_SRCS,
+    | SCREEN_APPS_SRCS
+    | PASCAL_APPS,
 )
 
 normalrule(
@@ -126,7 +128,8 @@ mkcpmfs(
     | BIG_APPS
     | BIG_APPS_SRCS
     | SCREEN_APPS
-    | SCREEN_APPS_SRCS,
+    | SCREEN_APPS_SRCS
+    | PASCAL_APPS,
 )
 
 normalrule(

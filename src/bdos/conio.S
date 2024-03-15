@@ -22,8 +22,10 @@ zproc bdos_CONIN
     pha
     cmp #31
     zif_cs
+        sta param+0
         jsr bdos_CONOUT
     zendif
+    pla
     rts
 zendproc
 

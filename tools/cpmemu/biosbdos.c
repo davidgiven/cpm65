@@ -528,8 +528,9 @@ void parse_filename(uint8_t fcb[16], const char* filename)
     memset(fcb+1, ' ', 11);
 
     {
+        const char* space = strchr(filename, ' ');
         const char* colon = strchr(filename, ':');
-        if (colon)
+        if (colon && (colon < space))
         {
             char c = *filename++;
             c = toupper(c);
