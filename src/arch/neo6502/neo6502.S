@@ -783,8 +783,8 @@ zproc compute_seek_location
     lda (param), y
     ror a
     ror a
-    ror a               ; bottom two bits rotated to the top
     pha
+    ror a               ; bottom two bits rotated to the top
     and #0xc0           ; discard everything else
     ora CP_PARAM+2
     sta CP_PARAM+2
@@ -794,11 +794,13 @@ zproc compute_seek_location
 
     ldy #FCB_S2
     lda (param), y
-    lsr a
-    lsr a
-    lsr a
     and #0x1f
+    asl a
+    asl a
+    asl a
+    ora CP_PARAM+3
     sta CP_PARAM+3
+
     stz CP_PARAM+4
     rts
 zendproc
