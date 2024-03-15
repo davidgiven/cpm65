@@ -5,8 +5,6 @@ from config import (
     MINIMAL_APPS_SRCS,
     BIG_APPS,
     BIG_APPS_SRCS,
-    SCREEN_APPS,
-    SCREEN_APPS_SRCS,
 )
 
 llvmcfile(

@@ -783,8 +783,8 @@ zproc compute_seek_location
     lda (param), y
     ror a
     ror a
-    ror a               ; bottom two bits rotated to the top
     pha
+    ror a               ; bottom two bits rotated to the top
     and #0xc0           ; discard everything else
     ora CP_PARAM+2
     sta CP_PARAM+2
@@ -794,11 +794,13 @@ zproc compute_seek_location
 
     ldy #FCB_S2
     lda (param), y
-    lsr a
-    lsr a
-    lsr a
     and #0x1f
+    asl a
+    asl a
+    asl a
+    ora CP_PARAM+3
     sta CP_PARAM+3
+
     stz CP_PARAM+4
     rts
 zendproc
@@ -1096,21 +1098,24 @@ zproc convert_and_find_file_table_entry
         phx
         lda file_table+FT_ATTRIBS, x
         zif_ne          ; skip empty slots
-            ldy #FT_FILENAMELEN-1
-            zrepeat
-                inx
-                iny
-
-                lda file_table, x
-                cmp temp_file_entry, y
-                zbreakif_ne
-
-                cpy temp_file_entry+FT_FILENAMELEN
-            zuntil_eq
+            lda file_table+FT_FILENAMELEN, x
+            cmp temp_file_entry+FT_FILENAMELEN
             zif_eq
-                plx
-                clc
-                rts
+                ldy #0
+                zrepeat
+                    lda file_table+FT_FILENAME, x
+                    cmp temp_file_entry+FT_FILENAME, y
+                    zbreakif_ne
+
+                    inx
+                    iny
+                    cpy temp_file_entry+FT_FILENAMELEN
+                zuntil_eq
+                zif_eq
+                    plx
+                    clc
+                    rts
+                zendif
             zendif
         zendif
         pla

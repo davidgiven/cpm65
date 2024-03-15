@@ -9,7 +9,7 @@ coroutine.resume(coroutine.create(function()
         end
     end
 
-    emu.wait(3)
+    emu.wait(4)
     kbd:post_coded("MODE 135{ENTER}*!boot{ENTER}") wait_kbd()
     emu.wait(11)
 
@@ -20,7 +20,7 @@ coroutine.resume(coroutine.create(function()
     kbd:post_coded("30 ldy #0x34{ENTER}") wait_kbd()
     kbd:post_coded("40 label: jmp label{ENTER}") wait_kbd()
     kbd:post_coded("save \"test.asm\"{ENTER}") wait_kbd()
-    emu.wait(10)
+    emu.wait(12)
     kbd:post_coded("quit{ENTER}") wait_kbd()
     emu.wait(6)
     kbd:post_coded("asm test.asm test.com{ENTER}") wait_kbd()

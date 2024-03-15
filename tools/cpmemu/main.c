@@ -24,6 +24,7 @@ static void syntax(void)
     printf("cpm [<flags>] [command] [args]:\n");
     printf("  -h             this help\n");
     printf("  -d             enter debugger on startup\n");
+    printf("  -t             enable instruction tracing on startup\n");
 	printf("  -m NUM         top of memory (by default, 0xff\n");
     printf("  -p DRIVE=PATH  map a drive to a path (by default, A=.)\n");
     printf(
@@ -39,7 +40,7 @@ static void parse_options(int argc, char* const* argv)
 {
     for (;;)
     {
-        switch (getopt(argc, argv, "hdp:m:"))
+        switch (getopt(argc, argv, "hdp:m:t:"))
         {
             case -1:
                 goto end_of_flags;
@@ -51,6 +52,10 @@ static void parse_options(int argc, char* const* argv)
 			case 'm':
 				himem = strtoul(optarg, NULL, 0);
 				break;
+
+            case 't':
+                tracing = true;
+                break;
 
             case 'p':
             {

@@ -16,7 +16,8 @@
 .endm
 
 bdos bdos_EXIT,            BDOS_EXIT_PROGRAM
-bdos bdos_SETDMA,          BDOS_SET_DMA_ADDRESS
+bdos bdos_SET_DMA_ADDRESS, BDOS_SET_DMA_ADDRESS
+bdos bdos_CONIN,           BDOS_CONSOLE_INPUT
 bdos bdos_CONOUT,          BDOS_CONSOLE_OUTPUT
 bdos bdos_WRITESTRING,     BDOS_WRITE_STRING
 bdos bdos_READLINE,        BDOS_READ_LINE
@@ -27,7 +28,9 @@ bdos bdos_GETSETUSER,      BDOS_GET_SET_USER_NUMBER
 bdos bdos_GETDRIVE,        BDOS_GET_CURRENT_DRIVE
 bdos bdos_GETBIOS,         BDOS_GET_BIOS
 bdos bdos_RENAME,          BDOS_RENAME_FILE
-bdos bdos_READSEQUENTIAL,  BDOS_READ_SEQUENTIAL
+bdos bdos_READ_SEQUENTIAL, BDOS_READ_SEQUENTIAL
+bdos bdos_GETTPA,          BDOS_GETTPA
+bdos bdos_OPEN_FILE,       BDOS_OPEN_FILE
 
 bios bios_SETBANK,     BIOS_SETBANK
 bios bios_GETTPA,      BIOS_GETTPA

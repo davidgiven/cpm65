@@ -9,6 +9,7 @@ from config import (
     BIG_APPS_SRCS,
     SCREEN_APPS,
     SCREEN_APPS_SRCS,
+    PASCAL_APPS,
 )
 import re
 
@@ -73,6 +74,7 @@ zip(
             | BIG_APPS_SRCS
             | SCREEN_APPS
             | SCREEN_APPS_SRCS
+            | PASCAL_APPS
         ).items()
     },
 )
