@@ -6,11 +6,23 @@ cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
 cxxprogram(name="shuffle", srcs=["./shuffle.cc"], deps=["+libfmt"])
 cxxprogram(name="mkoricdsk", srcs=["./mkoricdsk.cc"], deps=["+libfmt"])
 cxxprogram(name="mkcombifs", srcs=["./mkcombifs.cc"], deps=["+libfmt"])
+cprogram(name="unixtocpm", srcs=["./unixtocpm.c"])
 cprogram(name="mkdfs", srcs=["./mkdfs.c"])
 cprogram(
     name="fontconvert", srcs=["./fontconvert.c", "./libbdf.c", "./libbdf.h"]
 )
 
+@Rule
+def unixtocpm(
+    self, name, src:Target=None):
+    normalrule(
+        replaces=self,
+        ins=[src],
+        outs=[name+".txt"],
+        deps=["tools+unixtocpm"],
+        commands=[
+            "{deps[0]} < {ins[0]} > {outs[0]}"],
+            label="UNIXTOCPM")
 
 @Rule
 def multilink(

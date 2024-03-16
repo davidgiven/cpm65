@@ -1,5 +1,6 @@
 from build.ab import normalrule, emit, Rule, Targets, Target
 from build.llvm import llvmprogram
+from tools.build import unixtocpm
 
 emit("FPC ?= fpc")
 
@@ -61,5 +62,6 @@ def pascalm_load(self, name, src: Target):
     )
 
 
+unixtocpm(name="pasc_pas_cpm", src="./cpascalm2k1.pas")
 pascalm_obp(name="pasc-obp", src="./cpascalm2k1.pas")
 pascalm_load(name="pasc-obb", src=".+pasc-obp")
