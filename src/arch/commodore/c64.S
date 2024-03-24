@@ -5,7 +5,7 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "driver.inc"
-
+#include "jumptables.inc"
 READST = $ffb7
 SETLFS = $ffba
 SETNAM = $ffbd
@@ -29,6 +29,12 @@ SECOND = $ff93
 TALKSA = $ff96
 CLRCHN = $ffcc
 GETIN = $ffe4
+PLOT = $fff0
+CLEAR_SCREEN = $e544
+SCROLLUP = $e8ea
+SCROLLDOWN = $e965
+HOME_CURSOR = $e566
+SHOW_CURSOR = $cc
 STATUS = $90
 
 ZEROPAGE
@@ -82,7 +88,142 @@ zendproc
 .global drvtop
 drvtop: .word drv_TTY
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
+
+screen_jmptable_lo:
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo screen_showcursor
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo screen_setstyle
+screen_jmptable_hi:
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi screen_showcursor
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi screen_setstyle
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+    ; Hardcode screen size for now
+    lda #39
+    ldx #24
+    rts
+zendproc
+
+zproc screen_clear
+   jsr CLEAR_SCREEN
+   rts
+zendproc
+
+zproc screen_setcursor
+    tay
+    clc
+    jsr PLOT
+    rts
+zendproc
+
+zproc screen_getcursor
+    sec
+    jsr PLOT
+    tya
+    rts
+zendproc
+
+zproc screen_putchar
+    jsr topetscii
+    jsr CHROUT
+    clc
+    rts
+zendproc
+
+zproc screen_putstring
+    sta ptr+0
+    stx ptr+1 
+    ldy #0
+    zrepeat
+        lda (ptr),y
+        zbreakif_eq
+        jsr topetscii
+        jsr CHROUT
+        iny
+    zuntil_eq
+    clc
+    rts
+zendproc
+
+zproc screen_getchar
+    ; Ignore timeout for now, just do a non-blocking read
+    jsr GETIN
+    zif_eq
+        sec
+        rts
+    zendif
+    clc
+    rts
+zendproc
+
+zproc screen_scrollup
+    jsr SCROLLUP
+    rts
+zendproc
+
+zproc screen_scrolldown
+    lda #0 
+    ldx #1 
+    jsr screen_setcursor
+    jsr SCROLLDOWN
+    rts
+zendproc
+
+zproc screen_cleartoeol
+    rts
+zendproc
+
+zproc screen_setstyle
+    rts
+zendproc
+
+zproc screen_showcursor
+    zif_eq
+        lda #01
+        sta SHOW_CURSOR
+        clc
+        rts
+    zendif
+    lda #00
+    sta SHOW_CURSOR
+    clc
+    rts
+zendproc
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
