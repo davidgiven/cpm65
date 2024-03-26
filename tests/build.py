@@ -11,15 +11,8 @@ normalrule(
     name="run_parsefcb_test",
     ins=["tools/cpmemu", ".+parsefcb_test", "./parsefcb_test.good"],
     outs=["parsefcb_test.out"],
-    commands=[
-        "{ins[0]} {ins[1]} > {outs[0]}",
-        "diff -u {outs[0]} {ins[2]}"
-    ],
-    label="TEST"
+    commands=["{ins[0]} {ins[1]} > {outs[0]}", "diff -u {outs[0]} {ins[2]}"],
+    label="TEST",
 )
 
-export(
-    name="tests",
-    deps=[".+run_parsefcb_test"]
-)
-
+export(name="tests", deps=[".+run_parsefcb_test"])
