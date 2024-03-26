@@ -11,6 +11,8 @@ import re
 import sys
 import builtins
 import string
+import fnmatch
+import traceback
 
 defaultGlobals = {}
 targets = {}
@@ -49,27 +51,6 @@ class ABException(BaseException):
     pass
 
 
-class ParameterList(Sequence):
-    def __init__(self, parent=[]):
-        self.data = parent
-
-    def __getitem__(self, i):
-        return self.data[i]
-
-    def __len__(self):
-        return len(self.data)
-
-    def __str__(self):
-        return " ".join(self.data)
-
-    def __add__(self, other):
-        newdata = self.data.copy() + other
-        return ParameterList(newdata)
-
-    def __repr__(self):
-        return f"<PList: {self.data}>"
-
-
 class Invocation:
     name = None
     callback = None
@@ -77,6 +58,20 @@ class Invocation:
     ins = None
     outs = None
     binding = None
+    traits = None
+    attr = None
+    attrdeps = None
+
+    def __init__(self):
+        self.attr = SimpleNamespace()
+        self.attrdeps = SimpleNamespace()
+        self.traits = set()
+
+    def __eq__(self, other):
+        return self.name is other.name
+
+    def __hash__(self):
+        return id(self.name)
 
     def materialise(self, replacing=False):
         if self in unmaterialisedTargets:
@@ -112,9 +107,7 @@ class Invocation:
                 self.callback(**self.args)
                 cwdStack.pop()
             except BaseException as e:
-                print(
-                    f"Error materialising {self} ({id(self)}): {self.callback}"
-                )
+                print(f"Error materialising {self}: {self.callback}")
                 print(f"Arguments: {self.args}")
                 raise e
 
@@ -124,10 +117,21 @@ class Invocation:
             if self in unmaterialisedTargets:
                 unmaterialisedTargets.remove(self)
 
+            self.traits.add(self.callback.__name__)
             materialisingStack.pop()
 
+    def bubbleattr(self, attr, xs):
+        xs = targetsof(xs, cwd=self.cwd)
+        a = set()
+        if hasattr(self.attrdeps, attr):
+            a = getattr(self.attrdeps, attr)
+
+        for x in xs:
+            a.add(x)
+        setattr(self.attrdeps, attr, a)
+
     def __repr__(self):
-        return "<Invocation %s>" % self.name
+        return "'%s'" % self.name
 
 
 def Rule(func):
@@ -147,7 +151,7 @@ def Rule(func):
             if name.startswith("./"):
                 name = join(cwd, name)
             elif "+" not in name:
-                name = cwd + "+" + name
+                name = join(cwd, "+" + name)
 
             i.name = name
             i.localname = name.split("+")[-1]
@@ -159,12 +163,11 @@ def Rule(func):
             i = replaces
             name = i.name
         else:
-            raise ABException("you must supply either name or replaces")
+            raise ABException("you must supply either 'name' or 'replaces'")
 
         i.cwd = cwd
         i.types = func.__annotations__
         i.callback = func
-        setattr(i, func.__name__, SimpleNamespace())
 
         i.binding = sig.bind(name=name, self=i, **kwargs)
         i.binding.apply_defaults()
@@ -244,7 +247,7 @@ def fileinvocation(s):
     return i
 
 
-def targetof(s, cwd):
+def targetof(s, cwd=None):
     if isinstance(s, Invocation):
         s.materialise()
         return s
@@ -257,10 +260,16 @@ def targetof(s, cwd):
         t.materialise()
         return t
 
-    if s.startswith(".+"):
-        s = cwd + s[1:]
-    elif s.startswith("./"):
-        s = normpath(join(cwd, s))
+    if s.startswith("."):
+        if cwd == None:
+            raise ABException(
+                "relative target names can't be used in targetof without supplying cwd"
+            )
+        if s.startswith(".+"):
+            s = cwd + s[1:]
+        elif s.startswith("./"):
+            s = normpath(join(cwd, s))
+
     elif s.endswith("/"):
         return fileinvocation(s)
     elif s.startswith("$"):
@@ -273,15 +282,18 @@ def targetof(s, cwd):
             return fileinvocation(s)
 
     (path, target) = s.split("+", 2)
+    s = join(path, "+" + target)
     loadbuildfile(join(path, "build.py"))
     if not s in targets:
-        raise ABException(f"build file at {path} doesn't contain +{target}")
+        raise ABException(
+            f"build file at {path} doesn't contain +{target} when trying to resolve {s}"
+        )
     i = targets[s]
     i.materialise()
     return i
 
 
-def targetsof(*xs, cwd):
+def targetsof(*xs, cwd=None):
     return flatten([targetof(x, cwd) for x in flatten(xs)])
 
 
@@ -294,6 +306,14 @@ def filenamesof(*xs):
         else:
             s += [f for f in [normpath(f) for f in filenamesof(t.outs)]]
     return s
+
+
+def filenamesmatchingof(xs, pattern):
+    return fnmatch.filter(filenamesof(xs), pattern)
+
+
+def targetswithtraitsof(xs, trait):
+    return [target for target in targetsof(xs) if target.traits.contains(trait)]
 
 
 def targetnamesof(*xs):
@@ -314,6 +334,24 @@ def filenameof(x):
     if len(xs) != 1:
         raise ABException("expected a single item")
     return xs[0]
+
+
+def bubbledattrsof(x, attr):
+    x = targetsof(x)
+    alltargets = set()
+    pending = set(x) if isinstance(x, Iterable) else {x}
+    while pending:
+        t = pending.pop()
+        if t not in alltargets:
+            alltargets.add(t)
+            if hasattr(t.attrdeps, attr):
+                pending.update(getattr(t.attrdeps, attr))
+
+    values = []
+    for t in alltargets:
+        if hasattr(t.attr, attr):
+            values += getattr(t.attr, attr)
+    return values
 
 
 def stripext(path):
@@ -390,6 +428,7 @@ def simplerule(
     emitter_label(templateexpand("{label} {name}", self))
 
     dirs = []
+    cs = []
     for out in filenamesof(outs):
         dir = dirname(out)
         if dir and dir not in dirs:
@@ -416,7 +455,7 @@ def normalrule(
 ):
     objdir = objdir or join("$(OBJ)", name)
 
-    self.normalrule.objdir = objdir
+    self.attr.objdir = objdir
     simplerule(
         replaces=self,
         ins=ins,
@@ -497,9 +536,11 @@ def main():
         loadbuildfile(f)
 
     for t in flatten([a.split(",") for a in args.targets]):
-        if t not in targets:
-            raise ABException("target %s is not defined" % t)
-        targets[t].materialise()
+        (path, target) = t.split("+", 2)
+        s = join(path, "+" + target)
+        if s not in targets:
+            raise ABException("target %s is not defined" % s)
+        targets[s].materialise()
     emit("AB_LOADED = 1\n")
 
 
