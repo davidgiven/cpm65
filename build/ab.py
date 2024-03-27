@@ -117,7 +117,6 @@ class Invocation:
             if self in unmaterialisedTargets:
                 unmaterialisedTargets.remove(self)
 
-            self.traits.add(self.callback.__name__)
             materialisingStack.pop()
 
     def bubbleattr(self, attr, xs):
@@ -168,6 +167,7 @@ def Rule(func):
         i.cwd = cwd
         i.types = func.__annotations__
         i.callback = func
+        i.traits.add(func.__name__)
 
         i.binding = sig.bind(name=name, self=i, **kwargs)
         i.binding.apply_defaults()
@@ -313,7 +313,7 @@ def filenamesmatchingof(xs, pattern):
 
 
 def targetswithtraitsof(xs, trait):
-    return [target for target in targetsof(xs) if target.traits.contains(trait)]
+    return [target for target in targetsof(xs) if trait in target.traits]
 
 
 def targetnamesof(*xs):

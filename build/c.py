@@ -12,6 +12,7 @@ from build.ab import (
     normalrule,
     bubbledattrsof,
     stripext,
+    targetswithtraitsof,
 )
 from os.path import *
 from types import SimpleNamespace
@@ -139,7 +140,7 @@ def libraryimpl(
         cheaders(
             replaces=self,
             hdrs=hdrs,
-            deps=filenamesmatchingof(deps, "*.h"),
+            deps=targetswithtraitsof(deps, "cheaders"),
             caller_cflags=caller_cflags,
         )
         return
@@ -147,16 +148,16 @@ def libraryimpl(
         hr = cheaders(
             name=self.localname + "_hdrs",
             hdrs=hdrs,
-            deps=filenamesmatchingof(deps, "*.h"),
+            deps=targetswithtraitsof(deps, "cheaders"),
             caller_cflags=caller_cflags,
         )
+        hr.materialise()
+        deps = deps + [hr]
 
     objs = findsources(
         name,
         srcs,
-        filenamesmatchingof(srcs, "*.h")
-        + filenamesmatchingof(deps, "*.h")
-        + ([hr] if hr else []),
+        targetswithtraitsof(deps, "cheaders"),
         cflags + bubbledattrsof(deps, "caller_cflags"),
         kind,
     )
@@ -170,9 +171,10 @@ def libraryimpl(
     )
     self.outs = self.outs + (hr.outs if hr else [])
 
+    self.traits.add("cheaders")
     self.attr.caller_ldflags = caller_ldflags
     self.bubbleattr("caller_ldflags", deps)
-    self.bubbleattr("caller_cflags", deps + ([hr] if hr else []))
+    self.bubbleattr("caller_cflags", deps)
 
 
 @Rule
