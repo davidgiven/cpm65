@@ -1,26 +1,24 @@
 from os.path import basename, join
 from build.ab import (
     ABException,
+    List,
     Rule,
     Targets,
     TargetsMap,
-    List,
     filenameof,
-    flatten,
+    filenamesmatchingof,
     filenamesof,
+    flatten,
     normalrule,
+    bubbledattrsof,
     stripext,
+    targetswithtraitsof,
 )
 from os.path import *
 from types import SimpleNamespace
 
 
 def cfileimpl(self, name, srcs, deps, suffix, commands, label, kind, cflags):
-    libraries = [d for d in deps if hasattr(d, "clibrary")]
-    for library in libraries:
-        if library.clibrary.cflags:
-            cflags += library.clibrary.cflags
-
     outleaf = stripext(basename(filenameof(srcs[0]))) + suffix
 
     normalrule(
@@ -30,7 +28,7 @@ def cfileimpl(self, name, srcs, deps, suffix, commands, label, kind, cflags):
         outs=[outleaf],
         label=label,
         commands=commands,
-        cflags=cflags,
+        cflags=cflags + bubbledattrsof(deps, "caller_cflags"),
     )
 
 
@@ -87,84 +85,96 @@ def findsources(name, srcs, deps, cflags, filerule):
     return objs
 
 
-def libraryimpl(
-    self, name, srcs, deps, hdrs, cflags, ldflags, commands, label, kind
+@Rule
+def cheaders(
+    self,
+    name,
+    hdrs: TargetsMap = None,
+    caller_cflags: List = None,
+    deps: Targets = None,
 ):
-    if not srcs and not hdrs:
-        raise ABException(
-            "clibrary contains no sources and no exported headers"
-        )
-
-    libraries = [d for d in deps if hasattr(d, "clibrary")]
-    for library in libraries:
-        if library.clibrary.cflags:
-            cflags += library.clibrary.cflags
-        if library.clibrary.ldflags:
-            ldflags += library.clibrary.ldflags
-
-    for f in filenamesof(srcs):
-        if f.endswith(".h"):
-            deps += [f]
-
-    hdrcs = []
-    hdrins = list(hdrs.values())
-    hdrouts = []
+    cs = []
+    ins = list(hdrs.values())
+    outs = []
     i = 0
     for dest, src in hdrs.items():
         s = filenamesof(src)
         if len(s) != 1:
             raise ABException(
-                "a dependency of an export must have exactly one output file"
+                "the target of a header must return exactly one file"
             )
 
-        hdrcs += ["cp {ins[" + str(i) + "]} {outs[" + str(i) + "]}"]
-        hdrouts += [dest]
+        cs += ["cp {ins[" + str(i) + "]} {outs[" + str(i) + "]}"]
+        outs += [dest]
         i = i + 1
 
-    if not hasattr(self, "clibrary"):
-        self.clibrary = SimpleNamespace()
-    if srcs:
-        hr = None
-        if hdrcs:
-            hr = normalrule(
-                name=f"{name}_hdrs",
-                ins=hdrins,
-                outs=hdrouts,
-                label="HEADERS",
-                commands=hdrcs,
-            )
-            hr.materialise()
+    r = normalrule(
+        replaces=self,
+        ins=ins,
+        outs=outs,
+        commands=cs,
+        deps=deps,
+        label="CHEADERS",
+    )
+    r.materialise()
+    self.attr.caller_cflags = caller_cflags + ["-I" + r.attr.objdir]
+    self.bubbleattr("caller_cflags", deps)
 
-        actualsrcs = findsources(
-            name,
-            srcs,
-            deps + ([f"{name}_hdrs"] if hr else []),
-            cflags + ([f"-I{hr.normalrule.objdir}"] if hr else []),
-            kind,
-        )
 
-        normalrule(
+def libraryimpl(
+    self,
+    name,
+    srcs,
+    deps,
+    hdrs,
+    caller_cflags,
+    caller_ldflags,
+    cflags,
+    ldflags,
+    commands,
+    label,
+    kind,
+):
+    hr = None
+    if hdrs and not srcs:
+        cheaders(
             replaces=self,
-            ins=actualsrcs,
-            outs=[basename(name) + ".a"],
-            label=label,
-            commands=commands if actualsrcs else [],
+            hdrs=hdrs,
+            deps=targetswithtraitsof(deps, "cheaders"),
+            caller_cflags=caller_cflags,
         )
-
-        self.clibrary.ldflags = ldflags
-        self.clibrary.cflags = ["-I" + hr.normalrule.objdir] if hr else []
-    else:
-        r = normalrule(
-            replaces=self,
-            ins=hdrins,
-            outs=hdrouts,
-            label="HEADERS",
-            commands=hdrcs,
+        return
+    if hdrs:
+        hr = cheaders(
+            name=self.localname + "_hdrs",
+            hdrs=hdrs,
+            deps=targetswithtraitsof(deps, "cheaders"),
+            caller_cflags=caller_cflags,
         )
-        r.materialise()
+        hr.materialise()
+        deps = deps + [hr]
 
-        self.clibrary.ldflags = ldflags
-        self.clibrary.cflags = ["-I" + r.normalrule.objdir]
+    objs = findsources(
+        name,
+        srcs,
+        targetswithtraitsof(deps, "cheaders"),
+        cflags + bubbledattrsof(deps, "caller_cflags"),
+        kind,
+    )
+
+    normalrule(
+        replaces=self,
+        ins=objs,
+        outs=[basename(name) + ".a"],
+        label=label,
+        commands=commands,
+    )
+    self.outs = self.outs + (hr.outs if hr else [])
+
+    self.traits.add("cheaders")
+    self.attr.caller_ldflags = caller_ldflags
+    self.bubbleattr("caller_ldflags", deps)
+    self.bubbleattr("caller_cflags", deps)
 
 
 @Rule
@@ -173,19 +183,23 @@ def clibrary(
     name,
     srcs: Targets = None,
     deps: Targets = None,
-    hdrs: TargetsMap = {},
+    hdrs: TargetsMap = None,
+    caller_cflags: List = [],
+    caller_ldflags: List = [],
     cflags: List = [],
     ldflags: List = [],
     commands=["$(AR) cqs {outs[0]} {ins}"],
     label="LIB",
     cfilerule=cfile,
 ):
-    return libraryimpl(
+    libraryimpl(
         self,
         name,
         srcs,
         deps,
         hdrs,
+        caller_cflags,
+        caller_ldflags,
         cflags,
         ldflags,
         commands,
@@ -200,33 +214,41 @@ def cxxlibrary(
     name,
     srcs: Targets = None,
     deps: Targets = None,
-    hdrs: TargetsMap = {},
+    hdrs: TargetsMap = None,
+    caller_cflags: List = [],
+    caller_ldflags: List = [],
     cflags: List = [],
     ldflags: List = [],
     commands=["$(AR) cqs {outs[0]} {ins}"],
     label="LIB",
 ):
-    return libraryimpl(
-        self, name, srcs, deps, hdrs, cflags, ldflags, commands, label, cxxfile
+    libraryimpl(
+        self,
+        name,
+        srcs,
+        deps,
+        hdrs,
+        caller_cflags,
+        caller_ldflags,
+        cflags,
+        ldflags,
+        commands,
+        label,
+        cxxfile,
     )
 
 
 def programimpl(
     self, name, srcs, deps, cflags, ldflags, commands, label, filerule, kind
 ):
-    libraries = [d for d in deps if hasattr(d, "clibrary")]
-    for library in libraries:
-        if library.clibrary.cflags:
-            cflags += library.clibrary.cflags
-        if library.clibrary.ldflags:
-            ldflags += library.clibrary.ldflags
+    ars = filenamesmatchingof(deps, "*.a")
+    deps = deps + filenamesmatchingof(srcs, "*.h")
+    ldflags = ldflags + bubbledattrsof(deps, "caller_ldflags")
 
-    deps += [f for f in filenamesof(srcs) if f.endswith(".h")]
-
-    ars = [f for f in filenamesof(libraries) if f.endswith(".a")]
+    cfiles = findsources(name, srcs, deps, cflags, filerule)
     normalrule(
         replaces=self,
-        ins=(findsources(name, srcs, deps, cflags, filerule) + ars + ars),
+        ins=cfiles + ars + ars,
         outs=[basename(name) + "$(EXT)"],
         deps=deps,
         label=label,
