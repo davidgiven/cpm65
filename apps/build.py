@@ -1,5 +1,6 @@
 from build.ab import Rule, Target, Targets, normalrule
 from build.llvm import llvmprogram
+from tools.build import unixtocpm
 
 
 @Rule
@@ -41,3 +42,10 @@ for prog in [
 
 for prog in ["asm", "attr", "copy", "stat", "submit", "objdump", "qe", "life", "ansiterm"]:
     llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
+
+# Source code.
+    
+for prog in ["cls", "bedit", "dump", "ls"]:
+    unixtocpm(name="%s_asm_cpm" % prog, src="./%s.asm" % prog)
+for include in ["cpm65", "drivers"]:
+    unixtocpm(name="%s_inc_cpm" % include, src="./%s.inc" % include)
