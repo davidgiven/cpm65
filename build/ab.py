@@ -386,10 +386,16 @@ def emitter_rule(rule, ins, outs, deps=[]):
     emit("")
     emit(".PHONY:", rule.name)
     emit(rule.name, ":", rule.sentinel)
-    if outs:
-        emit(filenamesof(outs), ":", rule.sentinel)
+    emit(
+        rule.sentinel,
+        filenamesof(outs) if outs else [],
+        ":",
+        filenamesof(ins),
+        filenamesof(deps),
+    )
 
-    emit(rule.sentinel, ":", filenamesof(ins), filenamesof(deps))
+    for f in filenamesof(outs):
+        emit(f, ":", rule.sentinel)
 
 
 def emitter_endrule(rule):
