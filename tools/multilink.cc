@@ -31,7 +31,7 @@ std::pair<std::vector<uint16_t>, uint8_t> compare(
     const std::string& f1, const std::string& f2)
 {
     if (std::filesystem::file_size(f1) != std::filesystem::file_size(f2))
-        error("files {} and {} are not the same size! {} {}", f1, f2);
+        error("files {} and {} are not the same size!", f1, f2);
 
     std::vector<uint16_t> results;
     std::ifstream s1(f1);

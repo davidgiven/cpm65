@@ -11,6 +11,7 @@ CFLAGS ?= -g -Og
 LDFLAGS ?= -g
 PKG_CONFIG ?= pkg-config
 ECHO ?= echo
+TARGETS ?= +all
 
 ifdef VERBOSE
 	hide =
@@ -49,6 +50,6 @@ build-files = $(shell find . -name 'build.py') $(wildcard build/*.py) $(wildcard
 $(OBJ)/build.mk: Makefile $(build-files)
 	@echo "AB"
 	@mkdir -p $(OBJ)
-	$(hide) $(PYTHON) -X pycache_prefix=$(OBJ) build/ab.py -t +all -o $@ \
+	$(hide) $(PYTHON) -X pycache_prefix=$(OBJ) build/ab.py $(patsubst %,-t %,$(TARGETS)) -o $@ \
 		build.py || rm -f $@
 

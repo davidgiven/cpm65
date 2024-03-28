@@ -6,6 +6,9 @@ export AR6502 = $(LLVM)/llvm-ar
 export CFLAGS6502 = -Os -g \
 	-Wno-main-return-type
 
+export CFLAGS = -O0 -g
+export CXXFLAGS = -O0 -g
+
 export LDFLAGS6502 = \
 	-mlto-zp=0
 
