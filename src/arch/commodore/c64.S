@@ -39,7 +39,7 @@ STATUS = $90
 
 SCREEN_WIDTH=40
 SCREEN_HEIGHT=25 
-VIDEO = $400
+VIDEO = $0400
 
 ZEROPAGE
 
@@ -265,7 +265,19 @@ zproc screen_scrolldown
 zendproc
 
 zproc screen_cleartoeol
-    rts
+    jsr screen_getcursor
+    tay
+    txa
+    jsr calculate_line_address
+    
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        iny
+        cpy #SCREEN_WIDTH
+    zuntil_eq
+    
+    rts 
 zendproc
 
 zproc screen_setstyle
@@ -837,13 +849,6 @@ zproc init_system
     rts
 zendproc
 
-loading_msg:
-    .byte 147, 14, 5
-    .ascii "cp/m-65 FOR THE cOMMODORE 64"
-    .byte 13, 0
-
-.data
-
 ; Sets ptr to the address of screen line A
 zproc calculate_line_address
     ; x*40 = x*8 + x*32.
@@ -875,11 +880,19 @@ zproc calculate_line_address
     ; On in screen address (0x400)
     lda ptr+1 
     and #0b00000011
-    ora #0b00000100
+    ora #>VIDEO
     sta ptr+1
 
     rts
 zendproc
+
+
+loading_msg:
+    .byte 147, 14, 5
+    .ascii "cp/m-65 FOR THE cOMMODORE 64"
+    .byte 13, 0
+
+.data
 
 zp_base:    .byte __USERZEROPAGE_START__
 zp_end:     .byte __USERZEROPAGE_END__
