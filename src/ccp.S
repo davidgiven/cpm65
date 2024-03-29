@@ -101,8 +101,10 @@ MAINLOOP:
 
         ; Monitor command?
 
+#ifdef CCP_MONITOR
         cmp #'@'
         beq monitor_command
+#endif
 
         ; Otherwise parse it as a normal command.
 
@@ -143,6 +145,8 @@ commands_hi:
     jmptabhi entry_REN
     jmptabhi entry_USER
     jmptabhi entry_TRANSIENT
+
+#ifdef CCP_MONITOR
 
 zproc monitor_command
     lda #0
@@ -233,6 +237,8 @@ monitor_digit:
     sta temp+0
     jmp monitor_nextchar
 zendproc
+
+#endif
 
 zproc read_command_from_keyboard
     ; Read from keyboard.
