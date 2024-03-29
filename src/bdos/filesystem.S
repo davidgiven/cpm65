@@ -1770,6 +1770,13 @@ zproc select_active_drive
         zuntil_mi
 
         clc
+    zelse
+        lda #<1f
+        ldx #>1f
+        jmp harderror
+1:
+        .ascii "BDOS: disk missing"
+        .byte 13, 10, 0
     zendif
     rts
 zendproc
