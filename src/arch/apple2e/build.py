@@ -5,6 +5,9 @@ from config import (
     MINIMAL_APPS_SRCS,
     BIG_APPS,
     BIG_APPS_SRCS,
+    SCREEN_APPS,
+    SCREEN_APPS_SRCS,
+    PASCAL_APPS,
 )
 
 llvmclibrary(
@@ -67,10 +70,21 @@ mkcpmfs(
         "0:scrndrv.com": "src/arch/apple2e/utils+scrndrv",
     }
     | MINIMAL_APPS
-    | MINIMAL_APPS_SRCS
     | BIG_APPS
-    | BIG_APPS_SRCS
     | SCREEN_APPS,
+)
+
+mkcpmfs(
+    name="diskimage2",
+    format="appleiie",
+    bootimage=".+bios_shuffled",
+    size=143360,
+    items={
+    }
+    | PASCAL_APPS
+    | MINIMAL_APPS_SRCS
+    | BIG_APPS_SRCS
+    | SCREEN_APPS_SRCS,
 )
 
 mametest(
