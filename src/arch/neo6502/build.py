@@ -60,6 +60,7 @@ zip(
         "B/NATTR.COM": "src/arch/neo6502/utils+nattr",
         "B/NDIR.COM": "src/arch/neo6502/utils+ndir",
         "B/NTRUNC.COM": "src/arch/neo6502/utils+ntrunc",
+        "A/PASC.PAS": "third_party/pascal-m+pasc_pas_cpm",
     }
     | {
         re.sub("^0:", "A/", k).upper(): v

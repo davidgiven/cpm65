@@ -165,6 +165,7 @@ def Rule(func):
             raise ABException("you must supply either 'name' or 'replaces'")
 
         i.cwd = cwd
+        i.sentinel = "$(OBJ)/.sentinels/" + name + ".mark"
         i.types = func.__annotations__
         i.callback = func
         i.traits.add(func.__name__)
@@ -381,18 +382,25 @@ def templateexpand(s, invocation):
     return Formatter().format(s)
 
 
-def emitter_rule(name, ins, outs, deps=[]):
+def emitter_rule(rule, ins, outs, deps=[]):
     emit("")
-    emit(".PHONY:", name)
-    if outs:
-        emit(name, ":", filenamesof(outs), ";")
-        emit(filenamesof(outs), "&:", filenamesof(ins), filenamesof(deps))
-    else:
-        emit(name, "&:", filenamesof(ins), filenamesof(deps))
+    emit(".PHONY:", rule.name)
+    emit(rule.name, ":", rule.sentinel)
+    emit(
+        rule.sentinel,
+        filenamesof(outs) if outs else [],
+        ":",
+        filenamesof(ins),
+        filenamesof(deps),
+    )
+
+    for f in filenamesof(outs):
+        emit(f, ":", rule.sentinel)
 
 
-def emitter_endrule(name):
-    pass
+def emitter_endrule(rule):
+    emit("\t$(hide) mkdir -p", dirname(rule.sentinel))
+    emit("\t$(hide) touch $@")
 
 
 def emitter_label(s):
@@ -424,7 +432,7 @@ def simplerule(
     self.ins = ins
     self.outs = outs
     self.deps = deps
-    emitter_rule(self.name, ins + deps, outs)
+    emitter_rule(self, ins + deps, outs)
     emitter_label(templateexpand("{label} {name}", self))
 
     dirs = []
@@ -438,7 +446,7 @@ def simplerule(
     for c in commands:
         cs += [templateexpand(c, self)]
     emitter_exec(cs)
-    emitter_endrule(self.name)
+    emitter_endrule(self)
 
 
 @Rule
@@ -470,7 +478,7 @@ def normalrule(
 @Rule
 def export(self, name=None, items: TargetsMap = {}, deps: Targets = None):
     cs = []
-    self.ins = items.values()
+    self.ins = []
     self.outs = []
     for dest, src in items.items():
         destf = filenameof(dest)
@@ -482,23 +490,26 @@ def export(self, name=None, items: TargetsMap = {}, deps: Targets = None):
                 "a dependency of an export must have exactly one output file"
             )
 
-        emitter_rule(self.name + "+" + destf, srcs, [destf])
-        emitter_label(f"CP {destf}")
-        if dir:
-            emitter_exec(["mkdir -p " + dir])
-
-        emitter_exec(["cp %s %s" % (srcs[0], destf)])
-        self.outs += [destf]
-
-    emitter_rule(self.name, self.outs, [], deps)
-    emit("\t@")
-
-    if self.outs:
+        subrule = simplerule(
+            name=self.name + "/+" + destf,
+            ins=[srcs[0]],
+            outs=[destf],
+            commands=["cp %s %s" % (srcs[0], destf)],
+            label="CP",
+        )
+        subrule.materialise()
         emit("clean::")
-        emit("\t$(hide) rm -f " + (" ".join(filenamesof(self.outs))))
-    self.outs += deps
+        emit("\t$(hide) rm -f", destf)
 
-    emitter_endrule(self.name)
+        self.ins += [subrule]
+
+    emitter_rule(
+        self,
+        self.ins,
+        self.outs,
+        [(d.outs if d.outs else d.sentinel) for d in deps],
+    )
+    emitter_endrule(self)
 
 
 def loadbuildfile(filename):

@@ -503,7 +503,7 @@ zproc bdos_FINDNEXT
 
     ; Module byte.
 
-    lda CP_PARAM+3
+    lda CP_PARAM+4
     lsr a
     lsr a
     lsr a
