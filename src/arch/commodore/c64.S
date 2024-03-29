@@ -163,23 +163,61 @@ zproc screen_getcursor
 zendproc
 
 zproc screen_putchar
-    jsr topetscii
-    jsr CHROUT
+    pha
+    lda CURSOR_Y
+    ldy CURSOR_X
+    jsr calculate_line_address
+    pla
+    jsr convert_ascii_to_screencode
+    sta (ptr),y
+    cpy #SCREEN_WIDTH-1
+    zif_cc
+        iny
+    zendif
+    sty CURSOR_X
+   
     clc
     rts
 zendproc
 
 zproc screen_putstring
+    sta ptr1+0
+    stx ptr1+1
+   
+    lda CURSOR_Y
+    jsr calculate_line_address
+    
+    ; Add cursor x-position to pointer
+    lda CURSOR_X
+    clc
+    adc ptr+0
     sta ptr+0
-    stx ptr+1 
+    zif_cs
+        inc ptr+1
+    zendif
+
     ldy #0
     zrepeat
-        lda (ptr),y
+        lda (ptr1),y
         zbreakif_eq
-        jsr topetscii
-        jsr CHROUT
+        jsr convert_ascii_to_screencode
+        ldx CURSOR_X
+        cpx #SCREEN_WIDTH
+        ; Do not linewrap
+        zif_cc
+            sta (ptr),y
+            inc CURSOR_X
+        zendif
         iny
     zuntil_eq
+    
+    ; Restore cursor to last character on line if needed
+    ldx CURSOR_X
+    cpx #SCREEN_WIDTH-1
+    zif_cs
+        dec CURSOR_X
+    zendif
+
     clc
     rts
 zendproc
@@ -262,9 +300,8 @@ zproc screen_scrolldown
 zendproc
 
 zproc screen_cleartoeol
-    jsr screen_getcursor
-    tay
-    txa
+    lda CURSOR_Y
+    ldy CURSOR_X
     jsr calculate_line_address
     
     lda #' '
@@ -879,6 +916,67 @@ zproc calculate_line_address
     and #0b00000011
     ora #>VIDEO
     sta ptr+1
+
+    rts
+zendproc
+
+ ; Preserves X and Y.
+zproc convert_ascii_to_screencode
+    ; Flip case.
+
+    cmp #'A'
+    zif_cs
+        cmp #'Z'+1
+        bcc swapcase
+    zendif
+
+    cmp #'a'
+    zif_cs
+        cmp #'z'+1
+        zif_cc
+        swapcase:
+            eor #0x20
+        zendif
+    zendif
+
+    ; This is from https://codebase64.org/doku.php?id=base:petscii_to_screencode&s[]=screencodes
+
+    cmp #0x20       ; if A<32 then...
+    bcc ddRev
+
+    cmp #0x60       ; if A<96 then...
+    bcc dd1
+
+    cmp #0x80       ; if A<128 then...
+    bcc dd2
+
+    cmp #0xa0       ; if A<160 then...
+    bcc dd3
+
+    cmp #0xc0       ; if A<192 then...
+    bcc dd4
+   
+    cmp #0xff       ; if A<255 then...
+    bcc ddRev
+
+    lda #0x7e       ; A=255, then A=126
+    bne ddEnd
+
+dd2:
+    and #0x5f       ; if A=96..127 then strip bits 5 and 7
+    bne ddEnd
+dd3:
+    ora #0x40       ; if A=128..159, then set bit 6
+    bne ddEnd
+dd4:
+    eor #0xc0       ; if A=160..191 then flip bits 6 and 7
+    bne ddEnd
+dd1:
+    and #0x3f       ; if A=32..95 then strip bits 6 and 7
+    bpl ddEnd       ; <- you could also do .byte 0x0c here
+ddRev:
+    eor #0x80       ; flip bit 7 (reverse on when off and vice versa)
+ddEnd:
 
     rts
 zendproc
