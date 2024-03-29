@@ -37,6 +37,10 @@ HOME_CURSOR = $e566
 SHOW_CURSOR = $cc
 STATUS = $90
 
+SCREEN_WIDTH=40
+SCREEN_HEIGHT=25 
+VIDEO = $400
+
 ZEROPAGE
 
 .global ptr
@@ -132,8 +136,8 @@ zendproc
 
 zproc screen_getsize
     ; Hardcode screen size for now
-    lda #39
-    ldx #24
+    lda #SCREEN_WIDTH-1
+    ldx #SCREEN_HEIGHT-1
     rts
 zendproc
 
@@ -143,16 +147,21 @@ zproc screen_clear
 zendproc
 
 zproc screen_setcursor
-    tay
-    clc
-    jsr PLOT
+    sta $d3
+    stx $d6
+    jsr $e56c
+#    tay
+#    clc
+ #   jsr PLOT
     rts
 zendproc
 
 zproc screen_getcursor
-    sec
-    jsr PLOT
-    tya
+    #sec
+    #jsr PLOT
+    #tya
+    lda $d3
+    ldx $d6
     rts
 zendproc
 
@@ -190,15 +199,68 @@ zproc screen_getchar
 zendproc
 
 zproc screen_scrollup
-    jsr SCROLLUP
+    ldx #0
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        inx
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #SCREEN_HEIGHT-1
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
     rts
 zendproc
 
 zproc screen_scrolldown
-    lda #0 
-    ldx #1 
-    jsr screen_setcursor
-    jsr SCROLLDOWN
+    ldx #SCREEN_HEIGHT-1 ; current line
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        dex
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #0
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
     rts
 zendproc
 
@@ -781,6 +843,43 @@ loading_msg:
     .byte 13, 0
 
 .data
+
+; Sets ptr to the address of screen line A
+zproc calculate_line_address
+    ; x*40 = x*8 + x*32.
+    
+    ; We have 25 lines. As 25*8 will fit in a byte, we can do this easily.
+
+    asl a               ; a = y*2
+    asl a               ; a = y*4
+    asl a               ; a = y*8
+    sta ptr+0           ; store y*8
+
+    ; Anything more than this needs to be 16-bit arithmetic.
+
+    asl a               ; = y*16
+    rol ptr+1
+
+    asl a               ; = y*32
+    rol ptr+1
+
+    ; Add.
+
+    clc
+    adc ptr+0
+    sta ptr+0
+    zif_cs
+        inc ptr+1
+    zendif
+ 
+    ; On in screen address (0x400)
+    lda ptr+1 
+    and #0b00000011
+    ora #0b00000100
+    sta ptr+1
+
+    rts
+zendproc
 
 zp_base:    .byte __USERZEROPAGE_START__
 zp_end:     .byte __USERZEROPAGE_END__
