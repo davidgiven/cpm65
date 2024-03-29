@@ -34,7 +34,10 @@ CLEAR_SCREEN = $e544
 SCROLLUP = $e8ea
 SCROLLDOWN = $e965
 HOME_CURSOR = $e566
+MOVE_CURSOR = $e56c 
 SHOW_CURSOR = $cc
+CURSOR_X = $d3
+CURSOR_Y = $d6
 STATUS = $90
 
 SCREEN_WIDTH=40
@@ -147,21 +150,15 @@ zproc screen_clear
 zendproc
 
 zproc screen_setcursor
-    sta $d3
-    stx $d6
-    jsr $e56c
-#    tay
-#    clc
- #   jsr PLOT
+    sta CURSOR_X
+    stx CURSOR_Y 
+    jsr MOVE_CURSOR
     rts
 zendproc
 
 zproc screen_getcursor
-    #sec
-    #jsr PLOT
-    #tya
-    lda $d3
-    ldx $d6
+    lda CURSOR_X 
+    ldx CURSOR_Y
     rts
 zendproc
 
