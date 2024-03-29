@@ -171,7 +171,7 @@ zproc screen_putchar
         iny
     zendif
     sty CURSOR_X
-   
+    jsr MOVE_CURSOR   
     clc
     rts
 zendproc
@@ -213,6 +213,7 @@ zproc screen_putstring
     zif_cs
         dec CURSOR_X
     zendif
+    jsr MOVE_CURSOR
 
     clc
     rts
