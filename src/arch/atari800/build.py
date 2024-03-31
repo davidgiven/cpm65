@@ -33,7 +33,7 @@ mkcpmfs(
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
     }
     | MINIMAL_APPS
-    | BIG_APPS,
+    | SCREEN_APPS
 )
 
 normalrule(
