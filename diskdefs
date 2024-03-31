@@ -53,7 +53,6 @@ diskdef generic-1m
 end
 
 # Simple SSSD disk on the Atari 810 or 1050 diskdrive
-# Reserve three tracks for BIOS+BDOS
 diskdef atari90
     seclen 128
     tracks 40
@@ -65,8 +64,8 @@ diskdef atari90
 end
 
 # Large ATR for use with emulators, hardware drive emulators or mounting
-# with AVG/SIDE cartridges on real hardware. seclen stil 128 so it uses
-# the same BIOS code as before. 8190 sectors. Almost 1MB.
+# with AVG/SIDE cartridges on real hardware. seclen is still 128. It uses
+# the same BIOS code as atari90. 8190 sectors. Almost 1MB.
 diskdef atarihd
     seclen 128
     tracks 455
