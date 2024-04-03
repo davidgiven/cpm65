@@ -753,7 +753,11 @@ zproc tty_conout
         sta cursorx
         rts
     zendif
-    cmp #127
+    cmp #127            ; DEL
+    zif_eq
+        lda #8          ; DEL is BS
+    zendif
+    cmp #8              ; proper ^H BS
     zif_eq
         dec cursorx
         zif_mi

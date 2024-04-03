@@ -680,7 +680,11 @@ zproc tty80_conout
         sta cursorx
         rts
     zendif
-    cmp #127                    ; Backspace
+    cmp #127                    ; DEL
+    zif_eq
+        lda #8                  ; DEL = BS
+    zendif
+    cmp #8                      ; ^H BS
     zif_eq
         dec cursorx
         zif_mi
