@@ -251,7 +251,12 @@ skip_init:
     ldx #>BIOS
     jsr jsr_run
 
-    rts
+    lda #0                          ; be sure we can read CCP.SYS
+    ldy #BDOS_GET_SET_USER_NUMBER
+    jsr BDOS
+
+    ldy #BDOS_EXIT_PROGRAM  ; warmboot, i8080 CP/M might have written to disk
+    jmp BDOS
 
 skip_run:
     jmp read_blocks_loop
