@@ -130,6 +130,10 @@ mkcpmfs(
         "2:pip.com": "third_party/atari8080/PIP.COM",
         "2:zork1.com": "third_party/atari8080/ZORK1.COM",
         "2:zork1.dat": "third_party/atari8080/ZORK1.DAT",
+        "2:tst8080.com": "third_party/atari8080/TST8080.COM",
+        "2:8080pre.com": "third_party/atari8080/8080PRE.COM",
+        "2:8080exm.com": "third_party/atari8080/8080EXM.COM",
+        "2:cputest.com": "third_party/atari8080/CPUTEST.COM",
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
