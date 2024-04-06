@@ -65,7 +65,7 @@ zproc main
 
     ldy #BIOS_GETTPA
     jsr BIOS
-    cpx #$b0                ; $b000 or higher, adjust if 8080.OVL grows
+    cpx #$b5                ; $b500 or higher, adjust if 8080.OVL grows
     bcs top_ok
 
     lda #<top_error
