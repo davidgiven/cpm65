@@ -8,7 +8,8 @@
 ;
 ; -------------------------------------------------------------------------
 
-; This program is intended for Atari's equiped with at least 128kB of RAM.
+; This program is intended for Atari's equiped with at least 128kB of RAM,
+; or a BBC Master 128 or 512 with 128kB of sideways RAM at banks 4-7.
 ; It first checks if the required memory is free, i.e. not too many resident
 ; drivers in either low or high memory, and then proceeds to load the file
 ; 8080.OVL. The structure of the file is similar to regular binary executables
@@ -36,7 +37,6 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #ifdef MASTER128
-
 #else
 #include "atari800.inc"
 #endif
@@ -82,29 +82,27 @@ zproc main
     ldy #BIOS_GETTPA
     jsr BIOS
     cpx #TEST_TPA_TOP
-    bcs top_ok
 
-    lda #<top_error
-    ldx #>top_error
+    zif_cc
+        lda #<top_error
+        ldx #>top_error
 error_out:
-    ldy #BDOS_WRITE_STRING
-    jmp BDOS
+        ldy #BDOS_WRITE_STRING
+        jmp BDOS
+    zendif
 
-top_ok:
-
-; check end of loader program
+; check end of loader program, i.e. bottom of TPA
 
     lda #>bottom_check
     clc
     adc #1
     cmp #TEST_TPA_BOTTOM
-    bcc bottom_ok
 
-    lda #<bottom_error
-    ldx #>bottom_error
-    jmp error_out
-
-bottom_ok:
+    zif_cs
+        lda #<bottom_error
+        ldx #>bottom_error
+        jmp error_out
+    zendif
 
 ; check if $e0-$ff is free
 
@@ -112,14 +110,14 @@ bottom_ok:
     jsr BIOS
 
     cmp #TEST_ZP_BOTTOM-ZP_WE_USE
-    bcc bottom_zp_ok
 
+    zif_cs
 print_zp_error:
-    lda #<zp_error
-    ldx #>zp_error
-    jmp error_out
+        lda #<zp_error
+        ldx #>zp_error
+        jmp error_out
+    zendif
 
-bottom_zp_ok:
     cpx #TEST_ZP_TOP
     bcc print_zp_error
 
@@ -132,15 +130,15 @@ bottom_zp_ok:
     sta $fe30
     sta $8000
     cmp $8000
-    beq bank_found
 
-    stx $f4
+    zif_ne
+        stx $f4
 
-    lda #<extmem_error
-    ldx #>extmem_error
-    jmp error_out
+        lda #<extmem_error
+        ldx #>extmem_error
+        jmp error_out
+    zendif
 
-bank_found:
     stx $f4
     stx $fe30
 
@@ -151,15 +149,15 @@ bank_found:
     sta PORTB
     eor #$10
     cmp $4000
-    bne bank_found
 
-    sta PORTB
+    zif_eq
+        sta PORTB
 
-    lda #<extmem_error
-    ldx #>extmem_error
-    jmp error_out
+        lda #<extmem_error
+        ldx #>extmem_error
+        jmp error_out
+    zendif
 
-bank_found:
     sta PORTB
 #endif
 
@@ -167,17 +165,17 @@ bank_found:
 
     ldx #$24
     lda #0
-clear_fcb:
-    sta my_fcb,x
-    dex
-    bpl clear_fcb
+    zrepeat
+        sta my_fcb,x
+        dex
+    zuntil_mi
 
     ldx #10
-copy_filename:
-    lda filename,x
-    sta my_fcb+1,x
-    dex
-    bpl copy_filename
+    zrepeat
+        lda filename,x
+        sta my_fcb+1,x
+        dex
+    zuntil_mi
 
 ; open '8080.OVL'
 
@@ -185,13 +183,13 @@ copy_filename:
     lda #<my_fcb
     ldx #>my_fcb
     jsr BDOS
-    bcc open_ok
 
-    lda #<open_error
-    ldx #>open_error
-    jmp error_out
+    zif_cs
+        lda #<open_error
+        ldx #>open_error
+        jmp error_out
+    zendif
 
-open_ok:
     lda #$80
     sta bufidx
 
@@ -199,14 +197,14 @@ open_ok:
     sta tmp
     jsr getbyte
     cmp #$ff
-    beq FF_almost_ok
 
+    zif_ne
 invalid_file:
-    lda #<FF_error
-    ldx #>FF_error
-    jmp error_out
+        lda #<FF_error
+        ldx #>FF_error
+        jmp error_out
+    zendif
 
-FF_almost_ok:
     lda tmp
     cmp #$ff
     bne invalid_file
@@ -249,48 +247,46 @@ next_byte:
 
     lda ptr
     cmp end
-    beq almost_end
 
+    zif_ne
 not_end:
-    inc ptr
-    zif_eq
-        inc ptr+1
+        inc ptr
+        zif_eq
+            inc ptr+1
+        zendif
+        jmp next_byte
     zendif
-    jmp next_byte
 
-almost_end:
     lda ptr+1
     cmp end+1
     bne not_end
 
     lda do_init
-    beq skip_init
+    zif_ne
+        jsr jsr_init
+    zendif
 
-    jsr jsr_init
-
-skip_init:
     lda do_run
-    beq skip_run
+    zif_ne
+        lda #13
+        ldy #BIOS_CONOUT
+        jsr BIOS
+        lda #10
+        ldy #BIOS_CONOUT
+        jsr BIOS
+    
+        lda #<BIOS      ; pass along pointer to BIOS
+        ldx #>BIOS
+        jsr jsr_run
 
-    lda #13
-    ldy #BIOS_CONOUT
-    jsr BIOS
-    lda #10
-    ldy #BIOS_CONOUT
-    jsr BIOS
+        lda #0                          ; be sure we can read CCP.SYS
+        ldy #BDOS_GET_SET_USER_NUMBER
+        jsr BDOS
 
-    lda #<BIOS      ; pass along pointer to BIOS
-    ldx #>BIOS
-    jsr jsr_run
+        ldy #BDOS_EXIT_PROGRAM  ; wboot, i8080 CP/M might have written to disk
+        jmp BDOS
+    zendif
 
-    lda #0                          ; be sure we can read CCP.SYS
-    ldy #BDOS_GET_SET_USER_NUMBER
-    jsr BDOS
-
-    ldy #BDOS_EXIT_PROGRAM  ; warmboot, i8080 CP/M might have written to disk
-    jmp BDOS
-
-skip_run:
     jmp read_blocks_loop
 zendproc
 
@@ -344,12 +340,12 @@ zendproc
 
 zproc getbyte
     ldx bufidx
-    bpl still_data_available
 
-    jsr read_next_sector
-    ldx bufidx
+    zif_mi
+        jsr read_next_sector
+        ldx bufidx
+    zendif
 
-still_data_available:
     lda sector_buffer,x
     inc bufidx
     rts
@@ -366,13 +362,12 @@ zproc read_next_sector
     ldy #BDOS_READ_SEQUENTIAL
     jsr BDOS
 
-    bcs unexpected_eof
+    zif_cc
+        lda #0
+        sta bufidx
+        rts
+    zendif
 
-    lda #0
-    sta bufidx
-    rts
-
-unexpected_eof:
     lda #<eof_error
     ldx #>eof_error
     ldy #BDOS_WRITE_STRING
