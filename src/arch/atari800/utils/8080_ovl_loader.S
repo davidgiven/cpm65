@@ -23,8 +23,8 @@
 ;
 ; Two special blocks are recognized.
 ;
-; e2 02 e3 02 lb hb     Init. JSR to $hhll, continue loading after RTS.
-; e0 02 e1 02 lb hb     Run. JMP to $hhll.
+; e2 02 e3 02 lb hb     Init. JSR to $hblb, continue loading after RTS.
+; e0 02 e1 02 lb hb     Run. JMP to $hblb.
 ;
 ; The loader does no sanity checks on loaded blocks, so be sure it only
 ; defines blocks between the end of the loader and the end of TPA memory.
@@ -35,7 +35,11 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#ifdef MASTER128
+
+#else
 #include "atari800.inc"
+#endif
 
 ZEROPAGE
 
@@ -44,7 +48,7 @@ ZP_START:
 ptr:        .fill 2
 end:        .fill 2
 tmp:        .fill 1
-bufidx:    .fill 1
+bufidx:     .fill 1
 
 ZP_END:
 
@@ -52,6 +56,18 @@ ZP_END:
 ; ZP and TPA are not automatically adjusted before the (this) program is called.
 
 ZP_WE_USE = ZP_END-ZP_START
+
+#ifdef MASTER128
+    TEST_TPA_TOP    = $68
+    TEST_TPA_BOTTOM = $30
+    TEST_ZP_BOTTOM  = $70
+    TEST_ZP_TOP     = $8f
+#else
+    TEST_TPA_TOP    = $b6
+    TEST_TPA_BOTTOM = $40
+    TEST_ZP_BOTTOM  = $e0
+    TEST_ZP_TOP     = $ff
+#endif
 
 ; -------------------------------------------------------------------------
 
@@ -65,7 +81,7 @@ zproc main
 
     ldy #BIOS_GETTPA
     jsr BIOS
-    cpx #$b5                ; $b500 or higher, adjust if 8080.OVL grows
+    cpx #TEST_TPA_TOP
     bcs top_ok
 
     lda #<top_error
@@ -81,8 +97,7 @@ top_ok:
     lda #>bottom_check
     clc
     adc #1
-    cmp #$40                ; $4000 or lower, adjust if 8080.OVL starts using
-                            ; memory below the banked memory window.
+    cmp #TEST_TPA_BOTTOM
     bcc bottom_ok
 
     lda #<bottom_error
@@ -96,7 +111,7 @@ bottom_ok:
     ldy #BIOS_GETZP
     jsr BIOS
 
-    cmp #$e0-ZP_WE_USE
+    cmp #TEST_ZP_BOTTOM-ZP_WE_USE
     bcc bottom_zp_ok
 
 print_zp_error:
@@ -105,11 +120,31 @@ print_zp_error:
     jmp error_out
 
 bottom_zp_ok:
-    cpx #$ff
-    bne print_zp_error
+    cpx #TEST_ZP_TOP
+    bcc print_zp_error
 
 ; check if we have banked memory
 
+#ifdef MASTER128
+    ldx $f4
+    lda #4
+    sta $f4
+    sta $fe30
+    sta $8000
+    cmp $8000
+    beq bank_found
+
+    stx $f4
+
+    lda #<extmem_error
+    ldx #>extmem_error
+    jmp error_out
+
+bank_found:
+    stx $f4
+    stx $fe30
+
+#else
     lda PORTB
     sta $4000               ; "random" value to $4000
     eor #$10                ; enable CPU banking
@@ -126,6 +161,7 @@ bottom_zp_ok:
 
 bank_found:
     sta PORTB
+#endif
 
 ; setup FCB
 
@@ -199,6 +235,13 @@ read_end_addr:
     ldy #BIOS_CONOUT
     jsr BIOS
 
+    lda #0
+    sta do_init
+    sta do_run
+
+    jsr check_02e0
+    jsr check_02e2
+
 next_byte:
     jsr getbyte
     ldy #0
@@ -220,25 +263,14 @@ almost_end:
     cmp end+1
     bne not_end
 
-    lda ptr
-    cmp #$e3
-    bne skip_init
-    lda ptr+1
-    cmp #$02
-    bne skip_init
-
-    lda $d301
-    sta $ff
+    lda do_init
+    beq skip_init
 
     jsr jsr_init
 
 skip_init:
-    lda ptr
-    cmp #$e1
-    bne skip_run
-    lda ptr+1
-    cmp #$02
-    bne skip_run
+    lda do_run
+    beq skip_run
 
     lda #13
     ldy #BIOS_CONOUT
@@ -262,12 +294,52 @@ skip_run:
     jmp read_blocks_loop
 zendproc
 
+zproc check_02e0
+    lda ptr+1
+    cmp #$02
+    zif_eq
+        lda ptr
+        cmp #$e0
+        zif_eq
+            inc do_run
+            lda #>run_address
+            sta ptr+1
+            sta end+1
+            ldx #<run_address
+            stx ptr
+            inx
+            stx end
+        zendif
+    zendif
+    rts
+zendproc
+
+zproc check_02e2
+    lda ptr+1
+    cmp #$02
+    zif_eq
+        lda ptr
+        cmp #$e2
+        zif_eq
+            inc do_init
+            lda #>init_address
+            sta ptr+1
+            sta end+1
+            ldx #<init_address
+            stx ptr
+            inx
+            stx end
+        zendif
+    zendif
+    rts
+zendproc
+
 zproc jsr_init
-    jmp ($02e2)
+    jmp (init_address)
 zendproc
 
 zproc jsr_run
-    jmp ($02e0)
+    jmp (run_address)
 zendproc
 
 zproc getbyte
@@ -315,7 +387,11 @@ zendproc
     .data
 
 title:
-    .ascii "Atari 130XE 8080 Overlay Loader"
+#ifdef MASTER128
+    .ascii "BBC Master 128 - 8080 Overlay Loader"
+#else
+    .ascii "Atari 130XE - 8080 Overlay Loader"
+#endif
     .byte 13,10,0
 
 top_error:
@@ -327,7 +403,11 @@ bottom_error:
     .byte 13,10,0
 
 zp_error:
-    .ascii "Error: ZP $E0-$FF must be free"
+#ifdef MASTER128
+    .ascii "Error: ZP 70-8F must be free"
+#else
+    .ascii "Error: ZP E0-FF must be free"
+#endif
     .byte 13,10,0
 
 extmem_error:
@@ -356,6 +436,14 @@ filename:
 my_fcb:         .fill 37
 
 sector_buffer:  .fill 128
+
+do_init:        .fill 1
+do_run:         .fill 1
+
+    .align 2        ; avoid page crossing jmp (abs)
+
+init_address:   .fill 2
+run_address:    .fill 2
 
 bottom_check:
 
