@@ -58,7 +58,7 @@ ZP_END:
 ZP_WE_USE = ZP_END-ZP_START
 
 #ifdef MASTER128
-    TEST_TPA_TOP    = $68
+    TEST_TPA_TOP    = $66
     TEST_TPA_BOTTOM = $30
     TEST_ZP_BOTTOM  = $70
     TEST_ZP_TOP     = $8f
