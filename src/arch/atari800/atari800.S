@@ -953,9 +953,9 @@ zproc bios_WRITE
 do_SIO:
     sta DCOMND
     lda #$31
+    sta DDEVIC
     clc
     adc drive_number
-    sta DDEVIC
     and #$0f
     sta DUNIT
 
