@@ -42,6 +42,8 @@ BIG_APPS = {
 BIG_APPS_SRCS = {}
 
 SCREEN_APPS = {
+    "0:adm3adrv.com": "apps+adm3adrv",
+    "0:adm3atst.com": "apps+adm3atst",
     "0:cls.com": "apps+cls",
     "0:life.com": "apps+life",
     "0:qe.com": "apps+qe",

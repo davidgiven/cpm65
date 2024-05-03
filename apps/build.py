@@ -21,6 +21,7 @@ def asm(self, name, src: Target = None, deps: Targets = []):
 # CP/M-65 assembler programs.
 
 for prog in [
+    "adm3atst",
     "bedit",
     "capsdrv",
     "cls",
@@ -49,3 +50,11 @@ for prog in ["cls", "bedit", "dump", "ls"]:
     unixtocpm(name="%s_asm_cpm" % prog, src="./%s.asm" % prog)
 for include in ["cpm65", "drivers"]:
     unixtocpm(name="%s_inc_cpm" % include, src="./%s.inc" % include)
+
+llvmprogram(
+    name="adm3adrv",
+    srcs=["./adm3adrv.S"],
+    deps=[
+        "include",
+    ],
+)
