@@ -121,15 +121,13 @@ advance_position:
 do_rubout:
         dec xpos
         lda xpos
-        cmp #$ff
-        zif_eq
+        zif_mi
             ldx width
             dex
             stx xpos
             dec ypos
             lda ypos
-            cmp #$ff
-            zif_eq
+            zif_mi
                 inc ypos
                 lda #0
                 sta xpos
