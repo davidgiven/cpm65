@@ -22,14 +22,16 @@ LF = 0x0a
 
 \ --- Resident part starts at the top of the file ---------------------------
 
+.bss width,1
+.bss height,1
 .bss max_x,1
-.bss max_y,1
 .bss cur_x,1
 .bss cur_y,1
 .bss mEsc, 1
 .bss parse, 1
 .bss cnt, 1
 .bss inp, 1
+
 .zproc start
     jmp entry
 .zendproc
@@ -67,11 +69,18 @@ driver:
                     jsr SCREEN
                     inc cur_x
                     lda cur_x
-                    cmp max_x
+                    cmp width
                     .zif cs
                         lda #0
                         sta cur_x
                         inc cur_y
+                        lda cur_y
+                        cmp height
+                        .zif cs
+                            dec cur_y
+                            ldy #SCREEN_SCROLLUP
+                            jsr SCREEN
+                        .zendif
                     .zendif
                     lda cur_x
                     ldx cur_y
@@ -145,19 +154,29 @@ driver:
             .zif eq
                 inc cur_y
                 lda cur_y
-                cmp max_y
+                cmp height
                 .zif cs
-                    lda max_y
-                    sta cur_y
+                    dec cur_y
                     ldy #SCREEN_SCROLLUP
                     jsr SCREEN 
                 .zendif
                 jmp par_done 
             .zendif
-            
+
             cmp #BACKSPACE
             .zif eq
                 dec cur_x
+                .zif mi
+                    lda max_x
+                    sta cur_x
+                    dec cur_y
+                    .zif mi
+                        inc cur_y
+                        lda #0
+                        sta cur_x
+                        jmp par_done   \ no rubout, stay at top left corner
+                    .zendif
+                .zendif
                 lda cur_x
                 ldx cur_y
                 ldy #SCREEN_SETCURSOR
@@ -170,11 +189,10 @@ driver:
 
             cmp #TAB
             .zif eq
-                \ Tab to be implemented, need to figure out how to do mod 8
                 lda cur_x
                 clc
                 adc #8
-                and #0xf8
+                and #0xf8   \ mod 8
                 cmp max_x
                 .zif cs
                     lda max_x
@@ -210,8 +228,8 @@ driver:
                 lda #0
                 sta mEsc
                 lda cur_y
-                cmp max_y
-                .zif ne
+                cmp height
+                .zif cc
                     inc cur_y
                 .zendif
                 jmp par_done
@@ -223,8 +241,8 @@ driver:
                 lda #0
                 sta mEsc
                 lda cur_x
-                cmp max_x
-                .zif ne
+                cmp width
+                .zif cc
                     inc cur_x
                 .zendif
                jmp par_done 
@@ -277,8 +295,8 @@ driver:
                 ldy #SCREEN_CLEARTOEOL
                 jsr SCREEN
                 ldx cur_y
-                cpx max_y
-                beq par_done
+                cpx height
+                bcs par_done
                 inx
                 .zloop
                     stx cnt
@@ -290,7 +308,7 @@ driver:
                     jsr SCREEN
                     ldx cnt
                     inx
-                    cpx max_y
+                    cpx height
                     .zbreak cs
                 .zendloop
                 jmp par_done
@@ -374,7 +392,11 @@ next: .word 0
     ldy #SCREEN_GETSIZE
     jsr SCREEN
     sta max_x
-    stx max_y   
+    tay
+    iny
+    sty width
+    inx
+    stx height
 
     \ Initialize resident variables
     lda #0
