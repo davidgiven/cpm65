@@ -17,6 +17,7 @@ export(
         "bin/pint.com": "third_party/pascal-m+pint",
         "bin/loader.com": "third_party/pascal-m+loader",
         "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
+        "bbcmicro2.ssd": "src/arch/bbcmicro+diskimage2",
         "oric.dsk": "src/arch/oric+diskimage",
         "apple2e.po": "src/arch/apple2e+diskimage",
         "atari800.atr": "src/arch/atari800+atari800_diskimage",
