@@ -18,12 +18,6 @@
 
 ZEROPAGE
 
-drv_zp_begin:
-
-ptr:    .fill 2
-
-drv_zp_end:
-
 ; -------------------------------------------------------------------------
 
 zproc main
@@ -212,7 +206,7 @@ home_cursor:
         rts
     zendif
 
-    jmp next_tty
+    rts             ; ignore everything else
 zendproc
 
 zproc LEAVE
@@ -268,13 +262,6 @@ zproc init
         jsr BIOS
         lda #>reserve_tpa_end
         ldy #BIOS_SETTPA
-        jsr BIOS
-
-        ldy #BIOS_GETZP
-        jsr BIOS
-        clc
-        adc #drv_zp_end-drv_zp_begin
-        ldy #BIOS_SETZP
         jsr BIOS
 
         ; Set values we need
