@@ -190,7 +190,7 @@ sensstr:    .byte   $01, $08                ; SENSE INTERRUPT STATUS
 readstr:    .byte   $09, $46, $00, $00, $00 ; READ: MFM, Drive 0, Head 0, Cyl 0
             .byte   $00                     ; Start sector
             .byte   $01                     ; 256 bytes/sect
-            .byte   $ff                     ; End sector (force read entire track)
+            .byte   $19                     ; End sector (force read entire track)
             .byte   $0E, $FF                ; Gap length $0E
 
 ; Error message string
