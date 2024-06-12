@@ -39,29 +39,29 @@ _start:
 
     ; Relocate the bios into low ram.
 
-    1:
-        srcp = . + 1
-        lda __bios_data_start
-        destp = . + 1
-        sta __bios_start
+1:
+    srcp = . + 1
+    lda __bios_data_start
+    destp = . + 1
+    sta __bios_start
 
-        inc srcp+0
-        zif_eq
-            inc srcp+1
-        zendif
+    inc srcp+0
+    zif_eq
+        inc srcp+1
+    zendif
 
-        inc destp+0
-        zif_eq
-            inc destp+1
-        zendif
+    inc destp+0
+    zif_eq
+        inc destp+1
+    zendif
 
-        lda destp+0
-        cmp #<__bios_end
-        bne 1b
+    lda destp+0
+    cmp #<__bios_end
+    bne 1b
 
-        lda destp+1
-        cmp #>__bios_end
-        bne 1b
+    lda destp+1
+    cmp #>__bios_end
+    bne 1b
 
     ; BIOS initialisation.
 
@@ -91,8 +91,8 @@ _start:
     jmp __TPA_START__ + COMHDR_ENTRY
 
 loading_msg:
-    .byte 147, 14, 5
-    .ascii "cp/m-65 FOR THE KIM-1"
+    .byte 13, 10
+    .ascii "CP/M-65 for the KIM-1"
     .byte 13, 0
 
 bdos_filename:
