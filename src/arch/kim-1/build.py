@@ -29,3 +29,16 @@ mkcpmfs(
 )
 
 mkimd(name="diskimage", src=".+cpmfs")
+
+normalrule(
+    name="distro",
+    ins=[
+        ".+diskimage",
+        "src/arch/kim-1/boot+cpm65.bin",
+    ],
+    outs=["kim-1.zip"],
+    commands=[
+        "zip -9qj {outs[0]} {ins}",
+    ],
+    label="ZIP",
+)
