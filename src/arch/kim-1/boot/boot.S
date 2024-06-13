@@ -75,7 +75,7 @@ init:
                         ; ||   | +-> Not Ready
                         ; ||   +---> Track 0 signal fails
                         ; ++-------> Abnormal termination
-    bne retmon          ; Return to monitor if anything goes wrong
+    bne e1              ; Return to monitor with error if anything goes wrong
 
     ; Read all sectors track 0, sector 0 of drive 0 into location $c000
     
@@ -101,7 +101,7 @@ init:
                         ; |   +--------> CRC error
                         ; +------------> End of cylinder
     cmp #$80            ; If status is "End of cylinder", all good 
-    bne retmon          ; Otherwise, return error
+    bne e2              ; Otherwise, return error
 
     jmp $c000
 
@@ -123,9 +123,6 @@ waitrdy:
     bit MSTR            ; Check if bit os the status register is 1 (Data ready)
     bpl waitrdy         ; Loop if not
     rts
-
-retmon:
-    brk
 
 ; Wait until interrupt and... 
 
@@ -158,17 +155,15 @@ readdatr:
 
 ; Error handling
 
-e4: inc errorc          ; 04 FINAL SEEK TO TRACK 0 ERROR CODE
-e3: inc errorc          ; 03 INTERMEDIATE SEEK ERROR CODE
-e2: inc errorc          ; 02 RECALIBRATE ERROR CODE
-e1: inc errorc          ; 01 SPECIFY ERROR CODE
+e2: inc errorc          ; 02 READ ERROR CODE
+e1: inc errorc          ; 01 RECALIBRATE ERROR CODE
     ldy #0
 1:  lda errmsg, y
-    beq ec
+    beq 2f
     jsr OUTCH
     iny
     bne 1b
-ec: lda errorc
+2:  lda errorc
     jsr PRTBYT
     jsr CRLF
 
