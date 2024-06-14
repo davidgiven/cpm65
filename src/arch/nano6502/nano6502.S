@@ -37,7 +37,7 @@ uart_rx_avail = $fe03
 ; Wasteful, but it's not like we are going to use the full card anyway
 BDOS_OFFSET = $1
 BDOS_BLOCKS = $0a ; Number of 512 byte blocks to load
-CPMFS_OFFSET = $2
+CPMFS_OFFSET = $3
 
 ZEROPAGE
 
@@ -51,7 +51,7 @@ current_drive: .byte 0
 sd_offset: .byte 0
 sd_page_zp: .byte 0
 sd_sector: .fill 4
-temp:   .byte 0
+kuken:   .byte 0
 ; --- Initialisation code ---------------------------------------------------
 
 ; Called once on startup and then never again.
@@ -61,16 +61,12 @@ zproc _start
     lda #01
     sta ROM_sel_reg
 
-    lda #'a'
-    jsr uart_out
     ; Clear screen
 
     lda #IO_page_video
     sta IO_page_reg
     sta tty_cls
    
-    lda #'b'
-    jsr uart_out 
     ; Print banner
  
     ldy #banner_end - banner
@@ -83,20 +79,12 @@ banner_wait:
         dey
     zuntil_eq
 
-    lda #'c'
-    jsr uart_out
     ; Load the BDOS image.
     lda #BDOS_OFFSET
     sta sd_offset
     lda mem_base
-    clc
-    adc #$30
-    jsr uart_out
-    lda mem_base
     jsr load_bdos
    
-    lda #'d'
-    jsr uart_out 
     ; Relocate it.
 
     lda mem_base
@@ -104,8 +92,6 @@ banner_wait:
     jsr bios_RELOCATE
 
 
-    lda #'e'
-    jsr uart_out
     ; Open CPMFS
     	
     lda #CPMFS_OFFSET
@@ -114,8 +100,6 @@ banner_wait:
     ; Initialize drivers
     jsr initdrivers
 
-    lda #'f'
-    jsr uart_out
     ; Avoid junk character in buffer at startup
     lda #$00
     sta pending_key
@@ -130,8 +114,6 @@ banner_wait:
     lda #<biosentry
     ldx #>biosentry
     
-    ;jmp mem_base + COMHDR_ENTRY
-
     rts                 ; indirect jump
 zendproc
     
@@ -140,6 +122,7 @@ banner: ; reversed!
     .ascii "-------------------- 2056onan rof 56-M/PC --------------------"
 banner_end:
     ; Filler
+    .byte 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00
     .byte 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00
 ; Stuff above of here must be 0x80 long, currently OK
 
@@ -404,6 +387,7 @@ tty_input_wait:
 
     ldx #0
     stx pending_key
+    clc
     rts
 zendproc
 
@@ -415,8 +399,12 @@ zproc tty_conout
     pha
     lda #IO_page_video
     sta IO_page_reg
+conout_wait:
+    lda tty_busy
+    bne conout_wait
     pla
     sta tty_write 
+    clc
     rts
 zendproc
 
@@ -427,6 +415,7 @@ zendproc
 zproc bios_SETDMA
     sta dma+0
     stx dma+1
+    clc
     rts
 zendproc
 
@@ -458,6 +447,9 @@ zproc bios_SETSEC
     sta ptr
     stx ptr+1
 
+    ;lda #'S'
+    ;jsr uart_out
+
     ; Set SD card IO page
     lda #IO_page_sdcard
     sta IO_page_reg
@@ -467,7 +459,25 @@ zproc bios_SETSEC
     lda (ptr),y
     and #$03
     sta sd_page_zp
-    sta sd_page
+    
+    ;clc
+    ;adc #$30
+    ;jsr uart_out
+
+    ; Print requested sector number
+    ;ldy #2
+    ;lda (ptr),y
+    ;jsr uart_out
+    
+    ;ldy #1
+    ;lda (ptr),y
+    ;jsr uart_out
+    
+    ;ldy #0
+    ;lda (ptr),y
+    ;jsr uart_out
+
+
 
     ; Divide sector address by 4 to get correct SD sector
     ldx #2
@@ -477,12 +487,12 @@ divloop:
     lsr
     sta (ptr),y
     
-    dey
+    ldy #1
     lda (ptr),y
     ror
     sta (ptr),y
 
-    dey
+    ldy #0
     lda (ptr),y
     ror     
     sta (ptr),y   
@@ -490,32 +500,48 @@ divloop:
     bne divloop
 
     lda #0
-    sta sd_offset+3
+    sta sd_sector+3
 
     ldy #2
     lda (ptr),y
-    sta sd_offset+2
+    sta sd_sector+2
 
     ldy #1
     lda (ptr),y
-    sta sd_offset+1
+    sta sd_sector+1
     
     ldy #0
-    sta (ptr),y
-    sta sd_offset+0
+    lda (ptr),y
+    sta sd_sector+0
 
     clc
-    lda sd_offset+1
-    adc CPMFS_OFFSET
-    sta sd_offset+1
+    lda sd_sector+1
+    adc #CPMFS_OFFSET
+    sta sd_sector+1
     bcc offset_done
-    inc sd_offset+2
+    inc sd_sector+2
  offset_done:
-    jsr sync_sd_offset
+    ;lda sd_sector+0
+    ;clc
+    ;adc #$30
+    ;jsr uart_out
 
+    ;lda sd_sector+1
+    ;clc
+    ;adc #$30
+    ;jsr uart_out
+
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
+
+    jsr sync_sd_offset
+    
+    clc
     rts
 zendproc
-    
+
 zproc bios_READ
 	;jsr jmp_locate
     ;lda dma;#<dma
@@ -523,10 +549,18 @@ zproc bios_READ
     ;jsr jmp_read_sector
     
     ; Setup pointer
-    lda dma
-    sta ptr
-    lda dma+1
-    sta ptr+1
+    #lda #<dma
+    #sta ptr
+    #lda dma+1
+    #lda #>dma
+    #sta ptr+1
+
+    ;lda #'R'
+    ;jsr uart_out
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
 
     ; Perform SD-card read
     jsr sdcard_read 
@@ -536,14 +570,15 @@ zproc bios_READ
     ldy #0
 readcopyloop:
     lda sd_base, X
-    sta (ptr),Y
+    sta (dma),Y
+    ;jsr uart_out
     iny
-    bne readcopycont
-    inc ptr+1
-readcopycont:
+    ;bne readcopycont
+    ;inc ptr+1
+;readcopycont:
     inx
     bne readcopyloop
-
+    clc
     rts
 zendproc
 
@@ -553,10 +588,17 @@ zproc bios_WRITE
     ;ldx dma+1;#>dma
     ;jsr jmp_write_sector
      ; Setup pointer
-    lda dma
-    sta ptr
-    lda dma+1
-    sta ptr+1
+    ;lda dma
+    ;sta ptr
+    ;lda dma+1
+    ;sta ptr+1
+
+    ;lda #'W'
+    ;jsr uart_out
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
 
     ; Perform SD-card read
     jsr sdcard_read 
@@ -565,54 +607,58 @@ zproc bios_WRITE
     ldx #$80
     ldy #0
 writecopyloop:
-    lda (ptr),Y
+    lda (dma),Y
     sta sd_base, X
     iny
-    bne writecopycont
-    inc ptr+1
-writecopycont:
+    ;bne writecopycont
+    ;inc ptr+1
+;writecopycont:
     inx
     bne writecopyloop
+prewritewait:
+    lda sd_busy
+    bne prewritewait
 
     ; Write to SD-card
     lda #01
     sta sd_write_strobe
-
+postwritewait:
+    lda sd_busy
+    bne postwritewait
+    
+    clc
     rts
 zendproc
 
 zproc bios_GETTPA
-    ;ldy current_bank
-    lda mem_base;, Y  
-    ldx mem_end;, Y
+    lda mem_base
+    ldx mem_end
+    clc
     rts
 zendproc
 
 zproc bios_SETTPA
-    ldy current_bank
-    cpy #0
-    bne settpa_end
-    sta mem_base;, Y 
-    stx mem_end;, Y
-settpa_end:
+    sta mem_base 
+    stx mem_end
+    clc
     rts
 zendproc
 
 zproc bios_GETZP
-    ;ldy current_bank
-    lda zp_base;, Y
-    ldx zp_end;, Y
+    lda zp_base
+    ldx zp_end
+    clc
     rts
 zendproc
 
 zproc bios_SETZP
-    sta zp_base;, Y 
-    stx zp_end;, Y
+    sta zp_base 
+    stx zp_end
+    clc
     rts
 zendproc
 
 zproc bios_SETBANK
-    sta current_bank
     rts
 zendproc
 
@@ -622,12 +668,16 @@ zproc sdcard_read
     
     jsr sync_sd_offset
 
+sd_read_busy_a:
+    lda sd_busy
+    bne sd_read_busy_a   
+    
     ; Read strobe
     lda #1
     sta sd_read_strobe
-sd_read_busy:
+sd_read_busy_b:
     lda sd_busy
-    bne sd_read_busy    
+    bne sd_read_busy_b
 
     rts
 zendproc
@@ -688,11 +738,11 @@ bdos_copy_cont:
     
 bdos_copy_done:
     dec ptr1
-    lda ptr1
-    clc
-    adc #$30
-    jsr uart_out
-    lda ptr1
+    ;lda ptr1
+    ;clc
+    ;adc #$30
+    ;jsr uart_out
+    ;lda ptr1
     beq bdos_all_done
 
     ; Increase SD sector address
@@ -713,16 +763,31 @@ bdos_all_done:
 zendproc
 
 zproc sync_sd_offset
-    lda #'S'    
-    jsr uart_out
-    lda sd_sector+1
-    clc
-    adc #$30
-    jsr uart_out
-    lda #13
-    jsr uart_out
-    lda #10
-    jsr uart_out
+    ;lda #'O'    
+    ;jsr uart_out
+    
+    ;lda sd_sector + 3
+    ;jsr uart_out
+
+    ;lda sd_sector + 2
+    ;jsr uart_out
+
+    ;lda sd_sector + 1
+    ;jsr uart_out
+
+    ;lda sd_sector
+    ;jsr uart_out
+
+    ;lda sd_page_zp
+    ;jsr uart_out
+
+
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
+
+    
     
     ; Set IO page
     lda #IO_page_sdcard
@@ -750,7 +815,7 @@ zproc uart_out
     pha
     ; Preserve io page
     lda IO_page_reg
-    sta temp
+    sta kuken
     
     lda #IO_page_uart
     sta IO_page_reg
@@ -762,7 +827,7 @@ uart_out_wait:
     pla
     sta uart_tx_data
 
-    lda temp
+    lda kuken
     sta IO_page_reg
     rts
 zendproc
