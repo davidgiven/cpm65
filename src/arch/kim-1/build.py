@@ -17,9 +17,10 @@ llvmrawprogram(
 )
 
 mkcpmfs(
-    name="cpmfs",
+    name="rawdiskimage",
     format="k-1013",
     bootimage=".+bios",
+    size=256 * 77 * 26,
     items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
@@ -28,7 +29,7 @@ mkcpmfs(
     | PASCAL_APPS,
 )
 
-mkimd(name="diskimage", src=".+cpmfs")
+mkimd(name="diskimage", src=".+rawdiskimage")
 
 normalrule(
     name="distro",
