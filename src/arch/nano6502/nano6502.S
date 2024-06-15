@@ -447,9 +447,6 @@ zproc bios_SETSEC
     sta ptr
     stx ptr+1
 
-    ;lda #'S'
-    ;jsr uart_out
-
     ; Set SD card IO page
     lda #IO_page_sdcard
     sta IO_page_reg
@@ -460,45 +457,28 @@ zproc bios_SETSEC
     and #$03
     sta sd_page_zp
     
-    ;clc
-    ;adc #$30
-    ;jsr uart_out
-
-    ; Print requested sector number
-    ;ldy #2
-    ;lda (ptr),y
-    ;jsr uart_out
-    
-    ;ldy #1
-    ;lda (ptr),y
-    ;jsr uart_out
-    
-    ;ldy #0
-    ;lda (ptr),y
-    ;jsr uart_out
-
-
-
     ; Divide sector address by 4 to get correct SD sector
     ldx #2
-divloop:
-    ldy #2
-    lda (ptr),y
-    lsr
-    sta (ptr),y
+    zrepeat
+        ldy #2
+        lda (ptr),y
+        lsr
+        sta (ptr),y
     
-    ldy #1
-    lda (ptr),y
-    ror
-    sta (ptr),y
+        ldy #1
+        lda (ptr),y
+        ror
+        sta (ptr),y
 
-    ldy #0
-    lda (ptr),y
-    ror     
-    sta (ptr),y   
-    dex
-    bne divloop
+        ldy #0
+        lda (ptr),y
+        ror     
+        sta (ptr),y   
+        dex
+    zuntil_eq
 
+    ; Store calculated sector
+    ; Could be turned into loop...
     lda #0
     sta sd_sector+3
 
@@ -518,24 +498,11 @@ divloop:
     lda sd_sector+1
     adc #CPMFS_OFFSET
     sta sd_sector+1
-    bcc offset_done
-    inc sd_sector+2
- offset_done:
-    ;lda sd_sector+0
-    ;clc
-    ;adc #$30
-    ;jsr uart_out
-
-    ;lda sd_sector+1
-    ;clc
-    ;adc #$30
-    ;jsr uart_out
-
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
+    
+    zif_cs
+        inc sd_sector+2
+    zendif
+    
     jsr sync_sd_offset
     
     clc
@@ -543,41 +510,20 @@ divloop:
 zendproc
 
 zproc bios_READ
-	;jsr jmp_locate
-    ;lda dma;#<dma
-    ;ldx dma+1;#>dma
-    ;jsr jmp_read_sector
-    
-    ; Setup pointer
-    #lda #<dma
-    #sta ptr
-    #lda dma+1
-    #lda #>dma
-    #sta ptr+1
-
-    ;lda #'R'
-    ;jsr uart_out
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
     ; Perform SD-card read
     jsr sdcard_read 
 
     ; Copy data to dma
     ldx #$80
     ldy #0
-readcopyloop:
-    lda sd_base, X
-    sta (dma),Y
-    ;jsr uart_out
-    iny
-    ;bne readcopycont
-    ;inc ptr+1
-;readcopycont:
-    inx
-    bne readcopyloop
+
+    zrepeat
+        lda sd_base, x
+        sta (dma),y
+        iny
+        inx
+    zuntil_eq
+ 
     clc
     rts
 zendproc
@@ -595,6 +541,18 @@ zproc bios_WRITE
 
     ;lda #'W'
     ;jsr uart_out
+    ;lda #'B'
+    ;jsr uart_out
+    ;lda sd_addr_3
+    ;jsr uart_out
+    ;lda sd_addr_2
+    ;jsr uart_out
+    ;lda sd_addr_1
+    ;jsr uart_out
+    ;lda sd_addr_0
+    ;jsr uart_out
+    ;lda sd_page
+    ;jsr uart_out
     ;lda #13
     ;jsr uart_out
     ;lda #10
@@ -606,18 +564,36 @@ zproc bios_WRITE
     ; Copy data from dma
     ldx #$80
     ldy #0
-writecopyloop:
-    lda (dma),Y
-    sta sd_base, X
-    iny
-    ;bne writecopycont
-    ;inc ptr+1
-;writecopycont:
-    inx
-    bne writecopyloop
+    zrepeat
+        lda (dma), y
+        sta sd_base, x
+        inx
+        iny
+        cpy #$80
+    zuntil_eq
+
 prewritewait:
     lda sd_busy
     bne prewritewait
+
+    ;lda #'W'
+    ;jsr uart_out
+    ;lda #'A'
+    ;jsr uart_out
+    ;lda sd_addr_3
+    ;jsr uart_out
+    ;lda sd_addr_2
+    ;jsr uart_out
+    ;lda sd_addr_1
+    ;jsr uart_out
+    ;lda sd_addr_0
+    ;jsr uart_out
+    ;lda sd_page
+    ;jsr uart_out
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
 
     ; Write to SD-card
     lda #01
@@ -668,16 +644,17 @@ zproc sdcard_read
     
     jsr sync_sd_offset
 
-sd_read_busy_a:
-    lda sd_busy
-    bne sd_read_busy_a   
+    zrepeat
+        lda sd_busy
+    zuntil_eq
     
     ; Read strobe
     lda #1
     sta sd_read_strobe
-sd_read_busy_b:
-    lda sd_busy
-    bne sd_read_busy_b
+
+    zrepeat
+        lda sd_busy
+    zuntil_eq
 
     rts
 zendproc
@@ -763,40 +740,14 @@ bdos_all_done:
 zendproc
 
 zproc sync_sd_offset
-    ;lda #'O'    
-    ;jsr uart_out
-    
-    ;lda sd_sector + 3
-    ;jsr uart_out
-
-    ;lda sd_sector + 2
-    ;jsr uart_out
-
-    ;lda sd_sector + 1
-    ;jsr uart_out
-
-    ;lda sd_sector
-    ;jsr uart_out
-
-    ;lda sd_page_zp
-    ;jsr uart_out
-
-
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
-    
-    
     ; Set IO page
     lda #IO_page_sdcard
     sta IO_page_reg    
 
     ; Wait until SD-card is not busy
-sd_offset_wait:
-    lda sd_busy
-    bne sd_offset_wait    
+    zrepeat
+        lda sd_busy
+    zuntil_eq
 
     lda sd_sector
     sta sd_addr_0
