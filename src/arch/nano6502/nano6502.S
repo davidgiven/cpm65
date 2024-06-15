@@ -54,9 +54,7 @@ ZEROPAGE
 .global ptr1
 ptr: .word 0
 ptr1: .word 0
-dma: .fill 2
-current_bank: .byte 0
-current_drive: .byte 0
+dma: .word 0
 sd_offset: .byte 0
 sd_page_zp: .byte 0
 sd_sector: .fill 4
@@ -471,7 +469,7 @@ zproc screen_scrolldown
 zendproc
 
 zproc screen_cleartoeol
-    jsr video_wait 
+    jsr video_init 
     sta video_clear_to_eol
     rts
 zendproc
@@ -586,25 +584,6 @@ zproc bios_SETSEC
     sta ptr
     stx ptr+1
 
-    ; Debug prints
-    ;lda #'S'
-    ;jsr uart_out
-
-    ;ldy #1
-    ;lda (ptr),y
-    ;jsr uart_hex
-    ;ldy #0
-    ;lda (ptr),y
-    ;jsr uart_hex	
-    
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
-
-
-
     ; Set SD card IO page
     lda #IO_page_sdcard
     sta IO_page_reg
@@ -669,34 +648,12 @@ zproc bios_SETSEC
 zendproc
 
 zproc bios_READ
-    ; Debug prints
-    ;lda #'R'
-    ;jsr uart_out
-
-    ;lda sd_addr_1
-    ;jsr uart_hex
-    ;lda sd_addr_0
-    ;jsr uart_hex	
-    ;lda sd_page
-    ;jsr uart_hex
-    
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
-
-
     ; Perform SD-card read
     jsr sdcard_read 
 
     ; Copy data to dma
     ldx #$80
     ldy #0
-
-    ; Set IO page
-    lda #IO_page_sdcard
-    sta IO_page_reg
 
     zrepeat
         lda sd_base, x
@@ -710,33 +667,9 @@ zproc bios_READ
 zendproc
 
 zproc bios_WRITE
-    ; Debug prints
-    ;lda #'W'
-    ;jsr uart_out
-
-    ;lda sd_addr_1
-    ;jsr uart_hex
-    ;lda sd_addr_0
-    ;jsr uart_hex	
-    ;lda sd_page
-    ;jsr uart_hex
-    
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
     ; Perform SD-card read
     jsr sdcard_read 
 
-    ; Set IO page
-    lda #IO_page_sdcard
-    sta IO_page_reg
-
-    zrepeat
-        lda sd_busy
-    zuntil_eq
-    
     ; Copy data from dma
     ldx #$80
     ldy #0
@@ -747,19 +680,13 @@ zproc bios_WRITE
         inx
     zuntil_eq
 
-    zrepeat
-        lda sd_busy
-    zuntil_eq
-    
+    jsr sd_wait   
+ 
     ; Write back to SD-card
     lda #01
     sta sd_write_strobe
 
-    zrepeat
-        lda sd_busy
-    zuntil_eq
-    
-    clc
+    jsr sd_wait   
     rts
 zendproc
 
@@ -812,31 +739,16 @@ zproc video_wait
 zendproc
 
 zproc sdcard_read
-    lda #IO_page_sdcard
-    sta IO_page_reg
-    
     jsr sync_sd_offset
 
-    zrepeat
-        lda sd_busy
-    zuntil_eq
-    
+    jsr sd_wait   
+ 
     ; Read strobe
     lda #1
     sta sd_read_strobe
 
-    zrepeat
-        lda sd_busy
-    zuntil_eq
-  
-    ; Read strobe
-    lda #1
-    sta sd_read_strobe
+    jsr sd_wait
 
-    zrepeat
-        lda sd_busy
-    zuntil_eq
-    
     rts
 zendproc
 
@@ -846,9 +758,7 @@ zproc sync_sd_offset
     sta IO_page_reg    
 
     ; Wait until SD-card is not busy
-    zrepeat
-        lda sd_busy
-    zuntil_eq
+    jsr sd_wait
 
     lda sd_sector
     sta sd_addr_0
@@ -861,41 +771,13 @@ zproc sync_sd_offset
     lda sd_page_zp
     sta sd_page
 
-    lda sd_addr_0
-    cmp sd_sector
-    zif_ne
-        lda #'X'
-        jsr uart_out
-    zendif
+    rts
+zendproc
 
-    lda sd_addr_1
-    cmp sd_sector+1
-    zif_ne
-        lda #'Y'
-        jsr uart_out
-    zendif
-    
-    lda sd_addr_2
-    cmp sd_sector+2
-    zif_ne
-        lda #'Z'
-        jsr uart_out
-    zendif
-
-    lda sd_addr_3
-    cmp sd_sector+3
-    zif_ne
-        lda #'Q'
-        jsr uart_out
-    zendif
-
-    lda sd_page
-    cmp sd_page_zp
-    zif_ne
-        lda #'W'
-        jsr uart_out
-    zendif
-
+zproc sd_wait
+    zrepeat
+        lda sd_busy
+    zuntil_eq
     rts
 zendproc
 
@@ -942,7 +824,6 @@ h4:
 zendproc
 
 .data
-;current_bank:   .byte 0
 vid_style:  .byte 0
 zp_base: .byte __ZEROPAGE_START__;, __ZP1_START__
 zp_end:  .byte __ZEROPAGE_END__;, __ZP1_END__
