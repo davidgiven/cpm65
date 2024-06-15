@@ -1,13 +1,13 @@
 MEMORY {
-    zp : ORIGIN = 0x05, LENGTH = 0xf0
+    zp : ORIGIN = 0x10, LENGTH = 0xf0
     ram (rw) : ORIGIN = 0x0300, LENGTH = 0x0800
 }
 
 SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
-		__ZP0_START__ = .;
-		__ZP0_END__ = 0xff;
+		__ZEROPAGE_START__ = .;
+		__ZEROPAGE_END__ = 0xff;
 	} >zp
 
 	.text : { *(.text .text.*) } >ram
@@ -16,7 +16,7 @@ SECTIONS {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		__TPA0_START__ = .;
-		__TPA0_END__   = 0xFE00;
+		__TPA0_END__   = 0xFD00;
 
 	} >ram
 }
