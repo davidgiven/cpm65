@@ -89,8 +89,6 @@ _start:
 
     ; Read the BDOS.
 
-    jmp .
-
     lda #<bdos_filename
     ldx #>bdos_filename
     ldy #>__TPA_START__
