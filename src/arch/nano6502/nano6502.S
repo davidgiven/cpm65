@@ -116,14 +116,100 @@ banner_wait:
     
     rts                 ; indirect jump
 zendproc
+
+zproc load_bdos
+    ; Push load adress unto stack
+    pha
+
+    ; Set IO page
+    lda #IO_page_sdcard
+    sta IO_page_reg
+
+    ; Set offset to BDOS address
+    lda #BDOS_OFFSET
+    sta sd_sector+1
+    lda #0
+    sta sd_sector
+    sta sd_sector+2
+    sta sd_sector+3
+    sta sd_page_zp
     
+    jsr sync_sd_offset
+
+    ; Read the BDOS blocks
+    lda #BDOS_BLOCKS+1
+    sta ptr1
+    ldy #0
+    lda #0
+    sta ptr
+    pla
+    sta ptr+1 
+    
+    zrepeat
+        ; read strobe
+        lda #1
+        sta sd_read_strobe
+
+        ; Wait for read to finish
+        zrepeat
+            lda sd_busy
+        zuntil_eq
+
+        ; Copy data to RAM
+        zrepeat
+        ;bdos_bank_loop:
+            ldx #$80
+            ;bdos_copy_loop:
+            zrepeat
+                lda sd_base,X
+                sta (ptr),Y 
+                iny
+                zif_eq     
+                    ;bne bdos_copy_cont
+                    inc ptr+1
+                zendif
+                ;bdos_copy_cont:
+                inx
+            zuntil_eq
+            ;bne bdos_copy_loop
+
+            inc sd_page_zp
+            jsr sync_sd_offset
+            lda sd_page_zp
+            cmp #04
+        zuntil_eq
+    
+        dec ptr1
+
+        ; Increase SD sector address
+        zif_ne
+            inc sd_sector
+            zif_eq
+                inc sd_sector+1
+                zif_eq
+                    inc sd_sector+2
+                    zif_eq
+                        inc sd_sector+3
+                    zendif
+                zendif
+            zendif
+            lda #0
+            sta sd_page_zp
+            jsr sync_sd_offset
+        zendif
+        
+        lda ptr1
+    zuntil_eq
+    
+    rts
+zendproc
+
+  
 banner: ; reversed!
     .byte 13, 10
     .ascii "-------------------- 2056onan rof 56-M/PC --------------------"
 banner_end:
-    ; Filler
-    .byte 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00
-    .byte 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00
+    .byte 00
 ; Stuff above of here must be 0x80 long, currently OK
 
 ; ---- Drive filenames -----
@@ -656,86 +742,6 @@ zproc sdcard_read
         lda sd_busy
     zuntil_eq
 
-    rts
-zendproc
-
-zproc load_bdos
-    ; Push load adress unto stack
-    pha
-
-    ; Set IO page
-    lda #IO_page_sdcard
-    sta IO_page_reg
-
-    ; Set offset to BDOS address
-    lda #BDOS_OFFSET
-    sta sd_sector+1
-    lda #0
-    sta sd_sector
-    sta sd_sector+2
-    sta sd_sector+3
-    sta sd_page_zp
-    
-    jsr sync_sd_offset
-
-    ; Read the BDOS blocks
-    lda #BDOS_BLOCKS+1
-    sta ptr1
-    ldy #0
-    lda #0
-    sta ptr
-    pla
-    sta ptr+1 
-bdos_sector_read:
-    ; read strobe
-    lda #1
-    sta sd_read_strobe
-bdos_read_wait:
-    lda sd_busy
-    bne bdos_read_wait
-
-    ; Copy data to RAM
-bdos_bank_loop:
-    ldx #$80
-bdos_copy_loop:
-    lda sd_base,X
-    sta (ptr),Y 
-    iny     
-    bne bdos_copy_cont
-    inc ptr+1
-bdos_copy_cont:
-    inx
-    bne bdos_copy_loop
-
-    inc sd_page_zp
-    jsr sync_sd_offset
-    lda sd_page_zp
-    cmp #04
-    bne bdos_bank_loop
-    
-bdos_copy_done:
-    dec ptr1
-    ;lda ptr1
-    ;clc
-    ;adc #$30
-    ;jsr uart_out
-    ;lda ptr1
-    beq bdos_all_done
-
-    ; Increase SD sector address
-    inc sd_sector
-    bne bdos_inc_done
-    inc sd_sector+1
-    bne bdos_inc_done
-    inc sd_sector+2
-    bne bdos_inc_done
-    inc sd_sector+3
-bdos_inc_done:
-    lda #0
-    sta sd_page_zp
-    jsr sync_sd_offset
-    jmp bdos_sector_read
-bdos_all_done:
     rts
 zendproc
 
