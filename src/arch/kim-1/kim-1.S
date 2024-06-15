@@ -2,12 +2,30 @@
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
+; KIM-1 port Copyright © 2024 Eduardo Casino
+
 #include "zif.inc"
 #include "cpm65.inc"
 #include "driver.inc"
 
-OUTCH = $1ea0
-GETCH = $1e5a
+; K-1013 FDC registers
+
+HSRC = 0xffe8           ; R/W   - K-1003 Hardware Status Register
+ADMA = 0xffea           ; Write - K-1013 Set DMA Address Register
+MSTR = 0xffee           ; Read  - NEC-765 Main Status Register 
+DATR = 0xffef           ; R/W   - NEC-765 Data Register
+
+; KIM-1 ROM entry points
+
+OUTCH = 0x1ea0
+GETCH = 0x1e5a
+DELAY = 0x1ed4
+DEHALF = 0x1eeb
+
+; KIM-1 I/O
+
+CHAR = 0xfe             ; ZP char buffer
+SAD = 0x1740            ; 6530 A Data (TTY)
 
 ZEROPAGE
 
@@ -100,11 +118,15 @@ bdos_filename:
 
 ; Actual BIOS code.
 
+; --- TTY driver ------------------------------------------------------------
+
 .data
 .global drvtop
 drvtop: .word drv_TTY
 
 defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+
+.text
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -132,10 +154,7 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif_eq
-        zrepeat
-            jsr GETCH
-            tax
-        zuntil_ne
+        jsr GETCH
     zendif
     ldx #0
     stx pending_key
@@ -158,10 +177,9 @@ zendproc
 zproc tty_const
     lda pending_key
     zif_eq
-        jsr GETCH
+        jsr tty_nbgetch
         sta pending_key
         zif_eq
-            lda #0
             clc
             rts
         zendif
@@ -172,62 +190,42 @@ zproc tty_const
     rts
 zendproc
 
-.text
-; Sets the current DMA address.
+; Non-blocking tty read. If there is a char ready,
+; put it into A. Otherwise, return 0x00. Adapted
+; from the KIM-1 ROM
 
-zproc bios_SETDMA
-    sta dma+0
-    stx dma+1
-    clc
-    rts
-zendproc
-
-; Select a disk.
-; A is the disk number.
-; Returns the DPH in XA.
-; Sets carry on error.
-
-zproc bios_SELDSK
-    cmp #0
-    zif_ne
-        sec                 ; invalid drive
-        rts
-    zendif
-
-    lda #<dph
-    ldx #>dph
-    clc
-    rts
-zendproc
-
-; Set the current absolute sector number.
-; XA is a pointer to a three-byte sector number.
-
-zproc bios_SETSEC
-    sta ptr+0
-    stx ptr+1
-
-    ldy #2
-    lda (ptr), y
+zproc tty_nbgetch
+    txa
+    pha
+        
+    ldx #8              ; Set up 8 bit count
+    lda #1
+    bit SAD             ; Check start bit
+    bne 1f 
+    bmi 1f              ; No start bit
+    jsr DELAY           ; Delay 1 bit
+    jsr DEHALF          ; Delay 1/2 bit time
+    zloop               ; Get 8 bits loop
+        lda SAD
+        and #0x80       ; Mask off low order bits
+        lsr CHAR        ; Shift bit into CHAR
+        ora CHAR
+        sta CHAR
+        jsr DELAY
+        dex
+    zuntil_eq  
+    jsr DEHALF
+    pla
+    tax
+    lda CHAR
+    rol a               ; Shift off parity
     lsr a
-    sta cpmfs_offset+3
-
-    dey
-    lda (ptr), y
-    ror a
-    sta cpmfs_offset+2
-
-    dey
-    lda (ptr), y
-    ror a
-    sta cpmfs_offset+1
-
-    lda #0
-    ror a
-    sta cpmfs_offset+0
-    clc
+    rts
+1:  lda #0
     rts
 zendproc
+
+; --- BIOS entrypoints ------------------------------------------------------
 
 zproc bios_GETTPA
     lda mem_base
@@ -262,49 +260,451 @@ zproc bios_SETBANK
     rts
 zendproc
 
-zproc bios_READ
-    jsr seek_to_sector
 
-    ; Read the data.
+; Sets the current DMA address.
+
+zproc bios_SETDMA
+    sta dma+0
+    stx dma+1
+    clc
+    rts
+zendproc
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc bios_SELDSK
+    cmp #0
+    zif_ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
+    lda #<dph
+    ldx #>dph
+    clc
+    rts
+zendproc
+
+; Set the current absolute sector number.
+; XA is a pointer to a three-byte number.
+
+zproc bios_SETSEC
+    sta ptr+0
+    stx ptr+1
+
+    ; Copy bottom 16 of sector number to temporary (the top byte must be 0).
+
+    ldy #0
+    lda (ptr), y
+    sta ptr1+0
+    iny
+    lda (ptr), y
+    sta ptr1+1
+
+    ; There are 26 CP/M sectors per host track. Do a 16-bit divide.
+
+    lda #0
+    sta requested_cpm_sector
+
+    ldx #16
+    lda #0
+    zrepeat
+        asl ptr1+0
+        rol ptr1+1
+        rol a
+        cmp #26
+        zif_cs
+            sbc #26
+            inc ptr1+0
+        zendif
+        dex
+    zuntil_eq
+    sta requested_cpm_sector
+    lda ptr1+0
+    sta requested_track
+
+    rts
+zendproc
+
+zproc bios_READ
+    jsr change_sector
+    zif_cs
+        rts
+    zendif
+
+    ; transfer data from FDC into disk buffer
+
+    lda requested_cpm_sector
+    cmp buffered_host_sector
+    zif_ne
+        sta buffered_host_sector
+        ldx requested_track
+        jsr fdc_exec_read
+        zif_cs
+            ; Some kind of read error. The data in the buffer is corrupt.
+
+            lda #0xff
+            sta buffered_host_sector
+
+            sec
+        zendif
+    zendif
+
+    ; Read the data from disk buffer
+
+    ldy #0
+    zrepeat
+        lda DISK_BUFFER, y
+        sta (dma), y
+        iny
+    zuntil_eq
 
     clc
     rts
 zendproc
 
 zproc bios_WRITE
-    jsr seek_to_sector
+    pha
+    jsr change_sector
+    pla
 
-    ; Write the data.
+    zif_cc
+        pha
+
+        lda requested_cpm_sector
+        ldy #0
+        zrepeat
+            lda (dma), y
+            sta DISK_BUFFER, y
+        zuntil_eq
+
+        lda #0x80
+        sta buffer_dirty
+
+        clc
+        pla
+        zif_ne
+            jsr flush_buffer
+        zendif
+    zendif
+    rts
+zendproc
+
+; --- Disk access -----------------------------------------------------------
+
+zproc change_sector
+    lda requested_cpm_sector
+    cmp buffered_host_sector
+    zif_eq
+        lda requested_track
+        cmp buffered_track
+        zif_eq
+            ; Buffered track/sector not changing, so do no work.
+
+            clc
+            rts
+        zendif
+    zendif
+
+    bit buffer_dirty
+    zif_mi
+        jsr flush_buffer
+        zif_cs
+            rts
+        zendif
+    zendif
+
+    lda requested_track
+    sta buffered_track
+
+    ; Seek track (Seek track is cheap if the controller is already there )
+
+    jsr fdc_exec_seek
+    zif_cs
+        ; Seek error. Invalidate buffered track
+
+        lda #0xff
+        sta buffered_track
+    zendif
+
+    rts
+zendproc
+
+zproc flush_buffer
+
+    lda requested_cpm_sector
+    ldx requested_track
+
+    jmp fdc_exec_write
+    zif_cc
+        ; A successful write, so mark the buffer as clean.
+
+        lda #0
+        sta buffer_dirty
+        clc
+    zendif
+
+    rts
+zendproc
+
+; --- K-1013 command functions----------------------------------------------------
+
+; Seek track in A
+
+zproc fdc_exec_seek
+
+    ; Save cylinder for later check
+
+    pha
+
+    ; Put new cylinder number into second byte of seek command
+
+    sta fdc_seek+3
+
+    ldx fdc_seek-fdc_commands   ; Command index into X
+    jsr fdc_exec_command
+    zif_cs
+        rts
+    zendif
+
+    ; Wait until FDC interrupt
+
+1:  lda HSRC
+    bmi 1b
+
+    ; Execute Sense Interrupt command
+
+    ldx fdc_senseint-fdc_commands
+    jsr fdc_exec_command
+    zif_cs
+        rts
+    zendif
+
+    ; Read results into memory
+
+    jsr fdc_read_result
+    zif_cs
+        rts
+    zendif
+
+    ; Compare cylinder number with desired one in ST1
+
+    pla
+    cmp disk_status+1
+    bne 2f
+
+    ; Look for error in the status registers
+
+    lda disk_status     ; Check ST0
+    and #0xf8           ; Delete don't care bits
+    cmp #0x20           ; Result must be "Seek Completed"
+    bne fdc_fail
+
+    clc
+    rts
+
+zendproc
+
+zproc fdc_fail
+    sec
+    rts
+zendproc
+
+; Sector num in A, cylinder in X
+
+zproc fdc_exec_rw
+
+    stx fdc_rw+3        ; Put cylinder in third byte of command
+    sta fdc_rw+5        ; Put sector in fifth byte of command
+    sta fdc_rw+7        ; Put last sector in seventh byte of command
+
+    ; Encode read/write buffer address into the DMA address register
+    ; DISK_BUFFER is in the higher half of the FDC system RAM, at page 0xfe
+    ; Bit 7 and 6: 11  ->  Upper half of system RAM, sys. RAM starts in even boundary
+    ; Bits 5-0: Bits 11-6 of the buffer address
+
+    lda #$f8
+    sta ADMA
+
+    ; Read/Write data into/from disk buffer
+
+    ldx fdc_rw-fdc_commands ; Command index into X
+    jsr fdc_exec_command
+    zif_cs
+        rts
+    zendif
+
+    ; Wait until IRQ from FDC
+
+1:  lda HSRC            ; WAIT UNTIL INTERRUPT REQUEST FROM FDC
+    bmi 1b
+    
+    ; Read results into memory
+
+    jsr fdc_read_result
+    zif_cs
+        rts
+    zendif   
+
+    ; Look for error in the status registers
+
+    lda disk_status     ; Check ST0
+    and #0xd8           ; Delete don't care bits
+    beq 2f              ; Jump ahead if ST0 clear
+    cmp #0x40           ; Test if abnormal termination
+    bne fdc_fail        ; Real error if not
+    lda disk_status+1   ; If abnormal termination, check ST1 for end of cylinder
+    bpl fdc_fail        ; Nope, then it is an error
+2:  lda disk_status+1   ; Check ST1
+    and #0x35           ; Mask out non-error bits
+    bne fdc_fail        ; Error if any remainder set
+    lda disk_status+2   ; Check ST2
+    and #0x33           ; Mask out non-error bits
+    bne fdc_fail        ; Error if any remainder set
+
+    clc
+    rts
+
+zendproc
+
+; Sector num in A, cylinder in X
+
+zproc fdc_exec_read
+    ; Put READ DATA command code into command byte
+
+    ldy #$46            ; Read, no multitrack, MFM, don't skip deleted
+    sty fdc_rw+1
+
+    ; Set FDC DMA write mode
+
+    ldy #1
+    sty HSRC
+
+    jmp fdc_exec_rw
+zendproc
+
+; Sector num in A, cylinder in X
+
+zproc fdc_exec_write
+    ; Put READ DATA command code into command byte
+
+    ldy #$45            ; Write, no multitrack, MFM, don't skip deleted
+    sty fdc_rw+1
+
+    ; Set FDC DMA read mode
+
+    ldy #0
+    sty HSRC
+
+    jmp fdc_exec_rw
+zendproc
+
+; Command index in X
+
+zproc fdc_exec_command
+    lda MSTR            ; Load Main Status Register
+    and #0x10           ; Check if busy
+    bne fail
+
+    ldy fdc_commands, x ; Load command length
+    inx
+
+    zloop
+1:      lda MSTR            ; Load Main Status Register again
+        bpl 1b              ; Wait until RQM from controller
+        and #0x40           ; Test data direction bit
+        bne fail            ; Error if controller wants to talk
+
+        lda fdc_commands, x ; Get command byte
+        sta DATR            ; Store into FDC data register
+        inx                 ; Next command byte
+        dey
+    zuntil_eq
 
     clc
     rts
 zendproc
 
-; Seeks the CPMFS file to the current sector.
+zproc fdc_read_result
+    ldx 0
+    zloop
+1:      lda MSTR            ; Load Main Status Register again
+        bpl 1b              ; Wait until RQM from controller
+        and #0x40           ; Test data direction bit
+        beq fail            ; Error if controller wants to listen
 
-zproc seek_to_sector
+        lda DATR            ; Get status byte from data register
+        sta disk_status, x  ; Put it into memory
+        inx                 ; Next byte
+        nop                 ; Give the controller time to update
+        nop                 ; the MSTR with a valid busy status
+        lda #0x10           ; Check if busy and go get another
+        and MSTR            ; byte while so
+    zuntil_eq
+
     clc
     rts
 zendproc
+
+zproc fail
+    sec
+    rts
+zendproc
+
+; --- Data ------------------------------------------------------------------
 
 .data
-
-pending_key:      .byte 0
 
 zp_base:    .byte __ZEROPAGE_START__
 zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA_START__@mos16hi
 mem_end:    .byte __TPA_END__@mos16hi
 
+; NEC-765 pre-formatted command strings
+
+fdc_commands:
+fdc_senseint:
+    .byte 0x08          ; Sense Interrupt Status
+
+fdc_seek:
+    .byte 3             ; Command length
+    .byte 0xf           ; Command code
+    .byte 0             ; Drive number in bits 0-1, side number in bit 2
+    .byte 0             ; NCN: New cylinder number
+
+fdc_sensedsk:
+    .byte 2             ; Command length
+    .byte 4             ; Command code
+    .byte 0             ; Drive number in bits 0-1, side number in bit 2
+
+fdc_rw:
+    .byte 9             ; Command length
+    .byte 0             ; Read or write command code. Updated by function
+    .byte 0             ; Drive number in bits 0-1, side number in bit 2
+    .byte 0             ; C: Present cylinder number. Must match current track
+    .byte 0             ; H: Head
+    .byte 0             ; R: Sector number to read
+    .byte 1             ; N: Code for 256 bytes per sector
+    .byte 0             ; EOT: Last sector to read
+    .byte 0xe           ; GPL: Gap length for 26 sectors, 256 bytes/sect
+    .byte 0xff          ; DTL: Data length = 0xff since N is non-zero
+
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 128*64, 2048, 128, 0
+define_drive dph, 77*26, 2048, 128, 26
 
-NOINIT
+.bss
 
-cpmfs_offset:     .fill 4 ; offset of sector in CPMFS file
+pending_key:            .byte 0
+requested_cpm_sector:   .fill 1     ; CP/M sector requested by user
+requested_track:        .fill 1     ; track requested by user
+buffered_host_sector:   .fill 1     ; host sector in buffer
+buffered_track:         .fill 1     ; track in buffer
+buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
+directory_buffer:       .fill 128   ; used by the BDOS
+disk_status:            .fill 8     ; Result phase readouts from NEC-765
 
 .global directory_buffer
-
-directory_buffer: .fill 128
-
