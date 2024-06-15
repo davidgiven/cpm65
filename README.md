@@ -31,6 +31,8 @@ to the 6502. So far it runs on:
   
   - Olimex' neo6502 6502-based computer.
 
+  - KIM-1 with K-1013 FDC, fully expanded RAM.
+
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
 much less standardised than 8080 and Z80 systems. (The systems above all load
@@ -308,6 +310,14 @@ the same time.
     utilitied. This are in no way complete, or documented.
 
   - The console is 53x30. It has a SCREEN driver.
+
+### KIM-1 notes
+
+  - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an
+    SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the
+    0x0400-0x13ff memory hole.
+
+  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `cpm65.bin` loader program into 0x0200 and execute it.
 
 ### Supported programs
 
