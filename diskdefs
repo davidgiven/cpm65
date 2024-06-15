@@ -97,11 +97,11 @@ diskdef sorbus
 end
 
 diskdef k-1013
-  seclen 256
-  tracks 77
-  sectrk 26
-  blocksize 2048
-  maxdir 128
-  boottrk 1
-  os 2.2
+    seclen 256
+    tracks 77
+    sectrk 26
+    blocksize 2048
+    maxdir 128
+    boottrk 1
+    os 2.2
 end
