@@ -14,6 +14,8 @@ SECTIONS {
 
 	.loader : {
 		*(loader)
+        *loader.o(.text .text.*)
+		. = ALIGN(256);
 	} >usrram
 
 	.text : {
@@ -21,11 +23,13 @@ SECTIONS {
 		__bios_data_end = __bios_data_start + __bios_end - __bios_start;
 		__bios_start = .;
 		*(.text .text.*)
+		. = ALIGN(256);
 	} >reloram AT>usrram
 
 	.data : {
 		*(.data .data.* .rodata .rodata.*)
 		__bios_end = .;
+		. = ALIGN(256);
 	} >reloram AT>usrram
 
 	.noinit (NOLOAD) : {
@@ -39,7 +43,7 @@ SECTIONS {
 }
 
 OUTPUT_FORMAT {
-	TRIM(reloram)
+	TRIM(usrram)
 }
 
 DISK_BUFFER = 0xfe00;
