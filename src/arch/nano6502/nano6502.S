@@ -15,6 +15,15 @@ ROM_sel_reg = $02
 tty_write = $fe06
 tty_cls = $fe09
 tty_busy = $fe07
+video_line = $fe00
+video_cursor_x = $fe01
+video_cursor_y = $fe02
+video_curvis = $fe03
+video_scroll_up = $fe04
+video_scroll_down = $fe05
+video_clear_to_eol = $fe08
+video_tty_enable = $fe0a
+video_line_data = $fe80
 
 sd_base   = $fe00
 sd_addr_0 = $fe00
@@ -84,6 +93,13 @@ banner_wait:
     sta sd_offset
     lda mem_base
     jsr load_bdos
+
+    ; Reset values of ptr
+    lda #0
+    sta ptr
+    sta ptr+1
+    sta ptr1
+    sta ptr1+1
    
     ; Relocate it.
 
@@ -222,7 +238,7 @@ banner_end:
 .global drvtop
 drvtop: .word drv_TTY
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine
 ; Y = TTY opcode
@@ -241,43 +257,43 @@ jmptable_hi:
 zendproc
 
 
-;defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 
 ; SCREEN driver strategy routine
 ; Y = TTY opcode
 
-;zproc drvstrat_SCREEN
-;    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
+zproc drvstrat_SCREEN
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
 
-;screen_jmptable_lo:
-;    jmptablo screen_version
-;    jmptablo screen_getsize
-;    jmptablo screen_clear
-;    jmptablo screen_setcursor
-;    jmptablo screen_getcursor
-;    jmptablo screen_putchar
-;    jmptablo screen_putstring
-;    jmptablo screen_getchar
-;    jmptablo screen_showcursor
-;    jmptablo screen_scrollup
-;    jmptablo screen_scrolldown
-;    jmptablo screen_cleartoeol
-;    jmptablo screen_setstyle
-;screen_jmptable_hi:
-;    jmptabhi screen_version
-;    jmptabhi screen_getsize
-;    jmptabhi screen_clear
-;    jmptabhi screen_setcursor
-;    jmptabhi screen_getcursor
-;    jmptabhi screen_putchar
-;    jmptabhi screen_putstring
-;    jmptabhi screen_getchar
-;    jmptabhi screen_showcursor
-;    jmptabhi screen_scrollup
-;    jmptabhi screen_scrolldown
-;    jmptabhi screen_cleartoeol
-;    jmptabhi screen_setstyle
-;zendproc
+screen_jmptable_lo:
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo screen_showcursor
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo screen_setstyle
+screen_jmptable_hi:
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi screen_showcursor
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi screen_setstyle
+zendproc
 
 ; SERIAL driver strategy routine
 ; Y = TTY opcode
@@ -334,105 +350,143 @@ zendproc
 
 ; --- SCREEN driver -------------------------------------------------------
 
-;zproc screen_version
-;    lda #0
-;    rts
-;zendproc
+zproc screen_version
+    lda #0
+    rts
+zendproc
 
-;zproc screen_getsize
-;    ; Screen size is 80x30
-;    lda #79
-;    ldx #29
-;    rts
-;zendproc
+zproc screen_getsize
+    ; Screen size is 80x30
+    lda #79
+    ldx #29
+    rts
+zendproc
 
-;zproc screen_clear
-;    jmp jmp_cls
-;zendproc
+zproc screen_clear
+    jsr video_init
+    sta tty_cls    
+    rts
+zendproc
 
-;zproc screen_setcursor
-;    jmp jmp_setcursor
-;zendproc
+zproc screen_setcursor
+    jsr video_init
+    sta video_cursor_x
+    jsr video_wait
+    stx video_cursor_y
+zendproc
 
-;zproc screen_getcursor
-;    lda vidcursor_x
-;    ldx vidcursor_y
-;    rts
-;zendproc
+zproc screen_getcursor
+    jsr video_init
+    lda video_cursor_x
+    ldx video_cursor_y
+    rts
+zendproc
 
-;zproc screen_putchar
-;    ora vid_style
-;    ldy #0
-;    sta (vidpointer),Y
+zproc screen_putchar
+    jsr video_init
+    pha
+    lda video_cursor_y
+    sta video_line
+    ldx video_cursor_x
+    pla
+    ora vid_style
+    sta video_line_data,x
+    
+    lda video_cursor_x
+    cmp #79
+    zif_ne
+        inc video_cursor_x 
+    zendif
 
-;   lda #63
-;    cmp vidcursor_x
-;    beq screen_putchar_done
-;    inc vidcursor_x
-;    lda vidcursor_x
-;    ldx vidcursor_y
-;    jsr screen_setcursor 
-;screen_putchar_done:
-;    rts    
-;zendproc
+    rts    
+zendproc
 
-;zproc screen_putstring
-;    sta ptr+0
-;    stx ptr+1
-;    ldy #0
-;putstring_loop:
-;    lda (ptr),y
-;    beq putstring_endloop
-;    jsr jmp_out 
-;    iny
-;    jmp putstring_loop
-;putstring_endloop:
-;    clc
-;    rts
-;zendproc
+zproc screen_putstring
+    sta ptr+0
+    stx ptr+1
+    ldy #0
+putstring_loop:
+    lda (ptr),y
+    beq putstring_endloop
+    jsr screen_putchar 
+    iny
+    jmp putstring_loop
+putstring_endloop:
+    clc
+    rts
+zendproc
 
-;zproc screen_getchar
-;    jsr jmp_scan
-;    cmp #00
-;    beq nodata
-;    cmp #$08
-;    bne notbs
-;    lda #127
-;notbs:    
-;    clc
-;    rts
-;nodata:
-;    sec   
-;    rts
-;zendproc
+zproc screen_getchar
+    lda #IO_page_uart
+    sta IO_page_reg
+    lda uart_rx_avail
+    beq nodata
+    lda uart_rx_data
+    cmp #$08
+    bne notbs
+    lda #127
+notbs:    
+    clc
+    rts
+nodata:
+    sec   
+    rts
+zendproc
 
-;zproc screen_showcursor
-;    jmp jmp_showcursor
-;zendproc
+zproc screen_showcursor
+    jsr video_init 
+    sta video_curvis
+    rts
+zendproc
 
-;zproc screen_scrollup
-;    jmp jmp_scrollup
-;zendproc
+zproc screen_scrollup
+    jsr video_init 
+    sta video_scroll_up
+    
+    jsr video_wait 
+    lda #0
+    sta video_cursor_x
+    jsr video_wait
+    lda #29
+    sta video_cursor_y 
+    jsr video_wait
+    sta video_clear_to_eol
+    rts  
+zendproc
 
-;zproc screen_scrolldown
-;    jmp jmp_scrolldown
-;zendproc
+zproc screen_scrolldown
+    jsr video_init 
+    sta video_scroll_down
+    
+    jsr video_wait
+ 
+    lda #0
+    sta video_cursor_x
+    jsr video_wait
+    lda #0
+    sta video_cursor_y 
+    jsr video_wait
+    sta video_clear_to_eol
+    rts 
+zendproc
 
-;zproc screen_cleartoeol
-;    jmp jmp_cleartoeol
-;zendproc
+zproc screen_cleartoeol
+    jsr video_wait 
+    sta video_clear_to_eol
+    rts
+zendproc
 
-;zproc screen_setstyle
-;    cmp #$01
-;    bne normal_style
-;    lda #$80
-;    sta vid_style
-;    rts
-;normal_style:
-;    lda #$00
-;    sta vid_style
-;    rts
-;zendproc
+zproc screen_setstyle
+    cmp #$01
+    bne normal_style
+    lda #$80
+    sta vid_style
+    rts
+normal_style:
+    lda #$00
+    sta vid_style
+    rts
+zendproc
 
 ; --- TTY driver -------------------------------------------------------
 
@@ -501,7 +555,6 @@ zendproc
 zproc bios_SETDMA
     sta dma+0
     stx dma+1
-    clc
     rts
 zendproc
 
@@ -532,6 +585,25 @@ zproc bios_SETSEC
     ; Setup adressing...    
     sta ptr
     stx ptr+1
+
+    ; Debug prints
+    ;lda #'S'
+    ;jsr uart_out
+
+    ;ldy #1
+    ;lda (ptr),y
+    ;jsr uart_hex
+    ;ldy #0
+    ;lda (ptr),y
+    ;jsr uart_hex	
+    
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
+
+
+
 
     ; Set SD card IO page
     lda #IO_page_sdcard
@@ -580,6 +652,7 @@ zproc bios_SETSEC
     lda (ptr),y
     sta sd_sector+0
 
+    ; Add offset
     clc
     lda sd_sector+1
     adc #CPMFS_OFFSET
@@ -596,12 +669,34 @@ zproc bios_SETSEC
 zendproc
 
 zproc bios_READ
+    ; Debug prints
+    ;lda #'R'
+    ;jsr uart_out
+
+    ;lda sd_addr_1
+    ;jsr uart_hex
+    ;lda sd_addr_0
+    ;jsr uart_hex	
+    ;lda sd_page
+    ;jsr uart_hex
+    
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
+
+
+
     ; Perform SD-card read
     jsr sdcard_read 
 
     ; Copy data to dma
     ldx #$80
     ldy #0
+
+    ; Set IO page
+    lda #IO_page_sdcard
+    sta IO_page_reg
 
     zrepeat
         lda sd_base, x
@@ -615,30 +710,17 @@ zproc bios_READ
 zendproc
 
 zproc bios_WRITE
-	;jsr jmp_locate
-    ;lda dma;#<dma
-    ;ldx dma+1;#>dma
-    ;jsr jmp_write_sector
-     ; Setup pointer
-    ;lda dma
-    ;sta ptr
-    ;lda dma+1
-    ;sta ptr+1
-
+    ; Debug prints
     ;lda #'W'
     ;jsr uart_out
-    ;lda #'B'
-    ;jsr uart_out
-    ;lda sd_addr_3
-    ;jsr uart_out
-    ;lda sd_addr_2
-    ;jsr uart_out
+
     ;lda sd_addr_1
-    ;jsr uart_out
+    ;jsr uart_hex
     ;lda sd_addr_0
-    ;jsr uart_out
+    ;jsr uart_hex	
     ;lda sd_page
-    ;jsr uart_out
+    ;jsr uart_hex
+    
     ;lda #13
     ;jsr uart_out
     ;lda #10
@@ -647,46 +729,35 @@ zproc bios_WRITE
     ; Perform SD-card read
     jsr sdcard_read 
 
+    ; Set IO page
+    lda #IO_page_sdcard
+    sta IO_page_reg
+
+    zrepeat
+        lda sd_busy
+    zuntil_eq
+    
     ; Copy data from dma
     ldx #$80
     ldy #0
     zrepeat
         lda (dma), y
         sta sd_base, x
-        inx
         iny
-        cpy #$80
+        inx
     zuntil_eq
 
-prewritewait:
-    lda sd_busy
-    bne prewritewait
-
-    ;lda #'W'
-    ;jsr uart_out
-    ;lda #'A'
-    ;jsr uart_out
-    ;lda sd_addr_3
-    ;jsr uart_out
-    ;lda sd_addr_2
-    ;jsr uart_out
-    ;lda sd_addr_1
-    ;jsr uart_out
-    ;lda sd_addr_0
-    ;jsr uart_out
-    ;lda sd_page
-    ;jsr uart_out
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
-    ; Write to SD-card
+    zrepeat
+        lda sd_busy
+    zuntil_eq
+    
+    ; Write back to SD-card
     lda #01
     sta sd_write_strobe
-postwritewait:
-    lda sd_busy
-    bne postwritewait
+
+    zrepeat
+        lda sd_busy
+    zuntil_eq
     
     clc
     rts
@@ -724,6 +795,22 @@ zproc bios_SETBANK
     rts
 zendproc
 
+zproc video_init
+    pha 
+    lda #IO_page_video
+    sta IO_page_reg    
+    jsr video_wait
+    pla
+    rts
+zendproc
+
+zproc video_wait
+    zrepeat
+        lda tty_busy
+    zuntil_eq
+    rts 
+zendproc
+
 zproc sdcard_read
     lda #IO_page_sdcard
     sta IO_page_reg
@@ -741,7 +828,15 @@ zproc sdcard_read
     zrepeat
         lda sd_busy
     zuntil_eq
+  
+    ; Read strobe
+    lda #1
+    sta sd_read_strobe
 
+    zrepeat
+        lda sd_busy
+    zuntil_eq
+    
     rts
 zendproc
 
@@ -765,6 +860,42 @@ zproc sync_sd_offset
     sta sd_addr_3    
     lda sd_page_zp
     sta sd_page
+
+    lda sd_addr_0
+    cmp sd_sector
+    zif_ne
+        lda #'X'
+        jsr uart_out
+    zendif
+
+    lda sd_addr_1
+    cmp sd_sector+1
+    zif_ne
+        lda #'Y'
+        jsr uart_out
+    zendif
+    
+    lda sd_addr_2
+    cmp sd_sector+2
+    zif_ne
+        lda #'Z'
+        jsr uart_out
+    zendif
+
+    lda sd_addr_3
+    cmp sd_sector+3
+    zif_ne
+        lda #'Q'
+        jsr uart_out
+    zendif
+
+    lda sd_page
+    cmp sd_page_zp
+    zif_ne
+        lda #'W'
+        jsr uart_out
+    zendif
+
     rts
 zendproc
 
@@ -789,23 +920,47 @@ uart_out_wait:
     rts
 zendproc
 
+zproc uart_hex
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr h4
+    pla
+h4:
+    and #0x0f
+    ora #'0'
+    cmp #'9'+1
+    zif_cs
+        adc #6
+    zendif
+    pha
+    jsr uart_out
+    pla
+    rts
+zendproc
+
 .data
 ;current_bank:   .byte 0
-zp_base: .byte __ZP0_START__;, __ZP1_START__
-zp_end:  .byte __ZP0_END__;, __ZP1_END__
+vid_style:  .byte 0
+zp_base: .byte __ZEROPAGE_START__;, __ZP1_START__
+zp_end:  .byte __ZEROPAGE_END__;, __ZP1_END__
 
-mem_base: .byte __TPA0_START__@mos16hi
-mem_end:  .byte __TPA0_END__@mos16hi
+mem_base: .byte __TPA0_START__@mos16hi, __TPA0_START__@mos16hi
+mem_end:  .byte __TPA0_END__@mos16hi, __TPA0_START__@mos16hi
 	
 ; DPH for drives
 
 define_drive dph, 128*64, 2048, 128, 0
 
-directory_buffer = _start
+;directory_buffer = _start
 NOINIT
 
 pending_key: .byte 0    ; pending keypress from system
-sector_num:  .fill 3    ; current absolute sector number
-	
+sector_num: .fill 3
+.global directory_buffer
+directory_buffer: .fill 128
+
 ; vim: filetype=asm sw=4 ts=4 et
 
