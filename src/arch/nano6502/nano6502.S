@@ -856,13 +856,15 @@ kuken:   .byte 0
 ;
 ; DPH for drives
 
-define_drive dph, 128*64, 2048, 128, 0
+;define_drive dph, 128*64, 2048, 128, 0
+define_drive dph, 32768, 2048, 1024, 256
 
+directory_buffer = _start
 NOINIT
 
 pending_key: .byte 0    ; pending keypress from system
 
-directory_buffer = _start
+;directory_buffer = _start
 
 ; vim: filetype=asm sw=4 ts=4 et
 
