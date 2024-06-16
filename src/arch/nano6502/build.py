@@ -19,7 +19,7 @@ llvmrawprogram(
 
 mkcpmfs(
     name="cpmfs",
-    format="sorbus",
+    format="generic-1m",
     items={"0:ccp.sys@sr": "src+ccp"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
@@ -31,7 +31,7 @@ mkcpmfs(
 
 mkcpmfs(
     name="emptycpmfs",
-    format="sorbus",
+    format="generic-1m",
     items="",
 )
 
