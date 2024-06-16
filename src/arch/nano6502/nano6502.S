@@ -35,6 +35,7 @@ sd_read_strobe = $fe05
 sd_write_strobe = $fe06
 sd_page = $fe07
 sd_done = $fe0a
+sd_data = $fe80
 
 uart_tx_data = $fe00
 uart_tx_done = $fe01
@@ -55,10 +56,6 @@ ZEROPAGE
 ptr: .word 0
 ptr1: .word 0
 dma: .word 0
-sd_offset: .byte 0
-sd_page_zp: .byte 0
-sd_sector: .fill 4
-kuken:   .byte 0
 ; --- Initialisation code ---------------------------------------------------
 
 ; Called once on startup and then never again.
@@ -92,13 +89,6 @@ banner_wait:
     lda mem_base
     jsr load_bdos
 
-    ; Reset values of ptr
-    lda #0
-    sta ptr
-    sta ptr+1
-    sta ptr1
-    sta ptr1+1
-   
     ; Relocate it.
 
     lda mem_base
@@ -578,88 +568,41 @@ zendproc
 ; XA is a pointer to a three-byte number.
 
 zproc bios_SETSEC
-    ; CP/M sector length is 128 bytes
-    ; SD card sector length is 512 bytes
-    ; Setup adressing...    
+    ; Save sector number
     sta ptr
     stx ptr+1
 
-    ; Set SD card IO page
-    lda #IO_page_sdcard
-    sta IO_page_reg
-
-    ; Get page offset
     ldy #0
-    lda (ptr),y
-    and #$03
-    sta sd_page_zp
-    
-    ; Divide sector address by 4 to get correct SD sector
-    ldx #2
     zrepeat
-        ldy #2
         lda (ptr),y
-        lsr
-        sta (ptr),y
-    
-        ldy #1
-        lda (ptr),y
-        ror
-        sta (ptr),y
-
-        ldy #0
-        lda (ptr),y
-        ror     
-        sta (ptr),y   
-        dex
+        sta cpm_sector,y
+        iny
+        cpy #3
     zuntil_eq
-
-    ; Store calculated sector
-    ; Could be turned into loop...
-    lda #0
-    sta sd_sector+3
-
-    ldy #2
-    lda (ptr),y
-    sta sd_sector+2
-
-    ldy #1
-    lda (ptr),y
-    sta sd_sector+1
-    
-    ldy #0
-    lda (ptr),y
-    sta sd_sector+0
-
-    ; Add offset
-    clc
-    lda sd_sector+1
-    adc #CPMFS_OFFSET
-    sta sd_sector+1
-    
-    zif_cs
-        inc sd_sector+2
-    zendif
-    
-    jsr sync_sd_offset
     
     clc
     rts
 zendproc
 
 zproc bios_READ
+    ;lda #'R'
+    ;jsr uart_out
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
+
     ; Perform SD-card read
     jsr sdcard_read 
 
     ; Copy data to dma
-    ldx #$80
     ldy #0
 
     zrepeat
-        lda sd_base, x
+        lda sd_data, y
         sta (dma),y
         iny
-        inx
+        cpy #$80
     zuntil_eq
  
     clc
@@ -667,23 +610,29 @@ zproc bios_READ
 zendproc
 
 zproc bios_WRITE
+    ;lda #'W'
+    ;jsr uart_out
+    ;lda sd_page
+    ;jsr uart_hex
+    ;lda #13
+    ;jsr uart_out
+    ;lda #10
+    ;jsr uart_out
+
+
     ; Perform SD-card read
     jsr sdcard_read 
 
     ; Copy data from dma
-    ldx #$80
     ldy #0
     zrepeat
         lda (dma), y
-        sta sd_base, x
+        sta sd_data, y
         iny
-        inx
+        cpy #$80
     zuntil_eq
 
-    jsr sd_wait   
- 
     ; Write back to SD-card
-    lda #01
     sta sd_write_strobe
 
     jsr sd_wait   
@@ -739,16 +688,84 @@ zproc video_wait
 zendproc
 
 zproc sdcard_read
+    jsr calculate_sd_address
     jsr sync_sd_offset
 
-    jsr sd_wait   
- 
     ; Read strobe
-    lda #1
     sta sd_read_strobe
 
     jsr sd_wait
 
+    rts
+zendproc
+
+zproc calculate_sd_address
+    ; CP/M sector length is 128 bytes
+    ; SD card sector length is 512 bytes
+    ; Setup adressing...    
+   
+    ; DEBUG
+    ;lda #'S'
+    ;jsr uart_out
+    ;ldy #1
+    ;lda (ptr),y
+    ;jsr uart_hex
+    ;dey
+    ;lda (ptr),y
+    ;jsr uart_hex
+ 
+    ; Get page offset
+    lda cpm_sector
+    and #$03
+    sta sd_page_zp
+    
+    ; Divide sector address by 4 to get correct SD sector
+    ldx #2
+    zrepeat
+        ldy #2
+        lda cpm_sector,y
+        lsr
+        sta cpm_sector,y
+    
+        ldy #1
+        lda cpm_sector,y
+        ror
+        sta cpm_sector,y
+
+        ldy #0
+        lda cpm_sector,y
+        ror     
+        sta cpm_sector,y   
+        dex
+    zuntil_eq
+
+    ; Store calculated sector
+    ; Could be turned into loop...
+    lda #0
+    sta sd_sector+3
+
+    ldy #2
+    lda cpm_sector,y
+    sta sd_sector+2
+
+    ldy #1
+    lda cpm_sector,y
+    sta sd_sector+1
+    
+    ldy #0
+    lda cpm_sector,y
+    sta sd_sector+0
+
+    ; Add offset
+    clc
+    lda sd_sector+1
+    adc #CPMFS_OFFSET
+    sta sd_sector+1
+    
+    zif_cs
+        inc sd_sector+2
+    zendif
+  
     rts
 zendproc
 
@@ -830,18 +847,22 @@ zp_end:  .byte __ZEROPAGE_END__;, __ZP1_END__
 
 mem_base: .byte __TPA0_START__@mos16hi, __TPA0_START__@mos16hi
 mem_end:  .byte __TPA0_END__@mos16hi, __TPA0_START__@mos16hi
-	
+
+sd_offset: .byte 0
+sd_page_zp: .byte 0
+sd_sector: .fill 4
+cpm_sector: .fill 3
+kuken:   .byte 0
+;
 ; DPH for drives
 
 define_drive dph, 128*64, 2048, 128, 0
 
-;directory_buffer = _start
 NOINIT
 
 pending_key: .byte 0    ; pending keypress from system
-sector_num: .fill 3
-.global directory_buffer
-directory_buffer: .fill 128
+
+directory_buffer = _start
 
 ; vim: filetype=asm sw=4 ts=4 et
 
