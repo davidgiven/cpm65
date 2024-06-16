@@ -47,7 +47,10 @@ uart_rx_avail = $fe03
 ; Wasteful, but it's not like we are going to use the full card anyway
 BDOS_OFFSET = $1
 BDOS_BLOCKS = $0a ; Number of 512 byte blocks to load
-CPMFS_OFFSET = $3
+CPMFS_A_OFFSET = $2
+CPMFS_B_OFFSET = $22
+CPMFS_C_OFFSET = $42
+CPMFS_D_OFFSET = $62
 
 ZEROPAGE
 
@@ -98,7 +101,7 @@ banner_wait:
 
     ; Open CPMFS
     	
-    lda #CPMFS_OFFSET
+    lda #CPMFS_A_OFFSET
     sta sd_offset
     
     ; Initialize drivers
@@ -553,14 +556,54 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
-        sec                 ; invalid drive
+    zif_eq
+        lda #CPMFS_A_OFFSET
+        sta sd_offset
+        lda #<dph_a
+        ldx #>dph_a
+        clc
         rts
     zendif
 
-    lda #<dph
-    ldx #>dph
-    clc
+    cmp #1
+    zif_eq
+        lda #CPMFS_B_OFFSET
+        sta sd_offset
+        lda #<dph_b
+        ldx #>dph_b
+        clc
+        rts
+    zendif
+
+    cmp #2
+    zif_eq
+        lda #CPMFS_C_OFFSET
+        sta sd_offset
+        lda #<dph_c
+        ldx #>dph_c
+        clc
+        rts
+    zendif
+    
+    cmp #3
+    zif_eq
+        lda #CPMFS_D_OFFSET
+        sta sd_offset
+        lda #<dph_d
+        ldx #>dph_d
+        clc
+        rts
+    zendif
+ 
+    ;zif_ne
+    ;    sec                 ; invalid drive
+    ;    rts
+    ;zendif
+
+    ;lda #<dph
+    ;ldx #>dph
+    ;clc
+    sec
     rts
 zendproc
 
@@ -759,7 +802,7 @@ zproc calculate_sd_address
     ; Add offset
     clc
     lda sd_sector+1
-    adc #CPMFS_OFFSET
+    adc sd_offset
     sta sd_sector+1
     
     zif_cs
@@ -798,47 +841,47 @@ zproc sd_wait
     rts
 zendproc
 
-zproc uart_out
-    pha
-    ; Preserve io page
-    lda IO_page_reg
-    sta kuken
+;zproc uart_out
+;    pha
+;    ; Preserve io page
+;    lda IO_page_reg
+;    sta kuken
     
-    lda #IO_page_uart
-    sta IO_page_reg
+;    lda #IO_page_uart
+;    sta IO_page_reg
 
-uart_out_wait:
-    lda uart_tx_done
-    beq uart_out_wait
+;uart_out_wait:
+;    lda uart_tx_done
+;    beq uart_out_wait
 
-    pla
-    sta uart_tx_data
+;    pla
+;    sta uart_tx_data
 
-    lda kuken
-    sta IO_page_reg
-    rts
-zendproc
+;    lda kuken
+;    sta IO_page_reg
+;    rts
+;zendproc
 
-zproc uart_hex
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr h4
-    pla
-h4:
-    and #0x0f
-    ora #'0'
-    cmp #'9'+1
-    zif_cs
-        adc #6
-    zendif
-    pha
-    jsr uart_out
-    pla
-    rts
-zendproc
+;zproc uart_hex
+;    pha
+;    lsr a
+;    lsr a
+;    lsr a
+;    lsr a
+;    jsr h4
+;    pla
+;h4:
+;    and #0x0f
+;    ora #'0'
+;    cmp #'9'+1
+;    zif_cs
+;        adc #6
+;    zendif
+;    pha
+;    jsr uart_out
+;    pla
+;    rts
+;zendproc
 
 .data
 vid_style:  .byte 0
@@ -857,7 +900,10 @@ kuken:   .byte 0
 ; DPH for drives
 
 ;define_drive dph, 128*64, 2048, 128, 0
-define_drive dph, 32768, 2048, 1024, 256
+define_drive dph_a, 32768, 2048, 1024, 256
+define_drive dph_b, 32768, 2048, 1024, 256
+define_drive dph_c, 32768, 2048, 1024, 256
+define_drive dph_d, 32768, 2048, 1024, 256
 
 directory_buffer = _start
 NOINIT

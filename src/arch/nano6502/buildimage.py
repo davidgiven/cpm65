@@ -4,12 +4,13 @@ import sys
 import os
 
 bdos_offset = 512*256
-cpmfs_offset = 512*256*2
+cpmfs_offset = 512*256
+cpmfs_size = 1024*4096
 
 bios_filename = '.obj/src/arch/nano6502/+nano6502/+nano6502'
 bdos_filename = '.obj/src/bdos/+bdos/+bdos'
 cpmfs_filename = '.obj/src/arch/nano6502/+cpmfs/src/arch/nano6502/+cpmfs.img'
-
+cpmfs_empty_filename = '.obj/src/arch/nano6502/+emptycpmfs/src/arch/nano6502/+emptycpmfs.img'
 output_filename = './nano6502.img'
 
 size = os.path.getsize(bios_filename)
@@ -60,6 +61,65 @@ byte=infile.read(1)
 while byte:
     outfile.write(byte)
     byte=infile.read(1)
+
+padding = cpmfs_size - size;
+out=0
+while padding:
+    outfile.write(out.to_bytes(1,"little"))
+    padding = padding - 1;
+
+infile.close()
+
+# Write empty drive B
+size = os.path.getsize(cpmfs_empty_filename)
+
+infile = open(cpmfs_empty_filename, "rb")
+
+byte=infile.read(1)
+while byte:
+    outfile.write(byte)
+    byte=infile.read(1)
+
+padding = cpmfs_size - size;
+out=0
+while padding:
+    outfile.write(out.to_bytes(1,"little"))
+    padding = padding - 1;
+
+infile.close()
+
+# Write empty drive C
+size = os.path.getsize(cpmfs_empty_filename)
+
+infile = open(cpmfs_empty_filename, "rb")
+
+byte=infile.read(1)
+while byte:
+    outfile.write(byte)
+    byte=infile.read(1)
+
+padding = cpmfs_size - size;
+out=0
+while padding:
+    outfile.write(out.to_bytes(1,"little"))
+    padding = padding - 1;
+infile.close()
+
+# Write empty drive D
+size = os.path.getsize(cpmfs_empty_filename)
+
+infile = open(cpmfs_empty_filename, "rb")
+
+byte=infile.read(1)
+while byte:
+    outfile.write(byte)
+    byte=infile.read(1)
+
+padding = cpmfs_size - size;
+out=0
+while padding:
+    outfile.write(out.to_bytes(1,"little"))
+    padding = padding - 1;
 
 infile.close()
 outfile.close()

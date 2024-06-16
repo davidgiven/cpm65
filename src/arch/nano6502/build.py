@@ -29,10 +29,17 @@ mkcpmfs(
     | PASCAL_APPS,
 )
 
+mkcpmfs(
+    name="emptycpmfs",
+    format="sorbus",
+    items="",
+)
+
 normalrule(
     name="diskimage",
     ins=[
         ".+cpmfs",
+        ".+emptycpmfs",
         ".+nano6502",
         "src/bdos",
     ],
