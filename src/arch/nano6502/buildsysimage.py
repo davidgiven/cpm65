@@ -12,7 +12,7 @@ bios_filename = '.obj/src/arch/nano6502/+nano6502/+nano6502'
 bdos_filename = '.obj/src/bdos/+bdos/+bdos'
 cpmfs_filename = '.obj/src/arch/nano6502/+cpmfs/src/arch/nano6502/+cpmfs.img'
 cpmfs_empty_filename = '.obj/src/arch/nano6502/+emptycpmfs/src/arch/nano6502/+emptycpmfs.img'
-output_filename = '.obj/src/arch/nano6502/+diskimage/nano6502.img'
+output_filename = '.obj/src/arch/nano6502/+sysimage/nano6502_sysonly.img'
 
 size = os.path.getsize(bios_filename)
 
@@ -91,24 +91,4 @@ while padding:
     padding = padding - 1;
 
 infile.close()
-
-# Write empty drives B-O
-for i in range(15):
-    size = os.path.getsize(cpmfs_empty_filename)
-
-    infile = open(cpmfs_empty_filename, "rb")
-
-    byte=infile.read(1)
-    while byte:
-        outfile.write(byte)
-        byte=infile.read(1)
-
-    padding = cpmfs_size - size;
-    out=0
-    while padding:
-        outfile.write(out.to_bytes(1,"little"))
-        padding = padding - 1;
-
-    infile.close()
-
 outfile.close()
