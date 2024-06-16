@@ -7,6 +7,7 @@
 #include "driver.inc"
 #include "jumptables.inc" 	
 IO_page_uart = $01
+IO_page_led = $02
 IO_page_sdcard = $03
 IO_page_video = $04
 IO_page_reg = $00
@@ -35,6 +36,8 @@ sd_read_strobe = $fe05
 sd_write_strobe = $fe06
 sd_page = $fe07
 sd_data = $fe80
+
+led_base = $fe00
 
 uart_tx_data = $fe00
 uart_tx_done = $fe01
@@ -694,6 +697,9 @@ zproc bios_SETSEC
 zendproc
 
 zproc bios_READ
+    ; Turn on drive indication LED
+    jsr toggle_led
+
     ; Perform SD-card read
     jsr sdcard_read 
 
@@ -706,12 +712,18 @@ zproc bios_READ
         iny
         cpy #$80
     zuntil_eq
- 
+    
+    ; Turn off drive indication LED
+    jsr toggle_led 
+
     clc
     rts
 zendproc
 
 zproc bios_WRITE
+    ; Turn on drive indication LED
+    jsr toggle_led
+
     ; Perform SD-card read
     jsr sdcard_read 
 
@@ -728,6 +740,10 @@ zproc bios_WRITE
     sta sd_write_strobe
 
     jsr sd_wait   
+    
+    ; Turn off drive indication LED
+    jsr toggle_led
+    
     rts
 zendproc
 
@@ -875,6 +891,19 @@ zproc sd_wait
     zrepeat
         lda sd_busy
     zuntil_eq
+    rts
+zendproc
+
+zproc toggle_led
+    ; Set LED IO page
+    lda #IO_page_led
+    sta IO_page_reg
+
+    ; Toggle first LED
+    lda led_base
+    eor #$01
+    sta led_base
+
     rts
 zendproc
 
