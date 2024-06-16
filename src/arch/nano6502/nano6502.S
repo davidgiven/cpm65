@@ -34,7 +34,6 @@ sd_busy   = $fe04
 sd_read_strobe = $fe05
 sd_write_strobe = $fe06
 sd_page = $fe07
-sd_done = $fe0a
 sd_data = $fe80
 
 uart_tx_data = $fe00
@@ -43,14 +42,25 @@ uart_rx_data = $fe02
 uart_rx_avail = $fe03
 
 
-; Offset to second byte of SDCARD adress
-; Wasteful, but it's not like we are going to use the full card anyway
+; Offset to second byte of SDCARD address
 BDOS_OFFSET = $1
 BDOS_BLOCKS = $0a ; Number of 512 byte blocks to load
-CPMFS_A_OFFSET = $2
-CPMFS_B_OFFSET = $22
-CPMFS_C_OFFSET = $42
-CPMFS_D_OFFSET = $62
+CPMFS_A_OFFSET = $02
+CPMFS_B_OFFSET = $0A
+CPMFS_C_OFFSET = $12
+CPMFS_D_OFFSET = $1A
+CPMFS_E_OFFSET = $22
+CPMFS_F_OFFSET = $2A
+CPMFS_G_OFFSET = $32
+CPMFS_H_OFFSET = $3A
+CPMFS_I_OFFSET = $42
+CPMFS_J_OFFSET = $4A
+CPMFS_K_OFFSET = $52
+CPMFS_L_OFFSET = $5A
+CPMFS_M_OFFSET = $62
+CPMFS_N_OFFSET = $6A
+CPMFS_O_OFFSET = $72
+CPMFS_P_OFFSET = $7A
 
 ZEROPAGE
 
@@ -214,15 +224,10 @@ zendproc
   
 banner: ; reversed!
     .byte 13, 10
-    .ascii "-------------------- 2056onan rof 56-M/PC --------------------"
+    .ascii "2056onan rof 56-M/PC"
 banner_end:
     .byte 00
 ; Stuff above of here must be 0x80 long, currently OK
-
-; ---- Drive filenames -----
-#cpmfs_filename:
-#    .ascii "CPMFS"
-#    .byte 00
 
 ; --- Drivers -------------------------------------------------------
 .data
@@ -285,59 +290,6 @@ screen_jmptable_hi:
     jmptabhi screen_cleartoeol
     jmptabhi screen_setstyle
 zendproc
-
-; SERIAL driver strategy routine
-; Y = TTY opcode
-
-;defdriver "SERIAL", DRVID_SERIAL, drvstrat_SERIAL, 0
-
-;zproc drvstrat_SERIAL
-;    jmpdispatch serial_jmptable_lo, serial_jmptable_hi
-
-;serial_jmptable_lo:
-;    jmptablo serial_inp
-;    jmptablo serial_out
-;    jmptablo serial_open
-;    jmptablo serial_close
-;    jmptablo serial_outp
-;    jmptablo serial_in    
-;serial_jmptable_hi:
-;    jmptabhi serial_inp
-;    jmptabhi serial_out
-;    jmptabhi serial_open
-;    jmptabhi serial_close
-;    jmptabhi serial_outp
-;    jmptabhi serial_in 
-;zendproc 
-
-; --- SERIAL driver -------------------------------------------------------
-
-;zproc serial_inp
-;    jsr ACIA3_Scan
-;    rts     
-;zendproc
-
-;zproc serial_out
-;    jmp ACIA3_Output     
-;zendproc
-
-;zproc serial_open
-;    jmp ACIA3_init
-;zendproc
-
-;zproc serial_close
-;    rts
-;zendproc
-
-;zproc serial_outp
-;    jsr ACIA3_Output
-;    clc
-;    rts
-;zendproc
-
-;zproc serial_in
-;    jmp ACIA3_Input
-;zendproc
 
 ; --- SCREEN driver -------------------------------------------------------
 
@@ -595,14 +547,128 @@ zproc bios_SELDSK
         rts
     zendif
  
-    ;zif_ne
-    ;    sec                 ; invalid drive
-    ;    rts
-    ;zendif
+    cmp #4
+    zif_eq
+        lda #CPMFS_E_OFFSET
+        sta sd_offset
+        lda #<dph_e
+        ldx #>dph_e
+        clc
+        rts
+    zendif
 
-    ;lda #<dph
-    ;ldx #>dph
-    ;clc
+    cmp #5
+    zif_eq
+        lda #CPMFS_F_OFFSET
+        sta sd_offset
+        lda #<dph_f
+        ldx #>dph_f
+        clc
+        rts
+    zendif
+
+    cmp #6
+    zif_eq
+        lda #CPMFS_G_OFFSET
+        sta sd_offset
+        lda #<dph_g
+        ldx #>dph_g
+        clc
+        rts
+    zendif
+    
+    cmp #7
+    zif_eq
+        lda #CPMFS_H_OFFSET
+        sta sd_offset
+        lda #<dph_h
+        ldx #>dph_h
+        clc
+        rts
+    zendif
+ 
+    cmp #8
+    zif_eq
+        lda #CPMFS_I_OFFSET
+        sta sd_offset
+        lda #<dph_i
+        ldx #>dph_i
+        clc
+        rts
+    zendif
+
+    cmp #9
+    zif_eq
+        lda #CPMFS_J_OFFSET
+        sta sd_offset
+        lda #<dph_j
+        ldx #>dph_j
+        clc
+        rts
+    zendif
+    
+    cmp #10
+    zif_eq
+        lda #CPMFS_K_OFFSET
+        sta sd_offset
+        lda #<dph_k
+        ldx #>dph_k
+        clc
+        rts
+    zendif
+
+    cmp #11
+    zif_eq
+        lda #CPMFS_L_OFFSET
+        sta sd_offset
+        lda #<dph_l
+        ldx #>dph_l
+        clc
+        rts
+    zendif
+
+    cmp #12
+    zif_eq
+        lda #CPMFS_M_OFFSET
+        sta sd_offset
+        lda #<dph_m
+        ldx #>dph_m
+        clc
+        rts
+    zendif
+    
+    cmp #13
+    zif_eq
+        lda #CPMFS_N_OFFSET
+        sta sd_offset
+        lda #<dph_d
+        ldx #>dph_d
+        clc
+        rts
+    zendif
+ 
+    cmp #14
+    zif_eq
+        lda #CPMFS_O_OFFSET
+        sta sd_offset
+        lda #<dph_o
+        ldx #>dph_o
+        clc
+        rts
+    zendif
+    
+    cmp #15
+    zif_eq
+        lda #CPMFS_P_OFFSET
+        sta sd_offset
+        lda #<dph_p
+        ldx #>dph_p
+        clc
+        rts
+    zendif
+ 
+
+    ; Invalid drive
     sec
     rts
 zendproc
@@ -628,13 +694,6 @@ zproc bios_SETSEC
 zendproc
 
 zproc bios_READ
-    ;lda #'R'
-    ;jsr uart_out
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
     ; Perform SD-card read
     jsr sdcard_read 
 
@@ -653,16 +712,6 @@ zproc bios_READ
 zendproc
 
 zproc bios_WRITE
-    ;lda #'W'
-    ;jsr uart_out
-    ;lda sd_page
-    ;jsr uart_hex
-    ;lda #13
-    ;jsr uart_out
-    ;lda #10
-    ;jsr uart_out
-
-
     ; Perform SD-card read
     jsr sdcard_read 
 
@@ -745,18 +794,7 @@ zendproc
 zproc calculate_sd_address
     ; CP/M sector length is 128 bytes
     ; SD card sector length is 512 bytes
-    ; Setup adressing...    
    
-    ; DEBUG
-    ;lda #'S'
-    ;jsr uart_out
-    ;ldy #1
-    ;lda (ptr),y
-    ;jsr uart_hex
-    ;dey
-    ;lda (ptr),y
-    ;jsr uart_hex
- 
     ; Get page offset
     lda cpm_sector
     and #$03
@@ -783,7 +821,6 @@ zproc calculate_sd_address
     zuntil_eq
 
     ; Store calculated sector
-    ; Could be turned into loop...
     lda #0
     sta sd_sector+3
 
@@ -841,76 +878,48 @@ zproc sd_wait
     rts
 zendproc
 
-;zproc uart_out
-;    pha
-;    ; Preserve io page
-;    lda IO_page_reg
-;    sta kuken
-    
-;    lda #IO_page_uart
-;    sta IO_page_reg
-
-;uart_out_wait:
-;    lda uart_tx_done
-;    beq uart_out_wait
-
-;    pla
-;    sta uart_tx_data
-
-;    lda kuken
-;    sta IO_page_reg
-;    rts
-;zendproc
-
-;zproc uart_hex
-;    pha
-;    lsr a
-;    lsr a
-;    lsr a
-;    lsr a
-;    jsr h4
-;    pla
-;h4:
-;    and #0x0f
-;    ora #'0'
-;    cmp #'9'+1
-;    zif_cs
-;        adc #6
-;    zendif
-;    pha
-;    jsr uart_out
-;    pla
-;    rts
-;zendproc
-
 .data
 vid_style:  .byte 0
-zp_base: .byte __ZEROPAGE_START__;, __ZP1_START__
-zp_end:  .byte __ZEROPAGE_END__;, __ZP1_END__
+zp_base: .byte __ZEROPAGE_START__;
+zp_end:  .byte __ZEROPAGE_END__;
 
-mem_base: .byte __TPA0_START__@mos16hi, __TPA0_START__@mos16hi
-mem_end:  .byte __TPA0_END__@mos16hi, __TPA0_START__@mos16hi
+mem_base: .byte __TPA0_START__@mos16hi
+mem_end:  .byte __TPA0_END__@mos16hi
 
 sd_offset: .byte 0
 sd_page_zp: .byte 0
 sd_sector: .fill 4
 cpm_sector: .fill 3
-kuken:   .byte 0
+
 ;
 ; DPH for drives
+;
 
-;define_drive dph, 128*64, 2048, 128, 0
-define_drive dph_a, 32768, 2048, 1024, 256
-define_drive dph_b, 32768, 2048, 1024, 256
-define_drive dph_c, 32768, 2048, 1024, 256
-define_drive dph_d, 32768, 2048, 1024, 256
+define_drive dph_a, 128*64, 2048, 128, 0
+define_drive dph_b, 128*64, 2048, 128, 0
+define_drive dph_c, 128*64, 2048, 128, 0
+define_drive dph_d, 128*64, 2048, 128, 0
+
+define_drive dph_e, 128*64, 2048, 128, 0
+define_drive dph_f, 128*64, 2048, 128, 0
+define_drive dph_g, 128*64, 2048, 128, 0
+define_drive dph_h, 128*64, 2048, 128, 0
+
+define_drive dph_i, 128*64, 2048, 128, 0
+define_drive dph_j, 128*64, 2048, 128, 0
+define_drive dph_k, 128*64, 2048, 128, 0
+define_drive dph_l, 128*64, 2048, 128, 0
+
+define_drive dph_m, 128*64, 2048, 128, 0
+define_drive dph_n, 128*64, 2048, 128, 0
+define_drive dph_o, 128*64, 2048, 128, 0
+define_drive dph_p, 128*64, 2048, 128, 0
 
 directory_buffer = _start
 NOINIT
 
 pending_key: .byte 0    ; pending keypress from system
 
-;directory_buffer = _start
 
 ; vim: filetype=asm sw=4 ts=4 et
 
