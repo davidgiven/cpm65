@@ -47,3 +47,16 @@ normalrule(
     commands=["rm -f {outs[0]}","./src/arch/nano6502/buildimage.py"],
     label="IMG",
 )
+
+normalrule(
+    name="sysimage",
+    ins=[
+        ".+cpmfs",
+        ".+nano6502",
+        "src/bdos",
+    ],
+    outs=["nano6502_sysonly.img"],
+    commands=["rm -f {outs[0]}","./src/arch/nano6502/buildsysimage.py"],
+    label="IMG",
+)
+

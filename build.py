@@ -31,7 +31,7 @@ export(
         "x16.zip": "src/arch/x16+diskimage",
         "sorbus.zip": "src/arch/sorbus+diskimage",
 	"nano6502.img": "src/arch/nano6502+diskimage",
-	"nano6502_sysonly.img": "src/arch/nano6502+diskimage",
+	"nano6502_sysonly.img": "src/arch/nano6502+sysimage",
     },
     deps=[
         "tests"
