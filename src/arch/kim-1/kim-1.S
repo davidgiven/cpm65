@@ -119,9 +119,9 @@ _start:
     jmp __TPA_START__ + COMHDR_ENTRY
 
 loading_msg:
-    .byte 13, 10
+    .byte 13, 10, 10
     .ascii "CP/M-65 for the KIM-1"
-    .byte 13, 0
+    .byte 13, 10, 0
 
 bdos_filename:
     .ascii "BDOS    SYS"
