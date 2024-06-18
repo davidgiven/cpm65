@@ -85,6 +85,14 @@ _start:
     cmp #>__bios_end
     bne 1b
 
+    ; System init
+
+    lda #0
+    sta pending_key
+    sta buffer_dirty
+    lda #$ff
+    sta buffered_host_sector
+
     ; BIOS initialisation.
 
     jsr initdrivers
