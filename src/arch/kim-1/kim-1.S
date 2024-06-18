@@ -314,10 +314,8 @@ zproc bios_SETSEC
     lda (ptr), y
     sta ptr1+1
 
-    ; There are 26 CP/M sectors per host track. Do a 16-bit divide.
-
-    lda #0
-    sta requested_cpm_sector
+    ; There are 52 CP/M sectors per host track (each 256 byte host sector
+    ; contains two CP/M sects). Do a 16-bit divide.
 
     ldx #16
     lda #0
@@ -325,14 +323,19 @@ zproc bios_SETSEC
         asl ptr1+0
         rol ptr1+1
         rol a
-        cmp #26
+        cmp #52
         zif_cs
-            sbc #26
+            sbc #52
             inc ptr1+0
         zendif
         dex
     zuntil_eq
     sta requested_cpm_sector
+
+    ; Host sectors numbered starting at 0
+
+    dec requested_cpm_sector
+
     lda ptr1+0
     sta requested_track
 
@@ -347,7 +350,8 @@ zproc bios_READ
 
     ; transfer data from FDC into disk buffer
 
-    lda requested_cpm_sector
+    lda requested_cpm_sector  
+    lsr a                           ; Divide by 2 to get the host sector
     cmp buffered_host_sector
     zif_ne
         sta buffered_host_sector
@@ -360,16 +364,25 @@ zproc bios_READ
             sta buffered_host_sector
 
             sec
+            rts
         zendif
     zendif
 
-    ; Read the data from disk buffer
+    ; Calculate offset in DISK_BUFFER
+
+    lda requested_cpm_sector
+    lsr a                       ; Push even/odd bit into C
+    and #0                      ; Clear A
+    ror a                       ; Shift C into bit 7 (results in  0x00 or 0x80)
+    sta __read_buf_offset
 
     ldy #0
     zrepeat
+__read_buf_offset = . + 1
         lda DISK_BUFFER, y
         sta (dma), y
         iny
+        cmp #0x80
     zuntil_eq
 
     clc
@@ -384,11 +397,21 @@ zproc bios_WRITE
     zif_cc
         pha
 
+        ; Calculate offset in DISK_BUFFER
+
         lda requested_cpm_sector
+        lsr a                       ; Push even/odd bit into C
+        and #0                      ; Clear A
+        ror a                       ; Shift C into bit 7 (results in  0x00 or 0x80)
+        sta __write_buf_offset
+
         ldy #0
         zrepeat
             lda (dma), y
+__write_buf_offset = . + 1
             sta DISK_BUFFER, y
+            iny
+            cmp #0x80
         zuntil_eq
 
         lda #0x80
@@ -407,6 +430,7 @@ zendproc
 
 zproc change_sector
     lda requested_cpm_sector
+    lsr a                           ; Divide by 2 to get the host sector
     cmp buffered_host_sector
     zif_eq
         lda requested_track
@@ -446,6 +470,7 @@ zendproc
 zproc flush_buffer
 
     lda requested_cpm_sector
+    lsr a                           ; Divide by 2 to get the host sector
     ldx requested_track
 
     jmp fdc_exec_write
@@ -704,13 +729,16 @@ define_drive dph, 77*26, 2048, 128, 26
 
 .bss
 
+; Keep directory_buffer here! Must be page-aligned.
+
+directory_buffer:       .fill 128   ; used by the BDOS
+
+.global directory_buffer
+
 pending_key:            .byte 0
+disk_status:            .fill 8     ; Result phase readouts from NEC-765
 requested_cpm_sector:   .fill 1     ; CP/M sector requested by user
 requested_track:        .fill 1     ; track requested by user
 buffered_host_sector:   .fill 1     ; host sector in buffer
 buffered_track:         .fill 1     ; track in buffer
 buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
-directory_buffer:       .fill 128   ; used by the BDOS
-disk_status:            .fill 8     ; Result phase readouts from NEC-765
-
-.global directory_buffer
