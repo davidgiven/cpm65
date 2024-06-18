@@ -470,11 +470,11 @@ zproc fdc_exec_seek
 
     pha
 
-    ; Put new cylinder number into second byte of seek command
+    ; Put new cylinder number into third byte of seek command
 
     sta fdc_seek+3
 
-    ldx fdc_seek-fdc_commands   ; Command index into X
+    ldx #fdc_seek-fdc_commands  ; Command index into X
     jsr fdc_exec_command
     zif_cs
         rts
@@ -487,7 +487,7 @@ zproc fdc_exec_seek
 
     ; Execute Sense Interrupt command
 
-    ldx fdc_senseint-fdc_commands
+    ldx #fdc_senseint-fdc_commands
     jsr fdc_exec_command
     zif_cs
         rts
@@ -541,7 +541,7 @@ zproc fdc_exec_rw
 
     ; Read/Write data into/from disk buffer
 
-    ldx fdc_rw-fdc_commands ; Command index into X
+    ldx #fdc_rw-fdc_commands ; Command index into X
     jsr fdc_exec_command
     zif_cs
         rts
@@ -549,7 +549,7 @@ zproc fdc_exec_rw
 
     ; Wait until IRQ from FDC
 
-1:  lda HSRC            ; WAIT UNTIL INTERRUPT REQUEST FROM FDC
+1:  lda HSRC            ; Wait until IRQ from FDC
     bmi 1b
     
     ; Read results into memory
@@ -677,18 +677,14 @@ mem_end:    .byte __TPA_END__@mos16hi
 
 fdc_commands:
 fdc_senseint:
-    .byte 0x08          ; Sense Interrupt Status
+    .byte 1             ; Command length
+    .byte 8             ; Sense Interrupt Status
 
 fdc_seek:
     .byte 3             ; Command length
     .byte 0xf           ; Command code
     .byte 0             ; Drive number in bits 0-1, side number in bit 2
     .byte 0             ; NCN: New cylinder number
-
-fdc_sensedsk:
-    .byte 2             ; Command length
-    .byte 4             ; Command code
-    .byte 0             ; Drive number in bits 0-1, side number in bit 2
 
 fdc_rw:
     .byte 9             ; Command length
