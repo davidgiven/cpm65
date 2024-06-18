@@ -49,9 +49,13 @@ _start:
 
     ldy #0
     zloop
+        tya
+        pha
         lda loading_msg, y
         zbreakif_eq
         jsr OUTCH
+        pla
+        tay
         iny
     zendloop
 
