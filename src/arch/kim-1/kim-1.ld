@@ -36,9 +36,6 @@ SECTIONS {
 		*(.bss .bss.*)
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
-
-		__TPA_START__ = .;
-		__TPA_END__   = 0xfe00;
 	} >reloram
 }
 
@@ -46,5 +43,7 @@ OUTPUT_FORMAT {
 	TRIM(usrram)
 }
 
+__TPA_START__ = 0x2000;
+__TPA_END__   = 0xfe00;
 DISK_BUFFER = 0xfe00;
 
