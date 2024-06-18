@@ -286,15 +286,12 @@ zendproc
 ; Sets carry on error.
 
 zproc bios_SELDSK
-    cmp #0
-    zif_ne
-        sec                 ; invalid drive
-        rts
+    cmp #4
+    zif_cc
+        tay
+        lda dph_lo, y
+        ldx dph_hi, y
     zendif
-
-    lda #<dph
-    ldx #>dph
-    clc
     rts
 zendproc
 
@@ -723,9 +720,23 @@ fdc_rw:
     .byte 0xe           ; GPL: Gap length for 26 sectors, 256 bytes/sect
     .byte 0xff          ; DTL: Data length = 0xff since N is non-zero
 
-; DPH for drive 0 (our only drive)
+; DPH for drives 0-3
 
-define_drive dph, 77*26, 2048, 128, 26
+dph_lo:
+    .byte dph0@mos16lo
+    .byte dph1@mos16lo
+    .byte dph2@mos16lo
+    .byte dph3@mos16lo
+dph_hi:
+    .byte dph0@mos16hi
+    .byte dph1@mos16hi
+    .byte dph2@mos16hi
+    .byte dph3@mos16hi
+
+define_drive dph0, 77*26, 2048, 128, 26
+define_drive dph1, 77*26, 2048, 128, 26
+define_drive dph2, 77*26, 2048, 128, 26
+define_drive dph3, 77*26, 2048, 128, 26
 
 .bss
 

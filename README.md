@@ -319,6 +319,8 @@ the same time.
 
   - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `cpm65.bin` loader program into 0x0200 and execute it.
 
+  - Up to 4 disks are supported.
+
 ### Supported programs
 
 Commands include `DUMP`, `STAT`, `COPY`, `SUBMIT`, `ASM`, `QE` and `BEDIT` plus
