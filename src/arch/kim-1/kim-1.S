@@ -89,6 +89,7 @@ _start:
     ; System init
 
     lda #0
+    sta current_drive
     sta pending_key
     sta buffer_dirty
     lda #$ff
@@ -306,6 +307,7 @@ zendproc
 zproc bios_SELDSK
     cmp #4
     zif_cc
+        sta current_drive
         tay
         lda dph_lo, y
         ldx dph_hi, y
@@ -347,13 +349,8 @@ zproc bios_SETSEC
     zuntil_eq
     sta requested_cpm_sector
 
-    ; Host sectors numbered starting at 0
-
-    dec requested_cpm_sector
-
     lda ptr1+0
     sta requested_track
-
     rts
 zendproc
 
@@ -371,6 +368,7 @@ zproc bios_READ
     zif_ne
         sta buffered_host_sector
         ldx requested_track
+        ldy current_drive
         jsr fdc_exec_read
         zif_cs
             ; Some kind of read error. The data in the buffer is corrupt.
@@ -388,7 +386,7 @@ zproc bios_READ
     lda requested_cpm_sector
     lsr a                       ; Push even/odd bit into C
     and #0                      ; Clear A
-    ror a                       ; Shift C into bit 7 (results in  0x00 or 0x80)
+    ror a                       ; Shift C into bit 7 (results in 0x00 or 0x80)
     sta __read_buf_offset
 
     ldy #0
@@ -397,9 +395,8 @@ __read_buf_offset = . + 1
         lda DISK_BUFFER, y
         sta (dma), y
         iny
-        cmp #0x80
+        cpy #0x80
     zuntil_eq
-
     clc
     rts
 zendproc
@@ -415,9 +412,10 @@ zproc bios_WRITE
         ; Calculate offset in DISK_BUFFER
 
         lda requested_cpm_sector
-        lsr a                       ; Push even/odd bit into C
+        lsr a                       ; Divide by 2 and push even/odd bit into C
+        sta buffered_host_sector
         and #0                      ; Clear A
-        ror a                       ; Shift C into bit 7 (results in  0x00 or 0x80)
+        ror a                       ; Shift C into bit 7 (results in 0x00 or 0x80)
         sta __write_buf_offset
 
         ldy #0
@@ -426,7 +424,7 @@ zproc bios_WRITE
 __write_buf_offset = . + 1
             sta DISK_BUFFER, y
             iny
-            cmp #0x80
+            cpy #0x80
         zuntil_eq
 
         lda #0x80
@@ -451,10 +449,12 @@ zproc change_sector
         lda requested_track
         cmp buffered_track
         zif_eq
-            ; Buffered track/sector not changing, so do no work.
+            lda current_drive
+            cmp buffered_drive
+                ; Buffered disk/track/sector not changing, so do no work.
 
-            clc
-            rts
+                clc
+                rts
         zendif
     zendif
 
@@ -468,8 +468,12 @@ zproc change_sector
 
     lda requested_track
     sta buffered_track
+    lda #0xff
+    sta buffered_host_sector
+    ldy current_drive
+    sty buffered_drive
 
-    ; Seek track (Seek track is cheap if the controller is already there )
+    ; Seek track (Seek track is cheap if the controller is already there)
 
     jsr fdc_exec_seek
     zif_cs
@@ -484,9 +488,9 @@ zendproc
 
 zproc flush_buffer
 
-    lda requested_cpm_sector
-    lsr a                           ; Divide by 2 to get the host sector
-    ldx requested_track
+    lda buffered_host_sector
+    ldx buffered_track
+    ldy buffered_drive
 
     jmp fdc_exec_write
     zif_cc
@@ -494,7 +498,6 @@ zproc flush_buffer
 
         lda #0
         sta buffer_dirty
-        clc
     zendif
 
     rts
@@ -502,7 +505,7 @@ zendproc
 
 ; --- K-1013 command functions----------------------------------------------------
 
-; Seek track in A
+; Seek track in A, drive in Y
 
 zproc fdc_exec_seek
 
@@ -513,6 +516,7 @@ zproc fdc_exec_seek
     ; Put new cylinder number into third byte of seek command
 
     sta fdc_seek+3
+    sty fdc_seek+2              ; Put drive in second byte of command
 
     ldx #fdc_seek-fdc_commands  ; Command index into X
     jsr fdc_exec_command
@@ -563,13 +567,14 @@ zproc fdc_fail
     rts
 zendproc
 
-; Sector num in A, cylinder in X
+; Sector num in A, cylinder in X, drive in Y
 
 zproc fdc_exec_rw
 
     stx fdc_rw+3        ; Put cylinder in third byte of command
     sta fdc_rw+5        ; Put sector in fifth byte of command
     sta fdc_rw+7        ; Put last sector in seventh byte of command
+    sty fdc_rw+2        ; Put drive in second byte of command
 
     ; Encode read/write buffer address into the DMA address register
     ; DISK_BUFFER is in the higher half of the FDC system RAM, at page 0xfe
@@ -620,34 +625,42 @@ zproc fdc_exec_rw
 
 zendproc
 
-; Sector num in A, cylinder in X
+; Sector num in A, cylinder in X, drive in Y
 
 zproc fdc_exec_read
+    pha
+
     ; Put READ DATA command code into command byte
 
-    ldy #$46            ; Read, no multitrack, MFM, don't skip deleted
-    sty fdc_rw+1
+    lda #$46            ; Read, no multitrack, MFM, don't skip deleted
+    sta fdc_rw+1
 
     ; Set FDC DMA write mode
 
-    ldy #1
-    sty HSRC
+    lda #1
+    sta HSRC
+
+    pla
 
     jmp fdc_exec_rw
 zendproc
 
-; Sector num in A, cylinder in X
+; Sector num in A, cylinder in X, drive in Y
 
 zproc fdc_exec_write
+    pha
+
     ; Put READ DATA command code into command byte
 
-    ldy #$45            ; Write, no multitrack, MFM, don't skip deleted
-    sty fdc_rw+1
+    lda #$45            ; Write, no multitrack, MFM, don't skip deleted
+    sta fdc_rw+1
 
     ; Set FDC DMA read mode
 
-    ldy #0
-    sty HSRC
+    lda #0
+    sta HSRC
+
+    pla
 
     jmp fdc_exec_rw
 zendproc
@@ -679,7 +692,7 @@ zproc fdc_exec_command
 zendproc
 
 zproc fdc_read_result
-    ldx 0
+    ldx #0
     zloop
 1:      lda MSTR            ; Load Main Status Register again
         bpl 1b              ; Wait until RQM from controller
@@ -751,10 +764,10 @@ dph_hi:
     .byte dph2@mos16hi
     .byte dph3@mos16hi
 
-define_drive dph0, 77*26, 2048, 128, 26
-define_drive dph1, 77*26, 2048, 128, 26
-define_drive dph2, 77*26, 2048, 128, 26
-define_drive dph3, 77*26, 2048, 128, 26
+define_drive dph0, 77*52, 2048, 128, 52
+define_drive dph1, 77*52, 2048, 128, 52
+define_drive dph2, 77*52, 2048, 128, 52
+define_drive dph3, 77*52, 2048, 128, 52
 
 .bss
 
@@ -766,8 +779,10 @@ directory_buffer:       .fill 128   ; used by the BDOS
 
 pending_key:            .byte 0
 disk_status:            .fill 8     ; Result phase readouts from NEC-765
+current_drive:          .fill 1     ; Current selected disk drive number
 requested_cpm_sector:   .fill 1     ; CP/M sector requested by user
 requested_track:        .fill 1     ; track requested by user
+buffered_drive:         .fill 1     ; Drive of track/sector in buffer
 buffered_host_sector:   .fill 1     ; host sector in buffer
 buffered_track:         .fill 1     ; track in buffer
 buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
