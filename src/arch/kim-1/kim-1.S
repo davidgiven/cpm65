@@ -26,6 +26,7 @@ DEHALF = 0x1eeb
 
 CHAR = 0xfe             ; ZP char buffer
 SAD = 0x1740            ; 6530 A Data (TTY)
+SBD = 0x1742            ; 6530 B data register
 
 ZEROPAGE
 
@@ -164,7 +165,17 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif_eq
+        sty savey
+        lda SBD         ; Supress echo
+        and #0xfe
+        sta SBD
         jsr GETCH
+        pha
+        lda SBD         ; Restore echo
+        ora #1
+        sta SBD
+        pla
+        ldy savey
     zendif
     ldx #0
     stx pending_key
@@ -179,7 +190,16 @@ zproc tty_conin
 zendproc
 
 zproc tty_conout
+    sty savey
+    cmp #'\n'
+    zif_eq
+        pha
+        lda #'\r'
+        jsr OUTCH
+        pla
+    zendif
     jsr OUTCH
+    ldy savey
     clc
     rts
 zendproc
@@ -205,9 +225,8 @@ zendproc
 ; from the KIM-1 ROM
 
 zproc tty_nbgetch
-    txa
-    pha
-        
+    stx savex
+    sty savey
     ldx #8              ; Set up 8 bit count
     lda #1
     bit SAD             ; Check start bit
@@ -225,13 +244,13 @@ zproc tty_nbgetch
         dex
     zuntil_eq  
     jsr DEHALF
-    pla
-    tax
     lda CHAR
     rol a               ; Shift off parity
     lsr a
-    rts
+    bne 2f
 1:  lda #0
+2:  ldx savex
+    ldy savey
     rts
 zendproc
 
@@ -753,3 +772,5 @@ requested_track:        .fill 1     ; track requested by user
 buffered_host_sector:   .fill 1     ; host sector in buffer
 buffered_track:         .fill 1     ; track in buffer
 buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
+savex:                  .fill 1
+savey:                  .fill 1
