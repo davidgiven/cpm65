@@ -265,8 +265,7 @@ zendproc
 
 zproc bios_SETTPA
     sta mem_base
-    txa
-    sta mem_end
+    stx mem_end
     clc
     rts
 zendproc
