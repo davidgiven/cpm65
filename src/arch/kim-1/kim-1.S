@@ -492,7 +492,7 @@ zproc flush_buffer
     ldx buffered_track
     ldy buffered_drive
 
-    jmp fdc_exec_write
+    jsr fdc_exec_write
     zif_cc
         ; A successful write, so mark the buffer as clean.
 
