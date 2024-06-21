@@ -451,10 +451,12 @@ zproc change_sector
         zif_eq
             lda current_drive
             cmp buffered_drive
+            zif_eq
                 ; Buffered disk/track/sector not changing, so do no work.
 
                 clc
                 rts
+            zendif
         zendif
     zendif
 
