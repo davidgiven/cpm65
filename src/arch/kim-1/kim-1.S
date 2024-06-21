@@ -166,7 +166,7 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif_eq
-        sty savey
+        sty ptr         ; Save Y
         lda SBD         ; Supress echo
         and #0xfe
         sta SBD
@@ -176,7 +176,7 @@ zproc tty_conin
         ora #1
         sta SBD
         pla
-        ldy savey
+        ldy ptr         ; Restore Y
     zendif
     ldx #0
     stx pending_key
@@ -191,7 +191,7 @@ zproc tty_conin
 zendproc
 
 zproc tty_conout
-    sty savey
+    sty ptr             ; Save Y
     cmp #'\n'
     zif_eq
         pha
@@ -200,7 +200,7 @@ zproc tty_conout
         pla
     zendif
     jsr OUTCH
-    ldy savey
+    ldy ptr             ; Restore Y
     clc
     rts
 zendproc
@@ -226,8 +226,8 @@ zendproc
 ; from the KIM-1 ROM
 
 zproc tty_nbgetch
-    stx savex
-    sty savey
+    stx ptr+0           ; Save XY
+    sty ptr+1
     ldx #8              ; Set up 8 bit count
     lda #1
     bit SAD             ; Check start bit
@@ -250,8 +250,8 @@ zproc tty_nbgetch
     lsr a
     bne 2f
 1:  lda #0
-2:  ldx savex
-    ldy savey
+2:  ldx ptr+0           ; Restore XY
+    ldy ptr+1
     rts
 zendproc
 
@@ -786,5 +786,3 @@ buffered_drive:         .fill 1     ; Drive of track/sector in buffer
 buffered_host_sector:   .fill 1     ; host sector in buffer
 buffered_track:         .fill 1     ; track in buffer
 buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
-savex:                  .fill 1
-savey:                  .fill 1
