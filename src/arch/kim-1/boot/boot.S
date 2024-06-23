@@ -77,7 +77,7 @@ init:
                         ; ++-------> Abnormal termination
     bne e1              ; Return to monitor with error if anything goes wrong
 
-    ; Read all sectors track 0, sector 0 of drive 0 into location $c000
+    ; Read 8 sectors from drive 0, track 0, starting at 0 into location $c000
     
     lda #$00            ; Dest address is $C000 (See section 2.1.4 of the K-1013 manual)
     sta ADMA            ; Set destination address to the DMA access register
@@ -185,7 +185,7 @@ sensstr:    .byte   $01, $08                ; SENSE INTERRUPT STATUS
 readstr:    .byte   $09, $46, $00, $00, $00 ; READ: MFM, Drive 0, Head 0, Cyl 0
             .byte   $00                     ; Start sector
             .byte   $01                     ; 256 bytes/sect
-            .byte   $19                     ; End sector (force read entire track)
+            .byte   $7                      ; End sector (FIXME: Do this part of the building process)
             .byte   $0E, $FF                ; Gap length $0E
 
 ; Error message string

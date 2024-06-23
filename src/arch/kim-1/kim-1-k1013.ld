@@ -15,6 +15,7 @@ SECTIONS {
 	.loader : {
 		*(loader)
         *loader.o(.text .text.*)
+		*libsd.o(.init .init.*)
 		. = ALIGN(256);
 	} >usrram
 
@@ -45,5 +46,5 @@ OUTPUT_FORMAT {
 
 __TPA_START__ = 0x2000;
 __TPA_END__   = 0xfe00;
-DISK_BUFFER = 0xfe00;
+DISK_BUFFER = __TPA_END__;
 
