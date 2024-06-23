@@ -30,7 +30,8 @@ export(
         "vic20.d64": "src/arch/commodore+vic20_diskimage",
         "x16.zip": "src/arch/x16+diskimage",
         "sorbus.zip": "src/arch/sorbus+diskimage",
-        "kim-1.zip": "src/arch/kim-1+distro",
+        "kim-1-k1013.zip": "src/arch/kim-1+distro-k1013",
+        "kim-1-sdcard.zip": "src/arch/kim-1+distro-sdcard",
     },
     deps=[
         "tests"

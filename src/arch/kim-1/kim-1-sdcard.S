@@ -1,0 +1,170 @@
+; CP/M-65 Copyright © 2022 David Given
+; This file is licensed under the terms of the 2-clause BSD license. Please
+; see the COPYING file in the root project directory for the full text.
+
+; KIM-1 port Copyright © 2024 Eduardo Casino
+
+#include "zif.inc"
+#include "cpm65.inc"
+
+#include "kim-1.S"
+
+.section loader, "ax"
+
+    ; System init
+
+zproc system_init, loader
+    lda #0
+    sta current_drive
+    sta pending_key
+    sta buffer_dirty
+    sta zp_sd_currentsector+3           ; Always 0
+
+    lda #0xff
+    sta zp_sd_currentsector+2           ; Mark buffer data as invalid
+
+    lda #<DISK_BUFFER
+    sta zp_sd_address+0
+    lda #>DISK_BUFFER
+    sta zp_sd_address+1
+
+    rts
+zendproc
+
+.text
+
+; Set the current absolute sector number.
+; XA is a pointer to a three-byte number.
+
+zproc bios_SETSEC
+    sta ptr+0
+    stx ptr+1
+
+    ; Copy the sector number to requested_cpm_sector
+
+    ldy #2
+    zrepeat
+        lda (ptr), y
+        sta requested_cpm_sector, y
+        dey
+    zuntil_mi
+
+    ; Divide by 4, keeping the 2 LSB of the CPM sector as the
+    ; 2 MSB of buffer_offset
+
+    ldy #2
+    zrepeat
+        lsr requested_cpm_sector+2
+        ror requested_cpm_sector+1
+        ror requested_cpm_sector+0
+        ror buffer_offset
+        dey
+    zuntil_eq
+
+    ; Use the disk number to set the offset into the sd card
+
+    lda current_drive
+    sta requested_cpm_sector+2
+
+    clc
+    rts
+zendproc
+
+; --- Disk access -----------------------------------------------------------
+
+zproc set_disk_buffer_offset
+    lda #<DISK_BUFFER
+    sta ptr+0
+    lda #>DISK_BUFFER
+    sta ptr+1
+
+    ; Get offset bits from requested_cpm_sector+3
+
+    bit requested_cpm_sector+3
+    zif_pl
+        inc ptr+1
+    zendif
+    zif_vs
+        lda #0x80
+        sta ptr+0
+    zendif
+
+    rts
+zendproc
+
+zproc change_sector
+    ; First check if requested sector is already in buffer
+
+    ldy #2
+    zrepeat
+        lda requested_cpm_sector, y
+        cmp zp_sd_currentsector, y
+        zbreakif_ne
+        dey
+    zuntil_mi
+    zif_mi
+        ; Buffered sector not changing, so do no work.
+
+        clc
+        rts
+    zendif
+
+    ; If requested sector is not buffered, flush buffer before changing
+
+    bit buffer_dirty
+    zif_mi
+        jsr flush_buffer
+        zif_cs
+            rts
+        zendif
+    zendif
+
+    ; Change sector
+
+    ldy #2
+    zrepeat
+        lda requested_cpm_sector, y
+        sta zp_sd_currentsector, y
+        dey
+    zuntil_mi
+
+    ; Read sector from disk
+
+    jsr sd_readsector
+    zif_cs
+        ; Some kind of read error. The data in the buffer is corrupt.
+
+        lda #0xff
+        sta zp_sd_currentsector+2
+    zendif
+
+    rts
+zendproc
+
+zproc flush_buffer
+    jsr sd_writesector
+    zif_cc
+        ; A successful write, so mark the buffer as clean.
+
+         lda #0
+        sta buffer_dirty
+        rts
+    zendif
+
+    rts
+zendproc
+
+; --- Data ------------------------------------------------------------------
+
+.data
+
+; DPH for drives 0-3
+
+define_drive dph0, 2048*64, 4096, 1024, 64
+define_drive dph1, 2048*64, 4096, 1024, 64
+define_drive dph2, 2048*64, 4096, 1024, 64
+define_drive dph3, 2048*64, 4096, 1024, 64
+
+.bss
+
+requested_cpm_sector:   .fill 3     ; CP/M sector requested by user

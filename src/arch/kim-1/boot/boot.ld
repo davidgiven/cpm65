@@ -8,9 +8,12 @@ SECTIONS {
 		*(.zp .zp.*)
 	} >zp
 
-
 	.text : {
 		*(.text .text.*)
+	} >ram
+
+	.init : {
+		*(.init .init.*)
 	} >ram
 
 }

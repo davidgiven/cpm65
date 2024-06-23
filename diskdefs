@@ -105,3 +105,13 @@ diskdef k-1013
     boottrk 1
     os 2.2
 end
+
+diskdef sdcard
+    seclen 512
+    tracks 2048
+    sectrk 16
+    blocksize 4096
+    maxdir 1024
+    boottrk 1
+    os 2.2
+end
