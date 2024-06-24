@@ -237,6 +237,8 @@ banner_end:
 .global drvtop
 drvtop: .word drv_TTY
 
+; --- TTY driver -------------------------------------------------------
+
 defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine
@@ -255,6 +257,67 @@ jmptable_hi:
     jmptabhi tty_conout
 zendproc
 
+; Returns 0x00 if no key is pending, 0xff if one is.
+; C if no key is pending, !C if key pending
+zproc tty_const
+    lda pending_key
+    zif_eq
+        lda #IO_page_uart
+        sta IO_page_reg
+        lda uart_rx_avail
+        zif_eq
+            lda #$00
+            sec
+            rts
+        zendif
+        lda uart_rx_data
+        sta pending_key
+    zendif
+    lda #$ff
+    clc
+    rts
+zendproc
+
+; Blocks and waits for the next keypress; returns it in A.
+
+zproc tty_conin
+    lda pending_key
+    zif_eq
+	    lda #IO_page_uart
+        sta IO_page_reg
+tty_input_wait:
+        lda uart_rx_avail
+        beq tty_input_wait
+        lda uart_rx_data    
+        rts
+    zendif
+
+    ldx #0
+    stx pending_key
+    clc
+    rts
+zendproc
+
+zproc tty_conout
+	cmp #127
+	zif_eq
+		lda #8
+	zendif
+    pha
+    lda #IO_page_video
+    sta IO_page_reg
+conout_wait:
+    lda tty_busy
+    bne conout_wait
+    pla
+    sta tty_write 
+    clc
+    rts
+zendproc
+
+
+
+; --- SCREEN driver -------------------------------------------------------
 
 defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 
@@ -293,8 +356,6 @@ screen_jmptable_hi:
     jmptabhi screen_cleartoeol
     jmptabhi screen_setstyle
 zendproc
-
-; --- SCREEN driver -------------------------------------------------------
 
 zproc screen_version
     lda #0
@@ -431,66 +492,6 @@ zproc screen_setstyle
 normal_style:
     lda #$00
     sta vid_style
-    rts
-zendproc
-
-; --- TTY driver -------------------------------------------------------
-
-; Returns 0x00 if no key is pending, 0xff if one is.
-; C if no key is pending, !C if key pending
-zproc tty_const
-    lda pending_key
-    zif_eq
-        lda #IO_page_uart
-        sta IO_page_reg
-        lda uart_rx_avail
-        zif_eq
-            lda #$00
-            sec
-            rts
-        zendif
-        lda uart_rx_data
-        sta pending_key
-    zendif
-    lda #$ff
-    clc
-    rts
-zendproc
-
-; Blocks and waits for the next keypress; returns it in A.
-
-zproc tty_conin
-    lda pending_key
-    zif_eq
-	    lda #IO_page_uart
-        sta IO_page_reg
-tty_input_wait:
-        lda uart_rx_avail
-        beq tty_input_wait
-        lda uart_rx_data    
-        rts
-    zendif
-
-    ldx #0
-    stx pending_key
-    clc
-    rts
-zendproc
-
-zproc tty_conout
-	cmp #127
-	zif_eq
-		lda #8
-	zendif
-    pha
-    lda #IO_page_video
-    sta IO_page_reg
-conout_wait:
-    lda tty_busy
-    bne conout_wait
-    pla
-    sta tty_write 
-    clc
     rts
 zendproc
 
