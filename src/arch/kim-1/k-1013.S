@@ -179,7 +179,7 @@ zproc fdc_exec_rw, .text.fdc_exec_rw, local
     lda disk_status+1   ; If abnormal termination, check ST1 for end of cylinder
     bpl fdc_fail        ; Nope, then it is an error
 2:  lda disk_status+1   ; Check ST1
-    and #0x35           ; Mask out non-error bits
+    and #0x37           ; Mask out non-error bits
     bne fdc_fail        ; Error if any remainder set
     lda disk_status+2   ; Check ST2
     and #0x33           ; Mask out non-error bits
