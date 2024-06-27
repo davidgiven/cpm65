@@ -128,41 +128,23 @@ zproc change_sector
 
     ; Change sector
 
+    lda current_drive
+    sta buffered_drive
     lda requested_track
     sta buffered_track
-    ldy current_drive
-    sty buffered_drive
-
-    ; Seek track (Seek track is cheap if the controller is already there)
-
-    lda #2                          ; Retries
-    sta tmp1
-    zloop
-        lda buffered_track
-        ldy buffered_drive
-        jsr fdc_exec_seek
-        zbreakif_cc
-
-        dec tmp1
-        zif_ne
-            ldy buffered_drive
-            jsr fdc_exec_recal
-            zcontinue
-        zendif
-
-        ; No more retries. Seek error, invalidate buffered track
-
-        lda #0xff
-        sta buffered_track
-        rts
-    zendloop
-
     lda requested_cpm_sector
     sta buffered_host_sector
 
+    ; Seek track
+
+    jsr seek_track
+    zif_cs
+        rts
+    zendif
+
     ; Read sector from disk
 
-    lda #2                      ; Retries
+    lda #2                          ; Retries
     sta tmp1
     zrepeat
         lda buffered_host_sector
@@ -185,7 +167,12 @@ zproc change_sector
 zendproc
 
 zproc flush_buffer
-    lda #2                         ; Retries
+    jsr seek_track
+    zif_cs
+        rts
+    zendif
+
+    lda #2                          ; Retries
     sta tmp1
     zrepeat
         lda buffered_host_sector
@@ -203,6 +190,34 @@ zproc flush_buffer
 
         dec tmp1
     zuntil_eq
+
+    sec
+    rts
+zendproc
+
+zproc seek_track
+    lda #2                          ; Retries
+    sta tmp1
+    zloop
+        lda buffered_track
+        ldy buffered_drive
+        jsr fdc_exec_seek
+        zbreakif_cc
+
+        dec tmp1
+        zif_ne
+            ldy buffered_drive
+            jsr fdc_exec_recal
+            zcontinue
+        zendif
+
+        ; No more retries. Seek error, invalidate buffered track
+
+        lda #0xff
+        sta buffered_track
+        sec
+        rts
+    zendloop
     rts
 zendproc
 
