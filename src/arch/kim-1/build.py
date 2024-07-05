@@ -51,6 +51,7 @@ mkcpmfs(
     bootimage=".+bios-sdcard",
     size=512 * 2048 * 16,
     items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
+    | {"0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
