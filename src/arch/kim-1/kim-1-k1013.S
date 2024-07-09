@@ -225,12 +225,9 @@ zendproc
 
 .data
 
-; DPH for drives 0-3
+; DPH for drive 0
 
 define_drive dph0, 77*52, 2048, 128, 52
-define_drive dph1, 77*52, 2048, 128, 52
-define_drive dph2, 77*52, 2048, 128, 52
-define_drive dph3, 77*52, 2048, 128, 52
 
 .bss
 

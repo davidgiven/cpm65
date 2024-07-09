@@ -213,7 +213,7 @@ zproc tty_nbgetch
     bmi 1f              ; No start bit
     jsr DELAY           ; Delay 1 bit
     jsr DEHALF          ; Delay 1/2 bit time
-    zloop               ; Get 8 bits loop
+    zrepeat             ; Get 8 bits loop
         lda SAD
         and #0x80       ; Mask off low order bits
         lsr CHAR        ; Shift bit into CHAR
@@ -241,14 +241,17 @@ zendproc
 ; Sets carry on error.
 
 zproc bios_SELDSK
-    cmp #4
-    zif_cc
-        sta current_drive
-        tay
-        lda dph_lo, y
-        ldx dph_hi, y
+    cmp #0
+    zif_ne
+        sec                 ; invalid drive
+        rts
     zendif
 
+    sta current_drive
+
+    lda #<dph0
+    ldx #>dph0
+    clc
     rts
 zendproc
 
@@ -348,19 +351,6 @@ zendproc
 ; --- Data ------------------------------------------------------------------
 
 .data
-
-; DPH table for drives 0-3
-
-dph_lo:
-    .byte dph0@mos16lo
-    .byte dph1@mos16lo
-    .byte dph2@mos16lo
-    .byte dph3@mos16lo
-dph_hi:
-    .byte dph0@mos16hi
-    .byte dph1@mos16hi
-    .byte dph2@mos16hi
-    .byte dph3@mos16hi
 
 zp_base:    .byte __ZEROPAGE_START__
 zp_end:     .byte __ZEROPAGE_END__

@@ -70,11 +70,11 @@ _start:
 
       bcs e1
 
-      ; Load first 4 sectors into $c000 (FIXME: Make this configurable)
+      ; Load first 4 sectors into $2000 (FIXME: Make this configurable)
 
       lda #0
       sta zp_sd_address+0
-      lda #$c0
+      lda #$60
       sta zp_sd_address+1
 
       lda #4
@@ -87,7 +87,7 @@ _start:
       dec zp_sd_sectorcount
       bne 1b
 
-      jmp $c000
+      jmp $6000
 
 ; Error handling
 

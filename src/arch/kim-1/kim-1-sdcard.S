@@ -28,6 +28,35 @@ zproc system_init, loader
     lda #>DISK_BUFFER
     sta zp_sd_address+1
 
+    ; Determine RAM size. Assumes at least a memory expansion from 0x2000 to 0x9fff
+
+    ldy #0
+    sty ptr+0
+    lda #0xa0
+    sta ptr+1
+
+    zloop
+        lda #0x55
+        sta (ptr), y
+        lda (ptr), y
+        cmp #0x55
+        bne 1f
+        lda #0xaa
+        sta (ptr), y
+        lda (ptr), y
+        cmp #0xaa
+        bne 1f
+        iny
+        zif_eq
+            inc ptr+1
+            lda ptr+1
+            cmp #0xff
+            beq 1f
+        zendif
+    zendloop
+1:  lda ptr+1
+    sta mem_end
+
     rts
 zendproc
 
@@ -52,6 +81,8 @@ zproc bios_SETSEC
     ; Divide by 4, keeping the 2 LSB of the CPM sector as the
     ; 2 MSB of buffer_offset
 
+    lda #0
+    sta buffer_offset
     ldy #2
     zrepeat
         lsr requested_cpm_sector+2
@@ -72,16 +103,16 @@ zendproc
 
 ; --- Disk access -----------------------------------------------------------
 
+; This assumes that DISK_BUFFER is page aligned!!
+
 zproc set_disk_buffer_offset
     lda #<DISK_BUFFER
     sta ptr+0
     lda #>DISK_BUFFER
     sta ptr+1
 
-    ; Get offset bits from requested_cpm_sector+3
-
-    bit requested_cpm_sector+3
-    zif_pl
+    bit buffer_offset
+    zif_mi
         inc ptr+1
     zendif
     zif_vs
@@ -99,19 +130,18 @@ zproc change_sector
     zrepeat
         lda requested_cpm_sector, y
         cmp zp_sd_currentsector, y
-        zbreakif_ne
+        bne 1f
         dey
     zuntil_mi
-    zif_mi
-        ; Buffered sector not changing, so do no work.
 
-        clc
-        rts
-    zendif
+    ; Buffered sector not changing, so do no work.
+
+    clc
+    rts
 
     ; If requested sector is not buffered, flush buffer before changing
 
-    bit buffer_dirty
+1:  bit buffer_dirty
     zif_mi
         jsr flush_buffer
         zif_cs
@@ -158,12 +188,9 @@ zendproc
 
 .data
 
-; DPH for drives 0-3
+; DPH for drives 0
 
-define_drive dph0, 2048*64, 4096, 1024, 64
-define_drive dph1, 2048*64, 4096, 1024, 64
-define_drive dph2, 2048*64, 4096, 1024, 64
-define_drive dph3, 2048*64, 4096, 1024, 64
+define_drive dph0, 4096*64, 4096, 1024, 64
 
 .bss
 

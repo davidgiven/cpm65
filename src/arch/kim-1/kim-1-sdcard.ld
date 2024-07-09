@@ -1,8 +1,7 @@
 MEMORY {
     zp : ORIGIN = 0x00, LENGTH = 0xef
-    ram (rw) : ORIGIN = 0x2000, LENGTH = 0xdd00
-	reloram (rw) : ORIGIN = 0x200, LENGTH = 0x1200
-    usrram (rw) : ORIGIN = 0xc000, LENGTH = 0x2000
+    ram (rw) : ORIGIN = 0x6000, LENGTH = 0x4000
+	reloram (rw) : ORIGIN = 0x400, LENGTH = 0x1000
 }
 
 SECTIONS {
@@ -15,25 +14,22 @@ SECTIONS {
 	.loader : {
 		*(loader)
         *loader.o(.text .text.*)
-		*libsd.o(.init .init.*)
 		. = ALIGN(256);
-	} >usrram
+	} >ram
 
 	.text : {
 		__bios_data_start = LOADADDR(.text);
 		__bios_data_end = __bios_data_start + __bios_end - __bios_start;
 		__bios_start = .;
 		*(.text .text.*)
-		. = ALIGN(256);
-	} >reloram AT>usrram
+	} >reloram AT>ram
 
 	.data : {
 		*(.data .data.* .rodata .rodata.*)
 		__bios_end = .;
-		. = ALIGN(256);
-	} >reloram AT>usrram
+	} >reloram AT>ram
 
-	.noinit (NOLOAD) : {
+	.bss (NOLOAD) : {
 		*(.bss .bss.*)
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
@@ -41,10 +37,9 @@ SECTIONS {
 }
 
 OUTPUT_FORMAT {
-	TRIM(usrram)
+	TRIM(ram)
 }
 
 __TPA_START__ = 0x2000;
-__TPA_END__   = 0xfd00;
-DISK_BUFFER = __TPA_END__;
-
+__TPA_END__   = 0xa000;
+DISK_BUFFER   = 0x0200;

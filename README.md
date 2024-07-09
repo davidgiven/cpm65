@@ -46,7 +46,7 @@ bigger the program.
 
 No, it won't let you run 8080 programs on the 6502!
 
-<div style="text-align: center">
+<div style="text-align: left">
 <a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Micro"></a>
 <a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
@@ -59,6 +59,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
 <a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
 <a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
+<a href="doc/kim-1.png"><img src="doc/kim-1.png" style="width:40%" alt="CP/M-65 running on the KIM-1"></a>
 </div>
 
 
@@ -100,7 +101,7 @@ disk images), libfmt (all the C++ tools use this), python3 (for the build
 system), and FreePascal (because the MADS assembler is written in Pascal). Use
 these Debian packages:
 
-    cc1541 cpmtools libfmt-dev python3 fp-compiler
+    cc1541 cpmtools libfmt-dev python3 fp-compiler srecord
 
 There are also automated tests which use `mame` to emulate a reasonable number
 of the platforms, to verify that they actually work. To use this, install
@@ -311,15 +312,31 @@ the same time.
 
   - The console is 53x30. It has a SCREEN driver.
 
-### KIM-1 notes
+### KIM-1 with K-1013 FDC notes
 
   - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an
     SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the
     0x0400-0x13ff memory hole.
 
-  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `cpm65.bin` loader program into 0x0200 and execute it.
+  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into 0x0200 and execute it.
 
-  - Up to 4 disks are supported.
+  - Only 1 disk is supported. Multi-disk is not stable in CP/M-65 yet.
+
+  - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with directly attached SD card notes
+
+  - This port uses Ryan E. Roth's [sdcard6502 for the PAL-1](https://github.com/ryaneroth/sdcard6502), which in turn is based on Gerge Foot's [sdcard6502 for Ben Eater's 6502 computer](https://github.com/gfoot/sdcard6502).
+
+  - You'll need and SDHC card of any capacity, only 32MB are used, and a generic Arduino SD card adapter **with 5V to 3.3V conversion**. See the links above for detailed requisites and connection instructions.
+
+  - For the KIM-1, at least a 32KB (56KB recommended) RAM expansion from 0x2000 is required, as well as RAM filling the 0x0400-0x13ff memory hole. The BIOS assumes that at least the required RAM is installed, and checks for extra RAM above 0xA000.
+
+  - Same requisites apply to the PAL-1 and, additionally, the second 6532 expansion board.
+
+  - 1 32MB disk supported.
+
+  - Only TTY interface for now, no SCREEN driver.
 
 ### Supported programs
 
