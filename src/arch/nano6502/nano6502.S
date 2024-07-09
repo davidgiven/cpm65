@@ -1,4 +1,5 @@
 ; CP/M-65 Copyright © 2022 David Given
+; nano6502 BIOS Copyright © 2024 Henrik Löfgren
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
@@ -10,12 +11,14 @@ IO_page_uart = $01
 IO_page_led = $02
 IO_page_sdcard = $03
 IO_page_video = $04
+IO_page_timer = $05
 IO_page_reg = $00
 ROM_sel_reg = $02
 
 tty_write = $fe06
 tty_cls = $fe09
 tty_busy = $fe07
+
 video_line = $fe00
 video_cursor_x = $fe01
 video_cursor_y = $fe02
@@ -24,7 +27,13 @@ video_scroll_up = $fe04
 video_scroll_down = $fe05
 video_clear_to_eol = $fe08
 video_tty_enable = $fe0a
+video_scroll_enable = $fe0b
 video_line_data = $fe80
+
+timer_idle = $fe00
+timer_start_strobe = $fe01
+timer_cs_lsb = $fe02
+timer_cs_msb = $fe03
 
 sd_base   = $fe00
 sd_addr_0 = $fe00
@@ -303,13 +312,7 @@ zproc tty_conout
 	zif_eq
 		lda #8
 	zendif
-    pha
-    lda #IO_page_video
-    sta IO_page_reg
-conout_wait:
-    lda tty_busy
-    bne conout_wait
-    pla
+    jsr video_init
     sta tty_write 
     clc
     rts
@@ -392,42 +395,59 @@ zendproc
 zproc screen_putchar
     jsr video_init
     pha
-    lda video_cursor_y
-    sta video_line
-    ldx video_cursor_x
+    lda #0
+    sta video_scroll_enable
     pla
     ora vid_style
-    sta video_line_data,x
-    
-    lda video_cursor_x
-    cmp #79
-    zif_ne
-        inc video_cursor_x 
-    zendif
-
+    sta tty_write
+    lda #1
+    sta video_scroll_enable 
     rts    
 zendproc
 
 zproc screen_putstring
     sta ptr+0
     stx ptr+1
+    jsr video_init
     ldy #0
+    lda #0
+    sta video_scroll_enable
 putstring_loop:
     lda (ptr),y
     beq putstring_endloop
-    jsr screen_putchar 
+    ora vid_style
+    sta tty_write
+    jsr video_wait 
     iny
     jmp putstring_loop
 putstring_endloop:
+    lda #1
+    sta video_scroll_enable
     clc
     rts
 zendproc
 
 zproc screen_getchar
+    ; Setup timer
+    pha
+    lda #IO_page_timer
+    sta IO_page_reg
+    pla
+    sta timer_cs_lsb
+    stx timer_cs_msb
+    sta timer_start_strobe
+
+screen_getchar_wait: 
     lda #IO_page_uart
     sta IO_page_reg
     lda uart_rx_avail
-    beq nodata
+    bne screen_getchar_data
+    lda #IO_page_timer
+    sta IO_page_reg
+    lda timer_idle
+    beq screen_getchar_wait
+    jmp nodata
+screen_getchar_data:
     lda uart_rx_data
     cmp #$08
     bne notbs
@@ -698,9 +718,6 @@ zproc bios_SETSEC
 zendproc
 
 zproc bios_READ
-    ; Turn on drive indication LED
-    jsr toggle_led
-
     ; Perform SD-card read
     jsr sdcard_read 
 
@@ -714,17 +731,11 @@ zproc bios_READ
         cpy #$80
     zuntil_eq
     
-    ; Turn off drive indication LED
-    jsr toggle_led 
-
     clc
     rts
 zendproc
 
 zproc bios_WRITE
-    ; Turn on drive indication LED
-    jsr toggle_led
-
     ; Perform SD-card read
     jsr sdcard_read 
 
@@ -741,9 +752,6 @@ zproc bios_WRITE
     sta sd_write_strobe
 
     jsr sd_wait   
-    
-    ; Turn off drive indication LED
-    jsr toggle_led
     
     rts
 zendproc
@@ -892,19 +900,6 @@ zproc sd_wait
     zrepeat
         lda sd_busy
     zuntil_eq
-    rts
-zendproc
-
-zproc toggle_led
-    ; Set LED IO page
-    lda #IO_page_led
-    sta IO_page_reg
-
-    ; Toggle first LED
-    lda led_base
-    eor #$01
-    sta led_base
-
     rts
 zendproc
 
