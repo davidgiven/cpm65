@@ -108,7 +108,7 @@ end
 
 diskdef sdcard
     seclen 512
-    tracks 2048
+    tracks 4096
     sectrk 16
     blocksize 4096
     maxdir 1024

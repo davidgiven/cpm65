@@ -49,7 +49,7 @@ mkcpmfs(
     name="rawdiskimage-sdcard",
     format="sdcard",
     bootimage=".+bios-sdcard",
-    size=512 * 2048 * 16,
+    size=512 * 4096 * 16,
     items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
     | {"0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm"}
     | MINIMAL_APPS
@@ -66,6 +66,7 @@ zip(
     items={
         "diskimage.imd": ".+diskimage-k1013",
         "boot.bin": "src/arch/kim-1/boot+boot.bin",
+        "boot.pap": "src/arch/kim-1/boot+boot.pap",
     },
 )
 
@@ -74,5 +75,7 @@ zip(
     items={
         "diskimage.raw": ".+rawdiskimage-sdcard",
         "bootsd.bin": "src/arch/kim-1/boot+bootsd.bin",
+        "bootsd.pap": "src/arch/kim-1/boot+bootsd.pap",
     },
 )
+
