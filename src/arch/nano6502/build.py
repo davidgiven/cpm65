@@ -20,7 +20,10 @@ llvmrawprogram(
 mkcpmfs(
     name="cpmfs",
     format="generic-1m",
-    items={"0:ccp.sys@sr": "src+ccp"}
+    items={"0:ccp.sys@sr": "src+ccp",
+	   "1:colorfg.com": "src/arch/nano6502/utils+colorfg",
+	   "1:colorbg.com": "src/arch/nano6502/utils+colorbg",
+	   "1:ledtest.com": "src/arch/nano6502/utils+ledtest"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
