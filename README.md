@@ -328,7 +328,7 @@ the same time.
 
   - This port uses Ryan E. Roth's [sdcard6502 for the PAL-1](https://github.com/ryaneroth/sdcard6502), which in turn is based on Gerge Foot's [sdcard6502 for Ben Eater's 6502 computer](https://github.com/gfoot/sdcard6502).
 
-  - You'll need and SDHC card of any capacity, only 32MB are used, and a generic Arduino SD card adapter **with 5V to 3.3V conversion**. See the links above for detailed requisites and connection instructions.
+  - You'll need an SDHC card of any capacity (only 32MB are used) and a generic Arduino SD card adapter **with 5V to 3.3V conversion**. See the links above for detailed requisites and connection instructions. Transfer the `diskimage.raw` file to the SD card using `dd`. Balena Etcher also works in Windows, just ignore the "not a bootable image" warning.
 
   - For the KIM-1, at least a 32KB (56KB recommended) RAM expansion from 0x2000 is required, as well as RAM filling the 0x0400-0x13ff memory hole. The BIOS assumes that at least the required RAM is installed, and checks for extra RAM above 0xA000.
 
