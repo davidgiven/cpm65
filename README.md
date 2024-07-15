@@ -312,7 +312,7 @@ the same time.
 
   - The console is 53x30. It has a SCREEN driver.
 
-### neo6502 notes
+### nano6502 notes
 
   - The [nano6502](https://github.com/venomix666/nano6502/) is a 65C02-based SoC for the Tang Nano 20K FPGA board.
    
