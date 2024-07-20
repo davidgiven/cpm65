@@ -23,6 +23,13 @@ llvmrawprogram (
     linkscript="./boot.ld",
 )
 
+llvmrawprogram (
+    name="bootsd-kimrom.bin",
+    srcs=["./bootsd.S"],
+    cflags=["-DKIM_ROM"],
+    linkscript="./boot-kimrom.ld",
+)
+
 mkpap(name="boot.pap", src=".+boot.bin")
 
 mkpap(name="bootsd.pap", src=".+bootsd.bin")
