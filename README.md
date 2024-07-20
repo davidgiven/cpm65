@@ -332,6 +332,10 @@ the same time.
   
   - To use it, transfer the `diskimage.raw` file to the SD card using `dd`. Balena Etcher also works in Windows, just ignore the "not a bootable image" warning. Start the KIM-1 in TTY mode, load the `bootsd.pap` loader program into 0x0200 and execute it.
 
+  - For KIM-1 clones, you can place the bootloader into the free space of the KIM-1 rom. Write the contents of the `bootsd-kimrom.bin` file at 0x1AA0 (or 0x2A0 relative to the KIM-1 rom). This romable loader has two entry points:
+    - 0x1AA0 is for cold start, that is, you can point the 6502 reset vector to 0x1AA0 if you want to start CP/M-65 at reset. In this case, the TTY is initialized to 9600 bauds, so make sure that your terminal is configured to that speed.
+    - 0x1AB2 is for booting from the KIM monitor
+
   - For the KIM-1, at least a 32KB (56KB recommended) RAM expansion from 0x2000 is required, as well as RAM filling the 0x0400-0x13ff memory hole. The BIOS assumes that at least the required RAM is installed, and checks for extra RAM above 0xA000.
 
   - Same requisites apply to the PAL-1 and, additionally, the second 6532 expansion board.
