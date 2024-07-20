@@ -76,6 +76,7 @@ zip(
         "diskimage.raw": ".+rawdiskimage-sdcard",
         "bootsd.bin": "src/arch/kim-1/boot+bootsd.bin",
         "bootsd.pap": "src/arch/kim-1/boot+bootsd.pap",
+        "bootsd-kimrom.bin": "src/arch/kim-1/boot+bootsd-kimrom.bin",
     },
 )
 
