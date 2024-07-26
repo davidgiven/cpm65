@@ -30,6 +30,23 @@ llvmrawprogram (
     linkscript="./boot-kimrom.ld",
 )
 
+llvmrawprogram (
+    name="bootiec-kim.bin",
+    srcs=["./bootiec.S"],
+    linkscript="./boot.ld",
+)
+
+llvmrawprogram (
+    name="bootiec-pal.bin",
+    srcs=["./bootiec.S"],
+    cflags=["-DPAL_1"],
+    linkscript="./boot.ld",
+)
+
 mkpap(name="boot.pap", src=".+boot.bin")
 
 mkpap(name="bootsd.pap", src=".+bootsd.bin")
+
+mkpap(name="bootiec-kim.pap", src=".+bootiec-kim.bin")
+
+mkpap(name="bootiec-pal.pap", src=".+bootiec-pal.bin")

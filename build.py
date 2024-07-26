@@ -32,6 +32,7 @@ export(
         "sorbus.zip": "src/arch/sorbus+diskimage",
         "kim-1-k1013.zip": "src/arch/kim-1+distro-k1013",
         "kim-1-sdcard.zip": "src/arch/kim-1+distro-sdcard",
+        "kim-1-iec.zip": "src/arch/kim-1+distro-iec",
     },
     deps=[
         "tests"
