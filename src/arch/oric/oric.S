@@ -7,7 +7,7 @@
 #include "driver.inc"
 #include "jumptables.inc"
 
-/* Microdisk interface definitions */
+/* Microdisc interface definitions */
 
 #define MFDC_command_register    0x0310
 #define MFDC_status_register     0x0310
@@ -107,7 +107,7 @@ dma:              .fill 2     ; current DMA
 
     jmp jasmin_start
 
-; Microdisk requires this literal data.
+; Microdisc requires this literal data.
 
     .byte 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x20, 0x20 ; :.....   :
     .byte 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x03 ; :     ...:
@@ -203,7 +203,7 @@ jasmin_start:
 
 .section "sector2", "ax"
 
-; This is the Microdisk boot sector. It can load at a variety of addresses, for
+; This is the Microdisc boot sector. It can load at a variety of addresses, for
 ; maximum inconvenience. After loading, we relocate to 0x9800, which is known to be
 ; unused (it's in the highres screen area).
 
@@ -290,8 +290,8 @@ sector2_start:
 
 .section "sector3", "ax"
 
-; Sector 3 of a disk must contain this exact data, or the Microdisk ROM will
-; refuse to boot it. (It's a minimal Microdisk filesystem.)
+; Sector 3 of a disk must contain this exact data, or the Microdisc ROM will
+; refuse to boot it. (It's a minimal Microdisc filesystem.)
 
     .byte $00,$00,$02,$53,$59,$53,$54,$45,$4d,$44,$4f,$53,$01,$00,$02,$00  ; ...SYSTEMDOS....
     .byte $02,$00,$00,$42,$4f,$4f,$54,$55,$50,$43,$4f,$4d,$00,$00,$00,$00  ; ...BOOTUPCOM....
