@@ -31,7 +31,7 @@ to the 6502. So far it runs on:
   
   - Olimex' neo6502 6502-based computer.
 
-  - KIM-1 with K-1013 FDC, fully expanded RAM.
+  - KIM-1 with K-1013 FDC, directly connected SD card module or 1541 drive.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -343,6 +343,16 @@ the same time.
   - 1 32MB disk supported.
 
   - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with Commodore 1541 drive
+
+  - Based on the C64 port, so same notes apply.
+
+  - This port needs the [xkim1541 extensions for the KIM-1 installed at 0xF000](https://github.com/eduardocasino/xkim1541). The PAL-1 is also supported, and needs the same extensions but installed at 0xDA00, [as modified by Neil Andretti](https://github.com/netzherpes/xkim1541).
+
+  - If you also have [my modified xKIM monitor](https://github.com/eduardocasino/xKIM/tree/IEC_support), then load the `CPM` program and jump to address 0x6000.
+
+  - If not, load the `bootiec-kim` or  `bootiec-pal` bootloader into 0x200 and execute it.
 
 ### Supported programs
 
