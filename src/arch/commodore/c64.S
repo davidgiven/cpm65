@@ -5,7 +5,7 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "driver.inc"
-
+#include "jumptables.inc"
 READST = $ffb7
 SETLFS = $ffba
 SETNAM = $ffbd
@@ -29,7 +29,16 @@ SECOND = $ff93
 TALKSA = $ff96
 CLRCHN = $ffcc
 GETIN = $ffe4
+CLEAR_SCREEN = $e544
+MOVE_CURSOR = $e56c 
+SHOW_CURSOR = $cc
+CURSOR_X = $d3
+CURSOR_Y = $d6
 STATUS = $90
+
+SCREEN_WIDTH=40
+SCREEN_HEIGHT=25 
+VIDEO = $0400
 
 ZEROPAGE
 
@@ -82,7 +91,244 @@ zendproc
 .global drvtop
 drvtop: .word drv_TTY
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
+
+screen_jmptable_lo:
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo screen_showcursor
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo screen_setstyle
+screen_jmptable_hi:
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi screen_showcursor
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi screen_setstyle
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+    ; Hardcode screen size for now
+    lda #SCREEN_WIDTH-1
+    ldx #SCREEN_HEIGHT-1
+    rts
+zendproc
+
+zproc screen_clear
+   jsr CLEAR_SCREEN
+   rts
+zendproc
+
+zproc screen_setcursor
+    sta CURSOR_X
+    stx CURSOR_Y 
+    jsr MOVE_CURSOR
+    rts
+zendproc
+
+zproc screen_getcursor
+    lda CURSOR_X 
+    ldx CURSOR_Y
+    rts
+zendproc
+
+zproc screen_putchar
+    pha
+    lda CURSOR_Y
+    ldy CURSOR_X
+    jsr calculate_line_address
+    pla
+    jsr convert_ascii_to_screencode
+    sta (ptr),y
+    cpy #SCREEN_WIDTH-1
+    zif_cc
+        iny
+    zendif
+    sty CURSOR_X
+    jsr MOVE_CURSOR   
+    clc
+    rts
+zendproc
+
+zproc screen_putstring
+    sta ptr1+0
+    stx ptr1+1
+   
+    lda CURSOR_Y
+    jsr calculate_line_address
+    
+    ; Add cursor x-position to pointer
+    lda CURSOR_X
+    clc
+    adc ptr+0
+    sta ptr+0
+    zif_cs
+        inc ptr+1
+    zendif
+
+    ldy #0
+    zrepeat
+        lda (ptr1),y
+        zbreakif_eq
+        jsr convert_ascii_to_screencode
+        ldx CURSOR_X
+        cpx #SCREEN_WIDTH
+        ; Do not linewrap
+        zif_cc
+            sta (ptr),y
+            inc CURSOR_X
+        zendif
+        iny
+    zuntil_eq
+    
+    ; Restore cursor to last character on line if needed
+    ldx CURSOR_X
+    cpx #SCREEN_WIDTH-1
+    zif_cs
+        dec CURSOR_X
+    zendif
+    jsr MOVE_CURSOR
+
+    clc
+    rts
+zendproc
+
+zproc screen_getchar
+    ; Ignore timeout for now, just do a non-blocking read
+    jsr GETIN
+    zif_eq
+        sec
+        rts
+    zendif
+    clc
+    rts
+zendproc
+
+zproc screen_scrollup
+    ldx #0
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        inx
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #SCREEN_HEIGHT-1
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+zproc screen_scrolldown
+    ldx #SCREEN_HEIGHT-1 ; current line
+    zrepeat
+        txa
+        jsr calculate_line_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        dex
+        txa
+        jsr calculate_line_address ; ptr is source pointer
+
+        ldy #SCREEN_WIDTH-1
+        zrepeat
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #0
+    zuntil_eq
+
+    ldy #SCREEN_WIDTH-1
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+zproc screen_cleartoeol
+    lda CURSOR_Y
+    ldy CURSOR_X
+    jsr calculate_line_address
+    
+    lda #' '
+    zrepeat
+        sta (ptr), y
+        iny
+        cpy #SCREEN_WIDTH
+    zuntil_eq
+    
+    rts 
+zendproc
+
+zproc screen_setstyle
+    rts
+zendproc
+
+zproc screen_showcursor
+    zif_eq
+        lda #01
+        sta SHOW_CURSOR
+        clc
+        rts
+    zendif
+    lda #00
+    sta SHOW_CURSOR
+    clc
+    rts
+zendproc
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -633,6 +879,105 @@ zproc init_system
 
     rts
 zendproc
+
+; Sets ptr to the address of screen line A
+zproc calculate_line_address
+    ; x*40 = x*8 + x*32.
+    
+    ; We have 25 lines. As 25*8 will fit in a byte, we can do this easily.
+
+    asl a               ; a = y*2
+    asl a               ; a = y*4
+    asl a               ; a = y*8
+    sta ptr+0           ; store y*8
+
+    ; Anything more than this needs to be 16-bit arithmetic.
+
+    asl a               ; = y*16
+    rol ptr+1
+
+    asl a               ; = y*32
+    rol ptr+1
+
+    ; Add.
+
+    clc
+    adc ptr+0
+    sta ptr+0
+    zif_cs
+        inc ptr+1
+    zendif
+ 
+    ; On in screen address (0x400)
+    lda ptr+1 
+    and #0b00000011
+    ora #>VIDEO
+    sta ptr+1
+
+    rts
+zendproc
+
+ ; Preserves X and Y.
+zproc convert_ascii_to_screencode
+    ; Flip case.
+
+    cmp #'A'
+    zif_cs
+        cmp #'Z'+1
+        bcc swapcase
+    zendif
+
+    cmp #'a'
+    zif_cs
+        cmp #'z'+1
+        zif_cc
+        swapcase:
+            eor #0x20
+        zendif
+    zendif
+
+    ; This is from https://codebase64.org/doku.php?id=base:petscii_to_screencode&s[]=screencodes
+
+    cmp #0x20       ; if A<32 then...
+    bcc ddRev
+
+    cmp #0x60       ; if A<96 then...
+    bcc dd1
+
+    cmp #0x80       ; if A<128 then...
+    bcc dd2
+
+    cmp #0xa0       ; if A<160 then...
+    bcc dd3
+
+    cmp #0xc0       ; if A<192 then...
+    bcc dd4
+   
+    cmp #0xff       ; if A<255 then...
+    bcc ddRev
+
+    lda #0x7e       ; A=255, then A=126
+    bne ddEnd
+
+dd2:
+    and #0x5f       ; if A=96..127 then strip bits 5 and 7
+    bne ddEnd
+dd3:
+    ora #0x40       ; if A=128..159, then set bit 6
+    bne ddEnd
+dd4:
+    eor #0xc0       ; if A=160..191 then flip bits 6 and 7
+    bne ddEnd
+dd1:
+    and #0x3f       ; if A=32..95 then strip bits 6 and 7
+    bpl ddEnd       ; <- you could also do .byte 0x0c here
+ddRev:
+    eor #0x80       ; flip bit 7 (reverse on when off and vice versa)
+ddEnd:
+
+    rts
+zendproc
+
 
 loading_msg:
     .byte 147, 14, 5
