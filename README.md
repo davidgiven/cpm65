@@ -31,6 +31,8 @@ to the 6502. So far it runs on:
   
   - Olimex' neo6502 6502-based computer.
 
+  - nano6502 6502-based SoC for the Tang Nano 20K FPGA board; TPA is 55kB.
+
   - KIM-1 with K-1013 FDC, directly connected SD card module or 1541 drive.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
@@ -59,6 +61,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
 <a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
 <a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
+<a href="doc/nano6502.png"><img src="doc/nano6502.png" style="width:40%" alt="CP/M-65 running on the nano6502"></a>
 <a href="doc/kim-1.png"><img src="doc/kim-1.png" style="width:40%" alt="CP/M-65 running on the KIM-1"></a>
 </div>
 
@@ -311,6 +314,22 @@ the same time.
     utilitied. This are in no way complete, or documented.
 
   - The console is 53x30. It has a SCREEN driver.
+
+### nano6502 notes
+
+  - The [nano6502](https://github.com/venomix666/nano6502/) is a 65C02-based SoC for the Tang Nano 20K FPGA board.
+   
+  - The CPU is running at 25.175 MHz (i.e. the pixel clock).
+
+  - It is using CPMFS directly on the microSD-card, with 15x1Mb partitions (drives `A` to `O`).
+
+  - The text output is over HDMI, with 640x480 video output and a 80x30 console. It has a SCREEN driver.
+
+  - The input is currently using the built in USB serial port. This way, this port can be run with only the Tang Nano 20K board without any specific carrier board.
+
+  - To use, write the `nano6502.img` file into the SD-card using `dd` or your preferred SD-card image writer. If you are updating the image and want to preserve the data on all drives except `A`, write the `nano6502_sysonly.img` instead.
+
+  - User area 1 on drive `A` contains utilities for setting the text and background colors, and a demo application which blinks the onboard LEDs.
 
 ### KIM-1 with K-1013 FDC notes
 
