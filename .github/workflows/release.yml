@@ -15,7 +15,7 @@ jobs:
         path: 'cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils srecord
 
     - name: install llvm-mos
       run: |
