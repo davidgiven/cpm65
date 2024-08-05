@@ -33,6 +33,8 @@ to the 6502. So far it runs on:
 
   - nano6502 6502-based SoC for the Tang Nano 20K FPGA board; TPA is 55kB.
 
+  - KIM-1 with K-1013 FDC, directly connected SD card module or 1541 drive.
+
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
 much less standardised than 8080 and Z80 systems. (The systems above all load
@@ -46,7 +48,7 @@ bigger the program.
 
 No, it won't let you run 8080 programs on the 6502!
 
-<div style="text-align: center">
+<div style="text-align: left">
 <a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Micro"></a>
 <a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
@@ -60,6 +62,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
 <a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
 <a href="doc/nano6502.png"><img src="doc/nano6502.png" style="width:40%" alt="CP/M-65 running on the nano6502"></a>
+<a href="doc/kim-1.png"><img src="doc/kim-1.png" style="width:40%" alt="CP/M-65 running on the KIM-1"></a>
 </div>
 
 
@@ -101,7 +104,7 @@ disk images), libfmt (all the C++ tools use this), python3 (for the build
 system), and FreePascal (because the MADS assembler is written in Pascal). Use
 these Debian packages:
 
-    cc1541 cpmtools libfmt-dev python3 fp-compiler
+    cc1541 cpmtools libfmt-dev python3 fp-compiler srecord
 
 There are also automated tests which use `mame` to emulate a reasonable number
 of the platforms, to verify that they actually work. To use this, install
@@ -327,6 +330,48 @@ the same time.
   - To use, write the `nano6502.img` file into the SD-card using `dd` or your preferred SD-card image writer. If you are updating the image and want to preserve the data on all drives except `A`, write the `nano6502_sysonly.img` instead.
 
   - User area 1 on drive `A` contains utilities for setting the text and background colors, and a demo application which blinks the onboard LEDs.
+
+### KIM-1 with K-1013 FDC notes
+
+  - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an
+    SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the
+    0x0400-0x13ff memory hole.
+
+  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into 0x0200 and execute it.
+
+  - Only 1 disk is supported. Multi-disk is not stable in CP/M-65 yet.
+
+  - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with directly attached SD card notes
+
+  - This port uses Ryan E. Roth's [sdcard6502 for the PAL-1](https://github.com/ryaneroth/sdcard6502), which in turn is based on George Foot's [sdcard6502 for Ben Eater's 6502 computer](https://github.com/gfoot/sdcard6502).
+
+  - You'll need an SDHC card of any capacity (only 32MB are used) and a generic Arduino SD card adapter **with 5V to 3.3V conversion**. See the links above for detailed requisites and connection instructions. 
+  
+  - To use it, transfer the `diskimage.raw` file to the SD card using `dd`. Balena Etcher also works in Windows, just ignore the "not a bootable image" warning. Start the KIM-1 in TTY mode, load the `bootsd.pap` loader program into 0x0200 and execute it.
+
+  - For KIM-1 clones, you can place the bootloader into the free space of the KIM-1 rom. Write the contents of the `bootsd-kimrom.bin` file at 0x1AA0 (or 0x2A0 relative to the KIM-1 rom). This romable loader has two entry points:
+    - 0x1AA0 is for cold start, that is, you can point the 6502 reset vector to 0x1AA0 if you want to start CP/M-65 at reset. In this case, the TTY is initialized to 9600 bauds, so make sure that your terminal is configured to that speed.
+    - 0x1AB2 is for booting from the KIM monitor
+
+  - For the KIM-1, at least a 32KB (56KB recommended) RAM expansion from 0x2000 is required, as well as RAM filling the 0x0400-0x13ff memory hole. The BIOS assumes that at least the required RAM is installed, and checks for extra RAM above 0xA000.
+
+  - Same requisites apply to the PAL-1 and, additionally, the second 6532 expansion board.
+
+  - 1 32MB disk supported.
+
+  - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with Commodore 1541 drive
+
+  - Based on the C64 port, so same notes apply.
+
+  - This port needs the [xkim1541 extensions for the KIM-1 installed at 0xF000](https://github.com/eduardocasino/xkim1541). The PAL-1 is also supported, and needs the same extensions but installed at 0xDA00, [as modified by Neil Andretti](https://github.com/netzherpes/xkim1541).
+
+  - If you also have [my modified xKIM monitor](https://github.com/eduardocasino/xKIM/tree/IEC_support), then load the `CPM` program and jump to address 0x6000.
+
+  - If not, load the `bootiec-kim` or  `bootiec-pal` bootloader into 0x200 and execute it.
 
 ### Supported programs
 
