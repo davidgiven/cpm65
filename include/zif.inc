@@ -111,6 +111,7 @@ _zmake_if cc, cs
 _zmake_if cs, cc
 _zmake_if pl, mi
 _zmake_if mi, pl
+_zmake_if vs, vc
 
 .macro zelse
     _zgetframe zifstack, %zifsp
