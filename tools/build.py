@@ -8,6 +8,7 @@ cxxprogram(name="mkoricdsk", srcs=["./mkoricdsk.cc"], deps=["+libfmt"])
 cxxprogram(name="mkcombifs", srcs=["./mkcombifs.cc"], deps=["+libfmt"])
 cprogram(name="unixtocpm", srcs=["./unixtocpm.c"])
 cprogram(name="mkdfs", srcs=["./mkdfs.c"])
+cprogram(name="mkimd", srcs=["./mkimd.c"])
 cprogram(
     name="fontconvert", srcs=["./fontconvert.c", "./libbdf.c", "./libbdf.h"]
 )
@@ -162,6 +163,18 @@ def mkoricdsk(self, name, src: Target = None):
         deps=["tools+mkoricdsk"],
         commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
         label="MKORICDSK",
+    )
+
+
+@Rule
+def mkimd(self, name, src: Target = None):
+    normalrule(
+        replaces=self,
+        ins=[src],
+        outs=[name + ".imd"],
+        deps=["tools+mkimd"],
+        commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
+        label="MKIMD",
     )
 
 
