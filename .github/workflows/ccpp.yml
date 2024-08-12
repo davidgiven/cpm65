@@ -41,6 +41,9 @@ jobs:
           bbcmicro.ssd
           c64.d64
           diskdefs
+          kim-1-iec.zip
+          kim-1-k1013.zip
+          kim-1-sdcard.zip
           neo6502.zip
           oric.dsk
           pet4032.d64
