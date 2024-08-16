@@ -1,0 +1,37 @@
+Parts of this support library are derived or imported directly from the cc65
+compiler by Ulrich von Bassewitz, Oliver Schmidt and others.
+
+For more information on cc65 see
+
+https://github.com/cc65/cc65
+
+
+
+The compilere tries to generate several kinds of helper calls
+
+1.	Calls that work entirely on XA. These are generally used
+	to implement unary operators that do not inline
+
+2.	Calls that work between XA and Y. These are generated for situations
+	where an 8bit value is applied to a XA, for example it is common
+	to add an 8bit number to a 16bit value
+
+3.	Calls that work between XA and @tmp. These are used for operations
+	that do not inline but where the right had side can be loaded directly
+	into registers. In that situation the compiler favours stuffing the
+	working (left) value into @tmp and loading the right hand side into
+	the registers without touching @tmp
+
+4.	Operations where the compiler finds no shortcuts. In which case they
+	occur between the top of the data stack and XA consuming the top of
+	the data stack in the process. Some of these are implemented using
+	a pop to @tmp helper, others have their own implementation for speed.
+
+Most helpers have multiple forms depending upon size and sometimes sign. So
+for example all comparisons exist in signed and unsigned form for multiple
+sizes.
+
+All references to XA also pertain to A only (8bit) or @hireg:XA (16bit)
+
+Be careful: the compiler knows things about the resulting state of Y for
+some helpers, and this will become true for more in future.

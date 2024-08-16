@@ -1,0 +1,185 @@
+General
+-	Pass cpu sub opts to cc1 (65c816 registers depend on subtype
+	for example)
+-	Encode storage class into register upper half
+-	For reg arg generate a reg for it, and an assign reg localptr offset
+-	Remove old install arrangement
+-	Package assemblers as FuxixBinTools
+
+1802:
+-	Optimizations
+	- shift by 8,16,24 l/r unsigned helpers
+	- multiply and divide fastpaths with shift
+	- peephole for jumps
+	- peephole for store/reload of local
+	- use plusconst in eqops for add/sub (will need direct helpers
+	- use mul/div optimizations also in mul/div/rem of eqops
+	- enable registers
+
+Z80:
+-	parse arg code from 65C816 but probably just use it to
+	deal with reg args as push ix/iy/bc directly (also track some HL
+	usage so we can do stuff like ld hl,%d push hl push hl - ditto 808x)
+-	track HL ?
+-	Option for no IY
+-	Some kind of core code hooks for passing platform ops
+	so you can specify stuff like -mz80-noiy to target.c and backend.c
+-	Move work back over to fuzix tree and check size of pass 2
+
+Z8:
+-	CCONLY (enables stuff like decw testing for 1 or tests for 0 etc)
+-	Argument parsing from 65C816 to optimize two cases
+	- push of register var
+	- push of LREF (pass r15 = offset, get lref push and return) - want
+	  for 65C816 too
+-	plusplusc is probably not worth it
+-	Track regpairs for r4/r6/r8/r10 and use them as well when loading
+	r14/r15
+-	Optimize in size mode
+
+	T_DEREF(T_PLUS(T_LREF, T_CONSTANT), r)
+	T_EQ(T_PLUS(T_LREF, T_CONSTANT), r)
+	to
+		right into AC
+		ld r15,#n
+		call __drfgargr%up
+		.word off
+
+	replacing the whole ld r15,#n,call____garg, add, adc, ld r14, ld r15
+	etc mess
+
+DONE	end of func jp xx for __exit2,3,4,5,6,7,8.... (and optimize the return n to use it
+	too)
+
+	__cpluseq1 __cpluseq2 __cpluseq4 // ditto for char helpers
+
+DONE	Clean up stack in called fn except vararg ?
+
+
+
+
+Would leave us two table type slots free (one if we don't do fold as well)
+
+8080
+-	Import Z80 trick for locals via DE
+
+
+	shld %1
+	shld %2
+	lhld %1		but volatiles...
+
+	mvi l,0
+	mov a,l
+=
+	xra a
+	mov l,a
+
+(and look at removing surplus writes to l in those cases)
+
+	push h
+	pop h
+	push h
+=
+ 	push h ?
+
+	xchg
+	call __cmpne  | __cmpeq
+
+	remove the xchg as de/hl is same as hl/de
+	others invert logic and remove xchg
+
+- Z80 find why asm blew up for (ix) not (ix + 0)
+- Optimise compares to 0 and FFFF on 8080/5 with
+  mov a,h ana l  and mov a,h ora l ??
+  and sbc hl,de on z80  - these all need the flags only bits
+- keep a volatile count of in context volatiles and some short arrays of names of volatiles
+  in scope so we can do basic volatiles as well as casting style
+- spot conditionals that are if (simple) and turn them into some kind of FLAGSONLY node so that
+  we can optimize simple conditions and avoid bool calls (eg ora a jz)
+	- set a FLAGONLY on the top node of the conditional in an if/while/.., then if we see a
+	  condition with FLAGONLY we can optimize it in the target
+		for stuff like if (*p) we can spot the boolc with FLAGSONLY and optimise it to
+		stuff like ld a,h or l and ld a,l or a (and peep can fix some of the other bits)
+  [Part done CCONLY exists now to use it more]
+
+- Switch optimizer
+- Optimizer options so can switch between cheap, full and add on stuff like rst hooks
+- register arguments (some way to pass the info and then generate a subtree
+    EQ REG regvar DEREF ARGUMENT n to initialize it)
+- hash array and function type lookup
+- hash name lookup
+- rewrite x = x + .. and x = x -... etc as += -=
+- Turn the frame the other way up ?
+- Track register state on backend
+- Fix up the canonical and array decay - check decay to array type
+- Have O_ op table tight packed and rerite T_ into O_ entries, then have a property table
+  for them (memread, memwrite, modworking, sideffect, setcc, communtatitve)
+  (rewrite is easy - directly code the ops with the right bits so T_ = O_ except
+  for the ones based on the ascii. Pack those tight and use a 256 byte lookup)
+- Can we tag the presence of volatile somehow. It is rare so we could just
+  remember if volatile appeared in a cast anywhere in the expression and assume
+  badness, and also keep a small table of names that are volatile (eg keep
+  10 sym ptrs for global and for local ?)
+- Other volatile option, is to pass a volatile marker on expression trees if
+  a volatile cast appears or a local is marked volatile. Globals are a bit
+  tricker that way ? (in progress)
+- 8085 - load byte vars by word loading the right offset and ignoring one.
+- Eliminate assignment to self ?
+- Pass "no &local used in this function" for optimization hints (means local
+  writes don't invalidate mem which for many reg processors with tracking is
+  really important)
+
+Broken 
+-	need to switch how we handle -ve numbers to fix -32768 problem but also
+	stuff like negative floats. In check for MINUS/PLUS we need to look for
+	-ve constant and if so invert it and re-insert a fake MINUS token
+	(Other plan -
+		unambiguous minus is T_NEGATE
+		ambiguious generate T_NEGMAYBE then the value. If we are
+		expecting a uni op then we parse it as T_NEGATE. If we
+		were expecting a value we throw it and negate the following
+		constant)
+-	Fix
+		{ int n; { long n; } } - need to know if we are creating new sym level
+-	Fix
+	void (*p)(void); void x(void);   if (p == x) - bad type (&x works)
+-	Why is  if (++x) of char generating a castc before the cmpeq ?
+
+Longer term
+- fix ptrdiff_t matches INT assumption
+- backend hooks for building stack frame via initializers
+- literal based handling for some types (set by target) - eg double/longlong
+  so that we pass pointers around including one to a memory "register". 
+  &x will need care as do casts
+- do we want to go to some kind of table rule parsing model over the
+  current code based one ?
+- look at some kind of simple register assignment rewriting so that 6803/6809
+  etc can try and rewrite some subtrees to use an index register, and maybe
+  also eliminate the push case for some of those
+- simple register tracking helper library
+- rewrite && and || and maybe ?: so that we don't have
+  (AND (BOOL (x)) (BOOL(y))) but some kind of
+  BOOL(AND(CC(x) CC(y))) and work on condition code plus a tidy if needed so
+  that we can have ccode setting trees that drop the top bool if the CC is
+  ok. - IP partly done but need to sort branch trees out to get best result
+
+- 6809 - use pshs/puls as a sneaky tight way to mod the stack
+- Optimizer pass for tree rearrangement ?
+PARTDONE - Whilst we need to be careful for side effects on * 0, we don't for and/or
+  subtrees with && || so should deal with those
+- cc0 and the -32768 funny (understand a little of previous token is needed)
+- native compile support for machines where a pointer is a native long type. Cross
+  is going to be fine usually
+- Write tree size before each expr and load and chain multiple trees if room
+  Does need care handling any extra header stuff in the way.
+- Can we walk the subtrees looking for the most repeated left/right expensive
+  refs (ie locals on 8080 or Z80) and rewrite the tree so the most common is
+  in say BC, then rewrite subtree with REG and a load/put of the reg
+- 8080 pass first argument in HL, so defer final push before func call. Then
+  can xthl push hl to get stack in order, and do cleanup of all args on
+  the return path instead of caller - would need vararg help for cleanup ?
+- 8080 rewrite  SHL(constant 1, by n) into a 1 << n node so we can gen a
+  fast 1 << n (lookup table ?)
+DONE - Walk subtrees of logic ops to try and optimize bools if value not used and subnodes just
+  need cc
+- Turn !! (NOT NOT) into BOOL

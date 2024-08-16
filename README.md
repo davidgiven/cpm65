@@ -526,3 +526,7 @@ Biela and is available under the terms of the MIT license.  See
 bytecode compiler and interpreter, which is © 1978-2021 Niklaus Wirth, Mark
 Rustad and Hans Otten and is available under the terms of the MIT license. See
 `third_party/pascal-m/LICENSE` for the full text.
+
+`third_party/fck` constains a hackup up copy of the Fuzix Compiler Kit, which is
+a mixture of GPLv3 and Artistic licenses. See `third_party/fck/README.md` for
+further information.

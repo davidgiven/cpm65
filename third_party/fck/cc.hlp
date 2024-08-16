@@ -1,0 +1,62 @@
+cc [option and file list]
+
+options:
+
+-c:    compile to object modules only
+-D:    define a macro for the C preprocessor
+-E:    preprocess only, to stdout
+-i:    enable split I/D if supported by this target
+-I:    add a directory to the include path
+-l:    add a library name to link
+-L:    add a path to the library search path
+-m:    set the CPU to compile for
+-M:    create a map file
+-o:    specify the output file name of the complation (a.out default)
+-O:    set optimization level 0-3, or for size '-Os'
+-s:    build standalone. Do not include the OS libraries and include paths
+-S:    compile to assembly source only
+-t:    set the target OS
+-T:    set the starting address of the text/code segment
+-V:    verbosely print pass information
+-X:    keep temporary files for debugging
+
+long options:
+--dlib:	build a loadable object module instead
+
+processors:
+-m8080: Intel 8080 (compatible 8085, Z80)
+-m8085: Intel 8085
+-mz80: Zilog Z80 (compatible Z180, Z280, eZ80)
+-mz180: Zilog Z180
+
+z80/z180 feature options:
+-mz80-banked: Z80 with banked code
+-mz80-noix: do not touch IX
+-mz80-noiy: do not touch IY
+
+processors (debug):
+-m65c816: 65C816 16bit mode
+-m6303: Hitachi 6303
+-m6309: Hitachi 6309 (currently as 6809)
+-m6800: Motorola 6800 (compatible 6303, 6803, 68HC11)
+-m6803: Motorola 6803 (compatible 6303, 68HC11)
+-m6809: Motorola 6809 (compatible 6309)
+-m68hc11: Motorola 68HC11
+-mnova: DG Nova
+-mnova3: DG Nova 3 and later (with stack hardware)
+-mthread: Generate threadcode tables
+-msuper8: Zilog Super 8
+-mz8: Zilog Z8
+
+nova feature options:
+-multiply: use the hardware multiply and divide option
+
+processors (development only)
+-m1802: bytecode for 1802 interpreter
+-m1805: bytecode for 1805 interpreter
+-m6502:	6502 8bit, NMOS legal instructions
+-m65c02: 6502 8bit CMOS legal instructions
+-m8086: Intel 8088/8086 (compatible 80186/286/..)
+-m80186: Intel 80188/186 (compatible 80286/...)
+-m8070: NS8070 series
+-mnova3: DG Nova3, Nova4 or MicroNova
