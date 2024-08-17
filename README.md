@@ -534,3 +534,7 @@ further information.
 `third_party/tinycpp` contains a copy of TinyCpp, which is © 2019 rofl0r@github
 and is available under the terms of the MIT license. See
 `third_party/tinycpp/COPYING` for the full text.
+
+`third_paty/libulz` contains a massively trimmed down copy of libulz, which is ©
+rofl0r@github and is available under the terms of the GPL v2 license. See
+`third_party/libulz/COPYING` for the full text.
