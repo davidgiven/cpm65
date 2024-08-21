@@ -53,6 +53,8 @@ jobs:
           kim-1-iec.zip
           kim-1-k1013.zip
           kim-1-sdcard.zip
+          nano6502.img
+          nano6502_sysonly.img
           neo6502.zip
           oricatmos.dsk
           pet4032.d64
@@ -76,6 +78,8 @@ jobs:
           cpm65/kim-1-iec.zip
           cpm65/kim-1-k1013.zip
           cpm65/kim-1-sdcard.zip
+          cpm65/nano6502.img
+          cpm65/nano6502_sysonly.img
           cpm65/neo6502.zip
           cpm65/oric.dsk
           cpm65/pet4032.d64

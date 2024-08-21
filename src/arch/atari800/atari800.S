@@ -1063,7 +1063,7 @@ mem_end:  .byte 0
 
 ; number of sectors, blocksize, direntries, reserved _sectors_
 
-; 54 reserved sectors = 6912 bytes for BIOS and BDOS
+; 18 reserved sectors
 
 #ifdef ATARI_HD
 define_drive dph, 8190, 2048, 128, 18
@@ -1074,7 +1074,7 @@ define_drive dph, 720, 1024, 64, 18
     .section .noinit, "ax", @nobits
 
     .global directory_buffer
-directory_buffer:   .fill 128           ; can be under RAM
+directory_buffer:   .fill 128           ; can be under ROM
 drive_number:       .fill 1
 sector_num:         .fill 3
 dma:                .fill 2
