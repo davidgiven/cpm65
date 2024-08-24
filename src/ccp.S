@@ -226,7 +226,7 @@ monitor_digit:
     zrepeat
         asl temp+0
         rol temp+1
-        rol temp2+2
+        rol temp2
         dex
     zuntil_mi
     ora temp+0
