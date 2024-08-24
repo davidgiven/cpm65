@@ -53,12 +53,12 @@ _start:
     .byte 0
 
 #ifdef ATARI_XL
-    .byte 17            ; (filesize(atari800xlhd.exe)+127)/128
+    .byte 17            ; (filesize(+atari800xlhd_bios)+127)/128
 #else
 #   ifdef ATARI_HD
-        .byte 13        ; (filesize(atari800hd.exe)+127)/128
+        .byte 14        ; (filesize(+atari800hd_bios)+127)/128
 #   else
-        .byte 13        ; (filesize(atari800.exe)+127)/128
+        .byte 14        ; (filesize(+atari800_bios)+127)/128
 #   endif
 #endif
 
@@ -908,16 +908,22 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
-        sec                 ; invalid drive
+    zif_eq
+        sta drive_number
+        lda #<dph
+        ldx #>dph
+        clc
         rts
     zendif
-
-    sta drive_number
-
-    lda #<dph
-    ldx #>dph
-    clc
+    cmp #1
+    zif_eq
+        sta drive_number
+        lda #<dph_b
+        ldx #>dph_b
+        clc
+        rts
+    zendif
+    sec
     rts
 zendproc
 
@@ -1063,8 +1069,10 @@ mem_end:  .byte 0
 
 #ifdef ATARI_HD
 define_drive dph, 8190, 2048, 128, 18
+define_drive dph_b, 8190, 2048, 128, 18
 #else
 define_drive dph, 720, 1024, 64, 18
+define_drive dph_b, 720, 1024, 64, 18
 #endif
 
     .section .noinit, "ax", @nobits
