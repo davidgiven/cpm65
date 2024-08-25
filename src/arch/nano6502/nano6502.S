@@ -12,6 +12,7 @@ IO_page_led = $02
 IO_page_sdcard = $03
 IO_page_video = $04
 IO_page_timer = $05
+IO_page_keyb = $06
 IO_page_reg = $00
 ROM_sel_reg = $02
 
@@ -53,6 +54,8 @@ uart_tx_done = $fe01
 uart_rx_data = $fe02
 uart_rx_avail = $fe03
 
+keyb_data_avail = $fe00
+keyb_data = $fe01
 
 ; Offset to second byte of SDCARD address
 BDOS_OFFSET = $1
@@ -270,18 +273,31 @@ zendproc
 ; C if no key is pending, !C if key pending
 zproc tty_const
     lda pending_key
-    zif_eq
-        lda #IO_page_uart
-        sta IO_page_reg
-        lda uart_rx_avail
-        zif_eq
-            lda #$00
-            sec
-            rts
-        zendif
-        lda uart_rx_data
-        sta pending_key
-    zendif
+    bne tty_const_done
+    
+    lda #IO_page_uart
+    sta IO_page_reg
+    lda uart_rx_avail
+    beq tty_const_keyb
+    lda uart_rx_data
+    sta pending_key
+    jmp tty_const_done
+       
+tty_const_keyb:
+    lda #IO_page_keyb
+    sta IO_page_reg
+    lda keyb_data_avail
+    beq tty_const_nokey
+    lda keyb_data
+    sta pending_key
+    jmp tty_const_done
+ 
+tty_const_nokey:            
+    lda #$00
+    sec
+    rts
+    
+tty_const_done:
     lda #$ff
     clc
     rts
@@ -292,12 +308,21 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif_eq
+tty_input_wait:
 	    lda #IO_page_uart
         sta IO_page_reg
-tty_input_wait:
         lda uart_rx_avail
+        beq tty_input_keyb
+        lda uart_rx_data
+        clc    
+        rts
+tty_input_keyb:
+        lda #IO_page_keyb
+        sta IO_page_reg
+        lda keyb_data_avail
         beq tty_input_wait
-        lda uart_rx_data    
+        lda keyb_data
+        clc
         rts
     zendif
 
@@ -442,13 +467,21 @@ screen_getchar_wait:
     sta IO_page_reg
     lda uart_rx_avail
     bne screen_getchar_data
+    lda #IO_page_keyb
+    sta IO_page_reg
+    lda keyb_data_avail
+    bne screen_getchar_data_keyb 
     lda #IO_page_timer
     sta IO_page_reg
     lda timer_idle
     beq screen_getchar_wait
     jmp nodata
+screen_getchar_data_keyb:
+    lda keyb_data
+    jmp screen_getchar_data_bsfix
 screen_getchar_data:
     lda uart_rx_data
+screen_getchar_data_bsfix:
     cmp #$08
     bne notbs
     lda #127
@@ -789,11 +822,11 @@ zproc bios_SETBANK
 zendproc
 
 zproc video_init
-    pha 
+    sta ptr1 
     lda #IO_page_video
     sta IO_page_reg    
     jsr video_wait
-    pla
+    lda ptr1
     rts
 zendproc
 
