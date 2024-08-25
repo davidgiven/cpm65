@@ -325,7 +325,7 @@ the same time.
 
   - The text output is over HDMI, with 640x480 video output and a 80x30 console. It has a SCREEN driver.
 
-  - The input is currently using the built in USB serial port. This way, this port can be run with only the Tang Nano 20K board without any specific carrier board.
+  - The text input can be done using either the built in USB serial port or a USB keyboard with the [nanoComp](https://github.com/venomix666/nanoComp) carrier board. This way, this port can be run with only the Tang Nano 20K board, or with the carrier board for stand-alone use.
 
   - To use, write the `nano6502.img` file into the SD-card using `dd` or your preferred SD-card image writer. If you are updating the image and want to preserve the data on all drives except `A`, write the `nano6502_sysonly.img` instead.
 
