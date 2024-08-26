@@ -923,6 +923,24 @@ zproc bios_SELDSK
         clc
         rts
     zendif
+#ifndef ATARI_HD
+    cmp #2
+    zif_eq
+        sta drive_number
+        lda #<dph_c
+        ldx #>dph_c
+        clc
+        rts
+    zendif
+    cmp #3
+    zif_eq
+        sta drive_number
+        lda #<dph_d
+        ldx #>dph_d
+        clc
+        rts
+    zendif
+#endif
     sec
     rts
 zendproc
@@ -1061,7 +1079,7 @@ mem_base: .byte __USERTPA_START__@mos16hi
 mem_end:  .byte 0
 #endif
 
-; DPH for drive 0 (our only drive)
+; DPH for all drives
 
 ; number of sectors, blocksize, direntries, reserved _sectors_
 
@@ -1073,6 +1091,8 @@ define_drive dph_b, 8190, 2048, 128, 18
 #else
 define_drive dph, 720, 1024, 64, 18
 define_drive dph_b, 720, 1024, 64, 18
+define_drive dph_c, 720, 1024, 64, 18
+define_drive dph_d, 720, 1024, 64, 18
 #endif
 
     .section .noinit, "ax", @nobits
