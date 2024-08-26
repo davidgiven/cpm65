@@ -248,7 +248,9 @@ zproc convert_user_fcb
     sta (param), y              ; update FCB
 
     txa                         ; set the active drive
-    jmp internal_LOGINDRIVE     ; and make sure it is logged in
+    sta active_drive
+
+    jmp select_active_drive
 zendproc
 
 ; --- Close a file (flush the FCB to disk) ----------------------------------
