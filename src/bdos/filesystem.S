@@ -1311,6 +1311,7 @@ zendproc
 zproc internal_LOGINDRIVE
     ; Select the drive.
 
+    sta active_drive
     jsr select_active_drive
 
     ; Decide if the drive was already logged in.
