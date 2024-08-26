@@ -248,6 +248,8 @@ zproc convert_user_fcb
     sta (param), y              ; update FCB
 
     txa                         ; set the active drive
+    sta active_drive
+
     jmp select_active_drive
 zendproc
 
