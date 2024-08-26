@@ -218,7 +218,7 @@ zproc bdos_READLINE
         cmp #18
         zif_eq
             jsr indent_new_line
-            ldy #1
+            ldy #2
             sty count
             zloop
                 ldy count
