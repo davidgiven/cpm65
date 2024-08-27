@@ -251,6 +251,10 @@ the same time.
     ```tty80drv.com```. This will cost you 7kB of TPA for driver code,
     font data, and screen memory. It has a full SCREEN implementation, too.
 
+   - The single-sided single-density version supports up to four drives.
+     Extra applications and source code are spread accross the extra disks.
+     The 1MB images support two drives, but only one is used at the moment.
+
 ### Oric notes
 
   - This disk image is a MFM_DISK format disk as used by Oricutron. (If you need
