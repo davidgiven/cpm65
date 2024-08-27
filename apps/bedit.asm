@@ -470,6 +470,7 @@ command_tab:
 .zendproc
 
 .zproc putchar
+    ldx #0
     ldy #BDOS_CONIO
     jmp BDOS
 .zendproc
