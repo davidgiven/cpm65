@@ -46,6 +46,8 @@ jobs:
         assets: | 
           apple2e.po
           atari800.atr
+          atari800b.atr
+          atari800c.atr
           atari800hd.atr
           atari800xlhd.atr
           bbcmicro.ssd
@@ -71,6 +73,8 @@ jobs:
         files: |
           cpm65/apple2e.po
           cpm65/atari800.atr
+          cpm65/atari800b.atr
+          cpm65/atari800c.atr
           cpm65/atari800hd.atr
           cpm65/atari800xlhd.atr
           cpm65/bbcmicro.ssd
