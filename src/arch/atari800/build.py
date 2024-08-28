@@ -47,6 +47,49 @@ normalrule(
     label="MAKEATR",
 )
 
+mkcpmfs(
+    name="atari800b_rawdiskimage",
+    format="atari90",
+    size=128 * 720,
+    items={
+    }
+    | BIG_APPS
+    | PASCAL_APPS
+)
+
+normalrule(
+    name="atari800b_diskimage",
+    ins=[".+atari800b_rawdiskimage"],
+    outs=["atari800b.atr"],
+    commands=[
+        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
+        "cat {ins[0]} >> {outs[0]}",
+    ],
+    label="MAKEATR",
+)
+
+mkcpmfs(
+    name="atari800c_rawdiskimage",
+    format="atari90",
+    size=128 * 720,
+    items={
+    }
+    | MINIMAL_APPS_SRCS
+    | SCREEN_APPS_SRCS
+    | BIG_APPS_SRCS
+)
+
+normalrule(
+    name="atari800c_diskimage",
+    ins=[".+atari800c_rawdiskimage"],
+    outs=["atari800c.atr"],
+    commands=[
+        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
+        "cat {ins[0]} >> {outs[0]}",
+    ],
+    label="MAKEATR",
+)
+
 llvmrawprogram(
     name="atari800hd_bios",
     srcs=["./atari800.S"],
