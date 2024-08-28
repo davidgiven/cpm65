@@ -247,10 +247,8 @@ zproc convert_user_fcb
     lda current_user
     sta (param), y              ; update FCB
 
-    txa                         ; set the active drive
-    sta active_drive
-
-    jmp select_active_drive
+    txa                         ; select the active drive
+    jmp internal_LOGINDRIVE     ; and make sure it is logged in
 zendproc
 
 ; --- Close a file (flush the FCB to disk) ----------------------------------
@@ -1314,6 +1312,9 @@ zproc internal_LOGINDRIVE
 
     sta active_drive
     jsr select_active_drive
+    zif_cs                  ; selecting drive failed, no need to go on
+        rts
+    zendif
 
     ; Decide if the drive was already logged in.
 
@@ -1323,7 +1324,8 @@ zproc internal_LOGINDRIVE
     jsr shiftr              ; flag at bottom of temp+0
 
     ror temp+0
-    zif_cs
+    zif_cs                  ; already logged in
+        clc                 ; drive exists and is successfully selected
         rts
     zendif
 
@@ -1414,6 +1416,7 @@ zproc internal_LOGINDRIVE
         zendif
     zendloop
 
+    clc
     rts
 zendproc
 
