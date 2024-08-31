@@ -1,10 +1,8 @@
 from build.ab import (
     Rule,
-    Target,
-    normalrule,
-    filenameof,
-    targetsof,
+    simplerule,
     TargetsMap,
+    filenameof,
     emit,
 )
 
@@ -24,10 +22,10 @@ def zip(self, name, flags="", items: TargetsMap = {}):
     for k, v in items.items():
         cs += [
             "cat %s | $(ZIP) -q %s {outs[0]} -" % (filenameof(v), flags),
-            "printf '@ -\\n@=%s\\n' | $(ZIPNOTE) -w {outs[0]}" % k,
+            "echo '@ -\\n@=%s\\n' | $(ZIPNOTE) -w {outs[0]}" % k,
         ]
         ins += [v]
 
-    normalrule(
-        replaces=self, ins=ins, outs=[name + ".zip"], commands=cs, label="ZIP"
+    simplerule(
+        replaces=self, ins=ins, outs=[f"={name}.zip"], commands=cs, label="ZIP"
     )

@@ -1,4 +1,4 @@
-from build.ab import normalrule
+from build.ab import simplerule
 from tools.build import mkcpmfs, mametest
 from build.llvm import llvmrawprogram, llvmclibrary
 from config import (
@@ -33,13 +33,13 @@ mkcpmfs(
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
     }
     | MINIMAL_APPS
-    | SCREEN_APPS
+    | SCREEN_APPS,
 )
 
-normalrule(
+simplerule(
     name="atari800_diskimage",
     ins=[".+atari800_rawdiskimage"],
-    outs=["atari800.atr"],
+    outs=["=atari800.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
@@ -57,10 +57,10 @@ mkcpmfs(
     | PASCAL_APPS
 )
 
-normalrule(
+simplerule(
     name="atari800b_diskimage",
     ins=[".+atari800b_rawdiskimage"],
-    outs=["atari800b.atr"],
+    outs=["=atari800b.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
@@ -79,10 +79,10 @@ mkcpmfs(
     | BIG_APPS_SRCS
 )
 
-normalrule(
+simplerule(
     name="atari800c_diskimage",
     ins=[".+atari800c_rawdiskimage"],
-    outs=["atari800c.atr"],
+    outs=["=atari800c.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
@@ -127,10 +127,10 @@ mkcpmfs(
     | PASCAL_APPS,
 )
 
-normalrule(
+simplerule(
     name="atari800hd_diskimage",
     ins=[".+atari800hd_rawdiskimage"],
-    outs=["atari800hd.atr"],
+    outs=["=atari800hd.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
@@ -175,10 +175,10 @@ mkcpmfs(
     | PASCAL_APPS,
 )
 
-normalrule(
+simplerule(
     name="atari800xlhd_diskimage",
     ins=[".+atari800xlhd_rawdiskimage"],
-    outs=["atari800xlhd.atr"],
+    outs=["=atari800xlhd.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",

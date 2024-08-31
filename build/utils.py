@@ -1,13 +1,34 @@
-from build.ab import Rule, normalrule, Target, filenameof, Targets
-from os.path import basename
+from build.ab import Rule, simplerule, Target, filenameof, Targets, filenamesof
+from os.path import basename, splitext
+import fnmatch
+import itertools
+
+
+def filenamesmatchingof(xs, pattern):
+    return fnmatch.filter(filenamesof(xs), pattern)
+
+
+def stripext(path):
+    return splitext(path)[0]
+
+
+def targetswithtraitsof(xs, trait):
+    return [t for t in xs if trait in t.traits]
+
+
+def collectattrs(*, targets, name, initial=[]):
+    s = set(initial)
+    for a in [t.args.get(name, []) for t in targets]:
+        s.update(a)
+    return s
 
 
 @Rule
 def objectify(self, name, src: Target, symbol):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=["build/_objectify.py", src],
-        outs=[basename(filenameof(src)) + ".h"],
+        outs=[f"={basename(filenameof(src))}.h"],
         commands=["$(PYTHON) {ins[0]} {ins[1]} " + symbol + " > {outs}"],
         label="OBJECTIFY",
     )
@@ -24,7 +45,7 @@ def test(
     label="TEST",
 ):
     if command:
-        normalrule(
+        simplerule(
             replaces=self,
             ins=[command],
             outs=["sentinel"],
@@ -33,7 +54,7 @@ def test(
             label=label,
         )
     else:
-        normalrule(
+        simplerule(
             replaces=self,
             ins=ins,
             outs=["sentinel"],

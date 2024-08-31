@@ -1,6 +1,7 @@
-from build.ab import normalrule
-from tools.build import mkdfs, mkcpmfs
+from build.ab import simplerule
+from tools.build import mkcpmfs
 from build.llvm import llvmrawprogram
+from build.zip import zip
 from config import (
     MINIMAL_APPS,
     MINIMAL_APPS_SRCS,
@@ -27,19 +28,11 @@ mkcpmfs(
     | PASCAL_APPS,
 )
 
-normalrule(
+zip(
     name="diskimage",
-    ins=[
-        ".+cpmfs",
-        ".+x16",
-        "src/bdos",
-    ],
-    outs=["x16.zip"],
-    commands=[
-        "zip -9qj {outs[0]} {ins}",
-        r'printf "@ +bdos\n@=BDOS\n" | zipnote -w {outs[0]}',
-        r'printf "@ +x16\n@=CPM\n" | zipnote -w {outs[0]}',
-        r'printf "@ +cpmfs.img\n@=CPMFS\n" | zipnote -w {outs[0]}',
-    ],
-    label="ZIP",
+    items={
+        "CPMFS": ".+cpmfs",
+        "CPM": ".+x16",
+        "BDOS": "src/bdos",
+    },
 )
