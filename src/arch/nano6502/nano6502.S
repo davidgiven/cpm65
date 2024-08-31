@@ -594,14 +594,14 @@ zproc serial_inp
 zendproc
 
 zproc serial_out
-    tax
+    sta ptr
     lda #IO_page_uart
     sta IO_page_reg
 wait_serial_out:
     lda uart_b_tx_done
     beq wait_serial_out
     
-    txa
+    lda ptr
     sta uart_b_tx_data
     rts    
 zendproc
@@ -611,7 +611,7 @@ serial_close:
 rts
 
 zproc serial_outp
-    tax
+    sta ptr
     lda #IO_page_uart
     sta IO_page_reg
 
@@ -620,7 +620,7 @@ zproc serial_outp
         sec
         rts
     zendif 
-    txa
+    lda ptr
     sta uart_b_tx_data
     clc
     rts   
