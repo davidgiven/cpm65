@@ -1,5 +1,5 @@
-from build.ab import normalrule
-from tools.build import mkdfs, mkcpmfs
+from build.ab import simplerule
+from tools.build import mkcpmfs
 from build.llvm import llvmrawprogram
 from config import (
     MINIMAL_APPS,
@@ -20,10 +20,12 @@ llvmrawprogram(
 mkcpmfs(
     name="cpmfs",
     format="generic-1m",
-    items={"0:ccp.sys@sr": "src+ccp",
-	   "1:colorfg.com": "src/arch/nano6502/utils+colorfg",
-	   "1:colorbg.com": "src/arch/nano6502/utils+colorbg",
-	   "1:ledtest.com": "src/arch/nano6502/utils+ledtest"}
+    items={
+        "0:ccp.sys@sr": "src+ccp",
+        "1:colorfg.com": "src/arch/nano6502/utils+colorfg",
+        "1:colorbg.com": "src/arch/nano6502/utils+colorbg",
+        "1:ledtest.com": "src/arch/nano6502/utils+ledtest",
+    }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
@@ -38,28 +40,36 @@ mkcpmfs(
     items="",
 )
 
-normalrule(
+simplerule(
     name="diskimage",
     ins=[
         ".+cpmfs",
         ".+emptycpmfs",
         ".+nano6502",
         "src/bdos",
+        "./buildimage.py",
     ],
-    outs=["nano6502.img"],
-    commands=["rm -f {outs[0]}","./src/arch/nano6502/buildimage.py"],
+    outs=["=nano6502.img"],
+    commands=[
+        "rm -f {outs[0]}",
+        "{ins[4]} {ins[2]} {ins[3]} {ins[0]} {ins[1]} {outs[0]}",
+    ],
     label="IMG",
 )
 
-normalrule(
+simplerule(
     name="sysimage",
     ins=[
         ".+cpmfs",
+        ".+emptycpmfs",
         ".+nano6502",
         "src/bdos",
+        "./buildsysimage.py",
     ],
-    outs=["nano6502_sysonly.img"],
-    commands=["rm -f {outs[0]}","./src/arch/nano6502/buildsysimage.py"],
+    outs=["=nano6502_sysonly.img"],
+    commands=[
+        "rm -f {outs[0]}",
+        "{ins[4]} {ins[2]} {ins[3]} {ins[0]} {ins[1]} {outs[0]}",
+    ],
     label="IMG",
 )
-

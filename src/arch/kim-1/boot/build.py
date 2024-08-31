@@ -1,42 +1,46 @@
-from build.ab import Rule, Target, normalrule
+from build.ab import Rule, Target, simplerule
 from build.llvm import llvmrawprogram
+
 
 @Rule
 def mkpap(self, name, src: Target = None):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=[name],
-        commands=["srec_cat {ins[0]} -binary -offset 0x0200 -o {outs[0]} -MOS_Technologies"],
+        outs=[f"={name}"],
+        commands=[
+            "srec_cat {ins[0]} -binary -offset 0x0200 -o {outs[0]} -MOS_Technologies"
+        ],
         label="SREC",
     )
 
-llvmrawprogram (
+
+llvmrawprogram(
     name="boot.bin",
     srcs=["./boot.S"],
     linkscript="./boot.ld",
 )
 
-llvmrawprogram (
+llvmrawprogram(
     name="bootsd.bin",
     srcs=["./bootsd.S"],
     linkscript="./boot.ld",
 )
 
-llvmrawprogram (
+llvmrawprogram(
     name="bootsd-kimrom.bin",
     srcs=["./bootsd.S"],
     cflags=["-DKIM_ROM"],
     linkscript="./boot-kimrom.ld",
 )
 
-llvmrawprogram (
+llvmrawprogram(
     name="bootiec-kim.bin",
     srcs=["./bootiec.S"],
     linkscript="./boot.ld",
 )
 
-llvmrawprogram (
+llvmrawprogram(
     name="bootiec-pal.bin",
     srcs=["./bootiec.S"],
     cflags=["-DPAL_1"],
