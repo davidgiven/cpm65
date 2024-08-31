@@ -57,10 +57,10 @@ mkcpmfs(
     | PASCAL_APPS
 )
 
-normalrule(
+simplerule(
     name="atari800b_diskimage",
     ins=[".+atari800b_rawdiskimage"],
-    outs=["atari800b.atr"],
+    outs=["=atari800b.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
@@ -79,10 +79,10 @@ mkcpmfs(
     | BIG_APPS_SRCS
 )
 
-normalrule(
+simplerule(
     name="atari800c_diskimage",
     ins=[".+atari800c_rawdiskimage"],
-    outs=["atari800c.atr"],
+    outs=["=atari800c.atr"],
     commands=[
         r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
         "cat {ins[0]} >> {outs[0]}",
