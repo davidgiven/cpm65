@@ -3,6 +3,9 @@
 .obj
 apple2e.po
 atari800.atr
+atari800b.atr
+atari800c.atr
+atari800d.atr
 atari800hd.atr
 atari800xlhd.atr
 bbcmicro.ssd
@@ -15,8 +18,11 @@ pet8032.d64
 pet8096.d64
 x16.zip
 oric.dsk
+kim-1-iec.zip
 kim-1-k1013.zip
 kim-1-sdcard.zip
 __pycache__
 neo6502.zip
 sorbus.zip
+nano6502.img
+nano6502_sysonly.img

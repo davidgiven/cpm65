@@ -11,7 +11,7 @@ ZEROPAGE
 cmdoffset:  .byte 0 ; current offset into command line (including size bytes)
 fcb:        .word 0 ; current FCB being worked on
 temp:       .word 0
-temp2:      .byte 0
+temp2:      .word 0
 
 zproc main
     tsx
@@ -226,7 +226,7 @@ monitor_digit:
     zrepeat
         asl temp+0
         rol temp+1
-        rol temp2+2
+        rol temp2
         dex
     zuntil_mi
     ora temp+0

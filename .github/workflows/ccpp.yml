@@ -36,6 +36,8 @@ jobs:
         path: |
           apple2e.po
           atari800.atr
+          atari800b.atr
+          atari800c.atr
           atari800hd.atr
           atari800xlhd.atr
           bbcmicro.ssd

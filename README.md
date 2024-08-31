@@ -251,6 +251,10 @@ the same time.
     ```tty80drv.com```. This will cost you 7kB of TPA for driver code,
     font data, and screen memory. It has a full SCREEN implementation, too.
 
+   - The single-sided single-density version supports up to four drives.
+     Extra applications and source code are spread accross the extra disks.
+     The 1MB images support two drives, but only one is used at the moment.
+
 ### Oric notes
 
   - This disk image is a MFM_DISK format disk as used by Oricutron. (If you need
@@ -325,7 +329,7 @@ the same time.
 
   - The text output is over HDMI, with 640x480 video output and a 80x30 console. It has a SCREEN driver.
 
-  - The input is currently using the built in USB serial port. This way, this port can be run with only the Tang Nano 20K board without any specific carrier board.
+  - The text input can be done using either the built in USB serial port or a USB keyboard with the [nanoComp](https://github.com/venomix666/nanoComp) carrier board. This way, this port can be run with only the Tang Nano 20K board, or with the carrier board for stand-alone use.
 
   - To use, write the `nano6502.img` file into the SD-card using `dd` or your preferred SD-card image writer. If you are updating the image and want to preserve the data on all drives except `A`, write the `nano6502_sysonly.img` instead.
 
