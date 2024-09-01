@@ -1,4 +1,4 @@
-from build.ab import Rule, Targets, Target, List
+from build.ab import Rule, Targets, Target
 from build.c import cprogram, cfile, clibrary
 
 
@@ -6,10 +6,11 @@ from build.c import cprogram, cfile, clibrary
 def llvmcfile(
     self,
     name,
-    srcs: Targets = None,
-    deps: Targets = None,
-    cflags: List = [],
+    srcs: Targets = [],
+    deps: Targets = [],
+    cflags=[],
     suffix=".o",
+    toolchain=None,
     commands=["$(CC6502) -c -o {outs[0]} {ins[0]} $(CFLAGS6502) {cflags}"],
     label="CC6502",
 ):
@@ -27,12 +28,12 @@ def llvmcfile(
 @Rule
 def llvmprogram(
     self,
-    name=None,
-    srcs: Targets = None,
-    deps: Targets = None,
-    cflags: List = None,
-    ldflags: List = None,
-    commands: List = ["$(CC6502) -o {outs[0]} {ins} {ldflags} $(LDFLAGS6502)"],
+    name,
+    srcs: Targets = [],
+    deps: Targets = [],
+    cflags=[],
+    ldflags=[],
+    commands=["$(CC6502) -o {outs[0]} {ins} {ldflags} $(LDFLAGS6502)"],
     label="CLINK6502",
 ):
     cprogram(
@@ -53,7 +54,7 @@ def llvmrawprogram(
     self,
     name,
     linkscript: Target,
-    deps: Targets = None,
+    deps: Targets = [],
     commands=[
         "$(LD6502) -Map {outs[0]}.map -T {deps[-1]} -o {outs[0]} {ins} {ldflags}"
     ],

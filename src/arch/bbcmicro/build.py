@@ -1,4 +1,3 @@
-from build.ab import normalrule
 from tools.build import mkdfs, mkcpmfs, mametest
 from build.llvm import llvmrawprogram
 from config import (
@@ -55,7 +54,6 @@ mkcpmfs(
 
 mkdfs(
     name="diskimage",
-    out="bbcmicro.ssd",
     title="CP/M-65",
     opt=2,
     items={
