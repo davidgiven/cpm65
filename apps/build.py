@@ -1,14 +1,14 @@
-from build.ab import Rule, Target, Targets, normalrule
+from build.ab import Rule, Target, Targets, simplerule
 from build.llvm import llvmprogram
 from tools.build import unixtocpm
 
 
 @Rule
 def asm(self, name, src: Target = None, deps: Targets = []):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=["out.com"],
+        outs=["=out.com"],
         deps=["tools/cpmemu", "apps+asm"] + deps,
         commands=[
             "chronic sh -c \"{deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})"
