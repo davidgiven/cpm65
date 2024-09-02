@@ -65,7 +65,6 @@ mkdfs(
 
 mkdfs(
     name="diskimage2",
-    out="bbcmicro2.ssd",
     title="CP/M-65",
     opt=2,
     items={
