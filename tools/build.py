@@ -1,4 +1,11 @@
-from build.ab import Rule, Target, simplerule, filenameof, TargetsMap, filenamesof
+from build.ab import (
+    Rule,
+    Target,
+    simplerule,
+    filenameof,
+    TargetsMap,
+    filenamesof,
+)
 from build.c import cxxprogram, cprogram
 
 cxxprogram(name="multilink", srcs=["./multilink.cc"], deps=["+libfmt"])
@@ -6,6 +13,7 @@ cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
 cxxprogram(name="shuffle", srcs=["./shuffle.cc"], deps=["+libfmt"])
 cxxprogram(name="mkoricdsk", srcs=["./mkoricdsk.cc"], deps=["+libfmt"])
 cxxprogram(name="mkcombifs", srcs=["./mkcombifs.cc"], deps=["+libfmt"])
+cxxprogram(name="fillfile", srcs=["./fillfile.cc"], deps=["+libfmt"])
 cprogram(name="unixtocpm", srcs=["./unixtocpm.c"])
 cprogram(name="mkdfs", srcs=["./mkdfs.c"])
 cprogram(name="mkimd", srcs=["./mkimd.c"])
@@ -13,17 +21,18 @@ cprogram(
     name="fontconvert", srcs=["./fontconvert.c", "./libbdf.c", "./libbdf.h"]
 )
 
+
 @Rule
-def unixtocpm(
-    self, name, src:Target=None):
+def unixtocpm(self, name, src: Target = None):
     simplerule(
         replaces=self,
         ins=[src],
         outs=[f"={name}.txt"],
         deps=["tools+unixtocpm"],
-        commands=[
-            "{deps[0]} < {ins[0]} > {outs[0]}"],
-            label="UNIXTOCPM")
+        commands=["{deps[0]} < {ins[0]} > {outs[0]}"],
+        label="UNIXTOCPM",
+    )
+
 
 @Rule
 def multilink(
@@ -65,6 +74,9 @@ def mkcpmfs(
     if template:
         cs += ["cp %s {outs[0]}" % filenameof(template)]
     else:
+        # Some versions of mkfs.cpm don't work right if the input file
+        # doesn't exist.
+        cs += ["{deps[1]} -f {outs[0]} -b 0xe5 -n 100000"]
         mkfs = "mkfs.cpm -f %s" % format
         if bootimage:
             mkfs += " -b %s" % filenameof(bootimage)
@@ -89,11 +101,14 @@ def mkcpmfs(
         replaces=self,
         ins=ins,
         outs=[f"={name}.img"],
-        deps=["diskdefs"] + [bootimage]
-        if bootimage
-        else [] + [template]
-        if template
-        else [],
+        deps=(
+            ["diskdefs", "tools+fillfile"]
+            + (
+                [bootimage]
+                if bootimage
+                else [] + [template] if template else []
+            )
+        ),
         commands=cs,
         label="MKCPMFS",
     )
