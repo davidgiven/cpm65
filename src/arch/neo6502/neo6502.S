@@ -55,12 +55,12 @@ FIOATTR_ARCHIVE     = 1<<2
 FIOATTR_READONLY    = 1<<3
 FIOATTR_HIDDEN      = 1<<4
 
-; Filenames are of the form: "/A10/ABCDEFGH.XYZ"
+; Filenames are of the form: "A10/ABCDEFGH.XYZ"+0 (17 bytes)
 
 FT_ATTRIBS        = 0 ; top bit indicate file is in use
 FT_FILENAMELEN    = 1
 FT_FILENAME       = 2
-FT__SIZE          = 20
+FT__SIZE          = 19
 
 NUM_FILES         = 8
 
@@ -405,8 +405,8 @@ zproc bdos_FINDFIRST
     ;
     ;    ?:????????.???
     
-    jsr convert_filename                ; Filename is '/A5/ABCDEFGH.IJK'
-    jsr truncate_filename_to_directory  ; Filename should look like '/A5'
+    jsr convert_filename                ; Filename is 'A5/ABCDEFGH.IJK'
+    jsr truncate_filename_to_directory  ; Filename should look like 'A5'
 
     lda #<(temp_file_entry+FT_FILENAMELEN)
     sta CP_PARAM+0
@@ -551,7 +551,7 @@ zproc bdos_FINDNEXT
 zendproc
 
 zproc truncate_filename_to_directory
-    ldx #2
+    ldx #1
     lda temp_file_entry+FT_FILENAME, x
     cmp #'/'
     zif_ne
@@ -1017,9 +1017,6 @@ zendproc
 zproc convert_filename
     stz temp_file_entry+FT_ATTRIBS
 
-    lda #'/'
-    sta temp_file_entry+FT_FILENAME+0
-
     lda (param)     ; drive
     dec
     zif_mi          ; no drive specified?
@@ -1027,9 +1024,9 @@ zproc convert_filename
     zendif
     clc
     adc #'A'
-    sta temp_file_entry+FT_FILENAME+1
+    sta temp_file_entry+FT_FILENAME+0
 
-    ldx #2
+    ldx #1
     lda current_user
     zif_ne
         cmp #9
