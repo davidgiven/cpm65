@@ -300,13 +300,15 @@ the same time.
     package.)
 
   - It is ridiculously fast.
-
-  - To use, unzip the `cpm65.zip` file into the root directory of the USB stick
-    or other storage card. Then enter `load "cpm65.neo"` at the prompt. CP/M-65
-    will run.
+  
+  - To use, unzip the `cpm65.zip` file into the any directory of the USB stick
+    or other storage card. Then enter `*cd your_directory_name` and then `load
+    "cpm65.neo"` at the prompt. CP/M-65 will run.
 
   - To run on the emulator, either load it as above, or boot it directly with
-    `neo cpm65.neo@8000 run@8010`.
+    `neo CPM65.NEO@8000 run@8010`. Remember that if you're running the emulator
+    on Linux, the filesystem is CASE SENSITIVE so you need to spell `CPM65.NEO`
+    using capital letters. (One CP/M-65 is running this is no longer a concern.)
 
   - This port uses an emulated BDOS, meaning that it stores its files as FAT
     files on the neo6502's USB stick. Most well-behaved CP/M-65 programs will
