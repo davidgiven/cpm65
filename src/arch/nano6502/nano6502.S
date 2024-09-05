@@ -355,7 +355,7 @@ zendproc
 defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, drv_SERIAL
 
 ; SCREEN driver strategy routine
-; Y = TTY opcode
+; Y = SCREEN opcode
 
 zproc drvstrat_SCREEN
     jmpdispatch screen_jmptable_lo, screen_jmptable_hi
@@ -553,8 +553,11 @@ normal_style:
     rts
 zendproc
 
+
+; --- SERIAL driver -------------------------------------------------------
+
 ; SERIAL driver strategy routine
-; Y = TTY opcode
+; Y = SERIAL opcode
 
 defdriver "SERIAL", DRVID_SERIAL, drvstrat_SERIAL, 0
 
@@ -576,8 +579,6 @@ serial_jmptable_hi:
     jmptabhi serial_outp
     jmptabhi serial_in 
 zendproc 
-
-; SERIAL driver
 
 zproc serial_inp
     lda #IO_page_uart
