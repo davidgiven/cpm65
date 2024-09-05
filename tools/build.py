@@ -1,4 +1,11 @@
-from build.ab import Rule, Target, normalrule, filenameof, targetsof, TargetsMap
+from build.ab import (
+    Rule,
+    Target,
+    simplerule,
+    filenameof,
+    TargetsMap,
+    filenamesof,
+)
 from build.c import cxxprogram, cprogram
 
 cxxprogram(name="multilink", srcs=["./multilink.cc"], deps=["+libfmt"])
@@ -6,6 +13,7 @@ cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
 cxxprogram(name="shuffle", srcs=["./shuffle.cc"], deps=["+libfmt"])
 cxxprogram(name="mkoricdsk", srcs=["./mkoricdsk.cc"], deps=["+libfmt"])
 cxxprogram(name="mkcombifs", srcs=["./mkcombifs.cc"], deps=["+libfmt"])
+cxxprogram(name="fillfile", srcs=["./fillfile.cc"], deps=["+libfmt"])
 cprogram(name="unixtocpm", srcs=["./unixtocpm.c"])
 cprogram(name="mkdfs", srcs=["./mkdfs.c"])
 cprogram(name="mkimd", srcs=["./mkimd.c"])
@@ -13,26 +21,27 @@ cprogram(
     name="fontconvert", srcs=["./fontconvert.c", "./libbdf.c", "./libbdf.h"]
 )
 
+
 @Rule
-def unixtocpm(
-    self, name, src:Target=None):
-    normalrule(
+def unixtocpm(self, name, src: Target = None):
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=[name+".txt"],
+        outs=[f"={name}.txt"],
         deps=["tools+unixtocpm"],
-        commands=[
-            "{deps[0]} < {ins[0]} > {outs[0]}"],
-            label="UNIXTOCPM")
+        commands=["{deps[0]} < {ins[0]} > {outs[0]}"],
+        label="UNIXTOCPM",
+    )
+
 
 @Rule
 def multilink(
     self, name=None, core: Target = None, zp: Target = None, tpa: Target = None
 ):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[core, zp, tpa],
-        outs=[name + ".com"],
+        outs=[f"={name}.com"],
         deps=["tools+multilink"],
         commands=["{deps[0]} -o {outs[0]} {ins}"],
         label="MULTILINK",
@@ -41,10 +50,10 @@ def multilink(
 
 @Rule
 def xextobin(self, name=None, src: Target = None, address=0):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=[name + ".bin"],
+        outs=[f"={name}.bin"],
         deps=["tools+xextobin"],
         commands=["{deps[0]} -i {ins[0]} -o {outs[0]} -b %d" % address],
         label="XEXTOBIN",
@@ -65,6 +74,9 @@ def mkcpmfs(
     if template:
         cs += ["cp %s {outs[0]}" % filenameof(template)]
     else:
+        # Some versions of mkfs.cpm don't work right if the input file
+        # doesn't exist.
+        cs += ["{deps[1]} -f {outs[0]} -b 0xe5 -n 100000"]
         mkfs = "mkfs.cpm -f %s" % format
         if bootimage:
             mkfs += " -b %s" % filenameof(bootimage)
@@ -76,6 +88,7 @@ def mkcpmfs(
         flags = None
         if "@" in k:
             k, flags = k.split("@")
+
         cs += ["cpmcp -f %s {outs[0]} %s %s" % (format, filenameof(v), k)]
         if flags:
             cs += ["cpmchattr -f %s {outs[0]} %s %s" % (format, flags, k)]
@@ -84,22 +97,25 @@ def mkcpmfs(
     if size:
         cs += ["truncate -s %d {outs[0]}" % size]
 
-    normalrule(
+    simplerule(
         replaces=self,
         ins=ins,
-        outs=[name + ".img"],
-        deps=["diskdefs"] + [bootimage]
-        if bootimage
-        else [] + [template]
-        if template
-        else [],
+        outs=[f"={name}.img"],
+        deps=(
+            ["diskdefs", "tools+fillfile"]
+            + (
+                [bootimage]
+                if bootimage
+                else [] + [template] if template else []
+            )
+        ),
         commands=cs,
         label="MKCPMFS",
     )
 
 
 @Rule
-def mkdfs(self, name, out=None, title="DFS", opt=0, items: TargetsMap = {}):
+def mkdfs(self, name, title="DFS", opt=0, items: TargetsMap = {}):
     cs = []
     ins = []
     for k, v in items.items():
@@ -112,10 +128,10 @@ def mkdfs(self, name, out=None, title="DFS", opt=0, items: TargetsMap = {}):
         if addr:
             cs += ["-l", addr, "-e", addr]
 
-    normalrule(
+    simplerule(
         replaces=self,
         ins=ins,
-        outs=[out],
+        outs=["=dfs.ssd"],
         deps=["tools+mkdfs"],
         commands=[
             ("{deps[0]} -O {outs[0]} -B %d -N %s " % (opt, title))
@@ -129,10 +145,10 @@ def mkdfs(self, name, out=None, title="DFS", opt=0, items: TargetsMap = {}):
 def shuffle(
     self, name, src: Target = None, blocksize=256, blockspertrack=16, map=""
 ):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=[name + ".bin"],
+        outs=[f"={name}.bin"],
         deps=["tools+shuffle"],
         commands=[
             "{deps[0]} -i {ins[0]} -o {outs[0]} -b %d -t %d -r -m %s"
@@ -144,10 +160,10 @@ def shuffle(
 
 @Rule
 def fontconvert(self, name, src: Target = None):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=[name + ".inc"],
+        outs=[f"={name}.inc"],
         deps=["tools+fontconvert"],
         commands=["{deps[0]} {ins[0]} > {outs[0]}"],
         label="FONTCONVERT",
@@ -156,10 +172,10 @@ def fontconvert(self, name, src: Target = None):
 
 @Rule
 def mkoricdsk(self, name, src: Target = None):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=[name + ".img"],
+        outs=[f"={name}.img"],
         deps=["tools+mkoricdsk"],
         commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
         label="MKORICDSK",
@@ -168,10 +184,10 @@ def mkoricdsk(self, name, src: Target = None):
 
 @Rule
 def mkimd(self, name, src: Target = None):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[src],
-        outs=[name + ".imd"],
+        outs=[f"={name}.imd"],
         deps=["tools+mkimd"],
         commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
         label="MKIMD",
@@ -188,10 +204,10 @@ def mametest(
     imagetype=".img",
     script: Target = None,
 ):
-    normalrule(
+    simplerule(
         replaces=self,
         ins=[diskimage, script],
-        outs=["stamp"],
+        outs=["=stamp"],
         deps=[runscript],
         commands=[
             "sh {deps[0]} %s %s %s %s"

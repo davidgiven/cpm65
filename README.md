@@ -251,6 +251,10 @@ the same time.
     ```tty80drv.com```. This will cost you 7kB of TPA for driver code,
     font data, and screen memory. It has a full SCREEN implementation, too.
 
+   - The single-sided single-density version supports up to four drives.
+     Extra applications and source code are spread accross the extra disks.
+     The 1MB images support two drives, but only one is used at the moment.
+
 ### Oric notes
 
   - This disk image is a MFM_DISK format disk as used by Oricutron. (If you need
@@ -296,13 +300,15 @@ the same time.
     package.)
 
   - It is ridiculously fast.
-
-  - To use, unzip the `cpm65.zip` file into the root directory of the USB stick
-    or other storage card. Then enter `load "cpm65.neo"` at the prompt. CP/M-65
-    will run.
+  
+  - To use, unzip the `cpm65.zip` file into the any directory of the USB stick
+    or other storage card. Then enter `*cd your_directory_name` and then `load
+    "cpm65.neo"` at the prompt. CP/M-65 will run.
 
   - To run on the emulator, either load it as above, or boot it directly with
-    `neo cpm65.neo@8000 run@8010`.
+    `neo CPM65.NEO@8000 run@8010`. Remember that if you're running the emulator
+    on Linux, the filesystem is CASE SENSITIVE so you need to spell `CPM65.NEO`
+    using capital letters. (One CP/M-65 is running this is no longer a concern.)
 
   - This port uses an emulated BDOS, meaning that it stores its files as FAT
     files on the neo6502's USB stick. Most well-behaved CP/M-65 programs will
@@ -314,6 +320,65 @@ the same time.
     utilitied. This are in no way complete, or documented.
 
   - The console is 53x30. It has a SCREEN driver.
+
+### nano6502 notes
+
+  - The [nano6502](https://github.com/venomix666/nano6502/) is a 65C02-based SoC for the Tang Nano 20K FPGA board.
+   
+  - The CPU is running at 25.175 MHz (i.e. the pixel clock).
+
+  - It is using CPMFS directly on the microSD-card, with 15x1Mb partitions (drives `A` to `O`).
+
+  - The text output is over HDMI, with 640x480 video output and a 80x30 console. It has a SCREEN driver.
+
+  - The text input can be done using either the built in USB serial port or a USB keyboard with the [nanoComp](https://github.com/venomix666/nanoComp) carrier board. This way, this port can be run with only the Tang Nano 20K board, or with the carrier board for stand-alone use.
+
+  - To use, write the `nano6502.img` file into the SD-card using `dd` or your preferred SD-card image writer. If you are updating the image and want to preserve the data on all drives except `A`, write the `nano6502_sysonly.img` instead.
+
+  - User area 1 on drive `A` contains utilities for setting the text and background colors, and a demo application which blinks the onboard LEDs.
+  - A SERIAL driver is available for the second UART, connected to pin 25 (RX) and 26 (TX) of the FPGA (and the UART header on the nanoComp carrier board). The baudrate is currently fixed to 115200.
+
+### KIM-1 with K-1013 FDC notes
+
+  - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an
+    SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the
+    0x0400-0x13ff memory hole.
+
+  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into 0x0200 and execute it.
+
+  - Only 1 disk is supported. Multi-disk is not stable in CP/M-65 yet.
+
+  - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with directly attached SD card notes
+
+  - This port uses Ryan E. Roth's [sdcard6502 for the PAL-1](https://github.com/ryaneroth/sdcard6502), which in turn is based on George Foot's [sdcard6502 for Ben Eater's 6502 computer](https://github.com/gfoot/sdcard6502).
+
+  - You'll need an SDHC card of any capacity (only 32MB are used) and a generic Arduino SD card adapter **with 5V to 3.3V conversion**. See the links above for detailed requisites and connection instructions. 
+  
+  - To use it, transfer the `diskimage.raw` file to the SD card using `dd`. Balena Etcher also works in Windows, just ignore the "not a bootable image" warning. Start the KIM-1 in TTY mode, load the `bootsd.pap` loader program into 0x0200 and execute it.
+
+  - For KIM-1 clones, you can place the bootloader into the free space of the KIM-1 rom. Write the contents of the `bootsd-kimrom.bin` file at 0x1AA0 (or 0x2A0 relative to the KIM-1 rom). This romable loader has two entry points:
+    - 0x1AA0 is for cold start, that is, you can point the 6502 reset vector to 0x1AA0 if you want to start CP/M-65 at reset. In this case, the TTY is initialized to 9600 bauds, so make sure that your terminal is configured to that speed.
+    - 0x1AB2 is for booting from the KIM monitor
+
+  - For the KIM-1, at least a 32KB (56KB recommended) RAM expansion from 0x2000 is required, as well as RAM filling the 0x0400-0x13ff memory hole. The BIOS assumes that at least the required RAM is installed, and checks for extra RAM above 0xA000.
+
+  - Same requisites apply to the PAL-1 and, additionally, the second 6532 expansion board.
+
+  - 1 32MB disk supported.
+
+  - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with Commodore 1541 drive
+
+  - Based on the C64 port, so same notes apply.
+
+  - This port needs the [xkim1541 extensions for the KIM-1 installed at 0xF000](https://github.com/eduardocasino/xkim1541). The PAL-1 is also supported, and needs the same extensions but installed at 0xDA00, [as modified by Neil Andretti](https://github.com/netzherpes/xkim1541).
+
+  - If you also have [my modified xKIM monitor](https://github.com/eduardocasino/xKIM/tree/IEC_support), then load the `CPM` program and jump to address 0x6000.
+
+  - If not, load the `bootiec-kim` or  `bootiec-pal` bootloader into 0x200 and execute it.
 
 ### nano6502 notes
 

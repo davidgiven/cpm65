@@ -17,10 +17,6 @@
 
 #define FCB_COUNT 256
 
-// output lines are overlapped with crlf
-// #define EOL "\r\n"
-#define EOL "\n"
-
 uint8_t accumulator[4];
 uint8_t ibp = 0;
 DPB* dpb;
@@ -65,7 +61,7 @@ void print(const char* s)
 
 void crlf(void)
 {
-    print(EOL);
+    print("\r\n");
 }
 
 void printx(const char* s)
@@ -527,11 +523,11 @@ void show_help(void)
     uint8_t j;
 
     printx(
-        "Set disk to read only:  stat d:=R/O"EOL
-        "Set file attributes:    stat d:filename.typ $R/O / $R/W / $SYS / $DIR"EOL
-        "Get file attributes:    stat d:filename.typ [ $S ]"EOL
-        "Show disk info:         stat DSK: / d: DSK:"EOL
-        "Show user number usage: stat USR:"EOL
+        "Set disk to read only:  stat d:=R/O\r\n"
+        "Set file attributes:    stat d:filename.typ $R/O / $R/W / $SYS / $DIR\r\n"
+        "Get file attributes:    stat d:filename.typ [ $S ]\r\n"
+        "Show disk info:         stat DSK: / d: DSK:\r\n"
+        "Show user number usage: stat USR:\r\n"
         "Show device mapping:    stat DEV:"
     );
 

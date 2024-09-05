@@ -30,12 +30,14 @@ jobs:
       run: make LLVM=$HOME/llvm-mos/bin -j`nproc` +all +mametest
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ github.event.repository.name }}.${{ github.sha }}
         path: |
           apple2e.po
           atari800.atr
+          atari800b.atr
+          atari800c.atr
           atari800hd.atr
           atari800xlhd.atr
           bbcmicro.ssd

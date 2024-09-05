@@ -12,6 +12,7 @@ IO_page_led = $02
 IO_page_sdcard = $03
 IO_page_video = $04
 IO_page_timer = $05
+IO_page_keyb = $06
 IO_page_reg = $00
 ROM_sel_reg = $02
 
@@ -53,6 +54,13 @@ uart_tx_done = $fe01
 uart_rx_data = $fe02
 uart_rx_avail = $fe03
 
+uart_b_tx_data = $fe04
+uart_b_tx_done = $fe05
+uart_b_rx_data = $fe06
+uart_b_rx_avail = $fe07
+
+keyb_data_avail = $fe00
+keyb_data = $fe01
 
 ; Offset to second byte of SDCARD address
 BDOS_OFFSET = $1
@@ -270,18 +278,31 @@ zendproc
 ; C if no key is pending, !C if key pending
 zproc tty_const
     lda pending_key
-    zif_eq
-        lda #IO_page_uart
-        sta IO_page_reg
-        lda uart_rx_avail
-        zif_eq
-            lda #$00
-            sec
-            rts
-        zendif
-        lda uart_rx_data
-        sta pending_key
-    zendif
+    bne tty_const_done
+    
+    lda #IO_page_uart
+    sta IO_page_reg
+    lda uart_rx_avail
+    beq tty_const_keyb
+    lda uart_rx_data
+    sta pending_key
+    jmp tty_const_done
+       
+tty_const_keyb:
+    lda #IO_page_keyb
+    sta IO_page_reg
+    lda keyb_data_avail
+    beq tty_const_nokey
+    lda keyb_data
+    sta pending_key
+    jmp tty_const_done
+ 
+tty_const_nokey:            
+    lda #$00
+    sec
+    rts
+    
+tty_const_done:
     lda #$ff
     clc
     rts
@@ -292,12 +313,21 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif_eq
-	    lda #IO_page_uart
-        sta IO_page_reg
 tty_input_wait:
+	lda #IO_page_uart
+        sta IO_page_reg
         lda uart_rx_avail
+        beq tty_input_keyb
+        lda uart_rx_data
+        clc    
+        rts
+tty_input_keyb:
+        lda #IO_page_keyb
+        sta IO_page_reg
+        lda keyb_data_avail
         beq tty_input_wait
-        lda uart_rx_data    
+        lda keyb_data
+        clc
         rts
     zendif
 
@@ -322,10 +352,10 @@ zendproc
 
 ; --- SCREEN driver -------------------------------------------------------
 
-defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, drv_SERIAL
 
 ; SCREEN driver strategy routine
-; Y = TTY opcode
+; Y = SCREEN opcode
 
 zproc drvstrat_SCREEN
     jmpdispatch screen_jmptable_lo, screen_jmptable_hi
@@ -442,13 +472,21 @@ screen_getchar_wait:
     sta IO_page_reg
     lda uart_rx_avail
     bne screen_getchar_data
+    lda #IO_page_keyb
+    sta IO_page_reg
+    lda keyb_data_avail
+    bne screen_getchar_data_keyb 
     lda #IO_page_timer
     sta IO_page_reg
     lda timer_idle
     beq screen_getchar_wait
     jmp nodata
+screen_getchar_data_keyb:
+    lda keyb_data
+    jmp screen_getchar_data_bsfix
 screen_getchar_data:
     lda uart_rx_data
+screen_getchar_data_bsfix:
     cmp #$08
     bne notbs
     lda #127
@@ -513,6 +551,92 @@ normal_style:
     lda #$00
     sta vid_style
     rts
+zendproc
+
+
+; --- SERIAL driver -------------------------------------------------------
+
+; SERIAL driver strategy routine
+; Y = SERIAL opcode
+
+defdriver "SERIAL", DRVID_SERIAL, drvstrat_SERIAL, 0
+
+zproc drvstrat_SERIAL
+    jmpdispatch serial_jmptable_lo, serial_jmptable_hi
+
+serial_jmptable_lo:
+    jmptablo serial_inp
+    jmptablo serial_out
+    jmptablo serial_open
+    jmptablo serial_close
+    jmptablo serial_outp
+    jmptablo serial_in    
+serial_jmptable_hi:
+    jmptabhi serial_inp
+    jmptabhi serial_out
+    jmptabhi serial_open
+    jmptabhi serial_close
+    jmptabhi serial_outp
+    jmptabhi serial_in 
+zendproc 
+
+zproc serial_inp
+    lda #IO_page_uart
+    sta IO_page_reg
+    lda uart_b_rx_avail
+    zif_eq
+    	; No data available
+        sec
+	    rts
+    zendif
+    lda uart_b_rx_data
+    clc
+    rts
+zendproc
+
+zproc serial_out
+    sta ptr
+    lda #IO_page_uart
+    sta IO_page_reg
+wait_serial_out:
+    lda uart_b_tx_done
+    beq wait_serial_out
+    
+    lda ptr
+    sta uart_b_tx_data
+    rts    
+zendproc
+
+serial_open:
+serial_close:
+rts
+
+zproc serial_outp
+    sta ptr
+    lda #IO_page_uart
+    sta IO_page_reg
+
+    lda uart_b_tx_done
+    zif_eq
+        sec
+        rts
+    zendif 
+    lda ptr
+    sta uart_b_tx_data
+    clc
+    rts   
+zendproc
+
+zproc serial_in
+    lda #IO_page_uart
+    sta IO_page_reg
+
+wait_serial_in:
+    lda uart_b_rx_avail
+    beq wait_serial_in
+
+    lda uart_b_rx_data
+    rts 
 zendproc
 
 ; -- Rest of the BIOS ---
@@ -789,11 +913,11 @@ zproc bios_SETBANK
 zendproc
 
 zproc video_init
-    pha 
+    sta ptr1 
     lda #IO_page_video
     sta IO_page_reg    
     jsr video_wait
-    pla
+    lda ptr1
     rts
 zendproc
 

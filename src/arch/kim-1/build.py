@@ -1,4 +1,4 @@
-from build.ab import normalrule, TargetsMap, filenameof, Rule
+from build.ab import simplerule, TargetsMap, filenameof, Rule
 from tools.build import mkimd, mkcpmfs
 from build.llvm import llvmrawprogram, llvmclibrary
 from build.zip import zip
@@ -17,6 +17,7 @@ COMMODORE_ITEMS = (
     | BIG_APPS
     | BIG_APPS_SRCS
 )
+
 
 @Rule
 def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
@@ -37,14 +38,15 @@ def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
         ins += [v]
 
     cs += ["{deps[0]} -f {outs[0]}"]
-    normalrule(
+    simplerule(
         replaces=self,
         ins=ins,
-        outs=[name + ".img"],
+        outs=[f"={name}.img"],
         deps=["tools+mkcombifs"],
         commands=cs,
         label="MKCBMFS",
     )
+
 
 llvmclibrary(
     name="libsd", srcs=["./libsd.S"], cflags=["-I ."], deps=["include"]

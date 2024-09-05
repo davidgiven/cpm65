@@ -1,10 +1,8 @@
 from build.ab import (
     Rule,
-    Target,
-    normalrule,
-    filenameof,
-    targetsof,
+    simplerule,
     TargetsMap,
+    filenameof,
     emit,
 )
 
@@ -28,6 +26,6 @@ def zip(self, name, flags="", items: TargetsMap = {}):
         ]
         ins += [v]
 
-    normalrule(
-        replaces=self, ins=ins, outs=[name + ".zip"], commands=cs, label="ZIP"
+    simplerule(
+        replaces=self, ins=ins, outs=[f"={name}.zip"], commands=cs, label="ZIP"
     )
