@@ -336,6 +336,7 @@ the same time.
   - To use, write the `nano6502.img` file into the SD-card using `dd` or your preferred SD-card image writer. If you are updating the image and want to preserve the data on all drives except `A`, write the `nano6502_sysonly.img` instead.
 
   - User area 1 on drive `A` contains utilities for setting the text and background colors, and a demo application which blinks the onboard LEDs.
+  - A SERIAL driver is available for the second UART, connected to pin 25 (RX) and 26 (TX) of the FPGA (and the UART header on the nanoComp carrier board). The baudrate is currently fixed to 115200.
 
 ### KIM-1 with K-1013 FDC notes
 

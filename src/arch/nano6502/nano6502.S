@@ -54,6 +54,11 @@ uart_tx_done = $fe01
 uart_rx_data = $fe02
 uart_rx_avail = $fe03
 
+uart_b_tx_data = $fe04
+uart_b_tx_done = $fe05
+uart_b_rx_data = $fe06
+uart_b_rx_avail = $fe07
+
 keyb_data_avail = $fe00
 keyb_data = $fe01
 
@@ -309,7 +314,7 @@ zproc tty_conin
     lda pending_key
     zif_eq
 tty_input_wait:
-	    lda #IO_page_uart
+	lda #IO_page_uart
         sta IO_page_reg
         lda uart_rx_avail
         beq tty_input_keyb
@@ -347,10 +352,10 @@ zendproc
 
 ; --- SCREEN driver -------------------------------------------------------
 
-defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, drv_SERIAL
 
 ; SCREEN driver strategy routine
-; Y = TTY opcode
+; Y = SCREEN opcode
 
 zproc drvstrat_SCREEN
     jmpdispatch screen_jmptable_lo, screen_jmptable_hi
@@ -546,6 +551,92 @@ normal_style:
     lda #$00
     sta vid_style
     rts
+zendproc
+
+
+; --- SERIAL driver -------------------------------------------------------
+
+; SERIAL driver strategy routine
+; Y = SERIAL opcode
+
+defdriver "SERIAL", DRVID_SERIAL, drvstrat_SERIAL, 0
+
+zproc drvstrat_SERIAL
+    jmpdispatch serial_jmptable_lo, serial_jmptable_hi
+
+serial_jmptable_lo:
+    jmptablo serial_inp
+    jmptablo serial_out
+    jmptablo serial_open
+    jmptablo serial_close
+    jmptablo serial_outp
+    jmptablo serial_in    
+serial_jmptable_hi:
+    jmptabhi serial_inp
+    jmptabhi serial_out
+    jmptabhi serial_open
+    jmptabhi serial_close
+    jmptabhi serial_outp
+    jmptabhi serial_in 
+zendproc 
+
+zproc serial_inp
+    lda #IO_page_uart
+    sta IO_page_reg
+    lda uart_b_rx_avail
+    zif_eq
+    	; No data available
+        sec
+	    rts
+    zendif
+    lda uart_b_rx_data
+    clc
+    rts
+zendproc
+
+zproc serial_out
+    sta ptr
+    lda #IO_page_uart
+    sta IO_page_reg
+wait_serial_out:
+    lda uart_b_tx_done
+    beq wait_serial_out
+    
+    lda ptr
+    sta uart_b_tx_data
+    rts    
+zendproc
+
+serial_open:
+serial_close:
+rts
+
+zproc serial_outp
+    sta ptr
+    lda #IO_page_uart
+    sta IO_page_reg
+
+    lda uart_b_tx_done
+    zif_eq
+        sec
+        rts
+    zendif 
+    lda ptr
+    sta uart_b_tx_data
+    clc
+    rts   
+zendproc
+
+zproc serial_in
+    lda #IO_page_uart
+    sta IO_page_reg
+
+wait_serial_in:
+    lda uart_b_rx_avail
+    beq wait_serial_in
+
+    lda uart_b_rx_data
+    rts 
 zendproc
 
 ; -- Rest of the BIOS ---
