@@ -20,7 +20,6 @@ export(
         "bin/cc1": "third_party/fck+cc1",
         "bin/cc2": "third_party/fck+cc2",
         "bin/cpp": "third_party/tinycpp",
-        "bin/cpp.com": "third_party/tinycpp+tinycpp-com",
         "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
         "oric.dsk": "src/arch/oric+diskimage",
         "apple2e.po": "src/arch/apple2e+diskimage",
