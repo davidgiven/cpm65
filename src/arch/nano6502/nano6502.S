@@ -344,6 +344,7 @@ zproc tty_conout
 	zendif
     jsr video_init
     sta tty_write 
+
     clc
     rts
 zendproc
@@ -586,6 +587,10 @@ zproc serial_inp
     lda uart_b_rx_avail
     zif_eq
     	; No data available
+
+        ; Short delay to prevent premature timeout in applications
+        jsr serial_delay
+
         sec
 	    rts
     zendif
@@ -637,6 +642,17 @@ wait_serial_in:
 
     lda uart_b_rx_data
     rts 
+zendproc
+
+zproc serial_delay
+    sta ptr
+    lda #$ff
+    sta ptr1
+    zrepeat
+        dec ptr1
+    zuntil_eq    
+    lda ptr
+    rts
 zendproc
 
 ; -- Rest of the BIOS ---
