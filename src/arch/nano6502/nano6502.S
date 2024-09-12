@@ -614,7 +614,11 @@ zendproc
 
 serial_open:
 serial_close:
-rts
+    ; Perform a read to clear the buffer
+    lda #IO_page_uart
+    sta IO_page_reg
+    lda uart_b_rx_data
+    rts
 
 zproc serial_outp
     sta ptr
@@ -646,7 +650,7 @@ zendproc
 
 zproc serial_delay
     sta ptr
-    lda #$ff
+    lda #$20
     sta ptr1
     zrepeat
         dec ptr1
