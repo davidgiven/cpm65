@@ -49,7 +49,7 @@ mkcpmfs(
     format="appleiie",
     bootimage=".+bios_shuffled",
     size=143360,
-    items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
+    items={"0:ccp.sys@sr": "src+ccp-tiny", "0:bdos.sys@sr": "src/bdos"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
