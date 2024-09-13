@@ -35,12 +35,16 @@ struct __attribute__((packed)) block_info {
 
 #define block_info_size (sizeof(struct block_info))
 
+static struct block_info sentinel_begin, sentinel_end;
+
 void zmalloc_init(void *start, size_t size) {
     base = start;
     struct block_info *p = base;
     p->free = 1;
     p->size = size - block_info_size;
-    p->prev = p->next = NULL;
+    p->prev = &sentinel_begin;
+    p->next = &sentinel_end;
+    p->prev->next = p->next->prev = p;
 }
 
 void *zmalloc(size_t size) {
@@ -60,7 +64,7 @@ void *zmalloc(size_t size) {
         q->next = p->next;
         p->next = q;
         q->prev = p;
-        if (q->next) q->next->prev = q;
+        q->next->prev = q;
         q->size = p->size - block_info_size - size;
         p->size = size;
         q->free = 1;
@@ -73,7 +77,7 @@ void *zmalloc(size_t size) {
         q->next = p->next;
         p->next = q;
         q->prev = p;
-        if (q->next) q->next->prev = q;
+        q->next->prev = q;
         p = q;
 #endif
     }
@@ -94,7 +98,7 @@ static void merge_with_next_free(struct block_info *p) {
         struct block_info *q = p->next;
         p->size += q->size + block_info_size;
         p->next = q->next;
-        if (p->next) p->next->prev = p;
+        p->next->prev = p;
     }
 }
 
@@ -110,7 +114,7 @@ void zfree(void *ptr) {
         struct block_info *q = p->prev;
         q->size += p->size + block_info_size;
         q->next = p->next;
-        if (q->next) q->next->prev = q;
+        q->next->prev = q;
         p = q;
     }
     merge_with_next_free(p);
@@ -137,7 +141,7 @@ void *zrealloc(void *ptr, size_t size) {
         q->next = p->next;
         p->next = q;
         q->prev = p;
-        if (q->next) q->next->prev = q;
+        q->next->prev = q;
         q->size = p->size - block_info_size - size;
         p->size = size;
         q->free = 1;
@@ -148,9 +152,27 @@ void *zrealloc(void *ptr, size_t size) {
 
 #ifdef ZMALLOC_DEBUG
 #include <stdio.h>
+void check_memory(void) {
+    struct block_info *p = base, *q = NULL;
+    int total = 0;
+    for (p = base; p; p = p->next) {
+        if (p->size) total += block_info_size + p->size;
+        if (!p->next) q = p;
+    }
+    printf("total fwd: %d\n", total);
+    total = 0;
+    for ( ; q; q = q->prev) {
+        if (q->size) total += block_info_size + q->size;
+    }
+    printf("total bwd: %d\n", total);
+    putchar('\n');
+}
 void print_memory(void) {
     struct block_info *p;
-    for (int c = 0, p = base ; p ; p = p->next, c++)
+    int c;
+    for (c = 0, p = base ; p ; p = p->next, c++)
         printf("block %d, %s, size: %ld\n", c, p->free ? "free" : "used", p->size);
+    putchar('\n');
+    check_memory();
 }
 #endif

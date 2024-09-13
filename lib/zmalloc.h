@@ -9,4 +9,5 @@ void *zrealloc(void *ptr, size_t size);
 
 #ifdef ZMALLOC_DEBUG
 void print_memory(void);
+void check_memory(void);
 #endif
