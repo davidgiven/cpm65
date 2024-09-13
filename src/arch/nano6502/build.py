@@ -25,6 +25,7 @@ mkcpmfs(
         "1:colorfg.com": "src/arch/nano6502/utils+colorfg",
         "1:colorbg.com": "src/arch/nano6502/utils+colorbg",
         "1:ledtest.com": "src/arch/nano6502/utils+ledtest",
+	"1:baudrate.com": "src/arch/nano6502/utils+baudrate",
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
