@@ -1,5 +1,15 @@
-from build.ab import Rule, simplerule, Target, filenameof, Targets, filenamesof
-from os.path import basename, splitext
+from build.ab import (
+    Rule,
+    Target,
+    Targets,
+    filenameof,
+    filenamesof,
+    cwdStack,
+    error,
+    simplerule,
+)
+from os.path import relpath, splitext, join, basename
+from glob import glob
 import fnmatch
 import itertools
 
@@ -21,6 +31,24 @@ def collectattrs(*, targets, name, initial=[]):
     for a in [t.args.get(name, []) for t in targets]:
         s.update(a)
     return list(s)
+
+
+def itemsof(pattern, root=None, cwd=None):
+    if not cwd:
+        cwd = cwdStack[-1]
+    if not root:
+        root = "."
+
+    pattern = join(cwd, pattern)
+    root = join(cwd, root)
+
+    result = {}
+    for f in glob(pattern, recursive=True):
+        try:
+            result[relpath(f, root)] = f
+        except ValueError:
+            error(f"file '{f}' is not in root '{root}'")
+    return result
 
 
 @Rule
@@ -48,7 +76,7 @@ def test(
         simplerule(
             replaces=self,
             ins=[command],
-            outs=["sentinel"],
+            outs=["=sentinel"],
             commands=["{ins[0]}", "touch {outs}"],
             deps=deps,
             label=label,
@@ -57,7 +85,7 @@ def test(
         simplerule(
             replaces=self,
             ins=ins,
-            outs=["sentinel"],
+            outs=["=sentinel"],
             commands=commands + ["touch {outs}"],
             deps=deps,
             label=label,

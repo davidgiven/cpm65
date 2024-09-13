@@ -15,7 +15,9 @@ ZIPNOTE ?= zipnote
 
 
 @Rule
-def zip(self, name, flags="", items: TargetsMap = {}):
+def zip(
+    self, name, flags="", items: TargetsMap = {}, extension="zip", label="ZIP"
+):
     cs = ["rm -f {outs[0]}"]
 
     ins = []
@@ -27,5 +29,9 @@ def zip(self, name, flags="", items: TargetsMap = {}):
         ins += [v]
 
     simplerule(
-        replaces=self, ins=ins, outs=[f"={name}.zip"], commands=cs, label="ZIP"
+        replaces=self,
+        ins=ins,
+        outs=[f"={self.localname}." + extension],
+        commands=cs,
+        label=label,
     )

@@ -1,14 +1,15 @@
 from build.ab import (
     simplerule,
+    error,
     Rule,
     Targets,
     TargetsMap,
     filenamesof,
-    error,
     filenameof,
     emit,
 )
-from build.utils import targetswithtraitsof, collectattrs
+from build.utils import targetswithtraitsof, collectattrs, filenamesmatchingof
+from build.zip import zip
 from os.path import *
 
 emit(
@@ -20,87 +21,112 @@ JFLAGS ?= -g
 )
 
 
-@Rule
-def jar(self, name, srcs: Targets = [], srcroot=None):
-    if not srcroot:
-        srcroot = self.cwd
-    fs = filenamesof(srcs)
-    try:
-        fs = [relpath(f, srcroot) for f in fs]
-    except ValueError:
-        error(f"some source files in {fs} aren't in the srcroot, {srcroot}")
+def _batched(items, n):
+    return (items[pos : pos + n] for pos in range(0, len(items), n))
 
-    simplerule(
+
+@Rule
+def jar(self, name, items: TargetsMap = {}):
+    zip(replaces=self, items=items, extension="jar", flags="-0", label="JAR")
+
+
+@Rule
+def srcjar(self, name, items: TargetsMap = {}):
+    zip(
         replaces=self,
-        ins=srcs,
-        outs=["=source.jar"],
-        commands=["jar cf {outs[0]} -C " + srcroot + " " + (" ".join(fs))],
-        label="JAR",
+        items=items,
+        extension="srcjar",
+        flags="-0",
+        label="SRCJAR",
     )
 
 
 @Rule
-def externaljar(self, name, path):
-    simplerule(
-        replaces=self,
-        ins=[],
-        outs=[],
-        commands=[],
-        label="EXTERNALJAR",
-        jar=path,
-    )
+def externaljar(self, name, paths):
+    for f in paths:
+        if isfile(f):
+            simplerule(
+                replaces=self,
+                ins=[],
+                outs=[],
+                commands=[],
+                label="EXTERNALJAR",
+                args={"jar": f, "caller_deps": [self]},
+            )
+            return
+    error(f"None of {paths} exist")
 
 
 @Rule
 def javalibrary(
     self,
     name,
-    srcs: Targets = [],
-    srcroot=None,
-    extrasrcs: TargetsMap = {},
+    srcitems: TargetsMap = {},
     deps: Targets = [],
 ):
-    filemap = {k: filenameof(v) for k, v in extrasrcs.items()}
-    ins = []
-    for f in filenamesof(srcs):
-        try:
-            ff = relpath(f, srcroot)
-        except ValueError:
-            error(f"source file {f} is not in the srcroot {srcroot}")
-        filemap[ff] = f
-        ins += [f]
+    alldeps = collectattrs(targets=deps, name="caller_deps", initial=deps)
+    externaldeps = targetswithtraitsof(alldeps, "externaljar")
+    externaljars = [t.args["jar"] for t in externaldeps]
+    internaldeps = targetswithtraitsof(alldeps, "javalibrary")
+    srcdeps = targetswithtraitsof(alldeps, "srcjar")
 
-    jardeps = filenamesof(targetswithtraitsof(deps, "javalibrary")) + [
-        t.args["jar"] for t in targetswithtraitsof(deps, "externaljar")
-    ]
+    classpath = filenamesof(internaldeps) + externaljars
+    srcfiles = filenamesmatchingof(srcitems.values(), "*.java")
 
-    dirs = {dirname(s) for s in filemap.keys()}
     cs = (
+        # Setup.
         [
-            "rm -rf {dir}/srcs {dir}/objs {outs[0]}",
-            "mkdir -p " + (" ".join([f"{self.dir}/srcs/{k}" for k in dirs])),
+            "rm -rf {dir}/src {dir}/objs {dir}/files.txt {outs[0]}",
+            "mkdir -p {dir}/src {dir}/objs",
         ]
-        + [f"cp {v} {self.dir}/srcs/{k}" for k, v in filemap.items()]
+        # Decompress any srcjars into directories of their own.
         + [
-            " ".join(
+            " && ".join(
                 [
-                    "$(JAVAC)",
-                    "$(JFLAGS)",
-                    "-d {dir}/objs",
-                    " -cp " + (":".join(jardeps)) if jardeps else "",
+                    "(mkdir {dir}/src/" + str(i),
+                    "cd {dir}/src/" + str(i),
+                    "$(JAR) xf $(abspath " + f + "))",
                 ]
-                + [f"{self.dir}/srcs/{k}" for k in filemap.keys()]
-            ),
-            "$(JAR) --create --no-compress --file {outs[0]} -C {self.dir}/objs .",
+            )
+            for i, f in enumerate(filenamesof(srcdeps))
         ]
     )
 
+    if srcfiles or srcdeps:
+        # Construct the list of filenames (which can be too long to go on
+        # the command line).
+        cs += (
+            [
+                "echo " + (" ".join(batch)) + " >> {dir}/files.txt"
+                for batch in _batched(srcfiles, 100)
+            ]
+            + ["find {dir}/src -name '*.java' >> {dir}/files.txt"]
+            # Actually do the compilation.
+            + [
+                " ".join(
+                    [
+                        "$(JAVAC)",
+                        "$(JFLAGS)",
+                        "-d {dir}/objs",
+                        (" -cp " + ":".join(classpath)) if classpath else "",
+                        "@{dir}/files.txt",
+                    ]
+                )
+            ]
+        )
+
+    # jar up the result.
+    cs += [
+        "$(JAR) --create --no-compress --file {outs[0]} -C {self.dir}/objs ."
+    ]
+
     simplerule(
         replaces=self,
-        ins=ins + deps,
-        outs=[f"={name}.jar"],
+        ins=list(srcitems.values()) + deps,
+        outs=[f"={self.localname}.jar"],
         commands=cs,
         label="JAVALIBRARY",
+        args={"caller_deps": externaldeps + internaldeps},
     )
 
 
@@ -108,37 +134,52 @@ def javalibrary(
 def javaprogram(
     self,
     name,
-    srcs: Targets = [],
-    srcroot=None,
-    extrasrcs: TargetsMap = {},
+    srcitems: TargetsMap = {},
     deps: Targets = [],
     mainclass=None,
 ):
-    jars = filenamesof(targetswithtraitsof(deps, "javalibrary"))
+    alldeps = collectattrs(targets=deps, name="caller_deps", initial=deps)
+    externaldeps = targetswithtraitsof(alldeps, "externaljar")
+    externaljars = [t.args["jar"] for t in externaldeps]
+    internaldeps = targetswithtraitsof(alldeps, "javalibrary")
 
     assert mainclass, "a main class must be specified for javaprogram"
-    if srcs or extrasrcs:
+    if srcitems:
         j = javalibrary(
             name=name + "_mainlib",
-            srcs=srcs,
-            srcroot=srcroot,
-            extrasrcs=extrasrcs,
+            srcitems=srcitems,
             deps=deps,
             cwd=self.cwd,
         )
         j.materialise()
-        jars += [filenameof(j)]
+        internaldeps += [j]
+        alldeps += [j]
 
     simplerule(
         replaces=self,
-        ins=jars,
+        ins=alldeps,
         outs=[f"={self.localname}.jar"],
-        commands=["rm -rf {dir}/objs", "mkdir -p {dir}/objs"]
-        + ["(cd {dir}/objs && $(JAR) xf $(abspath " + j + "))" for j in jars]
+        commands=[
+            "rm -rf {dir}/objs",
+            "mkdir -p {dir}/objs",
+            "echo 'Manifest-Version: 1.0' > {dir}/manifest.mf",
+            "echo 'Created-By: ab' >> {dir}/manifest.mf",
+            "echo 'Main-Class: " + mainclass + "' >> {dir}/manifest.mf",
+        ]
+        + (
+            (
+                ["printf 'Class-Path:' >> {dir}/manifest.mf"]
+                + [f"echo '  {j}' >> {{dir}}/manifest.mf" for j in externaljars]
+            )
+            if externaljars
+            else []
+        )
         + [
-            "$(JAR) --create --file={outs[0]} --main-class="
-            + mainclass
-            + " -C {dir}/objs ."
+            "(cd {dir}/objs && $(JAR) xf $(abspath " + j + "))"
+            for j in filenamesof(internaldeps)
+        ]
+        + [
+            "$(JAR) --create --file={outs[0]} --manifest={dir}/manifest.mf -C {dir}/objs ."
         ],
-        label="MERGEJARS",
+        label="JAVAPROGRAM",
     )
