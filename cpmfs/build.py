@@ -1,6 +1,6 @@
 from tools.build import unixtocpm
 
-for f in ["asm", "atbasic", "bedit", "ds"]:
+for f in ["asm", "atbasic", "bedit"]:
     unixtocpm(name="%s_txt_cpm" % f, src="./%s.txt" % f)
 
 unixtocpm(name="demo_sub_cpm", src="./demo.sub")

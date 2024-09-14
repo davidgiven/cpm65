@@ -44,8 +44,6 @@ for prog in [
 for prog in ["asm", "attr", "copy", "stat", "submit", "objdump", "qe", "life", "ansiterm"]:
     llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
 
-llvmprogram(name="dwarfstar", srcs=["./dwarfstar.c"], deps=["lib+cpm65", "lib+zmalloc"])
-
 # Source code.
     
 for prog in ["cls", "bedit", "dump", "ls"]:
