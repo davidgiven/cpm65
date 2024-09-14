@@ -1,7 +1,8 @@
 #pragma once
 #include <stddef.h>
+#include <stdint.h>
 
-void zmalloc_init(void *start, size_t size);
+void zmalloc_init(void *start, size_t size, uint8_t realloc_free_minsize);
 void *zmalloc(size_t size);
 void *zcalloc(size_t nmemb, size_t size);
 void zfree(void *ptr);

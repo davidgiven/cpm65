@@ -16,6 +16,9 @@
 #include "lib/zmalloc.h"
 #include "lib/screen.h"
 
+#define ROUNDUP(x)  (((x)+7) & -8)  // nearest multiple of 8
+#define MINSIZE 8                   // realloc doesn't free smaller than this
+
 struct erow {
     int size;
     char *chars;
@@ -65,13 +68,13 @@ bool editorInsertRow(int at, char *s, size_t len) {
 
     void *tmp;
     if (E.numrows == E.rowsroom) {
-        tmp = zrealloc(E.row, sizeof(struct erow) * (E.rowsroom + ROOMINC));
+        tmp = zrealloc(E.row, ROUNDUP(sizeof(struct erow) * (E.rowsroom + ROOMINC)));
         if (!tmp) return false;
         E.row = tmp;
         E.rowsroom += ROOMINC;
     }
 
-    tmp = zmalloc(len + 1);
+    tmp = zmalloc(ROUNDUP(len + 1));
     if (!tmp) return false;
 
     memmove(&E.row[at+1], &E.row[at], sizeof(struct erow) * (E.numrows - at));
@@ -105,7 +108,7 @@ void editorDelRow(int at) {
 bool editorRowInsertChar(struct erow *row, int at, uint8_t c) {
     if (at < 0 || at > row->size) at = row->size;
 
-    void *tmp = zrealloc(row->chars, row->size + 2);
+    void *tmp = zrealloc(row->chars, ROUNDUP(row->size + 2));
     if (!tmp) return false;
 
     row->chars = tmp;
@@ -117,7 +120,7 @@ bool editorRowInsertChar(struct erow *row, int at, uint8_t c) {
 }
 
 bool editorRowAppendString(struct erow *row, char *s, size_t len) {
-    void *tmp = zrealloc(row->chars, row->size + len + 1);
+    void *tmp = zrealloc(row->chars, ROUNDUP(row->size + len + 1));
     if (!tmp) return false;
     row->chars = tmp;
     memcpy(&row->chars[row->size], s, len);
@@ -151,7 +154,7 @@ failed:
 
 void editorClearToEOL(struct erow *row) {
     row->size = E.cx;
-    row->chars = zrealloc(row->chars, row->size + 1);
+    row->chars = zrealloc(row->chars, ROUNDUP(row->size + 1));
 }
 
 void editorInsertNewline(void) {
@@ -709,8 +712,8 @@ void initEditor(void) {
 
     uint16_t tpa = cpm_bios_gettpa();
     uint8_t *top = (uint8_t *) (tpa & 0xff00);
-//    zmalloc_init(cpm_ram, 4096);        // test low RAM
-    zmalloc_init(cpm_ram, top - cpm_ram);
+//    zmalloc_init(cpm_ram, 4096, MINSIZE);        // test low RAM
+    zmalloc_init(cpm_ram, top - cpm_ram, MINSIZE);
 
     screen_getsize(&E.screencols, &E.screenrows);
     E.screencols++;

@@ -7,22 +7,11 @@
  */
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>     // memset, memcpy
-#include <stdlib.h>     // abort
-
-// Round up, use to avoid constant copies on ascending realloc sizes and
-// reduce memory fragmentation
-//
-//#define ROUNDUP(x)  x                   // no roundup
-//#define ROUNDUP(x)  (((x)+3) & -4)      // nearest multiple of 4
-
-#define ROUNDUP(x)  (((x)+7) & -8)        // nearest multiple of 8
-#define MINSIZE 8                         // used during realloc
-
-//#define ROUNDUP(x)  (((x)+15) & -16)    // nearest multiple of 16
-//#define ROUNDUP(x)  (((x)+31) & -32)    // nearest multiple of 32
 
 static void *base;
+static uint8_t minsize = 1;
 
 struct block_info;
 
@@ -37,7 +26,7 @@ struct __attribute__((packed)) block_info {
 
 static struct block_info sentinel_begin, sentinel_end;
 
-void zmalloc_init(void *start, size_t size) {
+void zmalloc_init(void *start, size_t size, uint8_t realloc_free_minsize) {
     base = start;
     struct block_info *p = base;
     p->free = 1;
@@ -45,12 +34,11 @@ void zmalloc_init(void *start, size_t size) {
     p->prev = &sentinel_begin;
     p->next = &sentinel_end;
     p->prev->next = p->next->prev = p;
+    minsize = realloc_free_minsize;
 }
 
 void *zmalloc(size_t size) {
     if (!size) return NULL;
-
-    size = ROUNDUP(size);
 
     struct block_info *p;
 
@@ -124,8 +112,6 @@ void *zrealloc(void *ptr, size_t size) {
     if (!ptr) return zmalloc(size);
     if (!size) { zfree(ptr); return NULL; }
 
-    size = ROUNDUP(size);
-
     struct block_info *p = (void *) ptr - block_info_size;
 
     if (size > p->size) { // bigger
@@ -135,7 +121,7 @@ void *zrealloc(void *ptr, size_t size) {
         memcpy(q, ptr, p->size);
         zfree(ptr);
         return q;
-    } else if (p->size > size + block_info_size + MINSIZE) { // smaller enough
+    } else if (p->size > size + block_info_size + minsize) { // smaller enough
         // split and create new free block
         struct block_info *q = (void *) p + block_info_size + size;
         q->next = p->next;
