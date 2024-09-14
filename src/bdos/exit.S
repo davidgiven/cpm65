@@ -20,6 +20,13 @@ zproc bdos_EXIT
     jsr bios_NEWLINE
     jsr bdos_RESET
 
+    ; The CCP.SYS is always loaded from user 0; switch users (but save the old one).
+
+    lda current_user
+    pha
+    lda #0
+    sta current_user
+
     ; Open the CCP.SYS file.
 
     lda #0
@@ -125,7 +132,12 @@ zproc bdos_EXIT
     lda temp+1              ; start of TPA, in pages
     jsr bios_RELOCATE
 
-    ; Execute it.
+    ; Restore the old user.
+
+    pla
+    sta current_user
+
+    ; Execute the CCP.
 
     lda #BANK_MAIN
     jsr bios_SETBANK
