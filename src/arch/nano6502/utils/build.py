@@ -23,3 +23,11 @@ llvmprogram(
         "include",
     ],
 )
+
+llvmprogram(
+    name="baudrate",
+    srcs=["./baudrate.S"],
+    deps=[
+        "include",
+    ],
+)
