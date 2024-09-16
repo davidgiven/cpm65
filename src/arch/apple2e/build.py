@@ -54,11 +54,13 @@ mkcpmfs(
         "0:ccp.sys@sr": "src+ccp-tiny",
         "0:bdos.sys@sr": "src/bdos",
         "0:scrntest.com": "apps+scrntest",
+        "0:cls.com": "apps+cls",
+        "0:atbasic.com": "third_party/altirrabasic",
+        "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
+        "0:qe.com": "apps+qe",
     }
     | MINIMAL_APPS
-    | MINIMAL_APPS_SRCS
-    | BIG_APPS
-    | BIG_APPS_SRCS,
+    | MINIMAL_APPS_SRCS,
 )
 
 mametest(

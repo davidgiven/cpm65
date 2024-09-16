@@ -12,6 +12,8 @@ SCREEN_80STOREOFF = 0xc000
 SCREEN_80STOREON  = 0xc001
 SCREEN_80COLOFF   = 0xc00c
 SCREEN_80COLON    = 0xc00d
+SCREEN_STDCHARSET = 0xc00e
+SCREEN_ALTCHARSET = 0xc00f
 SCREEN_PAGE2OFF   = 0xc054
 SCREEN_PAGE2ON    = 0xc055
 
@@ -44,6 +46,12 @@ MEM_BANKING   = 0xc080
 
 DECODE_TABLE_START = 0x96
 
+SCREENF_CURSORSHOWN = 0x80
+SCREENF_INVERSE = 0x40
+
+SCRWIDTH = 80
+SCRHEIGHT = 24
+
 .extern biosentry
 
 .global _start
@@ -71,6 +79,7 @@ _start:
     sta SCREEN_80COLON
     sta SCREEN_80STOREON
     sta SCREEN_PAGE2OFF
+    sta SCREEN_ALTCHARSET
     ldx #0xff
     txs                     ; reset stack
 
@@ -97,6 +106,8 @@ _start:
     ; Initialise it.
 
     jsr initdrivers
+    lda #0
+    sta cursorf
 
     ; Print the startup banner.
 
@@ -242,7 +253,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
-    jmptablo fail ; screen_setstyle
+    jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -256,7 +267,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-    jmptabhi fail ; screen_setstyle
+    jmptabhi screen_setstyle
 zendproc
 
 zproc fail
@@ -271,21 +282,34 @@ zproc screen_version
 zendproc
 
 zproc screen_getsize
-    lda #79
-    ldx #24
+    lda #SCRWIDTH-1
+    ldx #SCRHEIGHT-1
     clc
+    rts
+zendproc
+
+zproc apply_style
+    bit cursorf
+    zif_vc
+        ora #0x80 ; non inverted
+    zendif
     rts
 zendproc
 
 zproc screen_clear
     jsr hide_cursor
-    lda #24
+    lda #SCRHEIGHT-1
     sta ptr1
+
+    lda #32
+    jsr apply_style
+    tax
+
     zrepeat
         lda ptr1
         jsr calculate_screen_address
         ldy #40
-        lda #32|0x80
+        txa
         zrepeat
             dey
             sta SCREEN_PAGE2ON
@@ -299,7 +323,6 @@ zproc screen_clear
     lda #0
     sta cursorx
     sta cursory
-    sta cursorf
     rts
 zendproc
 
@@ -325,7 +348,7 @@ zproc screen_putchar
     pha
     jsr prepare_for_screen_write
     pla
-    eor #0x80
+    jsr apply_style
     sta (ptr), y
 
     inc cursorx
@@ -393,7 +416,7 @@ zproc screen_scrollup
         txa
         jsr calculate_screen_address ; ptr is source pointer
 
-        ldy #39
+        ldy #(SCRWIDTH/2)-1
         zrepeat
             sta SCREEN_PAGE2OFF
             lda (ptr), y
@@ -404,7 +427,7 @@ zproc screen_scrollup
             dey
         zuntil_mi
 
-        cpx #23
+        cpx #SCRHEIGHT-1
     zuntil_eq
 
     jmp clear_line_at_ptr
@@ -413,7 +436,7 @@ zendproc
 zproc screen_scrolldown
     jsr hide_cursor
 
-    ldx #23             ; current line
+    ldx #SCRHEIGHT-1    ; current line
     zrepeat
         txa
         jsr calculate_screen_address
@@ -426,7 +449,7 @@ zproc screen_scrolldown
         txa
         jsr calculate_screen_address ; ptr is source pointer
 
-        ldy #39
+        ldy #(SCRWIDTH/2)-1
         zrepeat
             sta SCREEN_PAGE2OFF
             lda (ptr), y
@@ -442,8 +465,9 @@ zproc screen_scrolldown
 zendproc
     ; fall through
 zproc clear_line_at_ptr
-    ldy #39
-    lda #32|0x80
+    ldy #(SCRWIDTH/2)-1
+    lda #32
+    jsr apply_style
     zrepeat
         sta SCREEN_PAGE2OFF
         sta (ptr), y
@@ -473,26 +497,39 @@ zproc screen_cleartoeol
 
         pla
         tay
-        lda #32|0x80
+        lda #32
+        jsr apply_style
         sta (ptr), y
 
         inx
-        cpx #80
+        cpx #SCRWIDTH
     zuntil_eq
+    rts
+zendproc
+
+zproc screen_setstyle
+    ldx #0
+    and #STYLE_REVERSE
+    zif_eq ; reverse off
+        lda cursorf
+        and #(~SCREENF_INVERSE) & 0xff
+        sta cursorf
+        rts
+    zendif
+
+    ; reverse on
+
+    lda cursorf
+    ora #SCREENF_INVERSE
+    sta cursorf
     rts
 zendproc
 
 zproc draw_cursor
     pha
     lda cursorf
-    zif_eq                  ; if zero, cursor is hidden
-        jsr prepare_for_screen_write
-        lda (ptr), y
-        sta cursork
-        lda #0x60           ; flashing block
-        sta (ptr), y
-
-        inc cursorf
+    zif_pl                  ; if bit 7 zero, cursor is hidden
+        jsr toggle_cursor
     zendif
     pla
     rts
@@ -503,16 +540,24 @@ zproc hide_cursor
     txa
     pha
     lda cursorf
-    zif_ne                  ; if non-zero, cursor is shown
-        jsr prepare_for_screen_write
-        lda cursork
-        sta (ptr), y
-
-        dec cursorf             ; mark cursor as hidden
+    zif_mi                  ; if bit 7 non-zero, cursor is shown
+        jsr toggle_cursor
     zendif
     pla
     tax
     pla
+    rts
+zendproc
+
+zproc toggle_cursor
+    jsr prepare_for_screen_write
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
+
+    lda cursorf
+    eor #SCREENF_CURSORSHOWN
+    sta cursorf
     rts
 zendproc
 
@@ -569,7 +614,7 @@ zproc tty_conout
     jsr screen_putchar
 
     lda cursorx
-    cmp #80
+    cmp #SCRWIDTH
     zif_eq
         lda #0
         sta cursorx
@@ -581,7 +626,7 @@ zendproc
 zproc write_nl
     inc cursory
     lda cursory
-    cmp #24
+    cmp #SCRHEIGHT
     zif_eq
         dec cursory
         jmp screen_scrollup
@@ -1316,8 +1361,7 @@ encode_tab:         .fill 64 ; must be within one page
 .bss
 cursorx:            .fill 1
 cursory:            .fill 1
-cursork:            .fill 1 ; character under the cursor
-cursorf:            .fill 1 ; non-zero is cursor shown
+cursorf:            .fill 1 ; SCREEN flags
 current_bank:       .fill 1
 current_phase:      .fill 1
 directory_buffer:   .fill 128
