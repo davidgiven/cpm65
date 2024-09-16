@@ -1,0 +1,87 @@
+DwarfStar
+=========
+
+A small text editor with WordStar
+keybindings.
+
+
+Usage
+-----
+
+    ds filename.ext
+
+If the file does not exist, a new file
+will be created when saving the file.
+
+
+Keybindings
+-----------
+
+A ^ denotes holding the Ctrl key. In
+case of two letter commands, the second
+letter can be pressed alone or by
+keeping Ctrl pressed.
+
+(the famous WordStar diamond)
+
+^E  move cursor up
+^X  move cursor down
+^S  move cursor left
+^D  move cursor right
+^QS move cursor to start of line
+^QD move cursor to end of line
+
+^R  move page up
+^C  move page down
+^QR move to start of file
+^QC move to end of file
+
+^A  word left
+^F  word right
+
+^W  scroll up
+^Z  scroll down
+
+^G  delete character right from cursor
+^H  delete character left from cursor
+
+^T  delete word right from cursor
+^Y  delete line
+^QY delete until end of line
+
+^I  insert up to four spaces
+^M  insert line break
+
+^QF find string
+
+^KS save file
+^KQ quit DwarfStar
+
+
+Author
+------
+
+DwarfStar was written by Ivo van
+Poorten in September 2024, based on
+"Build your Own Text Editor" [1] which
+was in turn based on antirez's kilo
+editor [2].
+
+Several improvements were made to
+reduce the amount of screen redrawing,
+making it suitable for slow screens,
+being either memory based or over a
+serial terminal line.  DwarfStar was
+first called 'lb' (short for pound,
+circa half a kilo) but as more features
+were added, mimicking the legendary
+WordStar, and its size growing well
+beyond what could reasonably called a
+pound, it was renamed DwarfStar. As of
+this writing cloc reports 626 lines of
+code. With syntax highlighting removed,
+but several features added, this is
+still well below the size of 'kilo'.
+
+[1] https://viewsourcecode.org/snaptoken/kilo/index.html
+[2] http://antirez.com/news/108

@@ -7,6 +7,7 @@ from config import (
     BIG_APPS,
     BIG_APPS_SRCS,
     SCREEN_APPS,
+    BIG_SCREEN_APPS,
     PASCAL_APPS,
 )
 
@@ -32,6 +33,7 @@ mkcpmfs(
     | BIG_APPS
     | BIG_APPS_SRCS
     | SCREEN_APPS
+    | BIG_SCREEN_APPS
     | PASCAL_APPS,
 )
 
