@@ -96,6 +96,7 @@ _zmake_loops cs, cc
 _zmake_loops pl, mi
 _zmake_loops mi, pl
 _zmake_loops vs, vc
+_zmake_loops vc, vs
 
 .macro _zmake_if pos, neg
     .macro zif_\pos
@@ -112,6 +113,7 @@ _zmake_if cs, cc
 _zmake_if pl, mi
 _zmake_if mi, pl
 _zmake_if vs, vc
+_zmake_if vc, vs
 
 .macro zelse
     _zgetframe zifstack, %zifsp
