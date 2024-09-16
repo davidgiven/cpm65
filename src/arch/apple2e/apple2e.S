@@ -241,7 +241,7 @@ screen_jmptable_lo:
     jmptablo fail ; screen_showcursor
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
-    jmptablo fail ; screen_cleartoeol
+    jmptablo screen_cleartoeol
     jmptablo fail ; screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
@@ -255,7 +255,7 @@ screen_jmptable_hi:
     jmptabhi fail
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
-    jmptabhi fail ; screen_cleartoeol
+    jmptabhi screen_cleartoeol
     jmptabhi fail ; screen_setstyle
 zendproc
 
@@ -451,6 +451,34 @@ zproc clear_line_at_ptr
         sta (ptr), y
         dey
     zuntil_mi
+    rts
+zendproc
+
+zproc screen_cleartoeol
+    jsr hide_cursor
+
+    lda cursory
+    jsr calculate_screen_address
+
+    ldx cursorx
+    zrepeat
+        txa
+        lsr a
+        pha
+        rol a
+        and #1
+        eor #1
+        tay
+        sta SCREEN_PAGE2OFF, y
+
+        pla
+        tay
+        lda #32|0x80
+        sta (ptr), y
+
+        inx
+        cpx #80
+    zuntil_eq
     rts
 zendproc
 
