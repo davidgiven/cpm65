@@ -221,7 +221,8 @@ the same time.
     it. The disk image has been munged according to ProDOS sector ordering.
 
   - It supports a single drive on slot 6 drive 1. You need a 80-column card
-    (but not any aux memory).
+    (but not any aux memory). The console is a standard 80x24, and there is
+    a SCREEN driver.
 
   - This port runs completely bare-metal and does not use any ROM routines.
 
