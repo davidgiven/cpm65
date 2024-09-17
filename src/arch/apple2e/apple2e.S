@@ -35,6 +35,12 @@ MEM_BANKING   = 0xc080
 
 DECODE_TABLE_START = 0x96
 
+SCREENF_CURSORSHOWN = 0x80
+SCREENF_INVERSE = 0x40
+
+SCRWIDTH = 80
+SCRHEIGHT = 24
+
 .extern biosentry
 
 .global _start
@@ -63,6 +69,7 @@ _start:
     sta SCREEN_80COLON
     sta SCREEN_80STOREON
     sta SCREEN_PAGE2OFF
+    sta SCREEN_ALTCHARSET
 #endif
     ldx #0xff
     txs                     ; reset stack
@@ -90,10 +97,12 @@ _start:
     ; Initialise it.
 
     jsr initdrivers
+    lda #0
+    sta cursorf
 
     ; Print the startup banner.
 
-    jsr clear_screen
+    jsr screen_clear
     ldy #banner_end - banner
     zrepeat
         tya
@@ -209,13 +218,343 @@ zproc bios_SETBANK
     rts
 zendproc
 
-; --- TTY driver ------------------------------------------------------------
-
 .data
 .global drvtop
 drvtop: .word drv_TTY
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+; --- SCREEN driver ---------------------------------------------------------
+
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
+
+screen_jmptable_lo:
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo fail ; screen_showcursor
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo screen_setstyle
+screen_jmptable_hi:
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi fail
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi screen_setstyle
+zendproc
+
+zproc fail
+    sec
+    rts
+zendproc
+
+zproc screen_version
+    lda #0
+    clc
+    rts
+zendproc
+
+zproc screen_getsize
+    lda #SCRWIDTH-1
+    ldx #SCRHEIGHT-1
+    clc
+    rts
+zendproc
+
+zproc apply_style
+    bit cursorf
+    zif_vc
+        ora #0x80 ; non inverted
+    zendif
+    rts
+zendproc
+
+zproc screen_clear
+    jsr hide_cursor
+    lda #SCRHEIGHT-1
+    sta ptr1
+
+    lda #32
+    jsr apply_style
+    tax
+
+    zrepeat
+        lda ptr1
+        jsr calculate_screen_address
+        ldy #40
+        txa
+        zrepeat
+            dey
+            sta SCREEN_PAGE2ON
+            sta (ptr), y
+            sta SCREEN_PAGE2OFF
+            sta (ptr), y
+        zuntil_eq
+
+        dec ptr1
+    zuntil_mi
+    lda #0
+    sta cursorx
+    sta cursory
+    rts
+zendproc
+
+zproc screen_setcursor
+    jsr hide_cursor
+    sta cursorx
+    stx cursory
+    jsr draw_cursor
+    clc
+    rts
+zendproc
+
+zproc screen_getcursor
+    lda cursorx
+    ldx cursory
+    clc
+    rts
+zendproc
+
+zproc screen_putchar
+    jsr hide_cursor
+
+    pha
+    jsr prepare_for_screen_write
+    pla
+    jsr apply_style
+    sta (ptr), y
+
+    inc cursorx
+    clc
+    rts
+zendproc
+    
+zproc screen_putstring
+    sta 1f+1
+    stx 1f+2
+
+    zloop
+    1:
+        lda 0xffff
+        zbreakif_eq
+
+        jsr screen_putchar
+
+        inc 1b+1
+        zif_eq
+            inc 1b+2
+        zendif
+    zendloop
+
+    clc
+    rts
+zendproc
+
+zproc screen_getchar
+    ; Turn the disk motor off.
+
+    ldx #DISK_SLOT
+    lda DISK_MOTOROFF, x
+    lda #0
+    sta motor_countdown
+
+    ; Display the cursor.
+
+    jsr draw_cursor
+
+    ; Wait for the key.
+
+    zrepeat
+        lda KBD_READ
+    zuntil_mi
+    sta KBD_STROBERESET
+    and #0x7f
+    clc
+    rts
+zendproc
+
+zproc screen_scrollup
+    jsr hide_cursor
+
+    ldx #0              ; current line
+    zrepeat
+        txa
+        jsr calculate_screen_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        inx
+        txa
+        jsr calculate_screen_address ; ptr is source pointer
+
+        ldy #(SCRWIDTH/2)-1
+        zrepeat
+            sta SCREEN_PAGE2OFF
+            lda (ptr), y
+            sta (ptr1), y
+            sta SCREEN_PAGE2ON
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        cpx #SCRHEIGHT-1
+    zuntil_eq
+
+    jmp clear_line_at_ptr
+zendproc
+
+zproc screen_scrolldown
+    jsr hide_cursor
+
+    ldx #SCRHEIGHT-1    ; current line
+    zrepeat
+        txa
+        jsr calculate_screen_address
+        lda ptr+0
+        sta ptr1+0
+        lda ptr+1
+        sta ptr1+1      ; ptr1 is dest pointer
+
+        dex
+        txa
+        jsr calculate_screen_address ; ptr is source pointer
+
+        ldy #(SCRWIDTH/2)-1
+        zrepeat
+            sta SCREEN_PAGE2OFF
+            lda (ptr), y
+            sta (ptr1), y
+            sta SCREEN_PAGE2ON
+            lda (ptr), y
+            sta (ptr1), y
+            dey
+        zuntil_mi
+
+        txa
+    zuntil_eq
+zendproc
+    ; fall through
+zproc clear_line_at_ptr
+    ldy #(SCRWIDTH/2)-1
+    lda #32
+    jsr apply_style
+    zrepeat
+        sta SCREEN_PAGE2OFF
+        sta (ptr), y
+        sta SCREEN_PAGE2ON
+        sta (ptr), y
+        dey
+    zuntil_mi
+    rts
+zendproc
+
+zproc screen_cleartoeol
+    jsr hide_cursor
+
+    lda cursory
+    jsr calculate_screen_address
+
+    ldx cursorx
+    zrepeat
+        txa
+        lsr a
+        pha
+        rol a
+        and #1
+        eor #1
+        tay
+        sta SCREEN_PAGE2OFF, y
+
+        pla
+        tay
+        lda #32
+        jsr apply_style
+        sta (ptr), y
+
+        inx
+        cpx #SCRWIDTH
+    zuntil_eq
+    rts
+zendproc
+
+zproc screen_setstyle
+    ldx #0
+    and #STYLE_REVERSE
+    zif_eq ; reverse off
+        lda cursorf
+        and #(~SCREENF_INVERSE) & 0xff
+        sta cursorf
+        rts
+    zendif
+
+    ; reverse on
+
+    lda cursorf
+    ora #SCREENF_INVERSE
+    sta cursorf
+    rts
+zendproc
+
+zproc draw_cursor
+    pha
+    lda cursorf
+    zif_pl                  ; if bit 7 zero, cursor is hidden
+        jsr toggle_cursor
+    zendif
+    pla
+    rts
+zendproc
+
+zproc hide_cursor
+    pha
+    txa
+    pha
+    lda cursorf
+    zif_mi                  ; if bit 7 non-zero, cursor is shown
+        jsr toggle_cursor
+    zendif
+    pla
+    tax
+    pla
+    rts
+zendproc
+
+zproc toggle_cursor
+    jsr prepare_for_screen_write
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
+
+    lda cursorf
+    eor #SCREENF_CURSORSHOWN
+    sta cursorf
+    rts
+zendproc
+
+; --- TTY driver ------------------------------------------------------------
+
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
@@ -241,6 +580,8 @@ zendproc
 ; Writes the character in A.
 
 zproc tty_conout
+    jsr hide_cursor
+
     cmp #13
     zif_eq
         lda #0
@@ -261,15 +602,10 @@ zproc tty_conout
     cmp #10
     beq write_nl
 
-    pha
-    jsr prepare_for_screen_write
-    pla
-    eor #0x80
-    sta (ptr), y
+    jsr screen_putchar
 
-    inc cursorx
     lda cursorx
-    cmp #SCREEN_WIDTH
+    cmp #SCRWIDTH
     zif_eq
         lda #0
         sta cursorx
@@ -281,55 +617,11 @@ zendproc
 zproc write_nl
     inc cursory
     lda cursory
-    cmp #SCREEN_HEIGHT
+    cmp #SCRHEIGHT
     zif_eq
         dec cursory
-        jmp scroll_up
+        jmp screen_scrollup
     zendif
-    rts
-zendproc
-
-zproc scroll_up
-    ldx #0              ; current line
-    zrepeat
-        txa
-        jsr calculate_screen_address
-        lda ptr+0
-        sta ptr1+0
-        lda ptr+1
-        sta ptr1+1      ; ptr1 is dest pointer
-
-        inx
-        txa
-        jsr calculate_screen_address ; ptr is source pointer
-
-        ldy #39
-        zrepeat
-#if TTY_MODE == TTY_MODE_80COLUMNS
-            sta SCREEN_PAGE2OFF
-            lda (ptr), y
-            sta (ptr1), y
-            sta SCREEN_PAGE2ON
-#endif
-            lda (ptr), y
-            sta (ptr1), y
-            dey
-        zuntil_mi
-
-        cpx #23
-    zuntil_eq
-
-    ldy #39
-    lda #32|0x80
-    zrepeat
-#if TTY_MODE == TTY_MODE_80COLUMNS
-        sta SCREEN_PAGE2OFF
-        sta (ptr), y
-        sta SCREEN_PAGE2ON
-#endif
-        sta (ptr), y
-        dey
-    zuntil_mi
     rts
 zendproc
 
@@ -384,31 +676,6 @@ zproc calculate_screen_address
     rts
 zendproc
 
-zproc clear_screen
-    lda #24
-    sta ptr1
-    zrepeat
-        lda ptr1
-        jsr calculate_screen_address
-        ldy #40
-        lda #32|0x80
-        zrepeat
-            dey
-#if TTY_MODE == TTY_MODE_80COLUMNS
-            sta SCREEN_PAGE2ON
-            sta (ptr), y
-            sta SCREEN_PAGE2OFF
-#endif
-            sta (ptr), y
-        zuntil_eq
-
-        dec ptr1
-    zuntil_mi
-    lda #0
-    sta cursorx
-    sta cursory
-    rts
-zendproc
 
 ; --- Keyboard --------------------------------------------------------------
 
@@ -1097,8 +1364,7 @@ encode_tab:         .fill 64 ; must be within one page
 cursorx:            .fill 1
 cursory:            .fill 1
 cursork:            .fill 1
-;~ cursorstylemask:    .fill 1
-;~ cursorvisible:      .fill 1
+cursorf:            .fill 1 ; SCREEN flags
 current_bank:       .fill 1
 current_phase:      .fill 1
 directory_buffer:   .fill 128

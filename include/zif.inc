@@ -10,8 +10,8 @@
 .set zloopsp, 0
 .set zifsp, 0
 
-.macro zproc name, section=.text, binding=global
-    .section \section, "ax"
+.macro zproc name, sect=.text, binding=global
+    .section \sect, "ax"
     .\binding \name
     \name:
 .endm
@@ -96,6 +96,7 @@ _zmake_loops cs, cc
 _zmake_loops pl, mi
 _zmake_loops mi, pl
 _zmake_loops vs, vc
+_zmake_loops vc, vs
 
 .macro _zmake_if pos, neg
     .macro zif_\pos
@@ -111,6 +112,8 @@ _zmake_if cc, cs
 _zmake_if cs, cc
 _zmake_if pl, mi
 _zmake_if mi, pl
+_zmake_if vs, vc
+_zmake_if vc, vs
 
 .macro zelse
     _zgetframe zifstack, %zifsp

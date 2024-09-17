@@ -20,6 +20,13 @@ zproc bdos_EXIT
     jsr bios_NEWLINE
     jsr bdos_RESET
 
+    ; The CCP.SYS is always loaded from user 0; switch users (but save the old one).
+
+    lda current_user
+    pha
+    lda #0
+    sta current_user
+
     ; Open the CCP.SYS file.
 
     lda #0
@@ -58,22 +65,13 @@ zproc bdos_EXIT
     lda #BANK_EXTRA
     jsr bios_SETBANK
 
-    jsr bios_GETZP          ; top of ZP in X
-    txa
-    sec
-    ldy #COMHDR_ZP_USAGE
-    sbc (user_dma), y
-    pha
-
-    jsr bios_GETTPA         ; top of TPA page number in X
-    txa
-    sec
-    ldy #COMHDR_TPA_USAGE
-    sbc (user_dma), y
-    sta temp+1
-    pha                     ; store load address for later
-    lda #0
-    sta temp+0
+    jsr compute_ccp_start_address
+    zif_cc
+        lda #BANK_MAIN
+        jsr bios_SETBANK
+        jsr compute_ccp_start_address
+        bcc 1b
+    zendif
 
     ; Copy the first record into memory.
         
@@ -106,11 +104,6 @@ zproc bdos_EXIT
 
     ; Patch the BDOS entry vector in the file header.
 
-    lda #0                  ; pop start address, saved earlier
-    sta temp+0
-    pla
-    sta temp+1
-
     ldy #COMHDR_BDOS
     lda #<ENTRY
     sta (temp), y
@@ -120,12 +113,16 @@ zproc bdos_EXIT
 
     ; Relocate.
 
-    pla                     ; pop start zero page address, saved earlier
-    tax
+    ldx temp+3              ; load start zero page address, saved earlier
     lda temp+1              ; start of TPA, in pages
     jsr bios_RELOCATE
 
-    ; Execute it.
+    ; Restore the old user.
+
+    pla
+    sta current_user
+
+    ; Execute the CCP.
 
     lda #BANK_MAIN
     jsr bios_SETBANK
@@ -134,6 +131,37 @@ zproc bdos_EXIT
     sta temp+0
 calltemp:
     jmp (temp)
+    
+; user_dma points at the first sector of the CPP; this sets temp to the start
+; address that the CCP should be loaded at. Returns with C *CLEAR* if there's no
+; room.
+;
+; temp+3 is set to the start ZP address page.
+compute_ccp_start_address:
+    jsr bios_GETZP          ; top of ZP in X
+    sta temp+2              ; bottom of ZP
+    txa
+    sec
+    ldy #COMHDR_ZP_USAGE
+    sbc (user_dma), y
+    cmp temp+2              ; check that there's room
+    bcc 1f
+    sta temp+3              ; store ZP address for later
+
+    jsr bios_GETTPA         ; top of TPA page number in X
+    sta temp+2              ; bottom of TPA
+    txa
+    sec
+    ldy #COMHDR_TPA_USAGE
+    sbc (user_dma), y
+    sta temp+1
+    cmp temp+2
+    bcc 1f
+    lda #0
+    sta temp+0
+    sec
+1:
+    rts
 
     .data
 ccp_fcb:

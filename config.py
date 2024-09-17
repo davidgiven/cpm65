@@ -34,7 +34,6 @@ BIG_APPS = {
     "0:atbasic.com": "third_party/altirrabasic",
     "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
     "0:objdump.com": "apps+objdump",
-    "0:scrntest.com": "apps+scrntest",
     "0:kbdtest.com": "apps+kbdtest",
     "0:ansiterm.com": "apps+ansiterm",
 }
@@ -42,12 +41,20 @@ BIG_APPS = {
 BIG_APPS_SRCS = {}
 
 SCREEN_APPS = {
+    "0:adm3adrv.com": "apps+adm3adrv",
+    "0:adm3atst.com": "apps+adm3atst",
     "0:cls.com": "apps+cls",
     "0:life.com": "apps+life",
     "0:qe.com": "apps+qe",
+    "0:scrntest.com": "apps+scrntest",
     "0:tetris.com": "apps+tetris",
     "0:vt52drv.com": "apps+vt52drv",
     "0:vt52test.com": "apps+vt52test",
+}
+
+BIG_SCREEN_APPS = {
+    "0:ds.com": "third_party/dwarfstar",
+    "0:ds.txt": "third_party/dwarfstar/+ds_txt_cpm",
 }
 
 SCREEN_APPS_SRCS = {"0:cls.asm": "apps+cls_asm_cpm"}

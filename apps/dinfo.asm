@@ -186,12 +186,12 @@ success:
         ldx #7
         .zrepeat
             lsr A
-            bcs used
-            inc val1
-            .zif eq
-                inc val1+1
+            .zif cc
+                inc val1
+                .zif eq
+                    inc val1+1
+                .zendif
             .zendif
-        used:
             inc count
             .zif eq
                 inc count+1
@@ -199,11 +199,11 @@ success:
             pha
             lda count+1
             cmp dsm+1
-            bne notyet
-            lda count
-            cmp dsm
-            beq stop    \ stop condition
-        notyet:
+            .zif eq
+                lda count
+                cmp dsm
+                beq stop    \ stop condition
+            .zendif
             pla
             dex
         .zuntil mi
@@ -222,11 +222,10 @@ stop:
     dex
     dex
     stx count           \ save bsh-3 for later
-    beq no_shift
+    .zif ne
+        jsr shift_val1_left_by_x
+    .zendif
 
-    jsr shift_val1_left_by_x
-
-no_shift:
     lda val1
     ldx val1+1
     ldy #0
@@ -245,11 +244,10 @@ no_shift:
     lda dsm+1
     sta val1+1
     ldx count
-    beq no_shift2
+    .zif ne
+        jsr shift_val1_left_by_x
+    .zendif
 
-    jsr shift_val1_left_by_x
-
-no_shift2:
     lda val1
     ldx val1+1
     ldy #0

@@ -1,10 +1,8 @@
 from build.ab import (
     Rule,
-    Target,
-    normalrule,
-    filenameof,
-    targetsof,
+    simplerule,
     TargetsMap,
+    filenameof,
     emit,
 )
 
@@ -17,7 +15,9 @@ ZIPNOTE ?= zipnote
 
 
 @Rule
-def zip(self, name, flags="", items: TargetsMap = {}):
+def zip(
+    self, name, flags="", items: TargetsMap = {}, extension="zip", label="ZIP"
+):
     cs = ["rm -f {outs[0]}"]
 
     ins = []
@@ -28,6 +28,10 @@ def zip(self, name, flags="", items: TargetsMap = {}):
         ]
         ins += [v]
 
-    normalrule(
-        replaces=self, ins=ins, outs=[name + ".zip"], commands=cs, label="ZIP"
+    simplerule(
+        replaces=self,
+        ins=ins,
+        outs=[f"={self.localname}." + extension],
+        commands=cs,
+        label=label,
     )
