@@ -108,6 +108,10 @@ mainloop:
 
 case_done:
     \ Cursor left
+    cmp #SCREEN_ARROW_LEFT
+    .zif eq
+        lda #'A'
+    .zendif
     cmp #'A'
     .zif eq
         lda #0
@@ -120,6 +124,10 @@ case_done:
     .zendif
     
     \ Cursor right
+    cmp #SCREEN_ARROW_RIGHT
+    .zif eq
+        lda #'D'
+    .zendif
     cmp #'D'
     .zif eq
         lda max_x
@@ -131,7 +139,11 @@ case_done:
         jmp mainloop
     .zendif
    
-    \ Cursor up 
+    \ Cursor up
+    cmp #SCREEN_ARROW_UP
+    .zif eq
+        lda #'W'
+    .zendif 
     cmp #'W'
     .zif eq
         lda #0
@@ -143,7 +155,11 @@ case_done:
         jmp mainloop
     .zendif
    
-    \ Cursor down 
+    \ Cursor down
+    cmp #SCREEN_ARROW_DOWN
+    .zif eq
+        lda #'S'
+    .zendif 
     cmp #'S'
     .zif eq
         lda max_y
