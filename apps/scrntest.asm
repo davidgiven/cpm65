@@ -390,7 +390,7 @@ dec_table:
 .zendproc
 
 string_init:
-    .byte "W,A,S,D - Move cursor\r\n"
+    .byte "W,A,S,D or arrow keys - Move cursor\r\n"
     .byte "C - Put character\r\n"
     .byte "P - Put string\r\n"
     .byte "V - Toggle cursor visibility\r\n"
