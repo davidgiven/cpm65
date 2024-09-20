@@ -82,7 +82,7 @@ void *zcalloc(size_t nmemb, size_t size) {
 }
 
 static void merge_with_next_free(struct block_info *p) {
-    if (p->next && p->next->free) {
+    if (p->next->free) {
         struct block_info *q = p->next;
         p->size += q->size + block_info_size;
         p->next = q->next;
@@ -98,7 +98,7 @@ void zfree(void *ptr) {
     struct block_info *p = ptr - block_info_size;
     p->free = 1;
 
-    if (p->prev && p->prev->free) {    // if free, merge with previous block
+    if (p->prev->free) {    // if free, merge with previous block
         struct block_info *q = p->prev;
         q->size += p->size + block_info_size;
         q->next = p->next;
