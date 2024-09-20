@@ -519,6 +519,7 @@ void editorSnapToRowlen(void) {
 
 void editorMoveCursor(uint8_t key) {
     switch(key) {
+    case SCREEN_ARROW_LEFT:
     case CTRL('S'):     // left
         if (E.cx) {
             E.cx--;
@@ -527,6 +528,7 @@ void editorMoveCursor(uint8_t key) {
             E.cx = E.row[E.cy].size;
         }
         break;
+    case SCREEN_ARROW_RIGHT:
     case CTRL('D'): {    // right
             struct erow *row = E.cy >= E.numrows ? NULL : &E.row[E.cy];
             if (row && E.cx < row->size) {
@@ -537,9 +539,11 @@ void editorMoveCursor(uint8_t key) {
             }
         }
         break;
+    case SCREEN_ARROW_UP:
     case CTRL('E'):     // up
         if (E.cy) E.cy--;
         break;
+    case SCREEN_ARROW_DOWN:
     case CTRL('X'):     // down
         if (E.cy < E.numrows) E.cy++;
         break;
