@@ -635,9 +635,13 @@ void editorProcessKeypress(void) {
         editorInsertNewline();
         break;
 
+    case SCREEN_ARROW_UP:
     case CTRL('E'):                     // ^E up
+    case SCREEN_ARROW_DOWN:
     case CTRL('X'):                     // ^X down
+    case SCREEN_ARROW_LEFT:
     case CTRL('S'):                     // ^S left
+    case SCREEN_ARROW_RIGHT:
     case CTRL('D'):                     // ^D right
         editorMoveCursor(c);
         break;
