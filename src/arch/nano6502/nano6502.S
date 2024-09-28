@@ -128,7 +128,6 @@ banner_wait:
     ldx zp_base
     jsr bios_RELOCATE
 
-
     ; Open CPMFS
     	
     lda #CPMFS_A_OFFSET
@@ -487,6 +486,36 @@ screen_getchar_data_keyb:
     jmp screen_getchar_data_bsfix
 screen_getchar_data:
     lda uart_rx_data
+    ; Handle escape codes for arrow keys
+    cmp #$1B
+    bne screen_getchar_data_bsfix
+    jsr esc_delay
+
+    lda uart_rx_avail
+    beq screen_getchar_noesc
+    lda uart_rx_data
+    cmp #$41
+    bne screen_getchar_down
+    ; Up
+    lda #$8B
+    jmp notbs
+screen_getchar_down:
+    cmp #$42
+    bne screen_getchar_right
+    lda #$8A
+    jmp notbs
+screen_getchar_right:
+    cmp #$43
+    bne screen_getchar_left
+    lda #$89
+    jmp notbs
+screen_getchar_left:      
+    cmp #$44
+    bne screen_getchar_noesc
+    lda #$88
+    jmp notbs
+screen_getchar_noesc:
+    lda #$1B
 screen_getchar_data_bsfix:
     cmp #$08
     bne notbs
@@ -551,6 +580,21 @@ zproc screen_setstyle
 normal_style:
     lda #$00
     sta vid_style
+    rts
+zendproc
+
+zproc esc_delay
+    ;sta ptr
+    ldx #$ff
+    ;sta ptr1
+    zrepeat
+        ldy #$ff
+        zrepeat
+            dey
+        zuntil_eq
+        dex
+    zuntil_eq    
+    ;lda ptr
     rts
 zendproc
 
