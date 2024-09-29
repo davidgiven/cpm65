@@ -584,9 +584,7 @@ normal_style:
 zendproc
 
 zproc esc_delay
-    ;sta ptr
     ldx #$ff
-    ;sta ptr1
     zrepeat
         ldy #$ff
         zrepeat
@@ -594,7 +592,6 @@ zproc esc_delay
         zuntil_eq
         dex
     zuntil_eq    
-    ;lda ptr
     rts
 zendproc
 
