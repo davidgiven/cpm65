@@ -111,5 +111,12 @@ drv_\name:
 
 #define SCREEN_SETSTYLE   12
 
+; Screen driver arrow key constants
+
+#define SCREEN_KEY_UP		0x8b
+#define SCREEN_KEY_DOWN	0x8a
+#define SCREEN_KEY_LEFT	0x88
+#define SCREEN_KEY_RIGHT	0x89
+
 ; vim: filetype=asm sw=4 ts=4 et
 

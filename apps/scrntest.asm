@@ -108,6 +108,10 @@ mainloop:
 
 case_done:
     \ Cursor left
+    cmp #SCREEN_KEY_LEFT
+    .zif eq
+        lda #'A'
+    .zendif
     cmp #'A'
     .zif eq
         lda #0
@@ -120,6 +124,10 @@ case_done:
     .zendif
     
     \ Cursor right
+    cmp #SCREEN_KEY_RIGHT
+    .zif eq
+        lda #'D'
+    .zendif
     cmp #'D'
     .zif eq
         lda max_x
@@ -131,7 +139,11 @@ case_done:
         jmp mainloop
     .zendif
    
-    \ Cursor up 
+    \ Cursor up
+    cmp #SCREEN_KEY_UP
+    .zif eq
+        lda #'W'
+    .zendif 
     cmp #'W'
     .zif eq
         lda #0
@@ -143,7 +155,11 @@ case_done:
         jmp mainloop
     .zendif
    
-    \ Cursor down 
+    \ Cursor down
+    cmp #SCREEN_KEY_DOWN
+    .zif eq
+        lda #'S'
+    .zendif 
     cmp #'S'
     .zif eq
         lda max_y
@@ -374,7 +390,7 @@ dec_table:
 .zendproc
 
 string_init:
-    .byte "W,A,S,D - Move cursor\r\n"
+    .byte "W,A,S,D or arrow keys - Move cursor\r\n"
     .byte "C - Put character\r\n"
     .byte "P - Put string\r\n"
     .byte "V - Toggle cursor visibility\r\n"
