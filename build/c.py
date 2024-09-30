@@ -139,7 +139,7 @@ def cheaders(
             len(s) == 1
         ), "the target of a header must return exactly one file"
 
-        cs += ["cp {ins[" + str(i) + "]} {outs[" + str(i) + "]}"]
+        cs += ["$(CP) {ins[" + str(i) + "]} {outs[" + str(i) + "]}"]
         outs += ["=" + dest]
         i = i + 1
 
