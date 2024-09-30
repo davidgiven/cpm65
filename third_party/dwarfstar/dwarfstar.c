@@ -519,7 +519,7 @@ void editorSnapToRowlen(void) {
 
 void editorMoveCursor(uint8_t key) {
     switch(key) {
-    case SCREEN_ARROW_LEFT:
+    case SCREEN_KEY_LEFT:
     case CTRL('S'):     // left
         if (E.cx) {
             E.cx--;
@@ -528,7 +528,7 @@ void editorMoveCursor(uint8_t key) {
             E.cx = E.row[E.cy].size;
         }
         break;
-    case SCREEN_ARROW_RIGHT:
+    case SCREEN_KEY_RIGHT:
     case CTRL('D'): {    // right
             struct erow *row = E.cy >= E.numrows ? NULL : &E.row[E.cy];
             if (row && E.cx < row->size) {
@@ -539,11 +539,11 @@ void editorMoveCursor(uint8_t key) {
             }
         }
         break;
-    case SCREEN_ARROW_UP:
+    case SCREEN_KEY_UP:
     case CTRL('E'):     // up
         if (E.cy) E.cy--;
         break;
-    case SCREEN_ARROW_DOWN:
+    case SCREEN_KEY_DOWN:
     case CTRL('X'):     // down
         if (E.cy < E.numrows) E.cy++;
         break;
@@ -635,13 +635,13 @@ void editorProcessKeypress(void) {
         editorInsertNewline();
         break;
 
-    case SCREEN_ARROW_UP:
+    case SCREEN_KEY_UP:
     case CTRL('E'):                     // ^E up
-    case SCREEN_ARROW_DOWN:
+    case SCREEN_KEY_DOWN:
     case CTRL('X'):                     // ^X down
-    case SCREEN_ARROW_LEFT:
+    case SCREEN_KEY_LEFT:
     case CTRL('S'):                     // ^S left
-    case SCREEN_ARROW_RIGHT:
+    case SCREEN_KEY_RIGHT:
     case CTRL('D'):                     // ^D right
         editorMoveCursor(c);
         break;

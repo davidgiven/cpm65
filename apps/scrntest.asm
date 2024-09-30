@@ -108,7 +108,7 @@ mainloop:
 
 case_done:
     \ Cursor left
-    cmp #SCREEN_ARROW_LEFT
+    cmp #SCREEN_KEY_LEFT
     .zif eq
         lda #'A'
     .zendif
@@ -124,7 +124,7 @@ case_done:
     .zendif
     
     \ Cursor right
-    cmp #SCREEN_ARROW_RIGHT
+    cmp #SCREEN_KEY_RIGHT
     .zif eq
         lda #'D'
     .zendif
@@ -140,7 +140,7 @@ case_done:
     .zendif
    
     \ Cursor up
-    cmp #SCREEN_ARROW_UP
+    cmp #SCREEN_KEY_UP
     .zif eq
         lda #'W'
     .zendif 
@@ -156,7 +156,7 @@ case_done:
     .zendif
    
     \ Cursor down
-    cmp #SCREEN_ARROW_DOWN
+    cmp #SCREEN_KEY_DOWN
     .zif eq
         lda #'S'
     .zendif 

@@ -113,25 +113,25 @@ int main(void)
         {
             case 'a': // Cursor left
             case 'A':
-            case SCREEN_ARROW_LEFT:
+            case SCREEN_KEY_LEFT:
                 if(xpos > 0)
                     xpos--;
                 break;
             case 'd': // Cursor right
             case 'D':
-            case SCREEN_ARROW_RIGHT:
+            case SCREEN_KEY_RIGHT:
                 if(xpos < w+1)
                     xpos++;
                 break;
             case 'w': // Cursor up
             case 'W':
-            case SCREEN_ARROW_UP:
+            case SCREEN_KEY_UP:
                 if(ypos > 1)
                     ypos--;
                 break;
             case 's': // Cursor down
             case 'S':
-            case SCREEN_ARROW_DOWN:
+            case SCREEN_KEY_DOWN:
                 if(ypos < h)
                     ypos++;
                 break;

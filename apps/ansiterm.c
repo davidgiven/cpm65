@@ -926,16 +926,16 @@ int main(void)
                 }
             } else if(inp > 127) {
                 switch(inp) {
-                    case SCREEN_ARROW_UP:
+                    case SCREEN_KEY_UP:
                         serial_out(UP);
                         break;
-                    case SCREEN_ARROW_DOWN:
+                    case SCREEN_KEY_DOWN:
                         serial_out(DOWN);
                         break;
-                    case SCREEN_ARROW_LEFT:
+                    case SCREEN_KEY_LEFT:
                         serial_out(LEFT);
                         break;
-                    case SCREEN_ARROW_RIGHT:
+                    case SCREEN_KEY_RIGHT:
                         serial_out(RIGHT);
                         break;
                     default:

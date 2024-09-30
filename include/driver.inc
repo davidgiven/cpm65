@@ -113,10 +113,10 @@ drv_\name:
 
 ; Screen driver arrow key constants
 
-#define SCREEN_ARROW_UP		0x8b
-#define SCREEN_ARROW_DOWN	0x8a
-#define SCREEN_ARROW_LEFT	0x88
-#define SCREEN_ARROW_RIGHT	0x89
+#define SCREEN_KEY_UP		0x8b
+#define SCREEN_KEY_DOWN	0x8a
+#define SCREEN_KEY_LEFT	0x88
+#define SCREEN_KEY_RIGHT	0x89
 
 ; vim: filetype=asm sw=4 ts=4 et
 
