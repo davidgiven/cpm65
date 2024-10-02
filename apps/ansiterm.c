@@ -55,6 +55,11 @@
 #define CAN         0x18
 #define SUB         0x1a
 
+#define UP          0x10
+#define DOWN        0x0e
+#define LEFT        0x02
+#define RIGHT       0x06       
+
 static uint8_t mEsc = 0;
 static uint8_t w;
 static uint8_t h;
@@ -918,6 +923,23 @@ int main(void)
                         break;
                     default:
                     break;
+                }
+            } else if(inp > 127) {
+                switch(inp) {
+                    case SCREEN_KEY_UP:
+                        serial_out(UP);
+                        break;
+                    case SCREEN_KEY_DOWN:
+                        serial_out(DOWN);
+                        break;
+                    case SCREEN_KEY_LEFT:
+                        serial_out(LEFT);
+                        break;
+                    case SCREEN_KEY_RIGHT:
+                        serial_out(RIGHT);
+                        break;
+                    default:
+                        break;
                 }
             } else {
                 // Send data to serial port and echo if avtivated

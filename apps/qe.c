@@ -702,8 +702,14 @@ void insert_mode(bool replacing)
         uint8_t c = screen_waitchar();
         if (c == 27)
             break;
+        else if(c>127)
+            /* Ignore arrow keys in insert mode*/
+            continue;
+
 
         dirty = true;
+        
+            
         if (c == 127)
         {
             if (gap_start != current_line)
@@ -943,7 +949,7 @@ void enter_change_mode(uint16_t count)
     command_count = count;
 }
 
-const char normal_keys[] = "^$hjklbwiAGxJOorR:\022dZc";
+const char normal_keys[] = "^$hjklbwiAGxJOorR:\022dZc\210\211\212\213";
 
 command_t* const normal_cbs[] = {
     cursor_home,
@@ -968,6 +974,10 @@ command_t* const normal_cbs[] = {
     enter_delete_mode,
     enter_zed_mode,
     enter_change_mode,
+    cursor_left,
+    cursor_right,
+    cursor_down,
+    cursor_up,
 };
 
 const struct bindings normal_bindings = {NULL, normal_keys, normal_cbs};
