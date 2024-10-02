@@ -9,6 +9,8 @@ from config import (
     SCREEN_APPS,
     BIG_SCREEN_APPS,
     PASCAL_APPS,
+    SERIAL_APPS,
+    SERIAL_SCREEN_APPS,
 )
 
 llvmrawprogram(
@@ -34,7 +36,9 @@ mkcpmfs(
     | BIG_APPS_SRCS
     | SCREEN_APPS
     | BIG_SCREEN_APPS
-    | PASCAL_APPS,
+    | PASCAL_APPS
+    | SERIAL_APPS
+    | SERIAL_SCREEN_APPS
 )
 
 mkcpmfs(
