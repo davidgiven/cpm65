@@ -428,7 +428,7 @@ Atari BASIC is rather different from Microsoft BASIC. Please consult [the user
 manual](https://www.virtualdub.org/downloads/Altirra%20BASIC%20Reference%20Manual.pdf).
 
 **Important!** Do not contact the author of Altirra BASIC for anything related
-*to the CP/M-65 port! Any bugs are strictly my fault.
+to the CP/M-65 port! Any bugs are strictly my fault.
 
 ### The editors
 
@@ -443,6 +443,12 @@ QE is a much less simple vi-inspired screen editor, written in C. it's much
 more comfortable to use than BEDIT, but is about five times the size, and will
 only run on systems with a SCREEN driver, as noted above (you can also use the
 `DEVICES` command to see what devices your system supports).
+
+DwarfStar is another screen editor. It has the same keybindings as WordStar,
+so those familiar with that will feel right at home. For a refresher, see
+the [documentation](third_party/dwarfstar/ds.txt), which was written in DS
+itself and is also available within CP/M-65 on the systems that have DS.COM
+installed.
 
 ### The Pascal
 
@@ -534,3 +540,7 @@ Biela and is available under the terms of the MIT license.  See
 bytecode compiler and interpreter, which is © 1978-2021 Niklaus Wirth, Mark
 Rustad and Hans Otten and is available under the terms of the MIT license. See
 `third_party/pascal-m/LICENSE` for the full text.
+
+`third_party/dwarfstar` contains DwarfStar, which is © 2024 by Ivo van Poorten and is available under the terms of the BSD 2-Clause License. See `third_party/dwarfstar/LICENSE` for the full text.
+
+`third_part/zmalloc` contains a copy of zmalloc, which is © 2024 by Ivo van Poorten and is available under the terms of the 0BSD License. See `third_party/zmalloc/LICENSE` for the full text.
