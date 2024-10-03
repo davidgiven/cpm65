@@ -68,7 +68,7 @@ bool zmalloc_init(void *start, size_t size) {
 
     // one free block
     struct block_info *freeb = base + sizeof(struct block_info);
-    freeb->size = size - sizeof(uintptr_t);
+    freeb->size = size;
 
     // setup free_list as begin <-> freeb <-> end
     freeb->prev = free_list = begin;
@@ -78,16 +78,23 @@ bool zmalloc_init(void *start, size_t size) {
     return true;
 }
 
+static size_t size_requirements(size_t size) {
+    size += sizeof(uintptr_t);
+    size = (size_t) align_up((void *)size, sizeof(uintptr_t));
+
+    if (size < sizeof(struct block_info))
+        size = sizeof(struct block_info);
+
+    return size;
+}
+
 void *zmalloc(size_t size) {
     if (!size) {
         errno = ENOMEM;
         return NULL;
     }
 
-    size = (size_t) align_up((void *)size, sizeof(uintptr_t));
-
-    if (size < 2 * sizeof(uintptr_t))
-        size = 2 * sizeof(uintptr_t);
+    size = size_requirements(size);
 
     struct block_info *p = free_list;
 
@@ -100,14 +107,14 @@ void *zmalloc(size_t size) {
     }
 
     if (p->size - size > minfreeblocksize) { // split
-        struct block_info *newb = (void *) p + size + sizeof(uintptr_t);
-        newb->size = p->size - size - sizeof(uintptr_t);;
+        struct block_info *freeb = (void *) p + size;
+        freeb->size = p->size - size;
 
         // link free block into free_list in place of p
-        newb->prev = p->prev;
-        newb->prev->next = newb;
-        newb->next = p->next;
-        newb->next->prev = newb;
+        freeb->prev = p->prev;
+        freeb->next = p->next;
+        freeb->prev->next = freeb;
+        freeb->next->prev = freeb;
         // reduce alloc size to size
         p->size = size;
     } else {                                // take full block
@@ -133,22 +140,22 @@ void *zcalloc(size_t nmemb, size_t size) {
 }
 
 static void link_to_free_list(struct block_info *p) {
-    struct block_info *nb = (void *) p + sizeof(uintptr_t) + p->size;
+    struct block_info *nextb = (void *) p + p->size;
 
-    if (is_free(nb->size)) {    // merge with next block, link to free_list
-        p->next = nb->next;
+    if (is_free(nextb->size)) {    // merge with next block, link to free_list
+        p->next = nextb->next;
+        p->prev = nextb->prev;
         p->next->prev = p;
-        p->prev = nb->prev;
         p->prev->next = p;
-        p->size += nb->size + sizeof(uintptr_t);
+        p->size += nextb->size;
     } else {                    // find next free block in memory, and link
-        struct block_info *q = (void *) p + p->size + sizeof(uintptr_t);
-        while (is_inuse(q->size))
-            q = (void *) q + get_size(q->size) + sizeof(uintptr_t);
-        p->prev = q->prev;
+        nextb = (void *) p + p->size;
+        while (is_inuse(nextb->size))
+            nextb = (void *) nextb + get_size(nextb->size);
+        p->prev = nextb->prev;
         p->prev->next = p;
-        p->next = q;
-        q->prev = p;
+        p->next = nextb;
+        nextb->prev = p;
     }
 }
 
@@ -168,10 +175,10 @@ void zfree(void *ptr) {
 
     // if previous block is adjacent, merge
     struct block_info *prev = p->prev;
-    if ((void *) prev + prev->size + sizeof(uintptr_t) == p) {
+    if ((void *) prev + prev->size == p) {
         prev->next = p->next;
         prev->next->prev = prev;
-        prev->size += p->size + sizeof(uintptr_t);
+        prev->size += p->size;
     }
 }
 
@@ -184,9 +191,7 @@ void *zrealloc(void *ptr, size_t size) {
         return NULL;
     }
 
-    size = (size_t) align_up((void *)size, sizeof(uintptr_t));
-    if (size < 2 * sizeof(uintptr_t))
-        size = 2 * sizeof(uintptr_t);
+    size = size_requirements(size);
 
     struct block_info *p = ptr - sizeof(uintptr_t);
 
@@ -196,19 +201,19 @@ void *zrealloc(void *ptr, size_t size) {
         memcpy(q, ptr, get_size(p->size));
         zfree(ptr);
         return q;
-    } else if (size < get_size(p->size)) {
-        struct block_info *q = (void *) p + sizeof(uintptr_t) + get_size(p->size);
-        if (is_free(q->size)) {     // add to next if free
-            struct block_info *t = (void *) p + sizeof(uintptr_t) + size;
-            t->size = q->size + (get_size(p->size) - size);
-            t->prev = q->prev;  // order matters, because we might overwrite
-            t->next = q->next;  // in case the reduction is only one unit
+    } else if (size < get_size(p->size)) {      // smaller
+        struct block_info *nextb = (void *) p + get_size(p->size);
+        if (is_free(nextb->size)) {     // add to next if free
+            struct block_info *t = (void *) p + size;
+            t->size = nextb->size + (get_size(p->size) - size);
+            t->prev = nextb->prev;  // order matters, because we might overwrite
+            t->next = nextb->next;  // in case the reduction is only one unit
             t->prev->next = t;
             t->next->prev = t;
             p->size = set_inuse(size);
         } else if (get_size(p->size) > size + minfreeblocksize) { // split
-            struct block_info *q = (void *) p + sizeof(uintptr_t) + size;
-            q->size = get_size(p->size) - size - sizeof(uintptr_t);
+            struct block_info *q = (void *) p + size;
+            q->size = get_size(p->size) - size;
             link_to_free_list(q);
             p->size = set_inuse(size);
         }
@@ -232,7 +237,7 @@ static void *__zmemalign(uintptr_t alignment, uintptr_t size) {
     }
 
     struct block_info *freeb = zmalloc(size + worst_padding)-sizeof(uintptr_t);
-    void *end   = (void *) freeb + get_size(freeb->size) + sizeof(uintptr_t);
+    void *end   = (void *) freeb + get_size(freeb->size);
 
     // freshly allocated, so prev is still valid (but next is not(!))
     struct block_info *prev = freeb->prev;
@@ -241,14 +246,14 @@ static void *__zmemalign(uintptr_t alignment, uintptr_t size) {
     void *tmp = (void *) freeb + minfreeblocksize + sizeof(uintptr_t);
     struct block_info *p = align_up(tmp, alignment) - sizeof(uintptr_t);
 
-    freeb->size = (void *) p - (void *) freeb - sizeof(uintptr_t);
+    freeb->size = (void *) p - (void *) freeb;
 
     // insert back into free_list, coalescing is impossible
     prev->next = next->prev = freeb;
     freeb->prev = prev;
     freeb->next = next;
 
-    p->size = set_inuse(end - (void *) p - sizeof(uintptr_t));
+    p->size = set_inuse(end - (void *) p);
 
     return (void *) p + sizeof(uintptr_t);
 }
@@ -285,8 +290,8 @@ void print_memory(void) {
         } else {
             printf("Block %ld: size = %ld, %s\n", count++, get_size(p->size),
                                         is_inuse(p->size) ? "used" : "free");
-            total += get_size(p->size) + sizeof(uintptr_t);
-            p = (void *) p + sizeof(uintptr_t) + get_size(p->size);
+            total += get_size(p->size);
+            p = (void *) p + get_size(p->size);
         }
     }
 
