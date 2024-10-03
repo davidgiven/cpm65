@@ -96,7 +96,7 @@ void *zmalloc(size_t size) {
 
     size = size_requirements(size);
 
-    struct block_info *p = free_list;
+    struct block_info *p = free_list->next;     // skip sentinel
 
     while (p && p->size < size)
         p = p->next;
