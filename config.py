@@ -14,8 +14,6 @@ MINIMAL_APPS = {
     "0:ls.com": "apps+ls",
     "0:stat.com": "apps+stat",
     "0:submit.com": "apps+submit",
-    "0:xrecv.com": "apps+xrecv",
-    "0:xsend.com": "apps+xsend",
 }
 
 # Programs which only work on a real CP/M filesystem (not emulation).
@@ -34,8 +32,6 @@ BIG_APPS = {
     "0:atbasic.com": "third_party/altirrabasic",
     "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
     "0:objdump.com": "apps+objdump",
-    "0:kbdtest.com": "apps+kbdtest",
-    "0:ansiterm.com": "apps+ansiterm",
 }
 
 BIG_APPS_SRCS = {}
@@ -49,6 +45,7 @@ SCREEN_APPS = {
     "0:scrntest.com": "apps+scrntest",
     "0:vt52drv.com": "apps+vt52drv",
     "0:vt52test.com": "apps+vt52test",
+    "0:kbdtest.com": "apps+kbdtest",
 }
 
 BIG_SCREEN_APPS = {
@@ -63,4 +60,13 @@ PASCAL_APPS = {
     "0:pasc.obb": "third_party/pascal-m+pasc-obb",
     "0:pload.com": "third_party/pascal-m+loader",
     "0:hello.pas": "cpmfs+hello_pas_cpm",
+}
+
+SERIAL_APPS = {
+    "0:xrecv.com": "apps+xrecv",
+    "0:xsend.com": "apps+xsend",
+}
+
+SERIAL_SCREEN_APPS = {
+    "0:ansiterm.com": "apps+ansiterm",
 }
