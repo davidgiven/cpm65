@@ -10,10 +10,3 @@ llvmclibrary(
 	  "lib/serial.h": "./serial.h"},
     deps=["include"],
 )
-
-llvmclibrary(
-    name="zmalloc",
-    srcs=["./zmalloc.c"],
-    hdrs={"lib/zmalloc.h": "./zmalloc.h"},
-    deps=["lib/zmalloc.h"],
-)

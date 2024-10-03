@@ -13,11 +13,10 @@
 #include <stdbool.h>
 #include <string.h>
 #include <cpm.h>
-#include "lib/zmalloc.h"
+#include "zmalloc.h"
 #include "lib/screen.h"
 
 #define ROUNDUP(x)  (((x)+7) & -8)  // nearest multiple of 8
-#define MINSIZE 8                   // realloc doesn't free smaller than this
 
 struct erow {
     int size;
@@ -720,8 +719,8 @@ void initEditor(void) {
 
     uint16_t tpa = cpm_bios_gettpa();
     uint8_t *top = (uint8_t *) (tpa & 0xff00);
-//    zmalloc_init(cpm_ram, 4096, MINSIZE);        // test low RAM
-    zmalloc_init(cpm_ram, top - cpm_ram, MINSIZE);
+//    zmalloc_init(cpm_ram, 4096);        // test low RAM
+    zmalloc_init(cpm_ram, top - cpm_ram);
 
     screen_getsize(&E.screencols, &E.screenrows);
     E.screencols++;
