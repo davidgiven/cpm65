@@ -540,28 +540,23 @@ zproc screen_getchar
     cmp #$1c ; Up
     zif_eq
         lda #$8b
-        jmp arrow_done
     zendif
 
     cmp #$1d ; Down
     zif_eq
         lda #$8a
-        jmp arrow_done
     zendif
     
     cmp #$1e ; Left
     zif_eq
         lda #$88
-        jmp arrow_done
     zendif
     
     cmp #$1f ; Right
     zif_eq
         lda #$89
-        jmp arrow_done
     zendif
 
-arrow_done:
     clc
     rts
 zendproc
