@@ -168,6 +168,18 @@ mkcpmfs(
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
         "1:phoenix.fnt": "third_party/fonts/atari/phoenix.fnt",
         "1:toshiba.fnt": "third_party/fonts/atari/toshiba.fnt",
+        "2:8080.com": "src/arch/atari800/utils+8080_ovl_loader",
+        "2:8080.ovl": "third_party/atari8080/8080.ovl",
+        "2:halt.com": "third_party/atari8080/HALT.COM",
+        "2:stat.com": "third_party/atari8080/STAT.COM",
+        "2:dump.com": "third_party/atari8080/DUMP.COM",
+        "2:pip.com": "third_party/atari8080/PIP.COM",
+        "2:zork1.com": "third_party/atari8080/ZORK1.COM",
+        "2:zork1.dat": "third_party/atari8080/ZORK1.DAT",
+        "2:tst8080.com": "third_party/atari8080/TST8080.COM",
+        "2:8080pre.com": "third_party/atari8080/8080PRE.COM",
+        "2:8080exm.com": "third_party/atari8080/8080EXM.COM",
+        "2:cputest.com": "third_party/atari8080/CPUTEST.COM",
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
