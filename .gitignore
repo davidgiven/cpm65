@@ -26,3 +26,5 @@ neo6502.zip
 sorbus.zip
 nano6502.img
 nano6502_sysonly.img
+*.os5
+*.os8

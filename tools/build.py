@@ -20,6 +20,7 @@ cprogram(name="mkimd", srcs=["./mkimd.c"])
 cprogram(
     name="fontconvert", srcs=["./fontconvert.c", "./libbdf.c", "./libbdf.h"]
 )
+cprogram(name="img2osi", srcs=["./img2osi.c"])
 
 
 @Rule
@@ -191,6 +192,30 @@ def mkimd(self, name, src: Target = None):
         deps=["tools+mkimd"],
         commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
         label="MKIMD",
+    )
+
+
+@Rule
+def img2os5(self, name, src: Target = None):
+    simplerule(
+        replaces=self,
+        ins=[src],
+        outs=[f"={name}.os5"],
+        deps=["tools+img2osi"],
+        commands=["{deps[0]} {ins[0]} {outs[0]}"],
+        label="IMG2OS5",
+    )
+
+
+@Rule
+def img2os8(self, name, src: Target = None):
+    simplerule(
+        replaces=self,
+        ins=[src],
+        outs=[f"={name}.os8"],
+        deps=["tools+img2osi"],
+        commands=["{deps[0]} {ins[0]} {outs[0]}"],
+        label="IMG2OS8",
     )
 
 

@@ -115,3 +115,25 @@ diskdef sdcard
     boottrk 1
     os 2.2
 end
+
+# 640 sectors = 80kB
+diskdef osi5
+    seclen 128
+    tracks 40
+    sectrk 16
+    blocksize 1024
+    maxdir 64
+    boottrk 1
+    os 2.2
+end
+
+# 1848 sectors = 231kB
+diskdef osi8
+    seclen 128
+    tracks 77
+    sectrk 24
+    blocksize 1024
+    maxdir 64
+    boottrk 1
+    os 2.2
+end
