@@ -63,6 +63,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
 <a href="doc/nano6502.png"><img src="doc/nano6502.png" style="width:40%" alt="CP/M-65 running on the nano6502"></a>
 <a href="doc/kim-1.png"><img src="doc/kim-1.png" style="width:40%" alt="CP/M-65 running on the KIM-1"></a>
+<a href="doc/osi.png"><img src="doc/osi.png" style="width:40%" alt="CP/M-65 running on the Ohio Scientific"></a>
 </div>
 
 
@@ -380,6 +381,23 @@ the same time.
   - If you also have [my modified xKIM monitor](https://github.com/eduardocasino/xKIM/tree/IEC_support), then load the `CPM` program and jump to address 0x6000.
 
   - If not, load the `bootiec-kim` or  `bootiec-pal` bootloader into 0x200 and execute it.
+
+### Ohio Scientific Notes
+
+- Supported systems are:
+  - 400 series, with Model 440 32x32 video, Model 470 disk controller (5.25" or 8"), and an ASCII keyboard.
+  - 500 series, with Model 540 64x32 video, Model 505 disk controller (5.25" or 8"), and 542 polled keyboard.
+  - 600 series, with 64x16 video, on-board disk controller (5.25" or 8"), and polled keyboard.
+  - serial system, without video, Model 470 or 505 disk controller (8" only), and serial ACIA at $fc00.
+
+- All systems need at least 16kB of RAM, but detect up to 40kB with BASIC present, and 48kB if BASIC is replaced by RAM.
+  Some boot ROMs do not boot when BASIC is absent. For example, SYN600 relies on BASIC ROM routines to load the boot sector.
+- The generated disk images can be used directly with [osiemu](https://github.com/ivop/osiemu), or converted to HFE format with its `osi2hfe` if you want to create real floppies or use it with a Gotek on real hardware.
+[Thomas Buescher's WinOSI](http://vintagecomputers.square7.ch/Emulator.html) has a tool to convert HFE to 65D. His version of WinOSI only emulates 600 series machines.
+[Mark Spankus' version of WinOSI]( https://osi.marks-lab.com/index.php) can run them all.
+- All systems boot with a plain TTY driver. If you have a 540B graphics card with the optional color option enabled, you can load a screen driver called `TTY540B` (located on drive D: on MF systems).
+This is the only video configuration that has the posibility to draw a character and a cursor at the same screen location.
+On serial systems, you can load `SCRVT100` to enable the screen driver if you are connected with a VT100 terminal.
 
 ### Supported programs
 
