@@ -382,7 +382,7 @@ the same time.
 
   - If not, load the `bootiec-kim` or  `bootiec-pal` bootloader into 0x200 and execute it.
 
-### Ohio Scientific Notes
+### Ohio Scientific notes
 
 - Supported systems are:
   - 400 series, with Model 440 32x32 video, Model 470 disk controller (5.25" or 8"), and an ASCII keyboard.
