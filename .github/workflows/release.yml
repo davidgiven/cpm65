@@ -59,6 +59,17 @@ jobs:
           nano6502_sysonly.img
           neo6502.zip
           oricatmos.dsk
+          osi400f.os8
+          osi400mf.os5
+          osi500f.os8
+          osi500mf.os5
+          osi600f.os8
+          osi600mf.os5
+          osif-b.os8
+          osimf-b.os5
+          osimf-c.os5
+          osimf-d.os5
+          osiserf.os8
           pet4032.d64
           pet8032.d64
           pet8096.d64
@@ -86,6 +97,17 @@ jobs:
           cpm65/nano6502_sysonly.img
           cpm65/neo6502.zip
           cpm65/oric.dsk
+          cpm65/osi400f.os8
+          cpm65/osi400mf.os5
+          cpm65/osi500f.os8
+          cpm65/osi500mf.os5
+          cpm65/osi600f.os8
+          cpm65/osi600mf.os5
+          cpm65/osif-b.os8
+          cpm65/osimf-b.os5
+          cpm65/osimf-c.os5
+          cpm65/osimf-d.os5
+          cpm65/osiserf.os8
           cpm65/pet4032.d64
           cpm65/pet8032.d64
           cpm65/pet8096.d64
