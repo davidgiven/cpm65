@@ -313,7 +313,7 @@ zproc tty_conin
     lda pending_key
     zif_eq
 tty_input_wait:
-	lda #IO_page_uart
+	    lda #IO_page_uart
         sta IO_page_reg
         lda uart_rx_avail
         beq tty_input_keyb
@@ -326,6 +326,11 @@ tty_input_keyb:
         lda keyb_data_avail
         beq tty_input_wait
         lda keyb_data
+        ; Filter out arrow keys
+        cmp #$80
+        zif_cs
+            lda #0
+        zendif
         clc
         rts
     zendif

@@ -689,6 +689,7 @@ zproc tty_const
     zendif
 
     lda pending_key
+   
     zif_ne
         lda #0xff
     zendif
@@ -704,6 +705,11 @@ zproc tty_conin
         lda #0xff
         ldx #0xff
         jsr screen_getchar
+        ; Filter out arrow keys
+        cmp #$80
+        zif_cs
+            lda #0
+        zendif
     zuntil_cc
 
     rts
