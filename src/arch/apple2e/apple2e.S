@@ -4,21 +4,10 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "apple2e.inc"
 #include "wait.inc"
 #include "driver.inc"
 #include "jumptables.inc"
-
-SCREEN_80STOREOFF = 0xc000
-SCREEN_80STOREON  = 0xc001
-SCREEN_80COLOFF   = 0xc00c
-SCREEN_80COLON    = 0xc00d
-SCREEN_STDCHARSET = 0xc00e
-SCREEN_ALTCHARSET = 0xc00f
-SCREEN_PAGE2OFF   = 0xc054
-SCREEN_PAGE2ON    = 0xc055
-
-KBD_READ        = 0xc000
-KBD_STROBERESET = 0xc010
 
 ; It's tempting to bake in the 0x60 offset for the drive unit at slot 6... but this
 ; changes the timing of the instructions which access these registers, and then
@@ -76,10 +65,12 @@ _start:
     cli
     lda MEM_BANKING+0xb     ; R/W 0xe000 RAM; bank 1 in 0xd000
     lda MEM_BANKING+0xb     ; yes, I'm sure
+#if TTY_MODE == TTY_MODE_80COLUMNS
     sta SCREEN_80COLON
     sta SCREEN_80STOREON
     sta SCREEN_PAGE2OFF
     sta SCREEN_ALTCHARSET
+#endif
     ldx #0xff
     txs                     ; reset stack
 
@@ -641,13 +632,17 @@ zproc prepare_for_screen_write
     lda cursory
     jsr calculate_screen_address
     lda cursorx
+#if TTY_MODE == TTY_MODE_80COLUMNS
     lsr a
+#endif
     tay
     lda #0
     rol
     eor #1
     tax
+#if TTY_MODE == TTY_MODE_80COLUMNS
     sta SCREEN_PAGE2OFF, x
+#endif
     rts
 zendproc
 
@@ -714,8 +709,11 @@ zproc tty_conin
     sta motor_countdown
 
     ; Display the cursor.
-
-    jsr draw_cursor
+    jsr prepare_for_screen_write
+    lda (ptr), y
+    sta cursork
+    lda #0x60           ; flashing block
+    sta (ptr), y
 
     ; Wait for the key.
 
@@ -727,6 +725,10 @@ zproc tty_conin
     clc
 
     ; Cursor off again.
+    tax
+    lda cursork
+    sta (ptr), y
+    txa
 
     rts
 zendproc
@@ -1361,6 +1363,7 @@ encode_tab:         .fill 64 ; must be within one page
 .bss
 cursorx:            .fill 1
 cursory:            .fill 1
+cursork:            .fill 1
 cursorf:            .fill 1 ; SCREEN flags
 current_bank:       .fill 1
 current_phase:      .fill 1
