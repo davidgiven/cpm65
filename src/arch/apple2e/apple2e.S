@@ -154,13 +154,16 @@ _start:
         inx
     zuntil_mi
 
-    ; Initialise the disk.
+    ; Initialise the disks.
 
     ldx #0
     stx current_phase
+    stx current_phase_a     ; already at track 0 after boot
+    stx selected_drive
     stx buffer_dirty
     dex
     stx buffered_track
+    stx current_phase_b     ; unkown position of the head
 
     ; Read the BDOS.
 
@@ -748,17 +751,76 @@ zendproc
 ; Sets carry on error.
 
 zproc bios_SELDSK
-    cmp #0
-    zif_ne
+    cmp #2
+    zif_pl
         sec                 ; invalid drive
         rts
     zendif
 
-    lda #<dph
-    ldx #>dph
+    cmp selected_drive
+    zif_ne
+        jsr change_drive
+    zendif
+
+    lda selected_drive
+    cmp #0
+    zif_eq
+        ; Drive A:
+        lda #<dph
+        ldx #>dph
+        clc
+        rts
+    zendif
+
+    ; Drive B:
+    lda #<dph_b
+    ldx #>dph_b
     clc
     rts
 zendproc
+
+zproc change_drive
+    pha
+    lda buffer_dirty
+    zif_ne
+        jsr write_track
+    zendif
+    lda #$FF
+    sta buffered_track
+    pla
+
+    sta selected_drive
+    cmp #0
+    zif_eq
+        ; B: to A:
+        ldx #DISK_SLOT
+        lda DISK_DRIVE1, x
+
+        lda current_phase
+        sta current_phase_b
+        lda current_phase_a
+        sta current_phase
+        rts
+    zendif
+
+    ; A: to B:
+    ldx #DISK_SLOT
+    lda DISK_DRIVE2, x
+
+    lda current_phase
+    sta current_phase_a
+    lda current_phase_b
+    sta current_phase
+    zif_ne
+        ; The head position is unknown. Seek to track 0.
+        lda #80
+        sta current_phase
+        lda #0
+        jsr seek_to_track
+    zendif
+    rts
+zendproc
+
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte sector number.
@@ -1349,9 +1411,9 @@ zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA0_START__@mos16hi, __TPA1_START__@mos16hi
 mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
-; DPH for drive 0 (our only drive)
-
+; DPH for drive 0 and 1
 define_drive dph, 0x42e, 1024, 64, 32
+define_drive dph_b, 0x42e, 1024, 64, 32
 
 .section aligneddata, "ax", @nobits
 disk_twos_buffer:   .fill 86 ; must be aligned
@@ -1364,6 +1426,9 @@ cursory:            .fill 1
 cursorf:            .fill 1 ; SCREEN flags
 current_bank:       .fill 1
 current_phase:      .fill 1
+current_phase_a:    .fill 1
+current_phase_b:    .fill 1
+selected_drive:     .fill 1
 directory_buffer:   .fill 128
 decode_tab:         .fill 0x100 - DECODE_TABLE_START
 wanted_track:       .fill 1
