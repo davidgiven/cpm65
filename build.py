@@ -19,6 +19,7 @@ export(
         "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
         "oric.dsk": "src/arch/oric+diskimage",
         "apple2e.po": "src/arch/apple2e+diskimage",
+        "apple2e_b.po": "src/arch/apple2e+diskimage_b",
         "atari800.atr": "src/arch/atari800+atari800_diskimage",
         "atari800b.atr": "src/arch/atari800+atari800b_diskimage",
         "atari800c.atr": "src/arch/atari800+atari800c_diskimage",
