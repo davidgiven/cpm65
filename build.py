@@ -40,6 +40,7 @@ export(
         "pet4032.d64": "src/arch/commodore+pet4032_diskimage",
         "pet8032.d64": "src/arch/commodore+pet8032_diskimage",
         "pet8096.d64": "src/arch/commodore+pet8096_diskimage",
+        "snes.smc": "src/arch/snes+snes_cartridge",
         "vic20.d64": "src/arch/commodore+vic20_diskimage",
         "x16.zip": "src/arch/x16+diskimage",
         "sorbus.zip": "src/arch/sorbus+diskimage",
