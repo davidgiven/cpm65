@@ -28,6 +28,7 @@ if __name__ == "__main__":
 	
 	parser.add_argument("-l", dest="LARG", action="store_true", help="unknown as of this time")
 	
+	parser.add_argument("-o", dest="relfile", type=str, help="Output rel file to produce")
 
 
 
@@ -82,6 +83,8 @@ if __name__ == "__main__":
 	if FILE[-4:].lower() == ".rel":
 		FILE = FILE[:-4] + ".asm"
 
+	relfile = ARGS.get("relfile", None)
+
 	print_verbose = False
 	if ARGS["p_verbose"] == True:
 		print_verbose = True
@@ -89,4 +92,4 @@ if __name__ == "__main__":
 
 
 	
-	assembler.assembleFile(FILE, optional_args, force_assemble=force_assembly, print_verbose=print_verbose)
+	assembler.assembleFile(FILE, optional_args, force_assemble=force_assembly, print_verbose=print_verbose, relfile=relfile)

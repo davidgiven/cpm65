@@ -531,7 +531,7 @@ class ASM_FILE(object):
 
 
 
-def assembleFile(filename, ext_vars={}, force_assemble=False, check_hash=False, print_verbose=False):
+def assembleFile(filename, ext_vars={}, force_assemble=False, check_hash=False, print_verbose=False, relfile=None):
 
 	global EXTERNAL_SYMBOLS
 	global data_page
@@ -561,6 +561,9 @@ def assembleFile(filename, ext_vars={}, force_assemble=False, check_hash=False, 
 		#FILE_PATH = "/".join(filename.split("/")[:-1]) + "/"
 
 		FILE_PATH, FILE_NAME = get_file_attrs(filename)
+		if not relfile:
+			relfile = FILE_PATH + FILE_NAME.split(".")[0] + ".rel"
+
 
 		succeeded = False
 		hash_text = ""
@@ -574,7 +577,7 @@ def assembleFile(filename, ext_vars={}, force_assemble=False, check_hash=False, 
 
 		if not force_assemble:
 			try:
-				f = open(FILE_PATH + FILE_NAME.split(".")[0] + ".rel")
+				f = open(relfile)
 
 				f.close()
 			except:
@@ -4221,7 +4224,7 @@ def assembleFile(filename, ext_vars={}, force_assemble=False, check_hash=False, 
 			TEST_OFFS = 0
 			P_TEST_OFFS = 0
 			PREV_LINE = 0
-			with open(FILE_PATH + FILE_NAME.split(".")[0] + ".lis", "w") as LIS_FILE:
+			with open(relfile.rsplit(".", 1)[0] + ".lis", "w") as LIS_FILE:
 				for S in sections:
 					PREV_LINE = 0
 					L_IND = -1
@@ -4931,7 +4934,7 @@ def assembleFile(filename, ext_vars={}, force_assemble=False, check_hash=False, 
 
 		start = util.get_time()
 
-		with open(FILE_PATH + FILE_NAME.split(".")[0] + ".rel", "wb") as REL_FILE:
+		with open(relfile, "wb") as REL_FILE:
 			L = len(REL_DATA)
 			out_bytes = []
 			for ind in range(L):

@@ -1,12 +1,18 @@
 from build.ab import simplerule
 from tools.build import mkcpmfs
 from build.llvm import llvmrawprogram
+from third_party.projectl.build import l_as65c
 from config import (
     MINIMAL_APPS,
     MINIMAL_APPS_SRCS,
     BIG_APPS,
     BIG_APPS_SRCS,
     SCREEN_APPS,
+)
+
+l_as65c(
+    name="main",
+    srcs=["./main.asm"],
 )
 
 llvmrawprogram(
