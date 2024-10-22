@@ -559,6 +559,14 @@ bytecode compiler and interpreter, which is © 1978-2021 Niklaus Wirth, Mark
 Rustad and Hans Otten and is available under the terms of the MIT license. See
 `third_party/pascal-m/LICENSE` for the full text.
 
-`third_party/dwarfstar` contains DwarfStar, which is © 2024 by Ivo van Poorten and is available under the terms of the BSD 2-Clause License. See `third_party/dwarfstar/LICENSE` for the full text.
+`third_party/dwarfstar` contains DwarfStar, which is © 2024 by Ivo van Poorten
+and is available under the terms of the BSD 2-Clause License. See
+`third_party/dwarfstar/LICENSE` for the full text.
 
-`third_part/zmalloc` contains a copy of zmalloc, which is © 2024 by Ivo van Poorten and is available under the terms of the 0BSD License. See `third_party/zmalloc/LICENSE` for the full text.
+`third_party/zmalloc` contains a copy of zmalloc, which is © 2024 by Ivo van
+Poorten and is available under the terms of the 0BSD License. See
+`third_party/zmalloc/LICENSE` for the full text.
+
+`third_party/project-l` contains a copy of some of the Project L 65816 tools
+written by MrL314@github, and is available under the terms of the GPL-3 license.
+See `third_party/project-l/LICENSE` for the full text.
