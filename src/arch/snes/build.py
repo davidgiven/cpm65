@@ -25,7 +25,7 @@ mkcpmfs(
 
 l_as65c(
     name="main",
-    srcs=["./main.asm"],
+    srcs=["./main.asm", "./snes.inc", "./charset.inc"],
 )
 
 llvmrawprogram(
