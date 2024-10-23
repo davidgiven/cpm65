@@ -1,4 +1,4 @@
-from build.ab import Rule, simplerule, Targets
+from build.ab import Rule, simplerule, Targets, Target
 from build.utils import filenamesmatchingof
 from glob import glob
 
@@ -32,3 +32,15 @@ def l_link(self, name, srcs: Targets, relinfo, deps: Targets=[]):
             f"chronic python3 third_party/projectl/link/link.py -r {relinfostr} -o {{outs[0]}} -ls {{outs[0]}}.map {{ins}}"
         ],
         label="PROJECTL_LINK")
+
+@Rule
+def l_hex2bin(self, name, src: Target, romformat="4"):
+    simplerule(
+        replaces=self,
+        ins=[src],
+        deps=glob("third_party/projectl/hex2bin/*.py"),
+        outs=[f"{self.localname}.bin"],
+        commands=[
+            f"chronic python3 third_party/projectl/hex2bin/hex2bin.py -r {romformat} -o {{outs[0]}} -f {{ins}}"
+        ],
+        label="PROJECTL_HEX2BIN")

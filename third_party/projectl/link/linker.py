@@ -197,7 +197,11 @@ def DO_LINK(L_ARGS):
 					if S["sec_addr"] == -1:
 						if not NAME in OFFSETS:
 							OFFSETS[NAME] = 0
-							#print("NOT IN OFFSETS: ", NAME)
+							print("NOT IN OFFSETS: ", NAME)
+							print(f"[ERROR] Section group {NAME} is not assigned to an address")
+							err_msg = "; [ERROR] not assigned to an address"
+							NO_ERRORS = False
+
 						R.get_section(S["sec_name"])["sec_addr"] = OFFSETS[NAME]
 
 						size = 0
