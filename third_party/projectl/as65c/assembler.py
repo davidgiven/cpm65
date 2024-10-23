@@ -4983,4 +4983,7 @@ def assembleFile(filename, ext_vars={}, force_assemble=False, check_hash=False, 
 		#print(curr_hash.hexdigest())
 		#print(curr_hash)
 
+	else:
+		sys.exit(1)
+
 

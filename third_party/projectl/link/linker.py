@@ -747,12 +747,14 @@ def DO_LINK(L_ARGS):
 		else:
 			print("\n[WARNING] Warnings or Errors occured during linking stage. Please look over errors.")
 			print("[INFO] Linked to " + str(outputfile) + ".\n\n")
+			sys.exit(1)
 
 	except Exception as e:
 
 		traceback.print_exc()
 
 		print("\n[ERROR] Link failed.\n\n")
+		sys.exit(1)
 
 
 

@@ -17,5 +17,18 @@ def l_as65c(self, name, srcs: Targets, deps: Targets = []):
             + realsrcs[0]
             + " -o {outs[0]}"
         ],
-        label="AS65C",
+        label="PROJECTL_AS65C",
     )
+
+@Rule
+def l_link(self, name, srcs: Targets, relinfo, deps: Targets=[]):
+    relinfostr=",".join(f"{segment}={hex(address)[2:]}" for segment, address in relinfo.items())
+    simplerule(
+        replaces=self,
+        ins=srcs,
+        deps=deps + glob("third_party/projectl/link/*.py"),
+        outs=[f"={self.localname}.hex"],
+        commands=[
+            f"chronic python3 third_party/projectl/link/link.py -r {relinfostr} -o {{outs[0]}} -ls {{outs[0]}}.map {{ins}}"
+        ],
+        label="PROJECTL_LINK")
