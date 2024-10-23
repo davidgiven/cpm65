@@ -1030,6 +1030,18 @@ def isValue(v, WARN=False):
 				if WARN: print("[DEBUG] REFUSING TO PARSE", str(v), "AS A HEX VALUE. DEFAULTING TO A VARIABLE.")
 				return False
 			return True
+		elif v[0:2].lower() == "0x":
+			int(v, 16)
+			return True
+		elif v[0:2].lower() == "0b":
+			int(v, 2)
+			return True
+		elif v[0:2].lower() == "0o":
+			int(v, 8)
+			return True
+		elif v[0] == "$":
+			int("0x" + v[1:], 16)
+			return True
 		else:
 			# ascii char check
 			if v[0] == "\"" and v[-1] == "\"" and len(v) == 3:
@@ -1061,6 +1073,14 @@ def parseValue(v):
 		elif v[-1].lower() == "h":
 			# if this works, the value is a hex number
 			return int("0x" + v[:-1], 16)
+		elif v[0:2].lower() == "0x":
+			return int(v, 16)
+		elif v[0:2].lower() == "0b":
+			return int(v, 2)
+		elif v[0:2].lower() == "0o":
+			return int(v, 8)
+		elif v[0] == "$":
+			return int("0x" + v[1:], 16)
 		else:
 			# ascii char parse
 			if v[0] == "\"" and v[-1] == "\"" and len(v) == 3:
