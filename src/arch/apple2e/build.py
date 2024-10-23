@@ -6,6 +6,9 @@ from config import (
     BIG_APPS,
     BIG_APPS_SRCS,
     SCREEN_APPS,
+    SCREEN_APPS_SRCS,
+    BIG_SCREEN_APPS,
+    PASCAL_APPS,
 )
 
 llvmcfile(
@@ -62,6 +65,20 @@ mkcpmfs(
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS,
 )
+
+mkcpmfs(
+    name="diskimage_b",
+    format="appleiie",
+    bootimage=".+bios_shuffled",
+    size=143360,
+    items={
+    }
+    | SCREEN_APPS
+    | SCREEN_APPS_SRCS
+    | BIG_SCREEN_APPS
+    | PASCAL_APPS,
+)
+
 
 mametest(
     name="mametest",
