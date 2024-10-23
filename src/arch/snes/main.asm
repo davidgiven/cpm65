@@ -6,7 +6,7 @@ start:
     mem8
     idx8
     sei
-    rep #00001001b      ; binary mode
+    rep #0b00001001     ; binary mode
     xce                 ; native mode
 
     rts
@@ -17,12 +17,12 @@ abt_e_entry:
 int_e_entry:
     rti
 
-    org 0ffc0h
+    org 0xffc0
 
     ;      012345678901234567890
     ascii 'CP/M-65 SNES         '
-    byte 00110001b      ; fast, HiROM
-    byte 002h           ; ROM + RAM + battery
+    byte 0b00110001     ; fast, HiROM
+    byte 0x02           ; ROM + RAM + battery
     byte 9              ; ROM size: 512kB
     byte 5              ; RAM size: 32kB
     byte 0              ; country
@@ -33,19 +33,19 @@ int_e_entry:
 
     ; Native mode vectors
 
-    word 0ffffh         ; reserved
-    word 0ffffh         ; reserved
-    word 0ffffh         ; COP
-    word 0ffffh         ; BRK
-    word 0ffffh         ; ABT
-    word 0ffffh         ; NMI
-    word 0ffffh         ; reserved
-    word 0ffffh         ; IRQ
+    word 0xffff         ; reserved
+    word 0xffff         ; reserved
+    word 0xffff         ; COP
+    word 0xffff         ; BRK
+    word 0xffff         ; ABT
+    word 0xffff         ; NMI
+    word 0xffff         ; reserved
+    word 0xffff         ; IRQ
 
     ; Emulation mode vectors
 
-    word 0ffffh         ; reserved
-    word 0ffffh         ; reserved
+    word 0xffff         ; reserved
+    word 0xffff         ; reserved
     word cop_e_entry
     word brk_e_entry
     word abt_e_entry
