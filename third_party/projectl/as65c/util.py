@@ -1023,9 +1023,6 @@ def isValue(v, WARN=False):
 		elif v[0:2].lower() == "0o":
 			int(v, 8)
 			return True
-		elif v[0] == "$":
-			int("0x" + v[1:], 16)
-			return True
 		elif v[-1].lower() == "b":
 			# if this works, the value is a binary number
 			int("0b" + v[:-1], 2)
@@ -1073,8 +1070,6 @@ def parseValue(v):
 			return int(v, 2)
 		elif v[0:2].lower() == "0o":
 			return int(v, 8)
-		elif v[0] == "$":
-			return int("0x" + v[1:], 16)
 		elif v[-1].lower() == "b":
 			# if this works, the value is a binary number
 			return int("0b" + v[:-1], 2)
