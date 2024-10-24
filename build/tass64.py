@@ -22,7 +22,7 @@ def tass64(self, name, srcs:Targets, deps:Targets=[], flags=[]):
         deps=incfiles + deps,
         outs=[f"={self.localname}.bin"],
         commands=[
-            f"64tass --quiet {{flags}} {incdirs} -o {{outs[0]}} {{ins[0]}}"
+            f"64tass --quiet {{flags}} {incdirs} --list {{outs[0]}}.lst -o {{outs[0]}} {{ins[0]}}"
         ],
         label="64TASS",
     )

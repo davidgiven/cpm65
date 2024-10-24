@@ -30,15 +30,32 @@ llvmrawprogram(
     linkscript="./bios.ld",
 )
 
+simplerule(
+    name="font",
+    ins=["src/arch/snes/tools+mkfont"],
+    outs=["=4bpp.bin", "=2bpp.bin"],
+    commands=[
+        "{ins[0]} {outs}"
+    ],
+    label="MKFONT"
+)
+
 tass64(
     name="snes_cartridge_bin",
-    srcs=["./main.asm", "./snes.inc", "./charset.inc", ".+diskimage"],
+    srcs=[
+        "./main.asm",
+        "./snes.inc",
+        ".+diskimage",
+        ".+font",
+    ],
     deps=[".+diskimage"],
     flags=[
         "--flat",
         "--ascii",
+        #        "--case-sensitive",
         "-Wno-wrap-pc",
-    ])
+    ],
+)
 
 simplerule(
     name="snes_cartridge",
@@ -46,9 +63,8 @@ simplerule(
     outs=["snes.img"],
     commands=[
         "cp {ins[0]} {outs[0]}",
-        "truncate -s %d {outs[0]}" % (2048*1024),
-        "chronic python3 {ins[1]} HIROM {outs[0]}"
+        "truncate -s %d {outs[0]}" % (2048 * 1024),
+        "chronic python3 {ins[1]} HIROM {outs[0]}",
     ],
     label="MKCARTRIDGE",
 )
-
