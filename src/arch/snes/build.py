@@ -1,7 +1,7 @@
 from build.ab import simplerule
+from build.tass64 import tass64
 from tools.build import mkcpmfs
 from build.llvm import llvmrawprogram
-from third_party.projectl.build import l_as65c, l_link, l_hex2bin
 from config import (
     MINIMAL_APPS,
     MINIMAL_APPS_SRCS,
@@ -23,11 +23,6 @@ mkcpmfs(
     | MINIMAL_APPS_SRCS,
 )
 
-l_as65c(
-    name="main",
-    srcs=["./main.asm", "./snes.inc", "./charset.inc"],
-)
-
 llvmrawprogram(
     name="bios",
     srcs=["./bios.S"],
@@ -35,27 +30,25 @@ llvmrawprogram(
     linkscript="./bios.ld",
 )
 
-l_link(
-    name="main_hex",
-    srcs=[".+main"],
-    relinfo={"PROG": 0, "DATA": 0, "BANK0": 0x008000},
-)
-
-l_hex2bin(
-    name="main_bin",
-    src=".+main_hex",
-    romformat="4",
-)
+tass64(
+    name="snes_cartridge_bin",
+    srcs=["./main.asm", "./snes.inc", "./charset.inc", ".+diskimage"],
+    deps=[".+diskimage"],
+    flags=[
+        "--flat",
+        "--ascii",
+        "-Wno-wrap-pc",
+    ])
 
 simplerule(
     name="snes_cartridge",
-    ins=[".+main_bin", ".+diskimage", "./checksum.py"],
+    ins=[".+snes_cartridge_bin", "./checksum.py"],
     outs=["snes.img"],
     commands=[
         "cp {ins[0]} {outs[0]}",
-        "dd if={ins[1]} of={outs[0]} bs=65536 seek=1 status=none",
         "truncate -s %d {outs[0]}" % (2048*1024),
-        "chronic python3 {ins[2]} HIROM {outs[0]}"
+        "chronic python3 {ins[1]} HIROM {outs[0]}"
     ],
     label="MKCARTRIDGE",
 )
+

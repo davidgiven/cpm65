@@ -567,6 +567,3 @@ and is available under the terms of the BSD 2-Clause License. See
 Poorten and is available under the terms of the 0BSD License. See
 `third_party/zmalloc/LICENSE` for the full text.
 
-`third_party/projectl` contains a copy of some of the Project L 65816 tools
-written by MrL314@github, and is available under the terms of the GPL-3 license.
-See `third_party/projectl/LICENSE` for the full text.
