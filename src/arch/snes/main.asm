@@ -205,8 +205,6 @@ clear_vram:
     pla
     RTS
 
-.include "charset.inc"
-
 cop_e_entry:
 brk_e_entry:
 abt_e_entry:
