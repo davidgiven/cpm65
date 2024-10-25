@@ -26,10 +26,12 @@ VRAM_MAP2_LOC    =  $1000
 VRAM_TILES_LOC   =  $2000
 VRAM_TILES2_LOC  =  $6000
 
-.logical 0
+.virtual $7f0000
 cursor_addr:
     .word 0
-.endlogical
+.endvirtual
+
+.dpage ?                ; Reserve $0000-$00ff for user programs
 
 * = $000000
 .logical $400000
@@ -41,13 +43,23 @@ font2_data:
 font2_data_end:
 .endlogical
 
+a16 .macro
+    rep #$20
+.endmacro
+
+a8 .macro
+    sep #$20
+.endmacro
+
 * = $008000
 start:
     .autsiz
     clc
     xce
-    rep #$10        ; X/Y 16-bit
-    sep #$20        ; A 8-bit
+    rep #$30            ; A/X/Y 16-bit
+
+    ldx #$01ff          ; 6502-compatible
+    txs
 
     ; Clear registers
     ldx #$33
@@ -60,25 +72,14 @@ start:
 
     ; Initialise the screen.
 
-    lda #$80             ; screen off during initialisation
-    sta INIDISP
-    lda #5 | $00         ; mode 5, 16x8 tiles all layers
-    sta BGMODE
-    lda #%00001000       ; high res mode, interlacing off
-    sta SETINI
-    lda #(VRAM_MAP1_LOC >> 9) | %00 ; tilemap 1 address, 32x32
-    sta BG1SC
-    lda #(VRAM_MAP2_LOC >> 9) | %00 ; tilemap 2 address, 32x32
-    sta BG2SC
-    lda #((>VRAM_TILES_LOC >> 5) | ((>VRAM_TILES2_LOC >> 1) & $f0))
-    sta BG12NBA
-    lda #%00000011       ; main screen turn on: BG1 and BG2
-    sta TM
-    sta TS               ; ditto subscreen
-
+    jsr blank_on
+    jsr init_screen
     jsr load_font_data
     jsr load_palette_data
+    jsr blank_off
    
+    jsr clear_screen
+
     lda #1
     jsr putc
     lda #2
@@ -92,11 +93,6 @@ start:
     lda #6
     jsr putc
 
-enable_display:
-   ; Maximum screen brightness
-   lda #$0F
-   sta INIDISP
-
 game_loop:
    wai ; Pause until next interrupt complete (i.e. V-blank processing is done)
    ; Do something
@@ -105,13 +101,79 @@ game_loop:
 
     rts
 
+init_screen
+    php
+    a8
+
+    lda #5 | $00            ; mode 5, 16x8 tiles all layers
+    sta BGMODE
+    lda #%00001000          ; high res mode, interlacing off
+    sta SETINI
+    lda #(VRAM_MAP1_LOC >> 9) | %00 ; tilemap 1 address, 32x32
+    sta BG1SC
+    lda #(VRAM_MAP2_LOC >> 9) | %00 ; tilemap 2 address, 32x32
+    sta BG2SC
+    lda #((>VRAM_TILES_LOC >> 5) | ((>VRAM_TILES2_LOC >> 1) & $f0))
+    sta BG12NBA
+    lda #%00000011          ; main screen turn on: BG1 and BG2
+    sta TM
+    sta TS                  ; ditto subscreen
+
+    plp
+    rts
+
+blank_on:
+    php
+    a8
+
+    lda #%10000000          ; force blank
+    sta INIDISP
+
+    plp
+    rts
+
+blank_off:
+    php
+    a8
+
+    lda #%00001111          ; blank off, maximum brightness
+    sta INIDISP
+
+    plp
+    rts
+
+wait_for_vblank:
+    php
+    a8 
+
+-
+    lda HVBJOY
+    and #%10000000          ; test for v-blank flag
+    beq -
+
+    plp
+    rts
+
+clear_screen:
+    php
+    a16
+
+    lda #0
+    sta cursor_addr
+
+    plp
+    rts
+
 putc:
     php
-    rep #$30            ; A/X/Y 16 bit
+    a16
+
     asl a
     and #$00ff
     ora #$2000
     pha
+
+    jsr wait_for_vblank
 
     lda cursor_addr
     bit #1
@@ -124,14 +186,17 @@ putc:
     pla
     sta VMDATAL
 
-    inc cursor_addr
+    lda cursor_addr
+    inc a
+    sta cursor_addr
 
     plp
     rts
 
 load_palette_data:
     php
-    sep #$30             ; A/X/Y 8 bit
+    a8
+
     stz CGADD
 
     stz CGDATA
@@ -144,61 +209,60 @@ load_palette_data:
     rts
 
 load_font_data:
-   php
-   rep #$30             ; A/X/Y 16 bit
+    php
+    a16
 
-   lda #%10000000       ; autoincrement by one word
-   sta VMAIN
+    lda #%10000000       ; autoincrement by one word
+    sta VMAIN
    
-   ldx #VRAM_TILES_LOC>>1 ; set dest VRAM address
-   stx VMADDL
-   ldx #0               ; source offset
+    ldx #VRAM_TILES_LOC>>1 ; set dest VRAM address
+    stx VMADDL
+    ldx #0               ; source offset
 -
-   lda @l font_data, x
-   sta VMDATAL
-   inx
-   inx
-   cpx #(font_data_end - font_data)
-   bne -
+    lda @l font_data, x
+    sta VMDATAL
+    inx
+    inx
+    cpx #(font_data_end - font_data)
+    bne -
 
-   ldx #VRAM_TILES2_LOC>>1 ; set dest VRAM address
-   stx VMADDL
-   ldx #0
+    ldx #VRAM_TILES2_LOC>>1 ; set dest VRAM address
+    stx VMADDL
+    ldx #0
 -
-   lda @l font2_data, x
-   sta VMDATAL
-   inx
-   inx
-   cpx #(font2_data_end - font2_data)
-   bne -
+    lda @l font2_data, x
+    sta VMDATAL
+    inx
+    inx
+    cpx #(font2_data_end - font2_data)
+    bne -
 
-   plp
-   rts
+    plp
+    rts
 
 clear_vram:
     pha
     phx
     php
 
-    REP #$30		; mem/A = 8 bit, X/Y = 16 bit
-    SEP #$20
+    a8
 
-    LDA #$80
-    STA $2115         ;Set VRAM port to.word access
-    LDX #$1809
-    STX $4300         ;Set DMA mode to fixed source,.word to $2118/9
-    LDX #$0000
-    STX $2116         ;Set VRAM port address to $0000
-    STX $0000         ;Set $00:0000 to $0000 (assumes scratchpad ram)
-    STX $4302         ;Set source address to $xx:0000
-    LDA #$00
-    STA $4304         ;Set source bank to $00
-    LDX #$FFFF
-    STX $4305         ;Set transfer size to 64k-1.bytes
-    LDA #$01
+    lda #$80
+    sta $2115         ;Set VRAM port to.word access
+    ldx #$1809
+    stx $4300         ;Set DMA mode to fixed source,.word to $2118/9
+    ldx #$0000
+    stx $2116         ;Set VRAM port address to $0000
+    stx $0000         ;Set $00:0000 to $0000 (assumes scratchpad ram)
+    stx $4302         ;Set source address to $xx:0000
+    lda #$00
+    sta $4304         ;Set source bank to $00
+    ldx #$FFFF
+    stx $4305         ;Set transfer size to 64k-1.bytes
+    lda #$01
     sta $420b         ;Initiate transfer
 
-    STZ $2119         ;clear the last.byte of the VRAM
+    stz $2119         ;clear the last.byte of the VRAM
 
     plp
     plx
@@ -212,22 +276,22 @@ int_e_entry:
     rti
 
 nmi_n_entry:
-   rep #$10        ; X/Y 16-bit
-   sep #$20        ; A 8-bit
-   phd
-   pha
-   phx
-   phy
-   ; Do stuff that needs to be done during V-Blank
-   lda RDNMI ; reset NMI flag
-   ply
-   plx
-   pla
-   pld
+    rep #$10        ; X/Y 16-bit
+    sep #$20        ; A 8-bit
+    phd
+    pha
+    phx
+    phy
+    ; Do stuff that needs to be done during V-Blank
+    lda RDNMI ; reset NMI flag
+    ply
+    plx
+    pla
+    pld
 return_int:
-   rti
+    rti
 
-   * = $ffc0
+    * = $ffc0
 
     ;      012345678901234567890
     .text 'CP/M-65 SNES         '
@@ -243,25 +307,25 @@ return_int:
 
     ; Native mode vectors
 
-   .word $ffff         ; reserved
-   .word $ffff         ; reserved
-   .word return_int     ; COP
-   .word return_int     ; BRK
-   .word return_int     ; ABT
-   .word nmi_n_entry    ; NMI
-   .word $ffff         ; reserved
-   .word return_int     ; IRQ
+    .word $ffff         ; reserved
+    .word $ffff         ; reserved
+    .word return_int     ; COP
+    .word return_int     ; BRK
+    .word return_int     ; ABT
+    .word nmi_n_entry    ; NMI
+    .word $ffff         ; reserved
+    .word return_int     ; IRQ
 
-    ; Emulation mode vectors
+     ; Emulation mode vectors
 
-   .word $ffff         ; reserved
-   .word $ffff         ; reserved
-   .word return_int    ; COP
-   .word brk_e_entry
-   .word return_int     ; ABT
-   .word nmi_n_entry    ; NMI
-   .word start          ; reserved
-   .word int_e_entry    ; IRQ
+    .word $ffff         ; reserved
+    .word $ffff         ; reserved
+    .word return_int    ; COP
+    .word brk_e_entry
+    .word return_int     ; ABT
+    .word nmi_n_entry    ; NMI
+    .word start          ; reserved
+    .word int_e_entry    ; IRQ
 
 * = $010000
 .binary "+diskimage.img"
