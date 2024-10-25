@@ -8,6 +8,121 @@
 #include "driver.inc"
 #include "jumptables.inc"
 
+; --- Zero page -------------------------------------------------------------
+
+ZEROPAGE
+
+.global ptr
+.global ptr1
+ptr:              .fill 2
+ptr1:             .fill 2
+cursorx:          .fill 1
+cursory:          .fill 1
+dma:              .fill 2     ; current DMA
+
 zproc bios_entry
     bra .
 zendproc
+
+; --- BIOS entrypoints ------------------------------------------------------
+
+zproc bios_GETTPA
+    lda mem_base
+    ldx mem_end
+    clc
+    rts
+zendproc
+
+zproc bios_SETTPA
+    sta mem_base
+    stx mem_end
+    clc
+    rts
+zendproc
+
+zproc bios_GETZP
+    lda zp_base
+    ldx zp_end
+    clc
+    rts
+zendproc
+
+zproc bios_SETZP
+    sta zp_base
+    stx zp_end
+    clc
+    rts
+zendproc
+
+zproc bios_SETBANK
+    rts
+zendproc
+
+zproc bios_SETDMA
+    sta dma+0
+    stx dma+1
+    rts
+zendproc
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc bios_SELDSK
+    cmp #0
+    bne fail                ; invalid drive
+
+    lda #<dph
+    ldx #>dph
+    clc
+    rts
+zendproc
+
+zproc fail
+    sec
+    rts
+zendproc
+
+; Set the current absolute sector number.
+; XA is a pointer to a three-byte number.
+
+zproc bios_SETSEC
+    rts
+zendproc
+
+zproc bios_READ
+    sec
+    rts
+zendproc
+
+zproc bios_WRITE
+    sec
+    rts
+zendproc
+
+; --- TTY driver ------------------------------------------------------------
+
+.data
+.global drvtop
+; This must point at the _last_ driver.
+drvtop: .word 0
+
+; DPH for drive 0 (our only drive)
+
+define_drive dph, 360, 4096, 256, 0
+
+; --- Data ------------------------------------------------------------------
+
+.data
+
+.global zp_base, zp_end, mem_base, mem_end
+zp_base:    .byte __ZEROPAGE_START__
+zp_end:     .byte __ZEROPAGE_END__
+mem_base:   .byte __TPA_START__@mos16hi
+mem_end:    .byte __TPA_END__@mos16hi
+
+.bss
+
+.global directory_buffer
+directory_buffer:       .fill 128   ; used by the BDOS

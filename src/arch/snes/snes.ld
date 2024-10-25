@@ -18,12 +18,25 @@ SECTIONS {
 		BIOS_LOAD_ADDR = .;
 	} >loader
 
+	.bss (NOLOAD) : {
+		*loader.o(.bss .bss.*)
+		*loader.o(.noinit .noinit.*)
+	} >loader
+
 	.text : {
 		BIOS_EXEC_ADDR = .;
-		*bios.o(.text .text.* .data .data.*)
-		. = ALIGN(0x100);
+		*(.text .text.*);
+		*(.data .data.*)
 		BIOS_END_ADDR = .;
 	} >bios AT>loader
+	 
+	.bss (NOLOAD) : {
+		*(.bss .bss.*)
+		*(.noinit .noinit.*)
+		. = ALIGN(0x100);
+		__TPA_START__ = .;
+		__TPA_END__ = 0xfe00;
+	} >bios
 }
 
 OUTPUT_FORMAT {

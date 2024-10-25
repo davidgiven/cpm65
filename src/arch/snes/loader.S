@@ -10,11 +10,6 @@
 
 ZEROPAGE
 
-.global ptr, ptr1
-
-ptr:            .fill 2
-ptr1:           .fill 2
-
 ; --- Initialisation code ---------------------------------------------------
 
 ; Boot sector and relocator. Loaded at 0x8000 when the system starts. Called
@@ -49,8 +44,18 @@ _start:
         zendif
     zuntil_eq
 
-.if 0
+    ; Initialise the BIOS common code.
+
     jsr initdrivers
+    
+    ; Load the BDOS.
+
+    lda #<bdos_filename
+    ldx #>bdos_filename
+    ldy mem_base
+
+    jsr loadfile
+.if 0
 
     jsr screen_clear
     jsr set_normal_text
@@ -79,37 +84,5 @@ banner: ; reversed!
     .ascii "\rSENS eht rof 56-M/PC"
 banner_end:
 
-.section header, "ax"
-    ;       012345678901234567890
-    .ascii "CP/M-65 SNES         "
-    .byte %00110001     ; fast, HiROM
-    .byte $02           ; ROM + RAM + battery
-    .byte 9              ; ROM size: 512kB
-    .byte 5              ; RAM size: 32kB
-    .byte 0              ; country
-    .byte 0              ; developer ID
-    .byte 0              ; version
-    .word 0              ; checksum complement (filled in later)
-    .word 0              ; checksum (filled in later)
-
-    ; Native mode vectors
-
-    .word $ffff         ; reserved
-    .word $ffff         ; reserved
-    .word return_int     ; COP
-    .word return_int     ; BRK
-    .word return_int     ; ABT
-    .word nmi_n_entry    ; NMI
-    .word $ffff         ; reserved
-    .word return_int     ; IRQ
-
-     ; Emulation mode vectors
-
-    .word $ffff         ; reserved
-    .word $ffff         ; reserved
-    .word return_int    ; COP
-    .word brk_e_entry
-    .word return_int     ; ABT
-    .word nmi_n_entry    ; NMI
-    .word _start         ; reserved
-    .word int_e_entry    ; IRQ
+bdos_filename:
+    .ascii "BDOS    SYS"
