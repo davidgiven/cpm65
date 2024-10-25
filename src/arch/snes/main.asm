@@ -26,6 +26,8 @@ VRAM_MAP2_LOC    =  $1000
 VRAM_TILES_LOC   =  $2000
 VRAM_TILES2_LOC  =  $6000
 
+LOADER_ADDRESS  = $7e8000
+
 .virtual $7f0000
 cursor_addr:
     .word 0
@@ -36,11 +38,14 @@ cursor_addr:
 * = $000000
 .logical $400000
 font_data:
-   .binary "4bpp.bin"
+    .binary "4bpp.bin"
 font_data_end:
 font2_data:
-   .binary "2bpp.bin"
+    .binary "2bpp.bin"
 font2_data_end:
+bios_data:
+    .binary "bios"
+bios_data_end:
 .endlogical
 
 a16 .macro
@@ -60,6 +65,8 @@ start:
 
     ldx #$01ff          ; 6502-compatible
     txs
+    lda #0
+    tad
 
     ; Clear registers
     ldx #$33
@@ -80,26 +87,25 @@ start:
    
     jsr clear_screen
 
-    lda #1
-    jsr putc
-    lda #2
-    jsr putc
-    lda #3
-    jsr putc
-    lda #4
-    jsr putc
-    lda #5
-    jsr putc
-    lda #6
-    jsr putc
+    ; Copy the BIOS loader to its final position.
 
-game_loop:
-   wai ; Pause until next interrupt complete (i.e. V-blank processing is done)
-   ; Do something
-   jmp game_loop
+    lda #(bios_data_end-bios_data)-1
+    ldx #<>bios_data
+    ldy #<>LOADER_ADDRESS
+    mvn #`bios_data, #`LOADER_ADDRESS
+    lda #0
 
+    ; Jump into the loader.
 
-    rts
+    lda #`LOADER_ADDRESS
+    pha
+    plb                     ; set DB so direct accesses go into user memory
+    lda #0
+    tad                     ; direct page register to 0
+
+    sec
+    xce                     ; enable emulation mode...
+    jml LOADER_ADDRESS      ; ...and go
 
 init_screen
     php

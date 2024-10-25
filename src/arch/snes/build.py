@@ -1,13 +1,23 @@
 from build.ab import simplerule
 from build.tass64 import tass64
 from tools.build import mkcpmfs
-from build.llvm import llvmrawprogram
+from build.llvm import llvmrawprogram, llvmcfile
 from config import (
     MINIMAL_APPS,
     MINIMAL_APPS_SRCS,
     BIG_APPS,
     BIG_APPS_SRCS,
     SCREEN_APPS,
+)
+
+llvmrawprogram(
+    name="bios",
+    srcs=["./loader.S", "./bios.S"],
+    deps=["include", "src/lib+bioslib", "src/bdos+bdoslib"],
+    cflags=[
+        "-mcpu=mosw65c02",
+    ],
+    linkscript="./snes.ld",
 )
 
 mkcpmfs(
@@ -23,21 +33,12 @@ mkcpmfs(
     | MINIMAL_APPS_SRCS,
 )
 
-llvmrawprogram(
-    name="bios",
-    srcs=["./bios.S"],
-    deps=["include", "src/lib+bioslib"],
-    linkscript="./bios.ld",
-)
-
 simplerule(
     name="font",
     ins=["src/arch/snes/tools+mkfont"],
     outs=["=4bpp.bin", "=2bpp.bin"],
-    commands=[
-        "{ins[0]} {outs}"
-    ],
-    label="MKFONT"
+    commands=["{ins[0]} {outs}"],
+    label="MKFONT",
 )
 
 tass64(
@@ -47,6 +48,7 @@ tass64(
         "./snes.inc",
         ".+diskimage",
         ".+font",
+        ".+bios",
     ],
     deps=[".+diskimage"],
     flags=[

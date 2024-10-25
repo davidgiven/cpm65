@@ -8,3 +8,6 @@
 #include "driver.inc"
 #include "jumptables.inc"
 
+zproc bios_entry
+    bra .
+zendproc
