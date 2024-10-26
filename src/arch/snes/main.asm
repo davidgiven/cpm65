@@ -33,6 +33,9 @@ VRAM_TILES2_LOC =  $6000
 
 LOADER_ADDRESS  = $7e8000
 
+SCREEN_WIDTH    = 64
+SCREEN_HEIGHT   = 32
+
 MOD_SHIFT       = %10000000 ; n bit
 MOD_CTRL        = %01000000 ; v bit
 MOD_CAPS        = %00000100
@@ -42,6 +45,7 @@ cursor_addr:    .word 0
 sector:         .long 0     ; 24 bits!
 pending_key:    .byte 0
 modifier_state: .byte 0
+cursorp:        .word 0     ; character count from top left of screen
 .endvirtual
 
 .virtual 0
@@ -203,41 +207,11 @@ wait_for_vblank:
 
 clear_screen:
     php
-    a16
 
+    a16
     lda #0
     sta cursor_addr
-
-    plp
-    rts
-
-putc:
-    php
-    a16
-
-    sec
-    sbc #$0020              ; convert to tile number
-    asl a                   ; tiles are indexed by twos
-    and #$00ff
-    ora #$2000              ; add in priority bit and palette
-    pha
-
-    jsr wait_for_vblank
-
-    lda cursor_addr
-    bit #1
-    bne +
-    ora #VRAM_MAP2_LOC
-+
-    lsr a
-    sta VMADDL
-
-    pla
-    sta VMDATAL
-
-    lda cursor_addr
-    inc a
-    sta cursor_addr
+    sta cursorp
 
     plp
     rts
@@ -317,26 +291,6 @@ clear_vram:
     plx
     pla
     rts
-
-tty_putchar:
-    clc
-    xce             ; switch to native mode
-    rep #$30        ; A/X/Y 16-bit
-    a8
-    phd
-    phb
-
-    pea #0          ; 16 bit push
-    plb
-    plb             ; databank register to 0
-
-    jsr putc
-
-    plb
-    pld
-    sec
-    xce             ; back to emulation mode
-    rtl
 
 exit_cop_e:
 
@@ -531,13 +485,91 @@ keyboard_init_data2:
     .byte $03, %11000001 ; Enable serial input
     .byte $ff
     
+; --- SCREEN driver ---------------------------------------------------------
+
+.databank $7f
+.dpage $2100
+
+screen_handler:
+    rtl
+
+screen_putchar:
+    php
+    a16
+    pha
+
+    lda cursorp
+    lsr a
+    bcs +
+        ora #(VRAM_MAP2_LOC >> 1) ; remember, we're working with word addresses
+    +
+    tax
+
+    a8
+    -
+        lda HVBJOY
+        and #%10000000      ; test for v-blank flag
+        beq -
+    a16
+
+    stx VMADDL
+
+    pla
+    sec
+    sbc #$0020              ; convert to tile number
+    asl a                   ; tiles come in pairs
+    and #$00ff
+    ora #$2000              ; priority bit and palette
+    sta VMDATAL
+
+    plp
+    rts
+
+.databank ?
+.dpage ?
+
+; --- TTY driver ------------------------------------------------------------
+
+.databank $7f
+.dpage $2100
+
+tty_handler:
+    php
+    clc
+    xce             ; switch to native mode
+    phb
+    phd
+    a8i8
+
+    pha
+    tya
+    asl a
+    tax
+
+    lda #$7f        ; databank to $7f0000 so we can read supervisor RAM
+    pha
+    plb
+    pea #$2100      ; direct page to $2100 so we can write to video registers
+    pld
+
+    pla
+    jsr (tty_driver_table, x)
+
+    pld
+    plb
+    sec
+    xce             ; return to emulation mode
+    plp
+    rtl
+
+tty_driver_table:
+    .word tty_const
+    .word tty_conin
+    .word tty_conout
+
 ; Returns 0xff if no key is pending, 0 if one is.
 
 tty_const:
-    clc
-    xce             ; switch to native mode
-    a8i8
-
     jsr get_current_key
     ldx #0
     cmp #0
@@ -545,16 +577,13 @@ tty_const:
     dex
 +
     txa
+    
+    clc
+    rts
 
-    sec
-    xce             ; back to emulation mode
-    rtl
+; Blocks and waits for a keypress.
 
 tty_conin:
-    clc
-    xce             ; switch to native mode
-    a8i8
-
 -
     jsr get_current_key
     cmp #0
@@ -565,9 +594,49 @@ tty_conin:
     sta pending_key
     pla
 
-    sec
-    xce             ; back to emulation mode
-    rtl
+    clc
+    rts
+
+tty_conout:
+.block
+    php
+    i8
+    a16
+    tax
+    cpx #13
+    bne +
+        lda #63
+        trb cursorp
+        bra exit
+    +
+    cpx #127
+    bne +
+        dec cursorp
+        ; TODO: blank erased character
+        bra exit
+    +
+    cpx #10
+    bne +
+        lda cursorp
+        and #$ffc0
+        clc
+        adc #64
+        sta cursorp
+        bra exit
+    +
+
+    i16
+    jsr screen_putchar
+
+    inc cursorp
+exit:
+    plp
+    clc
+    rts
+.endblock
+
+.databank ?
+.dpage ?
 
 ; --- I/O handling ----------------------------------------------------------
 
@@ -638,12 +707,13 @@ bios_read:
 ; This must be kept in sync with the values in globals.inc.
 
     * = $ff00
-    jmp tty_putchar
+    jmp *               ; seldsk
     jmp bios_setdma
     jmp bios_setsec
     jmp bios_read
-    jmp tty_conin
-    jmp tty_const
+    jmp *               ; write
+    jmp tty_handler
+    jmp screen_handler
 
 ; --- ROM header ------------------------------------------------------------
 

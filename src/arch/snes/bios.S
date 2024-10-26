@@ -99,44 +99,21 @@ zendproc
 
 ; --- TTY driver ------------------------------------------------------------
 
-defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
-    jmpdispatch jmptable_lo, jmptable_hi
-
-jmptable_lo:
-    jmptablo tty_const
-    jmptablo tty_conin
-    jmptablo tty_conout
-jmptable_hi:
-    jmptabhi tty_const
-    jmptabhi tty_conin
-    jmptabhi tty_conout
-zendproc
-
-; Returns 0xff if no key is pending, 0 if one is.
-
-zproc tty_const
-    .4byte 0x22 | (JUMP_TTY_CONST << 8)
-    clc
+    .4byte 0x22 | (JUMP_TTY << 8)
     rts
 zendproc
 
-; Blocks until a key is pressed; returns it in A.
+; --- Screen driver ---------------------------------------------------------
 
-zproc tty_conin
-    .4byte 0x22 | (JUMP_TTY_CONIN << 8)
-    clc
-    rts
-zendproc
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 
-; Writes the character in A.
-
-zproc tty_conout
-    .4byte 0x22 | (JUMP_TTY_PUTCHAR << 8)
-    clc
+zproc drvstrat_SCREEN
+    .4byte 0x22 | (JUMP_SCREEN << 8)
     rts
 zendproc
 

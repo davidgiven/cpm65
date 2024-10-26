@@ -52,12 +52,11 @@ _start:
 
     ldy #banner_end - banner
     zrepeat
-        tya
-        pha
+        phy
         lda banner-1, y
-        jsr tty_conout
-        pla
-        tay
+        ldy #TTY_CONOUT
+        jsr drvstrat_TTY
+        ply
         dey
     zuntil_eq
 
