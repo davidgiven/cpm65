@@ -103,14 +103,50 @@ zendproc
 
 ; --- TTY driver ------------------------------------------------------------
 
-.data
-.global drvtop
-; This must point at the _last_ driver.
-drvtop: .word 0
+defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
 
-; DPH for drive 0 (our only drive)
+; TTY driver strategy routine.
+; Y=TTY opcode.
+zproc drvstrat_TTY
+    jmpdispatch jmptable_lo, jmptable_hi
 
-define_drive dph, 360, 4096, 256, 0
+jmptable_lo:
+    jmptablo tty_const
+    jmptablo tty_conin
+    jmptablo tty_conout
+jmptable_hi:
+    jmptabhi tty_const
+    jmptabhi tty_conin
+    jmptabhi tty_conout
+zendproc
+
+; Returns 0xff if no key is pending, 0 if one is.
+
+zproc tty_const
+    lda #0xff
+
+    clc
+    rts
+zendproc
+
+; Blocks until a key is pressed; returns it in A.
+
+zproc tty_conin
+    zloop
+    zendloop
+    rts
+zendproc
+
+; Writes the character in A.
+
+zproc tty_conout
+    .byte 0x22          ; JSL 0x00ff00
+    .word 0xff00
+    .byte 0
+
+    clc
+    rts
+zendproc
 
 ; --- Data ------------------------------------------------------------------
 
@@ -121,6 +157,14 @@ zp_base:    .byte __ZEROPAGE_START__
 zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA_START__@mos16hi
 mem_end:    .byte __TPA_END__@mos16hi
+
+.global drvtop
+; This must point at the _last_ driver.
+drvtop: .word drv_TTY
+
+; DPH for drive 0 (our only drive)
+
+define_drive dph, 360, 4096, 256, 0
 
 .bss
 

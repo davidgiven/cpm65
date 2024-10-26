@@ -174,16 +174,18 @@ putc:
     php
     a16
 
-    asl a
+    sec
+    sbc #$0020              ; convert to tile number
+    asl a                   ; tiles are indexed by twos
     and #$00ff
-    ora #$2000
+    ora #$2000              ; add in priority bit and palette
     pha
 
     jsr wait_for_vblank
 
     lda cursor_addr
     bit #1
-    beq +
+    bne +
     ora #VRAM_MAP2_LOC
 +
     lsr a
@@ -273,9 +275,31 @@ clear_vram:
     plp
     plx
     pla
-    RTS
+    rts
 
-cop_e_entry:
+tty_putchar:
+    clc
+    xce             ; switch to native mode
+    rep #$30        ; A/X/Y 16-bit
+    a8
+    phd
+    phb
+
+    pea #0          ; 16 bit push
+    plb
+    plb             ; databank register to 0
+
+    jsr putc
+
+    plb
+    pld
+    sec
+    xce             ; back to emulation mode
+    rtl
+
+exit_cop_e:
+
+
 brk_e_entry:
 abt_e_entry:
 int_e_entry:
@@ -296,6 +320,9 @@ nmi_n_entry:
     pld
 return_int:
     rti
+
+    * = $ff00
+    jml tty_putchar
 
     * = $ffc0
 
@@ -328,10 +355,10 @@ return_int:
     .word $ffff         ; reserved
     .word return_int    ; COP
     .word brk_e_entry
-    .word return_int     ; ABT
-    .word nmi_n_entry    ; NMI
-    .word start          ; reserved
-    .word int_e_entry    ; IRQ
+    .word return_int    ; ABT
+    .word nmi_n_entry   ; NMI
+    .word start         ; reserved
+    .word int_e_entry   ; IRQ
 
 * = $010000
 .binary "+diskimage.img"

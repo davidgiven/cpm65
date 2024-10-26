@@ -48,6 +48,19 @@ _start:
 
     jsr initdrivers
     
+    ; Display the banner.
+
+    ldy #banner_end - banner
+    zrepeat
+        tya
+        pha
+        lda banner-1, y
+        jsr tty_conout
+        pla
+        tay
+        dey
+    zuntil_eq
+
     ; Load the BDOS.
 
     lda #<bdos_filename
@@ -60,16 +73,6 @@ _start:
     jsr screen_clear
     jsr set_normal_text
 
-    ldy #banner_end - banner
-    zrepeat
-        tya
-        pha
-        lda banner-1, y
-        jsr tty_conout
-        pla
-        tay
-        dey
-    zuntil_eq
     .endif
 
     jmp bios_entry
