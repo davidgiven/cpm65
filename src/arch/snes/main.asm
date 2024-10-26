@@ -21,16 +21,27 @@
 .cdef " ~", 32
 .include "snes.inc"
 
-VRAM_MAP1_LOC    =  $0000
-VRAM_MAP2_LOC    =  $1000
-VRAM_TILES_LOC   =  $2000
-VRAM_TILES2_LOC  =  $6000
+SCC_B_CTRL      = $5F00 ; SCC channel B control port
+SCC_B_DATA      = $5F01 ; SCC channel B data port
+SCC_A_CTRL      = $5F02 ; SCC channel A control port
+SCC_A_DATA      = $5F03 ; SCC channel A data port
+
+VRAM_MAP1_LOC   =  $0000
+VRAM_MAP2_LOC   =  $1000
+VRAM_TILES_LOC  =  $2000
+VRAM_TILES2_LOC =  $6000
 
 LOADER_ADDRESS  = $7e8000
+
+MOD_SHIFT       = %10000000 ; n bit
+MOD_CTRL        = %01000000 ; v bit
+MOD_CAPS        = %00000100
 
 .virtual $7f0000
 cursor_addr:    .word 0
 sector:         .long 0     ; 24 bits!
+pending_key:    .byte 0
+modifier_state: .byte 0
 .endvirtual
 
 .virtual 0
@@ -59,6 +70,22 @@ a16 .macro
 
 a8 .macro
     sep #$20
+.endmacro
+
+i16 .macro
+    rep #$10
+.endmacro
+
+i8 .macro
+    sep #$10
+.endmacro
+
+a8i8 .macro
+    sep #$30
+.endmacro
+
+a16i16 .macro
+    rep #$30
 .endmacro
 
 * = $008000
@@ -93,6 +120,10 @@ start:
     jsr load_font_data
     jsr load_palette_data
     jsr blank_off
+
+    ; Other hardware.
+
+    jsr init_keyboard
    
     jsr clear_screen
 
@@ -331,6 +362,213 @@ nmi_n_entry:
 return_int:
     rti
 
+; --- Keyboard handling -----------------------------------------------------
+
+init_keyboard:
+    php
+    a8
+
+    lda #0
+    sta pending_key
+    sta modifier_state
+
+    ldx #keyboard_init_data1
+    jsr write_keyboard_init_data
+    jsr wait
+    ldx #keyboard_init_data2
+    jsr write_keyboard_init_data
+    jsr wait
+
+    plp
+    rts
+
+get_current_key:
+.block
+    phb
+    php
+    a8i8
+
+    .databank $7f
+    lda #$7f
+    pha
+    plb
+
+    lda pending_key
+    bne exit
+
+    ; Block and wait for a scancode from the keyboard.
+
+    lda SCC_A_CTRL      ; shortcut to reading register 0
+    lsr a               ; Rx bit into carry
+    bcc exit_nokey
+
+    lda SCC_A_DATA      ; shortcut to reading data register
+
+    cmp #$70
+    beq shift_mod_down
+    cmp #$70 | $80
+    beq shift_mod_up
+    cmp #$74
+    beq ctrl_mod_down
+    cmp #$74 | $80
+    beq ctrl_mod_up
+    bit #$80            ; keyup?
+    bne exit_nokey      ; ignore.
+
+    ; Got one.
+
+    tax
+    lda keymap_normal, x
+    bit modifier_state
+    bpl +
+    lda keymap_shift, x
++
+    bit modifier_state
+    bvc +
+    and #$1f
++
+    sta pending_key
+exit:
+    plp
+    plb
+    rts
+
+shift_mod_down:
+    lda #MOD_SHIFT
+    bra set_mod
+ctrl_mod_down:
+    lda #MOD_CTRL
+set_mod:
+    tsb modifier_state
+    bra exit_nokey
+
+shift_mod_up:
+    lda #MOD_SHIFT
+    bra clr_mod
+ctrl_mod_up:
+    lda #MOD_CTRL
+clr_mod:
+    trb modifier_state
+exit_nokey:
+    lda #0
+    bra exit
+
+keymap_normal:
+    .byte $1B, $31, $32, $33, $34, $35, $36, $37 ; $00
+    .byte $38, $39, $30, $2D, $5E, $5C, $08, $09
+    .byte $71, $77, $65, $72, $74, $79, $75, $69 ; $10
+    .byte $6F, $70, $40, $5B, $0D, $61, $73, $64
+    .byte $66, $67, $68, $6A, $6B, $6C, $3B, $3A ; $20
+    .byte $5D, $7A, $78, $63, $76, $62, $6E, $6D
+    .byte $2C, $2E, $2F, $00, $20, $0E, $13, $14 ; $30
+    .byte $12, $7F, $1E, $1D, $1C, $1F, $0C, $01
+    .byte $2D, $2F, $37, $38, $39, $2A, $34, $35 ; $40
+    .byte $36, $2B, $31, $32, $33, $3D, $30, $2C
+    .byte $2E, $0F, $00, $00, $00, $00, $00, $00 ; $50
+    .byte $00, $00, $00, $00, $00, $00, $00, $00
+    .byte $03, $02, $00, $00, $00, $00, $00, $00 ; $60
+    .byte $00, $00, $00, $00, $00, $00, $00, $00
+keymap_shift:
+    .byte $1B, $21, $22, $23, $24, $25, $26, $27 ; $00
+    .byte $28, $29, $00, $3D, $60, $7C, $08, $09
+    .byte $51, $57, $45, $52, $54, $59, $55, $49 ; $10
+    .byte $4F, $50, $7E, $7B, $0D, $41, $53, $44
+    .byte $46, $47, $48, $4A, $4B, $4C, $2B, $2A ; $20
+    .byte $7D, $5A, $58, $43, $56, $42, $4E, $4D
+    .byte $3C, $3E, $3F, $5F, $20, $0E, $13, $14 ; $30
+    .byte $12, $7F, $1E, $1D, $1C, $1F, $0B, $01
+    .byte $2D, $2F, $37, $38, $39, $2A, $34, $35 ; $40
+    .byte $36, $2B, $31, $32, $33, $3D, $30, $2C
+    .byte $2E, $0F, $00, $00, $00, $00, $00, $00 ; $50
+    .byte $00, $00, $00, $00, $00, $00, $00, $00
+    .byte $18, $02, $00, $00, $00, $00, $00, $00 ; $60
+    .byte $00, $00, $00, $00, $00, $00, $00, $00
+
+    .databank ?
+.endblock
+
+write_keyboard_init_data:
+-
+    lda 0, x
+    bmi +
+    sta SCC_A_CTRL
+    inx
+    lda 0, x
+    sta SCC_A_CTRL
+    inx
+    bra -
++
+    rts
+
+wait:
+    php
+    a16
+    lda #$9000
+-
+    dec a
+    bne -
+    plp
+    rts
+
+keyboard_init_data1:
+    .byte $09, %10000000 ; Reset SCC channel A
+    .byte $0e, %00000000 ; Stop baudrate generator
+    .byte $01, %00000000 ; Disable interrupt
+    .byte $03, %11000000 ; Disable serial input
+    .byte $05, %01100010 ; Disable serial output
+    .byte $0f, %00000000 ; Disable all status interrupts
+    .byte $00, %00010000 ; Reset status interrupt
+    .byte $00, %00010000 ; Reset status interrupt
+    .byte $04, %01000101 ; Set StopBit-1,NonParity
+    .byte $0b, %11010100 ; Set clock mode
+    .byte $ff
+
+keyboard_init_data2:
+    .byte $0c, %00000110 ; Set baurate status low
+    .byte $0d, %00000000 ; Set baurate status high
+    .byte $0e, %00000001 ; start Baudrate generator
+    .byte $05, %11101000 ; Enable serial output DTR=L,RTS=H
+    .byte $03, %11000001 ; Enable serial input
+    .byte $ff
+    
+; Returns 0xff if no key is pending, 0 if one is.
+
+tty_const:
+    clc
+    xce             ; switch to native mode
+    a8i8
+
+    jsr get_current_key
+    ldx #0
+    cmp #0
+    beq +
+    dex
++
+    txa
+
+    sec
+    xce             ; back to emulation mode
+    rtl
+
+tty_conin:
+    clc
+    xce             ; switch to native mode
+    a8i8
+
+-
+    jsr get_current_key
+    cmp #0
+    beq -
+
+    pha
+    lda #0
+    sta pending_key
+    pla
+
+    sec
+    xce             ; back to emulation mode
+    rtl
+
 ; --- I/O handling ----------------------------------------------------------
 
 bios_setdma:
@@ -404,6 +642,8 @@ bios_read:
     jmp bios_setdma
     jmp bios_setsec
     jmp bios_read
+    jmp tty_conin
+    jmp tty_const
 
 ; --- ROM header ------------------------------------------------------------
 

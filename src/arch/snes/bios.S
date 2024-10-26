@@ -119,8 +119,7 @@ zendproc
 ; Returns 0xff if no key is pending, 0 if one is.
 
 zproc tty_const
-    lda #0xff
-
+    .4byte 0x22 | (JUMP_TTY_CONST << 8)
     clc
     rts
 zendproc
@@ -128,7 +127,8 @@ zendproc
 ; Blocks until a key is pressed; returns it in A.
 
 zproc tty_conin
-    lda #'q'
+    .4byte 0x22 | (JUMP_TTY_CONIN << 8)
+    clc
     rts
 zendproc
 
