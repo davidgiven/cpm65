@@ -1,5 +1,5 @@
 MEMORY {
-    zp : ORIGIN = 0, LENGTH = 0x100
+    zp : ORIGIN = 6, LENGTH = 0x100-6
 	stack : ORIGIN = 0x100, LENGTH = 0x100
 	bios : ORIGIN = 0x200, LENGTH = 0x7e00
 	loader : ORIGIN = 0x8000, LENGTH = 0x8000

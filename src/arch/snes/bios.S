@@ -7,6 +7,7 @@
 #include "wait.inc"
 #include "driver.inc"
 #include "jumptables.inc"
+#include "globals.inc"
 
 ; --- Zero page -------------------------------------------------------------
 
@@ -18,11 +19,6 @@ ptr:              .fill 2
 ptr1:             .fill 2
 cursorx:          .fill 1
 cursory:          .fill 1
-dma:              .fill 2     ; current DMA
-
-zproc bios_entry
-    bra .
-zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
@@ -59,8 +55,7 @@ zproc bios_SETBANK
 zendproc
 
 zproc bios_SETDMA
-    sta dma+0
-    stx dma+1
+    .4byte 0x22 | (JUMP_BIOS_SETDMA << 8)
     rts
 zendproc
 
@@ -88,11 +83,12 @@ zendproc
 ; XA is a pointer to a three-byte number.
 
 zproc bios_SETSEC
+    .4byte 0x22 | (JUMP_BIOS_SETSEC << 8)
     rts
 zendproc
 
 zproc bios_READ
-    sec
+    .4byte 0x22 | (JUMP_BIOS_READ << 8)
     rts
 zendproc
 
@@ -132,18 +128,14 @@ zendproc
 ; Blocks until a key is pressed; returns it in A.
 
 zproc tty_conin
-    zloop
-    zendloop
+    lda #'q'
     rts
 zendproc
 
 ; Writes the character in A.
 
 zproc tty_conout
-    .byte 0x22          ; JSL 0x00ff00
-    .word 0xff00
-    .byte 0
-
+    .4byte 0x22 | (JUMP_TTY_PUTCHAR << 8)
     clc
     rts
 zendproc

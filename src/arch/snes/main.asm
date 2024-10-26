@@ -29,11 +29,16 @@ VRAM_TILES2_LOC  =  $6000
 LOADER_ADDRESS  = $7e8000
 
 .virtual $7f0000
-cursor_addr:
-    .word 0
+cursor_addr:    .word 0
+sector:         .long 0     ; 24 bits!
 .endvirtual
 
-.dpage ?                ; Reserve $0000-$00ff for user programs
+.virtual 0
+dma:            .long 0     ; 24 bits!
+ptr:            .long 0     ; 24 bits!
+.endvirtual
+
+.dpage ?                ; Reserve $0006-$00ff for user programs
 
 * = $000000
 .logical $400000
@@ -68,6 +73,10 @@ start:
     lda #0
     tad
 
+    a8
+    lda #$7e
+    sta @l dma+2        ; top byte of DMA address
+
     ; Clear registers
     ldx #$33
     jsr clear_vram
@@ -89,6 +98,7 @@ start:
 
     ; Copy the BIOS loader to its final position.
 
+    a16
     lda #(bios_data_end-bios_data)-1
     ldx #<>bios_data
     ldy #<>LOADER_ADDRESS
@@ -321,8 +331,81 @@ nmi_n_entry:
 return_int:
     rti
 
+; --- I/O handling ----------------------------------------------------------
+
+bios_setdma:
+    phx
+    pha
+    clc
+    xce             ; switch to native mode
+    rep #$30        ; A/X/Y 16-bit
+
+    pla             ; pop address as a 16-bit value
+    sta dma
+
+    sec
+    xce             ; back to emulation mode
+    rtl
+
+bios_setsec:
+    phx
+    pha
+    clc
+    xce             ; switch to native mode
+    rep #$30        ; A/X/Y 16-bit
+
+    plx             ; pop address as a 16-bit value
+    lda 0,b,x       ; get bottom two bytes of sector number
+    sta sector+0
+    a8
+    lda 2,b,x       ; get top byte of sector number
+    sta sector+2
+
+    sec
+    xce             ; back to emulation mode
+    rtl
+
+bios_read:
+    xce             ; switch to native mode
+    rep #$30        ; A/X/Y 16-bit
+
+    ; Compute the address in the romdisk.
+
+    lda sector+0    ; bottom two bytes of sector number
+    lsr a
+    ora #$4100      ; patch in address of ROMdisk
+    sta ptr+1, d    ; top two bytes of address
+    a8
+    lda sector+0
+    ror a
+    lda #0
+    ror a
+    sta ptr+0, d    ; bottom byte of address
+
+    ldy #$7f
+-
+    lda [ptr, d], y
+    sta [dma, d], y
+    dey
+    bpl -
+
+    sec
+    xce             ; back to emulation mode
+    clc
+    rtl
+
+
+; --- Jump table ------------------------------------------------------------
+
+; This must be kept in sync with the values in globals.inc.
+
     * = $ff00
-    jml tty_putchar
+    jmp tty_putchar
+    jmp bios_setdma
+    jmp bios_setsec
+    jmp bios_read
+
+; --- ROM header ------------------------------------------------------------
 
     * = $ffc0
 

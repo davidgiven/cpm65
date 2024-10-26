@@ -13,7 +13,7 @@ from config import (
 llvmrawprogram(
     name="bios",
     srcs=["./loader.S", "./bios.S"],
-    deps=["include", "src/lib+bioslib", "src/bdos+bdoslib"],
+    deps=["include", "src/lib+bioslib", "src/bdos+bdoslib","./globals.inc"],
     cflags=[
         "-mcpu=mosw65c02",
     ],

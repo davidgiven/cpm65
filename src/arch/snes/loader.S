@@ -65,17 +65,20 @@ _start:
 
     lda #<bdos_filename
     ldx #>bdos_filename
-    ldy mem_base
-
+    ldy #>__TPA_START__
     jsr loadfile
-.if 0
 
-    jsr screen_clear
-    jsr set_normal_text
+    ; Fix it up.
 
-    .endif
+    lda #>__TPA_START__
+    ldy #__ZEROPAGE_START__
+    jsr bios_RELOCATE
 
-    jmp bios_entry
+    ; Go!
+
+    lda #<biosentry
+    ldx #>biosentry
+    jmp __TPA_START__ + COMHDR_ENTRY
 
 return_int:
 nmi_n_entry:
