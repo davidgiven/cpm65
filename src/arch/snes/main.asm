@@ -46,6 +46,7 @@ sector:         .long 0     ; 24 bits!
 pending_key:    .byte 0
 modifier_state: .byte 0
 cursorp:        .word 0     ; character count from top left of screen
+scrollp:        .word 0     ; current scroll position
 .endvirtual
 
 .virtual 0
@@ -158,7 +159,7 @@ init_screen
 
     lda #5 | $00            ; mode 5, 16x8 tiles all layers
     sta BGMODE
-    lda #%00001000          ; high res mode, interlacing off
+    lda #%00001100          ; high res mode, interlacing off
     sta SETINI
     lda #(VRAM_MAP1_LOC >> 9) | %00 ; tilemap 1 address, 32x32
     sta BG1SC
@@ -212,6 +213,7 @@ clear_screen:
     lda #0
     sta cursor_addr
     sta cursorp
+    sta scrollp
 
     plp
     rts
@@ -493,16 +495,28 @@ keyboard_init_data2:
 screen_handler:
     rtl
 
+calculate_screen_address:
+    php
+    a16
+
+    lda cursorp
+    clc
+    adc scrollp
+    and #(SCREEN_WIDTH*SCREEN_HEIGHT-1)
+    lsr a
+    bcs +
+        ora #(VRAM_MAP2_LOC >> 1) ; remember, we're working with word addresses
+    +
+    
+    plp
+    rts
+
 screen_putchar:
     php
     a16
     pha
 
-    lda cursorp
-    lsr a
-    bcs +
-        ora #(VRAM_MAP2_LOC >> 1) ; remember, we're working with word addresses
-    +
+    jsr calculate_screen_address
     tax
 
     a8
@@ -521,6 +535,69 @@ screen_putchar:
     and #$00ff
     ora #$2000              ; priority bit and palette
     sta VMDATAL
+
+    plp
+    rts
+
+screen_scrollup:
+    php
+    a16
+
+    lda scrollp
+    clc
+    adc #SCREEN_WIDTH
+    and #(SCREEN_WIDTH*SCREEN_HEIGHT-1)
+    sta scrollp
+
+    lsr a
+    lsr a
+    lsr a
+    and #$fff8
+
+    tax
+    a8
+    -
+        lda HVBJOY
+        and #%10000000      ; test for v-blank flag
+        beq -
+    txa
+
+    sta BG1VOFS
+    xba
+    sta BG1VOFS
+    xba
+    sta BG2VOFS
+    xba
+    sta BG2VOFS
+
+    ; Clear the bottom line.
+
+    lda #%10000000       ; autoincrement by one word
+    sta VMAIN
+
+    a16
+    lda scrollp
+    lsr a
+    pha
+    sta VMADDL
+
+    ldx #SCREEN_WIDTH
+    lda #$2000
+    -
+        sta VMDATAL
+        dex
+        bne -
+
+    pla
+    ora #(VRAM_MAP2_LOC >> 1) ; remember, we're working with word addresses
+    sta VMADDL
+
+    ldx #SCREEN_WIDTH
+    lda #$2000
+    -
+        sta VMDATAL
+        dex
+        bne -
 
     plp
     rts
@@ -622,13 +699,22 @@ tty_conout:
         clc
         adc #64
         sta cursorp
-        bra exit
+        bra maybescroll
     +
 
     i16
     jsr screen_putchar
 
-    inc cursorp
+    lda cursorp
+    inc a
+maybescroll:
+    cmp #SCREEN_WIDTH * SCREEN_HEIGHT
+    bne +
+        jsr screen_scrollup
+        lda #SCREEN_WIDTH * 31
+    +
+    sta cursorp
+
 exit:
     plp
     clc
