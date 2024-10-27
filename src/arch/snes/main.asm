@@ -34,7 +34,7 @@ VRAM_TILES2_LOC =  $6000
 LOADER_ADDRESS  = $7e8000
 
 SCREEN_WIDTH    = 64
-SCREEN_HEIGHT   = 25
+SCREEN_HEIGHT   = 28
 VSCROLL_POS     = 1024-8
 
 MOD_SHIFT       = %10000000 ; n bit
@@ -618,6 +618,9 @@ nmi_handler:
 
     lda RDNMI       ; reset NMI flag
 
+    lda #%10000000       ; force blank
+    sta INIDISP
+
     lda #%10000000       ; autoincrement by one word
     sta VMAIN
    
@@ -637,6 +640,9 @@ nmi_handler:
     stx VMADDL          ; destination VRAM address
     lda #%10000000      ; DMA enable
     sta MDMAEN
+
+    lda #%00001111      ; screen on, maximum brightness
+    sta INIDISP
 
     a16i16
     plb

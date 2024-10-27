@@ -35,7 +35,7 @@ SECTIONS {
 		*(.noinit .noinit.*)
 		. = ALIGN(0x100);
 		__TPA_START__ = .;
-		__TPA_END__ = 0xfe00;
+		__TPA_END__ = 0xff00;
 	} >bios
 }
 
