@@ -30,7 +30,8 @@ mkcpmfs(
         "0:cls.com": "apps+cls",
     }
     | MINIMAL_APPS
-    | MINIMAL_APPS_SRCS,
+    | MINIMAL_APPS_SRCS
+    | BIG_APPS,
 )
 
 simplerule(

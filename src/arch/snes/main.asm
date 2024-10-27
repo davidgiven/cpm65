@@ -104,16 +104,27 @@ a16i16 .macro
 * = $008000
 start:
     .autsiz
+    sei
     clc
     xce
-    rep #$30            ; A/X/Y 16-bit
+    a16i16
+
+    ; Wipe memory.
+
+    a8
+    ldx #0
+    txa
+    -
+        sta $7e0000, x
+        sta $7f0000, x
+        dex
+        bne -
 
     ldx #$01ff          ; 6502-compatible
     txs
-    lda #0
-    tad
+    pea #0              ; databank to zero for I/O access
+    pld
 
-    a8
     lda #$7e
     sta dma+2        ; top byte of DMA address
 
@@ -136,7 +147,7 @@ start:
    
     jsr clear_screen
 
-    ; Copy the BIOS loader to its final position.
+    ; Wipe memory and copy the BIOS loader to its final position.
 
     a16
     lda #(bios_data_end-bios_data)-1
@@ -526,6 +537,7 @@ keyboard_init_data2:
 .dpage $2100
 
 screen_handler:
+    bra *
     rtl
 
 ; Calculates the address relative to map1_mirror.
@@ -803,7 +815,8 @@ bios_read:
 
     lda sector+0    ; bottom two bytes of sector number
     lsr a
-    ora #$4100      ; patch in address of ROMdisk
+    clc
+    adc #$4100      ; patch in address of ROMdisk
     sta ptr+1, d    ; top two bytes of address
     a8
     lda sector+0

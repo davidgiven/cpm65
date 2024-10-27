@@ -149,7 +149,7 @@ drvtop: .word drv_TTY
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 360, 4096, 256, 0
+define_drive dph, 160*72, 4096, 256, 0
 
 .bss
 
