@@ -20,6 +20,25 @@ ptr1:             .fill 2
 cursorx:          .fill 1
 cursory:          .fill 1
 
+.macro SYSIN
+    clc
+    .byte 0xfb      ; xce, leave emulation mode
+.endm
+
+.macro SYSOUT
+    php
+    sec
+    .byte 0xfb      ; xce, back into emulation mode
+    plp
+    rts
+.endm
+
+.macro SYSCALL n
+    SYSIN
+    .4byte 0x22 | (\n << 8) ; jsl
+    SYSOUT
+.endm
+
 ; --- BIOS entrypoints ------------------------------------------------------
 
 zproc bios_GETTPA
@@ -55,8 +74,7 @@ zproc bios_SETBANK
 zendproc
 
 zproc bios_SETDMA
-    .4byte 0x22 | (JUMP_BIOS_SETDMA << 8)
-    rts
+    SYSCALL JUMP_BIOS_SETDMA
 zendproc
 
 ; Select a disk.
@@ -83,13 +101,11 @@ zendproc
 ; XA is a pointer to a three-byte number.
 
 zproc bios_SETSEC
-    .4byte 0x22 | (JUMP_BIOS_SETSEC << 8)
-    rts
+    SYSCALL JUMP_BIOS_SETSEC
 zendproc
 
 zproc bios_READ
-    .4byte 0x22 | (JUMP_BIOS_READ << 8)
-    rts
+    SYSCALL JUMP_BIOS_READ
 zendproc
 
 zproc bios_WRITE
@@ -104,8 +120,7 @@ defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 ; TTY driver strategy routine.
 ; Y=TTY opcode.
 zproc drvstrat_TTY
-    .4byte 0x22 | (JUMP_TTY << 8)
-    rts
+    SYSCALL JUMP_TTY
 zendproc
 
 ; --- Screen driver ---------------------------------------------------------
@@ -113,8 +128,9 @@ zendproc
 defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 
 zproc drvstrat_SCREEN
-    .4byte 0x22 | (JUMP_SCREEN << 8)
+    sec
     rts
+    SYSCALL JUMP_SCREEN
 zendproc
 
 ; --- Data ------------------------------------------------------------------

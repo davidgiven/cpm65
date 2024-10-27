@@ -18,6 +18,16 @@ ZEROPAGE
 .global _start
 .section loader, "ax"
 _start:
+    ; Switch to emulation mode.
+
+    sec
+    .byte 0xfb      ; xce
+
+    ; This rti instruction is incredibly important.
+
+    lda #$40
+    sta $ffff
+
     ; Relocate the BIOS to the bottom of memory.
 
     zrepeat

@@ -27,14 +27,15 @@ SCC_A_CTRL      = $5F02 ; SCC channel A control port
 SCC_A_DATA      = $5F03 ; SCC channel A data port
 
 VRAM_MAP1_LOC   =  $0000
-VRAM_MAP2_LOC   =  $1000
+VRAM_MAP2_LOC   =  $0800
 VRAM_TILES_LOC  =  $2000
 VRAM_TILES2_LOC =  $6000
 
 LOADER_ADDRESS  = $7e8000
 
 SCREEN_WIDTH    = 64
-SCREEN_HEIGHT   = 32
+SCREEN_HEIGHT   = 25
+VSCROLL_POS     = 1024-8
 
 MOD_SHIFT       = %10000000 ; n bit
 MOD_CTRL        = %01000000 ; v bit
@@ -47,6 +48,13 @@ pending_key:    .byte 0
 modifier_state: .byte 0
 cursorp:        .word 0     ; character count from top left of screen
 scrollp:        .word 0     ; current scroll position
+
+vram_mirror_start:
+map1_mirror:    .fill 2*32*SCREEN_HEIGHT
+                .fill 2*32*(32 - SCREEN_HEIGHT) ; padding to match up with VRAM
+map2_mirror:    .fill 2*32*SCREEN_HEIGHT
+vram_mirror_end:
+
 .endvirtual
 
 .virtual 0
@@ -107,7 +115,7 @@ start:
 
     a8
     lda #$7e
-    sta @l dma+2        ; top byte of DMA address
+    sta dma+2        ; top byte of DMA address
 
     ; Clear registers
     ldx #$33
@@ -120,11 +128,7 @@ start:
 
     ; Initialise the screen.
 
-    jsr blank_on
     jsr init_screen
-    jsr load_font_data
-    jsr load_palette_data
-    jsr blank_off
 
     ; Other hardware.
 
@@ -149,13 +153,22 @@ start:
     lda #0
     tad                     ; direct page register to 0
 
-    sec
-    xce                     ; enable emulation mode...
     jml LOADER_ADDRESS      ; ...and go
 
 init_screen
+.block
     php
+    phd
     a8
+    i16
+
+    ldx #$2100
+    phx
+    pld
+    .dpage $2100
+
+    lda #%10000000          ; force blank
+    sta INIDISP
 
     lda #5 | $00            ; mode 5, 16x8 tiles all layers
     sta BGMODE
@@ -171,28 +184,29 @@ init_screen
     sta TM
     sta TS                  ; ditto subscreen
 
-    plp
-    rts
+    lda #<VSCROLL_POS
+    sta BG1VOFS
+    xba
+    lda #>VSCROLL_POS
+    sta BG1VOFS
+    xba
+    sta BG2VOFS
+    xba
+    sta BG2VOFS
 
-blank_on:
-    php
-    a8
+    jsr load_font_data
+    jsr load_palette_data
 
-    lda #%10000000          ; force blank
-    sta INIDISP
-
-    plp
-    rts
-
-blank_off:
-    php
-    a8
+    lda #%10000000          ; enable vsync NMI
+    sta NMITIMEN
 
     lda #%00001111          ; blank off, maximum brightness
     sta INIDISP
 
+    pld
     plp
     rts
+.endblock
 
 wait_for_vblank:
     php
@@ -214,6 +228,20 @@ clear_screen:
     sta cursor_addr
     sta cursorp
     sta scrollp
+
+    lda #0
+    sta map1_mirror
+    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
+    ldx #<>map1_mirror
+    ldy #<>map1_mirror + 2
+    mvn #`map1_mirror, #`map1_mirror
+
+    lda #0
+    sta map2_mirror
+    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
+    ldx #<>map2_mirror
+    ldy #<>map2_mirror + 2
+    mvn #`map2_mirror, #`map2_mirror
 
     plp
     rts
@@ -303,20 +331,25 @@ int_e_entry:
     rti
 
 nmi_n_entry:
-    rep #$10        ; X/Y 16-bit
-    sep #$20        ; A 8-bit
-    phd
+    a16i16
     pha
-    phx
-    phy
-    ; Do stuff that needs to be done during V-Blank
-    lda RDNMI ; reset NMI flag
-    ply
-    plx
+    jsr nmi_handler
     pla
-    pld
 return_int:
     rti
+
+nmi_e_entry:
+    clc
+    xce             ; out of emulation mode
+
+    a16i16
+    pha
+    jsr nmi_handler
+    pla
+
+    sec
+    xce             ; into emulation mode
+    jml $7effff     ; run the rti instruction in emulation mode from bank 7e
 
 ; --- Keyboard handling -----------------------------------------------------
 
@@ -495,38 +528,32 @@ keyboard_init_data2:
 screen_handler:
     rtl
 
+; Calculates the address relative to map1_mirror.
+
 calculate_screen_address:
+.block
     php
     a16
 
     lda cursorp
-    clc
-    adc scrollp
-    and #(SCREEN_WIDTH*SCREEN_HEIGHT-1)
     lsr a
     bcs +
-        ora #(VRAM_MAP2_LOC >> 1) ; remember, we're working with word addresses
+        ; clc ; carry clear from previous instruction
+        adc #(map2_mirror - map1_mirror) >> 1
     +
-    
+    asl a
+
     plp
     rts
+.endblock
 
 screen_putchar:
     php
-    a16
+    a16i16
     pha
 
     jsr calculate_screen_address
     tax
-
-    a8
-    -
-        lda HVBJOY
-        and #%10000000      ; test for v-blank flag
-        beq -
-    a16
-
-    stx VMADDL
 
     pla
     sec
@@ -534,73 +561,90 @@ screen_putchar:
     asl a                   ; tiles come in pairs
     and #$00ff
     ora #$2000              ; priority bit and palette
-    sta VMDATAL
+    sta map1_mirror, x
 
     plp
     rts
 
 screen_scrollup:
     php
-    a16
+    a16i16
+    phb
 
-    lda scrollp
-    clc
-    adc #SCREEN_WIDTH
-    and #(SCREEN_WIDTH*SCREEN_HEIGHT-1)
-    sta scrollp
+    ; Actually do the scroll.
 
-    lsr a
-    lsr a
-    lsr a
-    and #$fff8
+    lda #(SCREEN_HEIGHT-1)*32*2 - 1
+    ldx #<>(map1_mirror + 1*32*2)
+    ldy #<>(map1_mirror + 0*32*2)
+    mvn #`map1_mirror, #`map1_mirror
 
-    tax
-    a8
-    -
-        lda HVBJOY
-        and #%10000000      ; test for v-blank flag
-        beq -
-    txa
+    lda #(SCREEN_HEIGHT-1)*32*2 - 1
+    ldx #<>(map2_mirror + 1*32*2)
+    ldy #<>(map2_mirror + 0*32*2)
+    mvn #`map2_mirror, #`map2_mirror
 
-    sta BG1VOFS
-    xba
-    sta BG1VOFS
-    xba
-    sta BG2VOFS
-    xba
-    sta BG2VOFS
+    ; Blank the bottom line.
 
-    ; Clear the bottom line.
+    stz map1_mirror + (SCREEN_HEIGHT-1)*32*2
+    lda #(SCREEN_WIDTH*2) - 3
+    ldx #<>(map1_mirror + (SCREEN_HEIGHT-1)*32*2)
+    ldy #<>(map1_mirror + (SCREEN_HEIGHT-1)*32*2 + 2)
+    mvn #`map1_mirror, #`map1_mirror
+
+    stz map2_mirror + (SCREEN_HEIGHT-1)*32*2
+    lda #(SCREEN_WIDTH*2) - 3
+    ldx #<>(map2_mirror + (SCREEN_HEIGHT-1)*32*2)
+    ldy #<>(map2_mirror + (SCREEN_HEIGHT-1)*32*2 + 2)
+    mvn #`map2_mirror, #`map2_mirror
+
+    plb
+    plp
+    rts
+
+nmi_handler:
+.block
+    phx
+    phy
+    phd
+    phb
+
+    a16i16
+    phk
+    plb             ; databank to 0 so we can read/write registers
+    pea #$4300      ; direct page to $4300 for fast access to DMA registers
+    pld
+    .databank 0
+    .dpage $4300
+
+    lda RDNMI       ; reset NMI flag
 
     lda #%10000000       ; autoincrement by one word
     sta VMAIN
+   
+    ; DMA the tilemaps.
 
-    a16
-    lda scrollp
-    lsr a
-    pha
-    sta VMADDL
+    lda #%00000001      ; CPU->PPU, no HDMA, two registers write once,
+    sta DMAPx + $70
+    lda #<VMDATAL       ; destination address
+    sta BBADx + $70
+    lda #`map1_mirror   ; source bank
+    ldx #<>map1_mirror  ; source address
+    sta A1Bx + $70
+    stx A1TxL + $70
+    ldx #vram_mirror_end - vram_mirror_start
+    stx DASxL + $70     ; number of bytes to transfer
+    ldx #VRAM_MAP1_LOC>>1 ; word address
+    stx VMADDL          ; destination VRAM address
+    lda #%10000000      ; DMA enable
+    sta MDMAEN
 
-    ldx #SCREEN_WIDTH
-    lda #$2000
-    -
-        sta VMDATAL
-        dex
-        bne -
-
-    pla
-    ora #(VRAM_MAP2_LOC >> 1) ; remember, we're working with word addresses
-    sta VMADDL
-
-    ldx #SCREEN_WIDTH
-    lda #$2000
-    -
-        sta VMDATAL
-        dex
-        bne -
-
-    plp
+    a16i16
+    plb
+    pld
+    ply
+    plx
     rts
+.endblock
 
 .databank ?
 .dpage ?
@@ -612,8 +656,6 @@ screen_scrollup:
 
 tty_handler:
     php
-    clc
-    xce             ; switch to native mode
     phb
     phd
     a8i8
@@ -634,8 +676,6 @@ tty_handler:
 
     pld
     plb
-    sec
-    xce             ; return to emulation mode
     plp
     rtl
 
@@ -711,7 +751,7 @@ maybescroll:
     cmp #SCREEN_WIDTH * SCREEN_HEIGHT
     bne +
         jsr screen_scrollup
-        lda #SCREEN_WIDTH * 31
+        lda #SCREEN_WIDTH * (SCREEN_HEIGHT-1)
     +
     sta cursorp
 
@@ -729,22 +769,16 @@ exit:
 bios_setdma:
     phx
     pha
-    clc
-    xce             ; switch to native mode
     rep #$30        ; A/X/Y 16-bit
 
     pla             ; pop address as a 16-bit value
     sta dma
 
-    sec
-    xce             ; back to emulation mode
     rtl
 
 bios_setsec:
     phx
     pha
-    clc
-    xce             ; switch to native mode
     rep #$30        ; A/X/Y 16-bit
 
     plx             ; pop address as a 16-bit value
@@ -754,12 +788,9 @@ bios_setsec:
     lda 2,b,x       ; get top byte of sector number
     sta sector+2
 
-    sec
-    xce             ; back to emulation mode
     rtl
 
 bios_read:
-    xce             ; switch to native mode
     rep #$30        ; A/X/Y 16-bit
 
     ; Compute the address in the romdisk.
@@ -782,8 +813,6 @@ bios_read:
     dey
     bpl -
 
-    sec
-    xce             ; back to emulation mode
     clc
     rtl
 
@@ -835,7 +864,7 @@ bios_read:
     .word return_int    ; COP
     .word brk_e_entry
     .word return_int    ; ABT
-    .word nmi_n_entry   ; NMI
+    .word nmi_e_entry   ; NMI
     .word start         ; reserved
     .word int_e_entry   ; IRQ
 
