@@ -41,13 +41,14 @@ MOD_SHIFT       = %10000000 ; n bit
 MOD_CTRL        = %01000000 ; v bit
 MOD_CAPS        = %00000100
 
+CURSOR_SHOWN    = %10000000 ; n bit
+
 .virtual $7f0000
-cursor_addr:    .word 0
 sector:         .long 0     ; 24 bits!
 pending_key:    .byte 0
 modifier_state: .byte 0
 cursorp:        .word 0     ; character count from top left of screen
-scrollp:        .word 0     ; current scroll position
+cursor_flags:   .byte 0
 
 vram_mirror_start:
 map1_mirror:    .fill 2*32*SCREEN_HEIGHT
@@ -166,6 +167,9 @@ start:
 
     jml LOADER_ADDRESS      ; ...and go
 
+break:
+    rts
+
 init_screen
 .block
     php
@@ -236,11 +240,11 @@ clear_screen:
 
     a16
     lda #0
-    sta cursor_addr
     sta cursorp
-    sta scrollp
+    a8
+    sta cursor_flags
 
-    lda #0
+    a16
     sta map1_mirror
     lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
     ldx #<>map1_mirror
@@ -259,9 +263,10 @@ clear_screen:
 
 load_palette_data:
     php
-    a8
+    a8i8
 
-    stz CGADD
+    lda #2
+    sta CGADD
 
     stz CGDATA
     stz CGDATA
@@ -269,12 +274,28 @@ load_palette_data:
     sta CGDATA
     sta CGDATA
 
+    ldx #4+2
+    stx CGADD
+
+    sta CGDATA
+    sta CGDATA
+    stz CGDATA
+    stz CGDATA
+
+    ldx #16+2
+    stx CGADD
+
+    sta CGDATA
+    sta CGDATA
+    stz CGDATA
+    stz CGDATA
+
     plp
     rts
 
 load_font_data:
     php
-    a16
+    a16i16
 
     lda #%10000000       ; autoincrement by one word
     sta VMAIN
@@ -559,6 +580,48 @@ calculate_screen_address:
     rts
 .endblock
 
+show_cursor:
+    php
+    i16
+    a8
+    lda cursor_flags
+    bmi +                   ; if cursor is already shown
+        a16
+        jsr calculate_screen_address
+        tax
+        lda map1_mirror, x
+        and #$00ff
+        ora #$2400
+        sta map1_mirror, x
+
+        a8
+        lda #CURSOR_SHOWN
+        tsb cursor_flags
+    +
+    plp
+    rts
+
+hide_cursor:
+    php
+    i16
+    a8
+    lda cursor_flags
+    bpl +                   ; if cursor is already hidden
+        a16
+        jsr calculate_screen_address
+        tax
+        lda map1_mirror, x
+        and #$00ff
+        ora #$2000
+        sta map1_mirror, x
+
+        a8
+        lda #CURSOR_SHOWN
+        trb cursor_flags
+    +
+    plp
+    rts
+
 screen_putchar:
     php
     a16i16
@@ -737,6 +800,11 @@ tty_conout:
     php
     i8
     a16
+
+    pha
+    jsr hide_cursor
+    pla
+
     tax
     cpx #13
     bne +
@@ -747,7 +815,13 @@ tty_conout:
     cpx #127
     bne +
         dec cursorp
-        ; TODO: blank erased character
+
+        a16i16
+        jsr calculate_screen_address
+        tax
+        stz map1_mirror, x
+        i8
+
         bra exit
     +
     cpx #10
@@ -774,6 +848,7 @@ maybescroll:
     sta cursorp
 
 exit:
+    jsr show_cursor
     plp
     clc
     rts

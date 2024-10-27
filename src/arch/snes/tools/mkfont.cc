@@ -886,8 +886,9 @@ static void write_data(const std::string& filename, int planes)
             for (int i = 0; i < 8; i++)
             {
                 uint8_t r = cdata[i];
+                /* Write either colour 2 or 3. */
                 fd.put((char)r);
-                fd.put(0);
+                fd.put(0xff);
             }
             for (int j = 2; j < planes; j += 2)
             {
