@@ -43,12 +43,17 @@ MOD_CAPS        = %00000100
 
 CURSOR_SHOWN    = %10000000 ; n bit
 
+; From driver.inc (which is the wrong syntax for 64tass to import)
+STYLE_REVERSE   = 1
+
 .virtual $7f0000
 sector:         .long 0     ; 24 bits!
 pending_key:    .byte 0
 modifier_state: .byte 0
 cursorp:        .word 0     ; character count from top left of screen
-cursor_flags:   .byte 0
+screen_flags:   .byte 0
+style_word:     .byte 0     ; always zero
+style_byte:     .byte 0     ; current screen drawing style
 tick_counter:   .byte 0
 
 vram_mirror_start:
@@ -219,7 +224,9 @@ init_screen
     sta INIDISP
 
     lda #CURSOR_SHOWN
-    sta cursor_flags
+    sta screen_flags
+    lda #$20
+    sta style_byte
 
     pld
     plp
@@ -588,7 +595,7 @@ screen_driver_table:
     .word screen_scrollup
     .word screen_scrolldown
     .word screen_cleartoeol
-    .word fail ; screen_setstyle
+    .word screen_setstyle
 
 fail:
     sec
@@ -616,15 +623,16 @@ screen_clear:
     lda #0
     sta cursorp
 
+    lda style_word
     sta map1_mirror
-    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
+    sta map2_mirror
+
+    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2/2 - 3
     ldx #<>map1_mirror
     ldy #<>map1_mirror + 2
     mvn #`map1_mirror, #`map1_mirror
 
-    lda #0
-    sta map2_mirror
-    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
+    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2/2 - 3
     ldx #<>map2_mirror
     ldy #<>map2_mirror + 2
     mvn #`map2_mirror, #`map2_mirror
@@ -684,10 +692,10 @@ screen_getchar:
 screen_showcursor:
     pha
     lda #CURSOR_SHOWN
-    trb cursor_flags
+    trb screen_flags
     plx                 ; sets Z flag
     beq +
-    tsb cursor_flags
+    tsb screen_flags
 +
     rts
 
@@ -725,7 +733,7 @@ screen_putchar:
     sbc #$0020              ; convert to tile number
     asl a                   ; tiles come in pairs
     and #$00ff
-    ora #$2000              ; priority bit and palette
+    ora style_word          ; priority bit and palette
     sta map1_mirror, x
 
     inc cursorp
@@ -756,7 +764,7 @@ screen_putstring:
         sbc #$0020              ; convert to tile number
         asl a                   ; tiles come in pairs
         and #$00ff
-        ora #$2000              ; priority bit and palette
+        ora style_word          ; priority bit and palette
         sta map1_mirror, y
         inx
         bra -
@@ -789,13 +797,15 @@ screen_scrollup:
 
     ; Blank the bottom line.
 
-    stz map1_mirror + (SCREEN_HEIGHT-1)*32*2
+    lda style_word
+    sta map1_mirror + (SCREEN_HEIGHT-1)*32*2
+    sta map2_mirror + (SCREEN_HEIGHT-1)*32*2
+
     lda #(SCREEN_WIDTH*2) - 3
     ldx #<>(map1_mirror + (SCREEN_HEIGHT-1)*32*2)
     ldy #<>(map1_mirror + (SCREEN_HEIGHT-1)*32*2 + 2)
     mvn #`map1_mirror, #`map1_mirror
 
-    stz map2_mirror + (SCREEN_HEIGHT-1)*32*2
     lda #(SCREEN_WIDTH*2) - 3
     ldx #<>(map2_mirror + (SCREEN_HEIGHT-1)*32*2)
     ldy #<>(map2_mirror + (SCREEN_HEIGHT-1)*32*2 + 2)
@@ -826,13 +836,15 @@ screen_scrolldown:
 
     ; Blank the top line.
 
-    stz map1_mirror
+    lda style_word
+    sta map1_mirror
+    sta map2_mirror
+
     lda #(SCREEN_WIDTH*2/2) - 3
     ldx #<>map1_mirror
     ldy #<>(map1_mirror + 2)
     mvn #`map1_mirror, #`map1_mirror
 
-    stz map2_mirror
     lda #(SCREEN_WIDTH*2/2) - 3
     ldx #<>map2_mirror
     ldy #<>(map2_mirror + 2)
@@ -855,7 +867,7 @@ screen_cleartoeol:
         jsr calculate_screen_address
         tax
 
-        lda #$2000
+        lda style_word
         sta map1_mirror, x
 
         inc cursorp
@@ -866,6 +878,17 @@ screen_cleartoeol:
     pla
     sta cursorp
     plp
+    rts
+
+.as
+.xs
+screen_setstyle:
+    ldx #$20
+    and #STYLE_REVERSE
+    beq +
+        ldx #$24
+    +
+    stx style_byte
     rts
 
 nmi_handler:
@@ -914,7 +937,7 @@ nmi_handler:
     sta tick_counter
     and #64
     beq +
-    lda cursor_flags
+    lda screen_flags
     bpl +
         a16
         jsr calculate_screen_address
@@ -1142,3 +1165,5 @@ bios_read:
 
 * = $010000
 .binary "+diskimage.img"
+
+; vim: sw=4 ts=4 et
