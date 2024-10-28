@@ -232,7 +232,7 @@ void get_detailed_drive_status(void)
     printx(": sectors per track");
 
     printipadded(dpb->off);
-    printx(": reserved tracks");
+    printx(": reserved sectors");
 }
 
 int index_sort_cb(const void* left, const void* right)

@@ -32,6 +32,7 @@ BIG_APPS = {
     "0:atbasic.com": "third_party/altirrabasic",
     "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
     "0:objdump.com": "apps+objdump",
+    "0:mkfs.com": "apps+mkfs",
 }
 
 BIG_APPS_SRCS = {}
