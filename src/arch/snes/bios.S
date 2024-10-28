@@ -30,7 +30,6 @@ cursory:          .fill 1
     sec
     .byte 0xfb      ; xce, back into emulation mode
     plp
-    rts
 .endm
 
 .macro SYSCALL n
@@ -75,6 +74,7 @@ zendproc
 
 zproc bios_SETDMA
     SYSCALL JUMP_BIOS_SETDMA
+    rts
 zendproc
 
 ; Select a disk.
@@ -83,11 +83,15 @@ zendproc
 ; Sets carry on error.
 
 zproc bios_SELDSK
-    cmp #0
-    bne fail                ; invalid drive
+    cmp #DPHTAB_SIZE
+    bcs fail                ; invalid drive
 
-    lda #<dph
-    ldx #>dph
+    SYSCALL JUMP_BIOS_SELDSK
+    
+    asl a
+    tay
+    lda dphtab+0, y
+    ldx dphtab+1, y
     clc
     rts
 zendproc
@@ -102,14 +106,16 @@ zendproc
 
 zproc bios_SETSEC
     SYSCALL JUMP_BIOS_SETSEC
+    rts
 zendproc
 
 zproc bios_READ
     SYSCALL JUMP_BIOS_READ
+    rts
 zendproc
 
 zproc bios_WRITE
-    sec
+    SYSCALL JUMP_BIOS_WRITE
     rts
 zendproc
 
@@ -121,6 +127,7 @@ defdriver TTY, DRVID_TTY, drvstrat_TTY, drv_SCREEN
 ; Y=TTY opcode.
 zproc drvstrat_TTY
     SYSCALL JUMP_TTY
+    rts
 zendproc
 
 ; --- Screen driver ---------------------------------------------------------
@@ -129,6 +136,7 @@ defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 
 zproc drvstrat_SCREEN
     SYSCALL JUMP_SCREEN
+    rts
 zendproc
 
 ; --- Data ------------------------------------------------------------------
@@ -145,9 +153,14 @@ mem_end:    .byte __TPA_END__@mos16hi
 ; This must point at the _last_ driver.
 drvtop: .word drv_TTY
 
-; DPH for drive 0 (our only drive)
+define_drive dph_romdisk, 160*72, 4096, 256, 0
+define_drive dph_ramdisk, 128*1024/128, 1024, 32, 0
 
-define_drive dph, 160*72, 4096, 256, 0
+.data
+dphtab:
+    .word dph_romdisk
+    .word dph_ramdisk
+DPHTAB_SIZE = 2
 
 .bss
 

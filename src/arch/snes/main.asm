@@ -55,6 +55,7 @@ screen_flags:   .byte 0
 style_word:     .byte 0     ; always zero
 style_byte:     .byte 0     ; current screen drawing style
 tick_counter:   .byte 0
+selected_disk:  .byte 0
 
 vram_mirror_start:
 map1_mirror:    .fill 2*32*SCREEN_HEIGHT
@@ -538,8 +539,7 @@ keyboard_init_data2:
 ;                                    DRIVERS
 ; ===========================================================================
 
-driver_handler .macro jt
-    php
+driver_handler .macro jt, ld=tya
     phb
     phd
     a8i8
@@ -549,7 +549,7 @@ driver_handler .macro jt
     xba
 
     pha
-    tya
+    \ld
     asl a
     tax
 
@@ -564,13 +564,6 @@ driver_handler .macro jt
 
     pld
     plb
-    bcs +
-    plp
-    clc
-    rtl
-+
-    plp
-    sec
     rtl
 .endmacro
 
@@ -1060,10 +1053,14 @@ exit:
 
 ; --- I/O handling ----------------------------------------------------------
 
+bios_seldsk:
+    sta selected_disk
+    rtl
+
 bios_setdma:
     phx
     pha
-    rep #$30        ; A/X/Y 16-bit
+    a16i16
 
     pla             ; pop address as a 16-bit value
     sta dma
@@ -1085,7 +1082,16 @@ bios_setsec:
     rtl
 
 bios_read:
-    rep #$30        ; A/X/Y 16-bit
+    driver_handler bios_read_table, lda selected_disk
+bios_read_table:
+    .word bios_read_romdisk
+    .word bios_read_ramdisk
+
+bios_read_romdisk:
+    a16i16
+
+    pea #0          ; direct page to $0000 for pointer access
+    pld
 
     ; Compute the address in the romdisk.
 
@@ -1101,6 +1107,8 @@ bios_read:
     ror a
     sta ptr+0, d    ; bottom byte of address
 
+read_sector_from_ptr:
+    a8i8
     ldy #$7f
 -
     lda [ptr, d], y
@@ -1109,7 +1117,72 @@ bios_read:
     bpl -
 
     clc
-    rtl
+    rts
+
+calculate_ramdisk_address:
+    a16i16
+
+    ; Compute the address in the romdisk. As this is 256kB maximum,
+    ; it can only fit 2048 sectors, so (luckily) the entire value is
+    ; in the bottom two bytes.
+
+    lda sector+0    ; bottom two bytes of sector number
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    lsr a           ; divide by 64
+    a8
+    clc
+    adc #$30        ; first bank where SRAM is found
+    sta ptr+2, d
+
+    a16
+    lda sector+0
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a           ; multiply by 128
+    and #$1fff      ; 8kB chunks
+    ora #$6000      ; address in each bank
+    sta ptr+0, d
+    
+    rts
+
+bios_read_ramdisk:
+    pea #0          ; direct page to $0000 for pointer access
+    pld
+
+    jsr calculate_ramdisk_address
+    bra read_sector_from_ptr
+
+bios_write:
+    driver_handler bios_write_table, lda selected_disk
+bios_write_table:
+    .word fail
+    .word bios_write_ramdisk
+
+bios_write_ramdisk:
+    pea #0          ; direct page to $0000 for pointer access
+    pld
+
+    jsr calculate_ramdisk_address
+
+    a8i8
+    ldy #$7f
+-
+    lda [dma, d], y
+    sta [ptr, d], y
+    dey
+    bpl -
+
+    clc
+    rts
+
 
 
 ; --- Jump table ------------------------------------------------------------
@@ -1117,11 +1190,11 @@ bios_read:
 ; This must be kept in sync with the values in globals.inc.
 
     * = $ff00
-    jmp *               ; seldsk
+    jmp bios_seldsk
     jmp bios_setdma
     jmp bios_setsec
     jmp bios_read
-    jmp *               ; write
+    jmp bios_write
     jmp tty_handler
     jmp screen_handler
 
@@ -1133,13 +1206,13 @@ bios_read:
     .text 'CP/M-65 SNES         '
     .byte %00110001     ; fast, HiROM
     .byte $02           ; ROM + RAM + battery
-    .byte 9              ; ROM size: 512kB
-    .byte 5              ; RAM size: 32kB
-    .byte 0              ; country
-    .byte 0              ; developer ID
-    .byte 0              ; version
-    .word 0              ; checksum complement (filled in later)
-    .word 0              ; checksum (filled in later)
+    .byte 11            ; ROM size: 2024kB
+    .byte 7             ; RAM size: 128kB
+    .byte 0             ; country
+    .byte 0             ; developer ID
+    .byte 0             ; version
+    .word 0             ; checksum complement (filled in later)
+    .word 0             ; checksum (filled in later)
 
     ; Native mode vectors
 
