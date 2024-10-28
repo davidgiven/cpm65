@@ -783,9 +783,8 @@ zproc bdos_WRITESEQUENTIAL
 
     jsr reset_user_dma
     lda #0
-    jsr write_sector
+    jsr write_sector            ; sets carry on error
     lda #0
-    clc
     rts
 zendproc
 
@@ -1290,10 +1289,10 @@ zproc check_dirent_writable
 zendproc 
 
 zproc not_writable_error
-    lda #<msg
-    ldx #>msg
+    lda #<1f
+    ldx #>1f
     jmp harderror
-msg:
+1:
     .ascii "BDOS: file is R/O"
     .byte 13, 10, 0
 zendproc
@@ -1692,7 +1691,19 @@ write_sector:
     pha
     jsr set_current_sector
     pla
-    jmp bios_WRITE
+    jsr bios_WRITE
+    bcs disk_write_error
+    rts
+
+zproc disk_write_error
+    lda #<1f
+    ldx #>1f
+    jmp harderror
+1:
+    .ascii "BDOS: disk write failed"
+    .byte 13, 10, 0
+zendproc
+
 
 ; Calculates the block and sector addresses of the dirent in
 ; directory_pos.

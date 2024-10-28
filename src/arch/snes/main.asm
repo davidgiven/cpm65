@@ -1136,6 +1136,8 @@ calculate_ramdisk_address:
     a8
     clc
     adc #$30        ; first bank where SRAM is found
+    cmp #$40        ; bounds check
+    bcs +
     sta ptr+2, d
 
     a16
@@ -1151,6 +1153,10 @@ calculate_ramdisk_address:
     ora #$6000      ; address in each bank
     sta ptr+0, d
     
+    clc
+    rts
++
+    sec
     rts
 
 bios_read_ramdisk:
@@ -1158,6 +1164,7 @@ bios_read_ramdisk:
     pld
 
     jsr calculate_ramdisk_address
+    bcs ramdisk_bounds_failure
     bra read_sector_from_ptr
 
 bios_write:
@@ -1171,6 +1178,7 @@ bios_write_ramdisk:
     pld
 
     jsr calculate_ramdisk_address
+    bcs ramdisk_bounds_failure
 
     a8i8
     ldy #$7f
@@ -1181,6 +1189,7 @@ bios_write_ramdisk:
     bpl -
 
     clc
+ramdisk_bounds_failure:
     rts
 
 
