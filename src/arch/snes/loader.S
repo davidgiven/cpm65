@@ -23,10 +23,14 @@ _start:
     sec
     .byte 0xfb      ; xce
 
-    ; This rti instruction is incredibly important.
+    ; This is the trampoline used to return from emulation-mode interrupts.
 
-    lda #$40
-    sta $ffff
+    lda #$38        ; sec
+    sta $ff00
+    lda #$fb        ; xce
+    sta $ff01
+    lda #$40        ; rti
+    sta $ff02
 
     ; Relocate the BIOS to the bottom of memory.
 

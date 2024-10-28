@@ -355,9 +355,7 @@ nmi_e_entry:
     jsr nmi_handler
     pla
 
-    sec
-    xce             ; into emulation mode
-    jml $7effff     ; run the rti instruction in emulation mode from bank 7e
+    jml $7eff00     ; run the sec/sce/rti instructions from bank 7e
 
 ; --- Keyboard handling -----------------------------------------------------
 
@@ -528,12 +526,11 @@ keyboard_init_data2:
     .byte $03, %11000001 ; Enable serial input
     .byte $ff
     
-; --- SCREEN driver ---------------------------------------------------------
+; ===========================================================================
+;                                    DRIVERS
+; ===========================================================================
 
-.databank $7f
-.dpage $2100
-
-screen_handler:
+driver_handler .macro jt
     php
     phb
     phd
@@ -555,12 +552,27 @@ screen_handler:
     pld
 
     pla
-    jsr (screen_driver_table, x)
+    jsr (\jt, x)
 
     pld
     plb
+    bcs +
     plp
+    clc
     rtl
++
+    plp
+    sec
+    rtl
+.endmacro
+
+; --- SCREEN driver ---------------------------------------------------------
+
+.databank $7f
+.dpage $2100
+
+screen_handler:
+    driver_handler screen_driver_table
 
 screen_driver_table:
     .word screen_version
@@ -570,7 +582,7 @@ screen_driver_table:
     .word screen_getcursor
     .word screen_putchar
     .word screen_putstring
-    .word screen_getchar
+    .word screen_getchar1
     .word screen_showcursor
     .word screen_scrollup
     .word screen_scrolldown
@@ -653,16 +665,17 @@ screen_getcursor:
 
 .as
 .xs
+screen_getchar1:
+    jsr break
 screen_getchar:
--
     jsr get_current_key
-    cmp #0
-    beq -
+    tax                 ; set flags
+    bne +
+        sec
+        rts
+    +
 
-    pha
-    lda #0
-    sta pending_key
-    pla
+    stz pending_key
 
     clc
     rts
@@ -716,6 +729,8 @@ screen_putchar:
     ora #$2000              ; priority bit and palette
     sta map1_mirror, x
 
+    inc cursorp
+
     plp
     rts
 
@@ -728,6 +743,8 @@ screen_putstring:
 
     lda cursorp
     pha
+
+    jsr break
 
     -
         jsr calculate_screen_address
@@ -813,13 +830,13 @@ screen_scrolldown:
     ; Blank the top line.
 
     stz map1_mirror
-    lda #(SCREEN_WIDTH*2) - 3
+    lda #(SCREEN_WIDTH*2/2) - 3
     ldx #<>map1_mirror
     ldy #<>(map1_mirror + 2)
     mvn #`map1_mirror, #`map1_mirror
 
-    stz map2_mirror + (SCREEN_HEIGHT-1)*32*2
-    lda #(SCREEN_WIDTH*2) - 3
+    stz map2_mirror
+    lda #(SCREEN_WIDTH*2/2) - 3
     ldx #<>map2_mirror
     ldy #<>(map2_mirror + 2)
     mvn #`map2_mirror, #`map2_mirror
@@ -929,29 +946,7 @@ nmi_handler:
 .dpage $2100
 
 tty_handler:
-    php
-    phb
-    phd
-    a8i8
-
-    pha
-    tya
-    asl a
-    tax
-
-    lda #$7f        ; databank to $7f0000 so we can read supervisor RAM
-    pha
-    plb
-    pea #$2100      ; direct page to $2100 so we can write to video registers
-    pld
-
-    pla
-    jsr (tty_driver_table, x)
-
-    pld
-    plb
-    plp
-    rtl
+    driver_handler tty_driver_table
 
 tty_driver_table:
     .word tty_const
@@ -977,7 +972,10 @@ tty_const:
 .as
 .xs
 tty_conin:
-    jmp screen_getchar
+    -
+        jsr screen_getchar
+        bcs -
+    rts
 
 tty_conout:
 .block
@@ -1018,14 +1016,13 @@ tty_conout:
     jsr screen_putchar
 
     lda cursorp
-    inc a
 maybescroll:
     cmp #SCREEN_WIDTH * SCREEN_HEIGHT
     bne +
         jsr screen_scrollup
         lda #SCREEN_WIDTH * (SCREEN_HEIGHT-1)
+        sta cursorp
     +
-    sta cursorp
 
 exit:
     plp
