@@ -8,6 +8,8 @@ from config import (
     BIG_APPS,
     BIG_APPS_SRCS,
     SCREEN_APPS,
+    BIG_SCREEN_APPS,
+    PASCAL_APPS,
 )
 
 llvmrawprogram(
@@ -32,7 +34,9 @@ mkcpmfs(
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
-    | SCREEN_APPS,
+    | SCREEN_APPS
+    | BIG_SCREEN_APPS
+    | PASCAL_APPS,
 )
 
 simplerule(
