@@ -145,8 +145,7 @@ start:
     ; Other hardware.
 
     jsr init_keyboard
-   
-    jsr clear_screen
+    jsr screen_clear
 
     ; Wipe memory and copy the BIOS loader to its final position.
 
@@ -234,30 +233,6 @@ wait_for_vblank:
     lda HVBJOY
     and #%10000000          ; test for v-blank flag
     beq -
-
-    plp
-    rts
-
-clear_screen:
-    php
-
-    a16
-    lda #0
-    sta cursorp
-
-    a16
-    sta map1_mirror
-    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
-    ldx #<>map1_mirror
-    ldy #<>map1_mirror + 2
-    mvn #`map1_mirror, #`map1_mirror
-
-    lda #0
-    sta map2_mirror
-    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
-    ldx #<>map2_mirror
-    ldy #<>map2_mirror + 2
-    mvn #`map2_mirror, #`map2_mirror
 
     plp
     rts
@@ -564,6 +539,10 @@ screen_handler:
     phd
     a8i8
 
+    xba             ; assemble XA into a 16-bit A parameter
+    txa
+    xba
+
     pha
     tya
     asl a
@@ -586,16 +565,16 @@ screen_handler:
 screen_driver_table:
     .word screen_version
     .word screen_getsize
-    .word fail ; screen_clear
+    .word screen_clear
     .word screen_setcursor
     .word screen_getcursor
     .word screen_putchar
-    .word fail ; screen_putstring
+    .word screen_putstring
     .word screen_getchar
     .word screen_showcursor
     .word screen_scrollup
-    .word fail ; screen_scrolldown
-    .word fail ; screen_cleartoeol
+    .word screen_scrolldown
+    .word screen_cleartoeol
     .word fail ; screen_setstyle
 
 fail:
@@ -615,6 +594,29 @@ screen_getsize:
     lda #SCREEN_WIDTH-1
     ldx #SCREEN_HEIGHT-1
     clc
+    rts
+
+screen_clear:
+    php
+
+    a16i16
+    lda #0
+    sta cursorp
+
+    sta map1_mirror
+    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
+    ldx #<>map1_mirror
+    ldy #<>map1_mirror + 2
+    mvn #`map1_mirror, #`map1_mirror
+
+    lda #0
+    sta map2_mirror
+    lda #SCREEN_WIDTH*SCREEN_HEIGHT*2 - 3
+    ldx #<>map2_mirror
+    ldy #<>map2_mirror + 2
+    mvn #`map2_mirror, #`map2_mirror
+
+    plp
     rts
 
 .as
@@ -643,6 +645,9 @@ screen_getcursor:
     asl a
     asl a
     a8
+
+    xba
+    tax
     pla
     rts
 
@@ -716,6 +721,41 @@ screen_putchar:
 
 .as
 .xs
+screen_putstring:
+    php
+    a16i16
+    tax
+
+    lda cursorp
+    pha
+
+    -
+        jsr calculate_screen_address
+        inc cursorp
+        tay
+
+        a8
+        lda $7e0000, x
+        a16
+        beq +
+        sec
+        sbc #$0020              ; convert to tile number
+        asl a                   ; tiles come in pairs
+        and #$00ff
+        ora #$2000              ; priority bit and palette
+        sta map1_mirror, y
+        inx
+        bra -
+    +
+
+    pla
+    sta cursorp
+
+    plp
+    rts
+
+.as
+.xs
 screen_scrollup:
     php
     a16i16
@@ -748,6 +788,69 @@ screen_scrollup:
     mvn #`map2_mirror, #`map2_mirror
 
     plb
+    plp
+    rts
+
+.as
+.xs
+screen_scrolldown:
+    php
+    a16i16
+    phb
+
+    ; Actually do the scroll.
+
+    lda #(SCREEN_HEIGHT-1)*32*2 - 1
+    ldx #<>(map1_mirror + (SCREEN_HEIGHT-2)*32*2)
+    ldy #<>(map1_mirror + (SCREEN_HEIGHT-1)*32*2)
+    mvp #`map1_mirror, #`map1_mirror
+
+    lda #(SCREEN_HEIGHT-1)*32*2 - 1
+    ldx #<>(map2_mirror + (SCREEN_HEIGHT-2)*32*2)
+    ldy #<>(map2_mirror + (SCREEN_HEIGHT-1)*32*2)
+    mvp #`map2_mirror, #`map2_mirror
+
+    ; Blank the top line.
+
+    stz map1_mirror
+    lda #(SCREEN_WIDTH*2) - 3
+    ldx #<>map1_mirror
+    ldy #<>(map1_mirror + 2)
+    mvn #`map1_mirror, #`map1_mirror
+
+    stz map2_mirror + (SCREEN_HEIGHT-1)*32*2
+    lda #(SCREEN_WIDTH*2) - 3
+    ldx #<>map2_mirror
+    ldy #<>(map2_mirror + 2)
+    mvn #`map2_mirror, #`map2_mirror
+
+    plb
+    plp
+    rts
+
+.as
+.xs
+screen_cleartoeol:
+    php
+    a16i16
+
+    lda cursorp
+    pha
+
+    -
+        jsr calculate_screen_address
+        tax
+
+        lda #$2000
+        sta map1_mirror, x
+
+        inc cursorp
+        lda cursorp
+        and #63
+        bne -
+    
+    pla
+    sta cursorp
     plp
     rts
 
@@ -795,14 +898,13 @@ nmi_handler:
     lda cursor_flags
     bpl +
         a16
-        jsr break
         jsr calculate_screen_address
         lsr a
         sta VMADDL
         asl a
         tax
         lda map1_mirror, x
-        ora #$2400
+        eor #$0400
         sta VMDATAL
     +
 
