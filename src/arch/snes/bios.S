@@ -128,8 +128,6 @@ zendproc
 defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, 0
 
 zproc drvstrat_SCREEN
-    sec
-    rts
     SYSCALL JUMP_SCREEN
 zendproc
 

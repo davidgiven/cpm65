@@ -218,6 +218,9 @@ init_screen
     lda #%00001111          ; blank off, maximum brightness
     sta INIDISP
 
+    lda #CURSOR_SHOWN
+    sta cursor_flags
+
     pld
     plp
     rts
@@ -241,8 +244,6 @@ clear_screen:
     a16
     lda #0
     sta cursorp
-    a8
-    sta cursor_flags
 
     a16
     sta map1_mirror
@@ -558,8 +559,120 @@ keyboard_init_data2:
 .dpage $2100
 
 screen_handler:
-    bra *
+    php
+    phb
+    phd
+    a8i8
+
+    pha
+    tya
+    asl a
+    tax
+
+    lda #$7f        ; databank to $7f0000 so we can read supervisor RAM
+    pha
+    plb
+    pea #$2100      ; direct page to $2100 so we can write to video registers
+    pld
+
+    pla
+    jsr (screen_driver_table, x)
+
+    pld
+    plb
+    plp
     rtl
+
+screen_driver_table:
+    .word screen_version
+    .word screen_getsize
+    .word fail ; screen_clear
+    .word screen_setcursor
+    .word screen_getcursor
+    .word screen_putchar
+    .word fail ; screen_putstring
+    .word screen_getchar
+    .word screen_showcursor
+    .word screen_scrollup
+    .word fail ; screen_scrolldown
+    .word fail ; screen_cleartoeol
+    .word fail ; screen_setstyle
+
+fail:
+    sec
+    rts
+
+.as
+.xs
+screen_version:
+    lda #0
+    clc
+    rts
+
+.as
+.xs
+screen_getsize:
+    lda #SCREEN_WIDTH-1
+    ldx #SCREEN_HEIGHT-1
+    clc
+    rts
+
+.as
+.xs
+screen_setcursor:
+    sta ptr
+    a16
+    and #$ff00
+    lsr a
+    lsr a
+    a8
+    ora ptr
+    a16
+    sta cursorp
+    rts
+
+.as
+.xs
+screen_getcursor:
+    lda cursorp
+    and #SCREEN_WIDTH-1
+    pha
+
+    a16
+    lda cursorp
+    asl a
+    asl a
+    a8
+    pla
+    rts
+
+.as
+.xs
+screen_getchar:
+-
+    jsr get_current_key
+    cmp #0
+    beq -
+
+    pha
+    lda #0
+    sta pending_key
+    pla
+
+    clc
+    rts
+
+.as
+.xs
+screen_showcursor:
+    pha
+    lda #CURSOR_SHOWN
+    trb cursor_flags
+    plx                 ; sets Z flag
+    beq +
+    tsb cursor_flags
++
+    rts
 
 ; Calculates the address relative to map1_mirror.
 
@@ -568,7 +681,7 @@ calculate_screen_address:
     php
     a16
 
-    lda cursorp
+    lda @l cursorp      ; long address to make independent of databank
     lsr a
     bcs +
         ; clc ; carry clear from previous instruction
@@ -580,48 +693,8 @@ calculate_screen_address:
     rts
 .endblock
 
-show_cursor:
-    php
-    i16
-    a8
-    lda cursor_flags
-    bmi +                   ; if cursor is already shown
-        a16
-        jsr calculate_screen_address
-        tax
-        lda map1_mirror, x
-        and #$00ff
-        ora #$2400
-        sta map1_mirror, x
-
-        a8
-        lda #CURSOR_SHOWN
-        tsb cursor_flags
-    +
-    plp
-    rts
-
-hide_cursor:
-    php
-    i16
-    a8
-    lda cursor_flags
-    bpl +                   ; if cursor is already hidden
-        a16
-        jsr calculate_screen_address
-        tax
-        lda map1_mirror, x
-        and #$00ff
-        ora #$2000
-        sta map1_mirror, x
-
-        a8
-        lda #CURSOR_SHOWN
-        trb cursor_flags
-    +
-    plp
-    rts
-
+.as
+.xs
 screen_putchar:
     php
     a16i16
@@ -641,6 +714,8 @@ screen_putchar:
     plp
     rts
 
+.as
+.xs
 screen_scrollup:
     php
     a16i16
@@ -691,6 +766,7 @@ nmi_handler:
     .databank 0
     .dpage $4300
 
+    a8
     lda RDNMI       ; reset NMI flag
 
     lda #%10000000       ; force blank
@@ -716,6 +792,21 @@ nmi_handler:
     lda #%10000000      ; DMA enable
     sta MDMAEN
 
+    lda cursor_flags
+    bpl +
+        a16
+        jsr break
+        jsr calculate_screen_address
+        lsr a
+        sta VMADDL
+        asl a
+        tax
+        lda map1_mirror, x
+        ora #$2400
+        sta VMDATAL
+    +
+
+    a8
     lda #%00001111      ; screen on, maximum brightness
     sta INIDISP
 
@@ -781,29 +872,16 @@ tty_const:
 
 ; Blocks and waits for a keypress.
 
+.as
+.xs
 tty_conin:
--
-    jsr get_current_key
-    cmp #0
-    beq -
-
-    pha
-    lda #0
-    sta pending_key
-    pla
-
-    clc
-    rts
+    jmp screen_getchar
 
 tty_conout:
 .block
     php
     i8
     a16
-
-    pha
-    jsr hide_cursor
-    pla
 
     tax
     cpx #13
@@ -848,7 +926,6 @@ maybescroll:
     sta cursorp
 
 exit:
-    jsr show_cursor
     plp
     clc
     rts

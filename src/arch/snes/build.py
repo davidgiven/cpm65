@@ -31,7 +31,8 @@ mkcpmfs(
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
-    | BIG_APPS,
+    | BIG_APPS
+    | SCREEN_APPS,
 )
 
 simplerule(
