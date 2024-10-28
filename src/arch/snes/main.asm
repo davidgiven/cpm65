@@ -49,6 +49,7 @@ pending_key:    .byte 0
 modifier_state: .byte 0
 cursorp:        .word 0     ; character count from top left of screen
 cursor_flags:   .byte 0
+tick_counter:   .byte 0
 
 vram_mirror_start:
 map1_mirror:    .fill 2*32*SCREEN_HEIGHT
@@ -456,7 +457,7 @@ keymap_normal:
     .byte $66, $67, $68, $6A, $6B, $6C, $3B, $3A ; $20
     .byte $5D, $7A, $78, $63, $76, $62, $6E, $6D
     .byte $2C, $2E, $2F, $00, $20, $0E, $13, $14 ; $30
-    .byte $12, $7F, $1E, $1D, $1C, $1F, $0C, $01
+    .byte $12, $7F, $8b, $88, $89, $8a, $0C, $01
     .byte $2D, $2F, $37, $38, $39, $2A, $34, $35 ; $40
     .byte $36, $2B, $31, $32, $33, $3D, $30, $2C
     .byte $2E, $0F, $00, $00, $00, $00, $00, $00 ; $50
@@ -471,7 +472,7 @@ keymap_shift:
     .byte $46, $47, $48, $4A, $4B, $4C, $2B, $2A ; $20
     .byte $7D, $5A, $58, $43, $56, $42, $4E, $4D
     .byte $3C, $3E, $3F, $5F, $20, $0E, $13, $14 ; $30
-    .byte $12, $7F, $1E, $1D, $1C, $1F, $0B, $01
+    .byte $12, $7F, $8b, $88, $89, $8a, $0B, $01
     .byte $2D, $2F, $37, $38, $39, $2A, $34, $35 ; $40
     .byte $36, $2B, $31, $32, $33, $3D, $30, $2C
     .byte $2E, $0F, $00, $00, $00, $00, $00, $00 ; $50
@@ -582,7 +583,7 @@ screen_driver_table:
     .word screen_getcursor
     .word screen_putchar
     .word screen_putstring
-    .word screen_getchar1
+    .word screen_getchar
     .word screen_showcursor
     .word screen_scrollup
     .word screen_scrolldown
@@ -665,8 +666,6 @@ screen_getcursor:
 
 .as
 .xs
-screen_getchar1:
-    jsr break
 screen_getchar:
     jsr get_current_key
     tax                 ; set flags
@@ -743,8 +742,6 @@ screen_putstring:
 
     lda cursorp
     pha
-
-    jsr break
 
     -
         jsr calculate_screen_address
@@ -912,6 +909,11 @@ nmi_handler:
     lda #%10000000      ; DMA enable
     sta MDMAEN
 
+    lda tick_counter
+    inc a
+    sta tick_counter
+    and #64
+    beq +
     lda cursor_flags
     bpl +
         a16
