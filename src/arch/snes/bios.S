@@ -155,12 +155,14 @@ drvtop: .word drv_TTY
 
 define_drive dph_romdisk, 160*72, 4096, 256, 0
 define_drive dph_ramdisk, 128*1024/128, 1024, 32, 0
+define_drive dph_fdddisk, 160*72, 4096, 256, 0
 
 .data
 dphtab:
     .word dph_romdisk
     .word dph_ramdisk
-DPHTAB_SIZE = 2
+    .word dph_fdddisk
+DPHTAB_SIZE = 3
 
 .bss
 

@@ -55,7 +55,7 @@ end
 diskdef generic-1440k
     seclen 128
     tracks 160
-    sectrk 72
+    sectrk 72       # 512*18
     blocksize 4096
     maxdir 256
     boottrk 0

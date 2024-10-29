@@ -26,6 +26,30 @@ SCC_B_DATA      = $5F01 ; SCC channel B data port
 SCC_A_CTRL      = $5F02 ; SCC channel A control port
 SCC_A_DATA      = $5F03 ; SCC channel A data port
 
+FD72069_STATUS  = $5f20 ; uPD72069 status register
+FD72069_DATA    = $5f21 ; uPD72069 data register
+FD72069_TC      = $5f30 ; terminal count
+
+FDC_RESET       = %00110110 ; Software reset
+FDC_SET_STDBY   = %00110101 ; Set standby
+FDC_RESET_STDBY = %00110100 ; Reset standby
+FDC_START_CLOCK = %01000111 ; Start clock
+FDC_SNSINT      = %00001000 ; Sense interrupt status
+FDC_SNSDEV      = %00000100 ; Sense device status
+FDC_SPECIFY     = %00000011 ; Specify
+FDC_INTERNAL250 = %00001011 ; Control internal mode (250k bps)
+FDC_INTERNAL300 = %11001011 ; Control internal mode (300k bps)
+FDC_INTERNAL500 = %01001011 ; Control internal mode (500k bps)
+FDC_SELFORMAT   = %01001111 ; Select format
+FDC_MOTORS      = %11111110 ; Enable motors
+FDC_RECALIBRATE = %00000111 ; Recalibtate
+FDC_SEEK        = %00001111 ; Seek
+FDC_READ        = %11100110 ; Read
+FDC_WRITE       = %11000101 ; Write
+FDC_WRITEID     = %01001101 ; Write ID
+
+FDD_TRACK_SIZE  = 18*512
+
 VRAM_MAP1_LOC   =  $0000
 VRAM_MAP2_LOC   =  $0800
 VRAM_TILES_LOC  =  $2000
@@ -56,12 +80,17 @@ style_word:     .byte 0     ; always zero
 style_byte:     .byte 0     ; current screen drawing style
 tick_counter:   .byte 0
 selected_disk:  .byte 0
+current_track:  .byte 0
+track_dirty:    .byte 0
 
 vram_mirror_start:
 map1_mirror:    .fill 2*32*SCREEN_HEIGHT
                 .fill 2*32*(32 - SCREEN_HEIGHT) ; padding to match up with VRAM
 map2_mirror:    .fill 2*32*SCREEN_HEIGHT
 vram_mirror_end:
+
+track_buffer:   .fill FDD_TRACK_SIZE
+fdc_status:     .fill 8
 
 .endvirtual
 
@@ -152,6 +181,7 @@ start:
     ; Other hardware.
 
     jsr init_keyboard
+    jsr init_fdd
     jsr screen_clear
 
     ; Wipe memory and copy the BIOS loader to its final position.
@@ -536,6 +566,339 @@ keyboard_init_data2:
     .byte $ff
     
 ; ===========================================================================
+;                                FLOPPY DISK I/O
+; ===========================================================================
+
+init_fdd:
+    php
+    a8i8
+    phb
+
+    phk                 ; databank to 0
+    plb
+
+    lda #FDC_RESET
+    jsr fd_aux_tx
+
+    jsr fd_recalibrate_twice
+    lda #$ff
+    sta current_track
+    lda #0
+    sta track_dirty
+
+    plb
+    plp
+    rts
+
+.databank 0
+
+; Writes A to the FDC data register.
+
+.as
+.xs
+fd_tx:
+    -
+        bit FD72069_STATUS
+    bpl -               ; wait until RQM (the top bit) is high
+    sta FD72069_DATA
+    rts
+
+; Writes A to the FDC aux register.
+
+.as
+.xs
+fd_aux_tx:
+    -
+        bit FD72069_STATUS
+    bpl -               ; wait until RQM (the top bit) is high
+    sta FD72069_STATUS
+    rts
+
+; Reads status from the FDC data register, into the fdc_status buffer.
+
+.as
+.xs
+fd_read_status:
+.block
+    ldx #0
+loop:
+    -
+        bit FD72069_STATUS
+    bpl -               ; wait until RQM (the top bit) is high
+    bvc exit            ; if DIO is low, there is no more data
+    lda FD72069_DATA
+    sta fdc_status, x
+    inx
+    bra loop
+
+exit:
+    rts
+.endblock
+
+; Turns the motor on.
+
+.as
+.xs
+fd_motor_on:
+    lda #FDC_START_CLOCK
+    jsr fd_aux_tx
+    lda #FDC_RESET_STDBY
+    jsr fd_aux_tx
+    jsr fd_read_status
+    rts
+
+; Turns the motor off again.
+
+.as
+.xs
+fd_motor_off:
+    lda #FDC_SET_STDBY
+    jmp fd_aux_tx
+
+; Performs the SENSE DRIVE STATE command, returning S3 in A.
+
+fd_sense_drive_state:
+    lda #FDC_SNSDEV
+    jsr fd_tx
+    lda #$00            ; head 0, drive 0
+    jsr fd_tx
+    jsr fd_read_status
+    lda fdc_status+0
+    rts
+
+; Waits for the drive to become ready. Returns C on error. Preserves A.
+
+.as
+.xs
+fd_wait_until_drive_ready:
+.block
+    pha
+    jsr fd_motor_on
+    -
+        jsr fd_sense_drive_state
+        bit #%00100000
+        bne exit
+
+        x16             ; short pause
+        ldx #0
+        -
+            dex
+        bne -
+        x8
+    bra -
+exit:
+    pla
+    clc
+    rts
+.endblock
+
+; Performs the RECALIBRATE command.
+
+.as
+.xs
+fd_recalibrate:
+    jsr fd_wait_until_drive_ready
+    lda #FDC_RECALIBRATE
+    jsr fd_tx
+    lda #0              ; head 0, drive 0
+    jsr fd_tx
+    ; falls through
+fd_wait_for_seek_ending:
+    lda #FDC_SNSINT
+    jsr fd_tx
+    jsr fd_read_status
+
+    lda fdc_status+0
+    bit #%00100000      ; SE, seek end
+    beq fd_wait_for_seek_ending
+    clc
+    rts
+
+; Recalibrates twice (to get the entire 80 track range).
+
+.as
+.xs
+fd_recalibrate_twice:
+    jsr fd_recalibrate
+    bcs +
+        jsr fd_recalibrate
+    +
+    rts
+
+; Seeks to physical track A (i.e. 0..79).
+
+.as
+.xs
+fd_seek:
+.block
+    pha
+    jsr fd_wait_until_drive_ready
+    bcs exit
+
+    pha
+    lda #FDC_SEEK
+    jsr fd_tx
+    lda #0              ; head 0, drive 0
+    jsr fd_tx
+    pla                 ; track number
+    jsr fd_tx
+    jsr fd_wait_for_seek_ending
+exit:
+    pla
+    rts
+.endblock
+
+; Reads logical track A (0..159) into the track buffer.
+
+.as
+.xs
+fd_read_logical_track:
+.block
+    tay
+    lda #$66            ; READ SECTORS
+    jsr fd_setup_read_or_write
+
+    php
+    i16
+
+    ldx #0
+    ldy #FDD_TRACK_SIZE
+    -
+        lda FD72069_STATUS
+        bpl -           ; RQM low? keep waiting
+        asl a           ; DIO now top bit
+        asl a           ; EXM now top bit
+        bpl +           ; if low, transfer complete
+
+        lda FD72069_DATA
+        sta track_buffer, x
+        inx
+        dey
+    bne -
+    +
+
+    plp
+    ; Fall through
+.endblock
+fd_complete_transfer:
+    lda FD72069_TC      ; reading this nudges the TC bit
+    jsr fd_read_status
+
+    ; Parsing the status code is fiddly, because we're allowed a readfail if EN
+    ; is set.
+
+    lda fdc_status+1
+    asl a               ; EN->C
+    lda fdc_status+0
+    rol a               ; IC6->b7, IC7->C, EN->b0
+    rol a               ; IC6->C, IC7->b0, EN->b1
+    rol a               ; IC6->b0, IC7->b1, EN->b2
+    and #7              ; clip off stray bits
+
+    ; This gives us a number from 0..7 which is our error. We use this
+    ; bitmap to determine whether it's fatal or not.
+    ; EN, IC7, IC6
+    ; 0    ; OK
+    ; 1    ; readfail
+    ; 1    ; unknown command
+    ; 1    ; disk removed
+    ; 0    ; OK
+    ; 0    ; reached end of track
+    ; 1    ; unknown command
+    ; 1    ; disk removed
+
+    inc a
+    tax
+    lda #%10001100
+    -
+        asl a
+        dex
+    bne -
+
+    ; The appropriate bit from the bitmap is now in C.
+    rts
+
+; Writes logical track A (0..159) from the track buffer.
+
+.as
+.xs
+fd_write_logical_track:
+.block
+    tay
+    lda #$65            ; WRITE SECTORS
+    jsr fd_setup_read_or_write
+
+    php
+    i16
+
+    ldx #0
+    ldy #FDD_TRACK_SIZE
+    -
+        lda FD72069_STATUS
+        bpl -           ; RQM low? keep waiting
+        asl a           ; DIO now top bit
+        asl a           ; EXM now top bit
+        bpl +           ; if low, transfer complete
+
+        lda track_buffer, x
+        sta FD72069_DATA
+        inx
+        dey
+    bne -
+    +
+
+    plp
+    bra fd_complete_transfer
+.endblock
+
+; Sends the commands to do a read or write. Main opcode in A, logical track
+; number in Y.
+
+.as
+.xs
+fd_setup_read_or_write:
+    pha
+    tya
+    lsr a               ; logical track to physical track
+    jsr fd_seek
+    pla
+
+    jsr fd_tx           ; 0: opcode
+
+    tya
+    and #1
+    asl a
+    asl a
+    jsr fd_tx           ; 1: head in bit 2, drive 0
+
+    tya
+    lsr a
+    jsr fd_tx           ; 2: track, again
+
+    tya
+    and #1
+    jsr fd_tx           ; 3: logical head, again
+
+    lda #1
+    jsr fd_tx           ; 4: start sector, always 1
+
+    lda #2
+    jsr fd_tx           ; 5: bytes per sector, always 512
+
+    lda #FDD_TRACK_SIZE/512
+    jsr fd_tx           ; 6: last sector (*inclusive*)
+
+    lda #27
+    jsr fd_tx           ; 7: gap 3 length (27 is standard for 3.5" drives)
+
+    lda #0
+    jsr fd_tx           ; 8: sector length (unused)
+
+    rts
+
+.databank ?
+
+; ===========================================================================
 ;                                    DRIVERS
 ; ===========================================================================
 
@@ -794,12 +1157,12 @@ screen_scrollup:
     sta map1_mirror + (SCREEN_HEIGHT-1)*32*2
     sta map2_mirror + (SCREEN_HEIGHT-1)*32*2
 
-    lda #(SCREEN_WIDTH*2) - 3
+    lda #(32*2) - 3
     ldx #<>(map1_mirror + (SCREEN_HEIGHT-1)*32*2)
     ldy #<>(map1_mirror + (SCREEN_HEIGHT-1)*32*2 + 2)
     mvn #`map1_mirror, #`map1_mirror
 
-    lda #(SCREEN_WIDTH*2) - 3
+    lda #(32*2) - 3
     ldx #<>(map2_mirror + (SCREEN_HEIGHT-1)*32*2)
     ldy #<>(map2_mirror + (SCREEN_HEIGHT-1)*32*2 + 2)
     mvn #`map2_mirror, #`map2_mirror
@@ -833,12 +1196,12 @@ screen_scrolldown:
     sta map1_mirror
     sta map2_mirror
 
-    lda #(SCREEN_WIDTH*2/2) - 3
+    lda #(32*2/2) - 3
     ldx #<>map1_mirror
     ldy #<>(map1_mirror + 2)
     mvn #`map1_mirror, #`map1_mirror
 
-    lda #(SCREEN_WIDTH*2/2) - 3
+    lda #(32*2/2) - 3
     ldx #<>map2_mirror
     ldy #<>(map2_mirror + 2)
     mvn #`map2_mirror, #`map2_mirror
@@ -1086,6 +1449,7 @@ bios_read:
 bios_read_table:
     .word bios_read_romdisk
     .word bios_read_ramdisk
+    .word bios_read_fdddisk
 
 bios_read_romdisk:
     a16i16
@@ -1120,6 +1484,7 @@ read_sector_from_ptr:
     rts
 
 calculate_ramdisk_address:
+    php
     a16i16
 
     ; Compute the address in the romdisk. As this is 256kB maximum,
@@ -1154,9 +1519,11 @@ calculate_ramdisk_address:
     sta ptr+0, d
     
     clc
+    plp
     rts
 +
     sec
+    plp
     rts
 
 bios_read_ramdisk:
@@ -1164,23 +1531,136 @@ bios_read_ramdisk:
     pld
 
     jsr calculate_ramdisk_address
-    bcs ramdisk_bounds_failure
+    bcs +
     bra read_sector_from_ptr
++
+    rts
+
+
+; Switches the track in the buffer to logical track A (i.e. 0..159).
+
+.as
+.xs
+change_fdd_track:
+.block
+    cmp current_track
+    clc
+    beq exit
+
+    pha
+    lda track_dirty
+    bpl +
+        lda current_track
+        jsr fd_write_logical_track
+        lda #0
+        sta track_dirty
+    +
+    pla
+    sta current_track
+    jsr fd_read_logical_track
+exit:
+    rts
+.endblock
+    
+; Sets ptr to the pointer to the current sector in the track buffer; returns the
+; track number in A.
+
+.as
+.xs
+calculate_fdd_address:
+.block
+    .dpage 0
+
+    ; There are 18*512=0x1200 bytes per track; that's 72 CP/M sectors. We therefore
+    ; need to divide the sector number by 72 to get the track number, the remainder
+    ; being the sector offset.
+    ;
+    ; A full division routine sucks so we're just going to repeatedly subtract by 72.
+
+    lda sector+0
+    sta ptr+0
+    lda sector+1
+    sta ptr+1
+    lda sector+2
+    sta ptr+2
+
+    ldx #0          ; track number
+    -
+        lda ptr+2
+        ora ptr+1
+        bne +       ; check for non-zero high bytes
+        lda ptr+0
+        cmp #FDD_TRACK_SIZE/128
+        bcc done    ; we're done
+
+    +
+        inx         ; increase track count
+
+        sec         ; subtract the number of sectors
+        lda ptr+0
+        sbc #FDD_TRACK_SIZE/128
+        sta ptr+0
+        lda ptr+1
+        sbc #0
+        sta ptr+1
+        lda ptr+2
+        sbc #0
+        sta ptr+2
+    bra -
+done:
+    ; Shift the sector number left by seven bits to get the offset.
+
+    lda ptr+0
+    lsr a
+    sta ptr+1
+    lda #0
+    ror a
+    sta ptr+0
+
+    ; Add the address of the track buffer.
+
+    lda #`track_buffer
+    sta ptr+2
+    lda ptr+0
+    clc
+    adc #<track_buffer
+    sta ptr+0
+    lda ptr+1
+    adc #>track_buffer
+    sta ptr+1
+
+    txa             ; track number into A
+    rts
+.endblock
+
+bios_read_fdddisk:
+    pea #0          ; direct page to $0000 for pointer access
+    pld
+
+    phk             ; databank to zero for I/O access
+    plb
+
+    jsr calculate_fdd_address
+    jsr change_fdd_track
+    jmp read_sector_from_ptr
 
 bios_write:
     driver_handler bios_write_table, lda selected_disk
 bios_write_table:
     .word fail
     .word bios_write_ramdisk
+    .word bios_write_fdddisk
 
+.as
+.xs
 bios_write_ramdisk:
     pea #0          ; direct page to $0000 for pointer access
     pld
 
     jsr calculate_ramdisk_address
-    bcs ramdisk_bounds_failure
+    bcs +
 
-    a8i8
+write_sector_to_ptr:
     ldy #$7f
 -
     lda [dma, d], y
@@ -1189,10 +1669,39 @@ bios_write_ramdisk:
     bpl -
 
     clc
-ramdisk_bounds_failure:
++
     rts
 
+bios_write_fdddisk:
+.block
+    pea #0          ; direct page to $0000 for pointer access
+    pld
+    .dpage $0000
 
+    phk             ; databank to zero for I/O access
+    plb
+    .databank 0
+
+    pha
+    jsr calculate_fdd_address
+    jsr change_fdd_track
+    jsr write_sector_to_ptr
+
+    lda #$80
+    sta track_dirty
+    pla
+
+    php
+    tax             ; set flags
+    beq +
+        lda current_track
+        jsr fd_write_logical_track
+        lda #0
+        sta track_dirty
+    +
+    plp
+    rts
+.endblock
 
 ; --- Jump table ------------------------------------------------------------
 
