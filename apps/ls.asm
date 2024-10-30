@@ -36,35 +36,10 @@ endcondx=tmp+3
 .zp pfile, 2
 .zp pfile2, 2
 
+.label print_string
+
 start:
 .expand 1
-
-    ldy #BDOS_GET_CURRENT_DRIVE
-    jsr BDOS
-    sta tmp
-
-    lda cpm_fcb
-    beq keepcur
-
-    sta tmp
-    dec tmp        \ fcb.dr - 1
-
-keepcur:
-    lda tmp
-    ldy #BDOS_SELECT_DRIVE
-    jsr BDOS
-
-    ldy #BDOS_GET_CURRENT_DRIVE
-    jsr BDOS
-
-    cmp tmp
-    beq success
-
-    lda #<error
-    ldx #>error
-    jmp print_string    \ exits
-
-success:
     lda cpm_fcb+1
     cmp #' '
     bne no_fill_wildcards

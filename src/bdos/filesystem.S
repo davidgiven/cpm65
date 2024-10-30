@@ -55,6 +55,8 @@ zproc internal_ENDSYS
     pha
     tya
     pha
+    txa
+    pha
 
     lda old_fcb_drive
     zif_pl
@@ -62,6 +64,8 @@ zproc internal_ENDSYS
         sta (param), y      ; restore user FCB
     zendif
 
+    pla
+    tax
     pla
     tay
     pla
@@ -1597,10 +1601,22 @@ zproc allocate_unused_block
     sta temp+3
 
     zloop
+        ; Bounds check.
+
+        lda temp+2
+        cmp blocks_on_disk+0
+        bcc not_out_of_bounds
+
+        lda temp+3
+        cmp blocks_on_disk+1
+        bcs disk_full_error
+
+    not_out_of_bounds:
         lda temp+2
         sta temp+0
         lda temp+3
         sta temp+1
+
         jsr get_bitmap_status
         and #$01
         zbreakif_eq
@@ -1621,6 +1637,15 @@ zproc allocate_unused_block
     lda temp+2
     ldx temp+3
     rts
+zendproc
+
+zproc disk_full_error
+    lda #<1f
+    ldx #>1f
+    jmp harderror
+1:
+    .ascii "BDOS: disk full"
+    .byte 13, 10, 0
 zendproc
 
 ; Sets a drive as being readonly.
@@ -1818,7 +1843,6 @@ NOINIT
 filesystem_state_start:
 find_first_count:       .byte 0
 active_drive:           .byte 0 ; drive currently being worked on
-old_drive:              .byte 0 ; if the drive has been overridden by the FCB
 old_fcb_drive:          .byte 0 ; drive in user FCB on entry
 write_protect_vector:   .word 0
 login_vector:           .word 0
