@@ -160,6 +160,10 @@ void main(void)
                 sector++;
             }
         }
+
+        /* Rewrite the last sector and force it to be flushed to disk. */
+
+        cpm_bios_write(1);
     }
 
     printx("Done.");
