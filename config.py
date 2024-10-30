@@ -52,7 +52,7 @@ SCREEN_APPS = {
 
 BIG_SCREEN_APPS = {
     "0:ds.com": "third_party/dwarfstar",
-    "0:dsr.txt": "third_party/dwarfstar/+ds_txt_cpm",
+    "0:ds.txt": "third_party/dwarfstar/+ds_txt_cpm",
 }
 
 SCREEN_APPS_SRCS = {"0:cls.asm": "apps+cls_asm_cpm"}
