@@ -63,5 +63,6 @@ jobs:
           pet4032.d64
           pet8032.d64
           pet8096.d64
+          snes.smc
           x16.zip
 

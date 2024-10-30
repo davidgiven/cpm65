@@ -74,6 +74,7 @@ jobs:
           pet4032.d64
           pet8032.d64
           pet8096.d64
+          snes.smc
           vic20.d64
           x16.zip
         fail-if-no-assets: false
@@ -112,6 +113,7 @@ jobs:
           cpm65/pet4032.d64
           cpm65/pet8032.d64
           cpm65/pet8096.d64
+          cpm65/snes.smc
           cpm65/vic20.d64
           cpm65/x16.zip
         tag_name: dev
