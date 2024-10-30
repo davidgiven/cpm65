@@ -307,7 +307,8 @@ the same time.
     the box, both drives B and C are unformatted; do `mkfs b` or `mkfs c` to
     create filesystems on them.
 
-  - It's super quick; the SNES has a 7MHz 65816. There's a SCREEN driver.
+  - It's super quick; the SNES has a 7MHz 65816. There's a SCREEN driver. The
+    console is 64.
 
 ### Sorbus notes
 
