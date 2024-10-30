@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
       with:
@@ -15,7 +15,7 @@ jobs:
         path: 'cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils srecord
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils srecord 64tass libreadline-dev
 
     - name: install llvm-mos
       run: |
@@ -74,6 +74,7 @@ jobs:
           pet4032.d64
           pet8032.d64
           pet8096.d64
+          snes.smc
           vic20.d64
           x16.zip
         fail-if-no-assets: false
@@ -112,6 +113,7 @@ jobs:
           cpm65/pet4032.d64
           cpm65/pet8032.d64
           cpm65/pet8096.d64
+          cpm65/snes.smc
           cpm65/vic20.d64
           cpm65/x16.zip
         tag_name: dev

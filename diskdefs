@@ -52,6 +52,15 @@ diskdef generic-1m
 	os 2.2
 end
 
+diskdef generic-1440k
+    seclen 128
+    tracks 160
+    sectrk 72       # 512*18
+    blocksize 4096
+    maxdir 256
+    boottrk 0
+end
+
 # Simple SSSD disk on the Atari 810 or 1050 diskdrive
 diskdef atari90
     seclen 128
