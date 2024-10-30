@@ -373,6 +373,9 @@ exit_cop_e:
 
 
 brk_e_entry:
+    jml $7eff00     ; run the sec/sce/rti instructions from bank 7e
+
+brk_n_entry:
 abt_e_entry:
 int_e_entry:
     rti
@@ -1737,7 +1740,7 @@ bios_write_fdddisk:
     .word $ffff         ; reserved
     .word $ffff         ; reserved
     .word return_int     ; COP
-    .word return_int     ; BRK
+    .word brk_n_entry    ; BRK
     .word return_int     ; ABT
     .word nmi_n_entry    ; NMI
     .word $ffff         ; reserved
@@ -1748,11 +1751,11 @@ bios_write_fdddisk:
     .word $ffff         ; reserved
     .word $ffff         ; reserved
     .word return_int    ; COP
-    .word brk_e_entry
+    .word $ffff         ; unused
     .word return_int    ; ABT
     .word nmi_e_entry   ; NMI
     .word start         ; reserved
-    .word int_e_entry   ; IRQ
+    .word brk_e_entry   ; IRQ
 
 * = $010000
 .binary "+diskimage.img"
