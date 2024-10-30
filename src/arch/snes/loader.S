@@ -84,7 +84,7 @@ _start:
     ; Fix it up.
 
     lda #>__TPA_START__
-    ldy #__ZEROPAGE_START__
+    ldx #__ZEROPAGE_START__
     jsr bios_RELOCATE
 
     ; Go!
