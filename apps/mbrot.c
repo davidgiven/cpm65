@@ -21,9 +21,9 @@ int main()
     int sum;
     int xt;
 
-    char * chr = ".,_-*!$&0 ";
+    char * chr = ".,_-*\\/!$&IO ";
 	
-    int maxIters = 10;
+    int maxIters = 13;
 
     if(!screen_init()) {
         cpm_printstring("Error: No SCREEN driver, exiting\r\n");
