@@ -45,7 +45,6 @@ def llvmprogram(
         commands=commands,
         label=label,
         cfilerule=llvmcfile,
-        cfilekind="llvmprogram",
     )
 
 
@@ -56,7 +55,7 @@ def llvmrawprogram(
     linkscript: Target,
     deps: Targets = [],
     commands=[
-        "$(LD6502) -Map {outs[0]}.map -T {deps[-1]} -o {outs[0]} {ins} {ldflags}"
+        "$(LD6502) -Map {outs[0]}.map -T {linkscript} -o {outs[0]} {ins} {ldflags} # {deps}"
     ],
     label="LD6502",
     **kwargs
@@ -67,7 +66,9 @@ def llvmrawprogram(
         commands=commands,
         label=label,
         cfilerule=llvmcfile,
-        cfilekind="llvmprogram",
+        args={
+            "linkscript": linkscript
+        },
         **kwargs
     )
 

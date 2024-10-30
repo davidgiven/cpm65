@@ -45,6 +45,7 @@ jobs:
         tag: dev
         assets: | 
           apple2e.po
+          apple2e_b.po
           atari800.atr
           atari800b.atr
           atari800c.atr
