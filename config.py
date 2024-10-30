@@ -47,11 +47,12 @@ SCREEN_APPS = {
     "0:vt52drv.com": "apps+vt52drv",
     "0:vt52test.com": "apps+vt52test",
     "0:kbdtest.com": "apps+kbdtest",
+    "0:mbrot.com": "apps+mbrot",
 }
 
 BIG_SCREEN_APPS = {
     "0:ds.com": "third_party/dwarfstar",
-    "0:ds.txt": "third_party/dwarfstar/+ds_txt_cpm",
+    "0:dsr.txt": "third_party/dwarfstar/+ds_txt_cpm",
 }
 
 SCREEN_APPS_SRCS = {"0:cls.asm": "apps+cls_asm_cpm"}
