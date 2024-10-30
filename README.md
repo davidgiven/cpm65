@@ -63,12 +63,12 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
+<a href="doc/snes.png"><img src="doc/snes.png" style="width:40%" alt="CP/M-65 running on the Super Nintendo"></a>
 <a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
 <a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
 <a href="doc/nano6502.png"><img src="doc/nano6502.png" style="width:40%" alt="CP/M-65 running on the nano6502"></a>
 <a href="doc/kim-1.png"><img src="doc/kim-1.png" style="width:40%" alt="CP/M-65 running on the KIM-1"></a>
 <a href="doc/osi.png"><img src="doc/osi.png" style="width:40%" alt="CP/M-65 running on the Ohio Scientific"></a>
-<a href="doc/snes.png"><img src="doc/snes.png" style="width:40%" alt="CP/M-65 running on the Super Nintendo"></a>
 </div>
 
 
