@@ -27,6 +27,10 @@ to the 6502. So far it runs on:
   - Oric 1 and Oric Atmos (but not, currently, the Telestrat) with Microdisc
     interface; TPA 44kB.
 
+  - The Super Nintendo. Yes, really. You get a 1440kB romdisk, a 128kB
+    battery-backed ramdisk in cartridge memory, and one 1440kB floppy drive --- if
+    you have the right hardware. TPA 58kB.
+
   - Sorbus homebrew 6502-based computer.
   
   - Olimex' neo6502 6502-based computer.
@@ -64,6 +68,7 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/nano6502.png"><img src="doc/nano6502.png" style="width:40%" alt="CP/M-65 running on the nano6502"></a>
 <a href="doc/kim-1.png"><img src="doc/kim-1.png" style="width:40%" alt="CP/M-65 running on the KIM-1"></a>
 <a href="doc/osi.png"><img src="doc/osi.png" style="width:40%" alt="CP/M-65 running on the Ohio Scientific"></a>
+<a href="doc/snes.png"><img src="doc/snes.png" style="width:40%" alt="CP/M-65 running on the Super Nintendo"></a>
 </div>
 
 
@@ -275,6 +280,33 @@ the same time.
   - The console is 40x28. It has a SCREEN driver.
 
   - The port runs completely bare-metal and does not use any ROM routines.
+
+### Super Nintendo notes
+
+  - Yes, it works! You get a 2MB HiRom cartridge with 128kB SRAM and an embedded
+    1440kB romdisk. It boots from the romdisk, meaning you can't change the BDOS
+    or CCP, or run submit files (because these operate through temporary files
+    on drive A:, which on the SNES is read only).
+
+  - If you want to interact with it, you'll need some completely unavailable
+    unreleased Nintendo prototype hardware which provides a keyboard and floppy
+    drive. It's so rare I can't even link to a page about it. More likely you'll
+    want to use this version of BSNES-Plus which has been patched to support this
+    hardware: https://github.com/MrL314/bsnes-plus/tree/sfx-dos It might be
+    possible to port it to use one of the [several floppy-disk-based cartridge
+    copiers](https://en.wikipedia.org/wiki/Game_backup_device) and the very rare
+    [XBAND
+    keyboard](https://ia903404.us.archive.org/22/items/x-band-keyboard/X-Band%20Keyboard_text.pdf).
+    If anyone knows of an emulator which supports these, please [let me
+    know](https://github.com/davidgiven/cpm65/discussions/new/choose) because I'd
+    really like to support these.
+
+  - Drive A is a 1440kB romdisk. Drive B is a 128kB ramdisk stored in the
+    (emulated) cartridge battery backed RAM. Drive C is the floppy drive. Out of
+    the box, both drives B and C are unformatted; do `mkfs b` or `mkfs c` to
+    create filesystems on them.
+
+  - It's super quick; the SNES has a 7MHz 65816. There's a SCREEN driver.
 
 ### Sorbus notes
 
