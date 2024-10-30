@@ -1605,9 +1605,15 @@ zproc allocate_unused_block
 
     zloop
         lda temp+2
+        cmp blocks_on_disk+0 ; bounds check
+        bcs disk_full_error
         sta temp+0
+
         lda temp+3
+        cmp blocks_on_disk+1 ; bounds check
+        bcs disk_full_error
         sta temp+1
+
         jsr get_bitmap_status
         and #$01
         zbreakif_eq
@@ -1628,6 +1634,15 @@ zproc allocate_unused_block
     lda temp+2
     ldx temp+3
     rts
+zendproc
+
+zproc disk_full_error
+    lda #<1f
+    ldx #>1f
+    jmp harderror
+1:
+    .ascii "BDOS: disk full"
+    .byte 13, 10, 0
 zendproc
 
 ; Sets a drive as being readonly.
