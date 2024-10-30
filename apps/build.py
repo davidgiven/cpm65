@@ -51,6 +51,7 @@ for prog in [
     "attr",
     "copy",
     "life",
+    "mbrot",
     "mkfs",
     "objdump",
     "qe",

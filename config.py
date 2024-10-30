@@ -47,6 +47,7 @@ SCREEN_APPS = {
     "0:vt52drv.com": "apps+vt52drv",
     "0:vt52test.com": "apps+vt52test",
     "0:kbdtest.com": "apps+kbdtest",
+    "0:mbrot.com": "apps+mbrot",
 }
 
 BIG_SCREEN_APPS = {

@@ -39,6 +39,8 @@ to the 6502. So far it runs on:
 
   - KIM-1 with K-1013 FDC, directly connected SD card module or 1541 drive.
 
+  - Ohio Scientific series with 16kB RAM or more, and a floppy drive. TPA up to 39kB.
+
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
 much less standardised than 8080 and Z80 systems. (The systems above all load
@@ -421,7 +423,7 @@ the same time.
 - Supported systems are:
   - 400 series, with Model 440 32x32 video, Model 470 disk controller (5.25" or 8"), and an ASCII keyboard.
   - 500 series, with Model 540 64x32 video, Model 505 disk controller (5.25" or 8"), and 542 polled keyboard.
-  - 600 series, with 64x16 video, on-board disk controller (5.25" or 8"), and polled keyboard.
+  - 600 series, with on board 64x16 video, Model 610 disk controller (5.25" or 8"), and polled keyboard.
   - serial system, without video, Model 470 or 505 disk controller (8" only), and serial ACIA at $fc00.
 
 - All systems need at least 16kB of RAM, but detect up to 40kB with BASIC present, and 48kB if BASIC is replaced by RAM.
