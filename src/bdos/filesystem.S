@@ -64,9 +64,6 @@ zproc internal_ENDSYS
         sta (param), y      ; restore user FCB
     zendif
 
-    lda current_drive       ; reselect the current drive
-    jsr bios_SELDSK
-
     pla
     tax
     pla
@@ -1846,7 +1843,6 @@ NOINIT
 filesystem_state_start:
 find_first_count:       .byte 0
 active_drive:           .byte 0 ; drive currently being worked on
-old_active_drive:       .byte 0 ; if the drive has been overridden by the FCB
 old_fcb_drive:          .byte 0 ; drive in user FCB on entry
 write_protect_vector:   .word 0
 login_vector:           .word 0
