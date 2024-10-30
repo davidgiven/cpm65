@@ -1604,14 +1604,20 @@ zproc allocate_unused_block
     sta temp+3
 
     zloop
+        ; Bounds check.
+
         lda temp+2
-        cmp blocks_on_disk+0 ; bounds check
-        bcs disk_full_error
-        sta temp+0
+        cmp blocks_on_disk+0
+        bcc not_out_of_bounds
 
         lda temp+3
-        cmp blocks_on_disk+1 ; bounds check
+        cmp blocks_on_disk+1
         bcs disk_full_error
+
+    not_out_of_bounds:
+        lda temp+2
+        sta temp+0
+        lda temp+3
         sta temp+1
 
         jsr get_bitmap_status
