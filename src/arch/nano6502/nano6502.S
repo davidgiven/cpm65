@@ -942,7 +942,7 @@ zproc bios_WRITE
     sta sd_write_strobe
 
     jsr sd_wait   
-    
+    clc 
     rts
 zendproc
 
