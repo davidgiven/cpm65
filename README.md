@@ -429,10 +429,8 @@ the same time.
 - All systems need at least 16kB of RAM, but detect up to 40kB with BASIC present, and 48kB if BASIC is replaced by RAM.
   Some boot ROMs do not boot when BASIC is absent. For example, SYN600 relies on BASIC ROM routines to load the boot sector.
 - The generated disk images can be used directly with [osiemu](https://github.com/ivop/osiemu), or converted to HFE format with its `osi2hfe` if you want to create real floppies or use it with a Gotek on real hardware.
-[Thomas Buescher's WinOSI](http://vintagecomputers.square7.ch/Emulator.html) has a tool to convert HFE to 65D. His version of WinOSI only emulates 600 series machines.
-[Mark Spankus' version of WinOSI]( https://osi.marks-lab.com/index.php) can run them all.
+For use with one of the two WinOSI emulators [Mark's Lab](https://osi.marks-lab.com/software/tools.html) has a tool to convert HFE images to 65D format.
 - All systems boot with a plain TTY driver. If you have a 540B graphics card with the optional color option enabled, you can load a screen driver called `TTY540B` (located on drive D: on MF systems).
-This is the only video configuration that has the posibility to draw a character and a cursor at the same screen location.
 On serial systems, you can load `SCRVT100` to enable the screen driver if you are connected with a VT100 terminal.
 
 ### Supported programs
