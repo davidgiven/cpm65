@@ -11,3 +11,12 @@ llvmprogram(
         "third_party/fonts/atari+ivo3x6",
     ],
 )
+
+llvmprogram(
+    name="8080_ovl_loader",
+    srcs=["./8080_ovl_loader.S"],
+    deps=[
+        "include",
+        "src/arch/atari800+headers",
+    ],
+)
