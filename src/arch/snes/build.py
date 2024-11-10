@@ -29,7 +29,7 @@ mkcpmfs(
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
-        "0:cls.com": "apps+cls",
+        "0:cls.com": "apps+cls"
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
