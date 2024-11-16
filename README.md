@@ -431,6 +431,7 @@ the same time.
 - The generated disk images can be used directly with [osiemu](https://github.com/ivop/osiemu), or converted to HFE format with its `osi2hfe` if you want to create real floppies or use it with a Gotek on real hardware.
 For use with one of the two WinOSI emulators [Mark's Lab](https://osi.marks-lab.com/software/tools.html) has a tool to convert HFE images to 65D format.
 - All systems boot with a plain TTY driver. If you have a 540B graphics card with the optional color option enabled, you can load a screen driver called `TTY540B` (located on drive D: on MF systems).
+For the Model 630 graphics card there's `TTY630`.
 On serial systems, you can load `SCRVT100` to enable the screen driver if you are connected with a VT100 terminal.
 
 ### Supported programs
