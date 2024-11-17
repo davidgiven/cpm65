@@ -16,7 +16,7 @@ export(
         "bin/pasdis": "third_party/pascal-m+pasdis",
         "bin/pint.com": "third_party/pascal-m+pint",
         "bin/loader.com": "third_party/pascal-m+loader",
-        "bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
+        "images/bbcmicro.ssd": "src/arch/bbcmicro+diskimage",
         "images/oric.dsk": "src/arch/oric+diskimage",
         "images/apple2e.po": "src/arch/apple2e+diskimage",
         "images/apple2e_b.po": "src/arch/apple2e+diskimage_b",
