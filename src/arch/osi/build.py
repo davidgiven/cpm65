@@ -109,6 +109,7 @@ mkcpmfs(
     size=128 * 640,
     items={
         "0:tty540b.com": "src/arch/osi/utils+tty540b",
+        "0:tty630.com": "src/arch/osi/utils+tty630",
     }
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
@@ -225,12 +226,16 @@ mkcpmfs(
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
+        "0:tty630.com": "src/arch/osi/utils+tty630",
     }
     | MINIMAL_APPS
     | BIG_APPS
     | PASCAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS_SRCS
+    | SCREEN_APPS
+    | SCREEN_APPS_SRCS
+    | BIG_SCREEN_APPS
 )
 
 mkcpmfs(
