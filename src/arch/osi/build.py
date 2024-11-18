@@ -1,4 +1,4 @@
-from tools.build import mkcpmfs, img2os5, img2os8, img2osi
+from tools.build import mkcpmfs, img2osi
 from build.llvm import llvmrawprogram
 from config import (
     MINIMAL_APPS,
@@ -116,32 +116,32 @@ mkcpmfs(
     | BIG_SCREEN_APPS
 )
 
-img2os5(
+img2osi(
     name="osi400mf_diskimage",
     src=".+osi400mf_rawdiskimage",
 )
 
-img2os5(
+img2osi(
     name="osi500mf_diskimage",
     src=".+osi500mf_rawdiskimage",
 )
 
-img2os5(
+img2osi(
     name="osi600mf_diskimage",
     src=".+osi600mf_rawdiskimage",
 )
 
-img2os5(
+img2osi(
     name="osimf-b_diskimage",
     src=".+osimf-b_rawdiskimage",
 )
 
-img2os5(
+img2osi(
     name="osimf-c_diskimage",
     src=".+osimf-c_rawdiskimage",
 )
 
-img2os5(
+img2osi(
     name="osimf-d_diskimage",
     src=".+osimf-d_rawdiskimage",
 )
@@ -246,22 +246,22 @@ mkcpmfs(
     }
 )
 
-img2os8(
+img2osi(
     name="osi400f_diskimage",
     src=".+osi400f_rawdiskimage",
 )
 
-img2os8(
+img2osi(
     name="osi500f_diskimage",
     src=".+osi500f_rawdiskimage",
 )
 
-img2os8(
+img2osi(
     name="osi600f_diskimage",
     src=".+osi600f_rawdiskimage",
 )
 
-img2os8(
+img2osi(
     name="osif-b_diskimage",
     src=".+osif-b_rawdiskimage",
 )
@@ -300,7 +300,7 @@ mkcpmfs(
     | BIG_SCREEN_APPS
 )
 
-img2os8(
+img2osi(
     name="osiserf_diskimage",
     src=".+osiserf_rawdiskimage",
 )
