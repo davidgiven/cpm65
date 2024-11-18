@@ -442,6 +442,10 @@ the same time.
   there's `TTY630`.  On serial systems, you can load `SCRVT100` to enable the
   screen driver if you are connected with a VT100 terminal.
 
+- The *600mf80* images are for a Superboard II/C1PMF with a non-standard
+  5.25" drive with *80 tracks* instead of the standard 40 tracks. A 3.5"
+  single density drive with 80 tracks would work, too.
+
 ### Supported programs
 
 Commands include `DUMP`, `STAT`, `COPY`, `SUBMIT`, `ASM`, `QE` and `BEDIT` plus

@@ -220,6 +220,18 @@ def img2os8(self, name, src: Target = None):
 
 
 @Rule
+def img2osi(self, name, src: Target = None):
+    simplerule(
+        replaces=self,
+        ins=[src],
+        outs=[f"={name}.osi"],
+        deps=["tools+img2osi"],
+        commands=["{deps[0]} {ins[0]} {outs[0]}"],
+        label="IMG2OSI",
+    )
+
+
+@Rule
 def mametest(
     self,
     name,

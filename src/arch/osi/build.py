@@ -1,4 +1,4 @@
-from tools.build import mkcpmfs, img2os5, img2os8
+from tools.build import mkcpmfs, img2os5, img2os8, img2osi
 from build.llvm import llvmrawprogram
 from config import (
     MINIMAL_APPS,
@@ -303,4 +303,82 @@ mkcpmfs(
 img2os8(
     name="osiserf_diskimage",
     src=".+osiserf_rawdiskimage",
+)
+
+# ----------------------------------------------------------------------------
+# 600 series with 5.25" (or 3.5") floppy, 80 tracks
+
+llvmrawprogram(
+    name="osi600mf80_bios",
+    srcs=["./osi.S"],
+    deps=["include",
+          "src/lib+bioslib",
+          "src/arch/osi/floppy.S",
+          "src/arch/osi/keyboard.S"],
+    cflags=["-DOSI600 -DTRACKS80"],
+    linkscript="./osi.ld",
+)
+
+mkcpmfs(
+    name="osi600mf80_rawdiskimage",
+    format="osi5_80",
+    bootimage=".+osi600mf80_bios",
+    size=128 * 1280,
+    items={
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src/bdos",
+        "0:tty630.com": "src/arch/osi/utils+tty630",
+    }
+    | MINIMAL_APPS
+    | BIG_APPS
+    | PASCAL_APPS
+    | SCREEN_APPS
+    | BIG_SCREEN_APPS
+)
+
+mkcpmfs(
+    name="osimf80-b_rawdiskimage",
+    format="osi5_80",
+    size=128 * 1280,
+    items={
+    }
+    | MINIMAL_APPS_SRCS
+    | BIG_APPS_SRCS
+    | SCREEN_APPS_SRCS
+)
+
+mkcpmfs(
+    name="osimf80-c_rawdiskimage",
+    format="osi5_80",
+    size=128 * 1280,
+    items={
+    }
+)
+
+mkcpmfs(
+    name="osimf80-d_rawdiskimage",
+    format="osi5_80",
+    size=128 * 1280,
+    items={
+    }
+)
+
+img2osi(
+    name="osi600mf80_diskimage",
+    src=".+osi600mf80_rawdiskimage",
+)
+
+img2osi(
+    name="osimf80-b_diskimage",
+    src=".+osimf80-b_rawdiskimage",
+)
+
+img2osi(
+    name="osimf80-c_diskimage",
+    src=".+osimf80-c_rawdiskimage",
+)
+
+img2osi(
+    name="osimf80-d_diskimage",
+    src=".+osimf80-d_rawdiskimage",
 )
