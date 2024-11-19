@@ -9,6 +9,8 @@
  *        2048 bytes per track, 81920 bytes per disk (80kB)
  *      - Raw disk image, 77 tracks, 24 sectors per track, 128 bytes per sector
  *        3072 bytes per track, 236544 bytes per disk (231kB)
+ *      - Raw disk image, 80 tracks, 16 sectors per track, 128 bytes per sector
+ *        2048 bytes per track, 163840 bytes per disk (160kB)
  *
  * Output:
  *      OSI Disk Stream format
@@ -87,9 +89,9 @@ int main(int argc, char **argv) {
     long insize = ftell(inp);
     fseek(inp, 0, SEEK_SET);
 
-    if (insize != 81920 && insize != 236544) {
-        fprintf(stderr, "error: wrong input file size, expected 81920 "
-                        " or 236544 bytes\n");
+    if (insize != 81920 && insize != 236544 && insize != 163840) {
+        fprintf(stderr, "error: wrong input file size, expected 81920, "
+                        "163840 or 236544 bytes\n");
         return 1;
     }
 
@@ -109,6 +111,13 @@ int main(int argc, char **argv) {
         delay2  = 32;
         npages  = 8;
         oh.type = TYPE_525_SS;
+    } else if (insize == 163840) {
+        ntracks = 80;
+        trksize = 0x0d00;
+        delay1  = 200;
+        delay2  = 32;
+        npages  = 8;
+        oh.type = TYPE_80_SD_SS_300;
     } else {
         ntracks = 77;
         trksize = 0x1500;
@@ -149,7 +158,7 @@ int main(int argc, char **argv) {
             if (npages > 8)
                 fseek(inp, (npages-8) * 256, SEEK_CUR);
 
-        } else {                            // track 1-39
+        } else {                            // track 1...ntracks
             for (int j=0; j<delay1*8; j++)
                 put_bit(1);
 
