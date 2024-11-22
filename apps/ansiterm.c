@@ -55,6 +55,11 @@
 #define CAN         0x18
 #define SUB         0x1a
 
+#define UP          0x10
+#define DOWN        0x0e
+#define LEFT        0x02
+#define RIGHT       0x06       
+
 static uint8_t mEsc = 0;
 static uint8_t w;
 static uint8_t h;
@@ -513,12 +518,12 @@ static void ansi_parse(uint8_t inp) {
                     case 'n':
                         // Device status report
                         // TODO: ASCII conversion of cursor position, send 0 for now
-                        serial_outp(ESC);
-                        serial_outp('[');
-                        serial_outp('0');
-                        serial_outp(';'); 
-                        serial_outp('0');
-                        serial_outp('R');
+                        serial_out(ESC);
+                        serial_out('[');
+                        serial_out('0');
+                        serial_out(';'); 
+                        serial_out('0');
+                        serial_out('R');
                         break;
                     case 'l':
                         if(CSI_private) {
@@ -692,20 +697,20 @@ static void xmodem_send_block(uint8_t block_cnt) {
     printi(block_cnt);
 
     // Send header
-    serial_outp(SOH);
-    serial_outp(block_cnt);
-    serial_outp(block_cnt ^ 0xFF);
+    serial_out(SOH);
+    serial_out(block_cnt);
+    serial_out(block_cnt ^ 0xFF);
 
     checksum = 0;
     // Send data
     for(i=0; i<128; i++) {
         data = xmodem_buffer[i];
         checksum += data;
-        serial_outp(data);
+        serial_out(data);
     }
 
     // Send checksum
-    serial_outp(checksum);    
+    serial_out(checksum);    
 }
 
 static void xmodem_send(void) {
@@ -760,7 +765,7 @@ static void xmodem_send(void) {
                 if(nak_cnt == 11) {
                     cpm_printstring("Too many NAKs, aborting");
                     cr();
-                    serial_outp(CAN);
+                    serial_out(CAN);
                     cpm_close_file(&xmodem_file);
                     return;
                 }
@@ -773,7 +778,7 @@ static void xmodem_send(void) {
                     cr();
                     cpm_printstring("Transmission done");
                     cr();
-                    serial_outp(EOT);
+                    serial_out(EOT);
                     cpm_close_file(&xmodem_file);
                     return;
                 }
@@ -785,7 +790,7 @@ static void xmodem_send(void) {
         if(cpm_const()) {
             // Cancel due to keypress
             cpm_close_file(&xmodem_file);
-            serial_outp(CAN);
+            serial_out(CAN);
             return;
         }
     }
@@ -918,6 +923,23 @@ int main(void)
                         break;
                     default:
                     break;
+                }
+            } else if(inp > 127) {
+                switch(inp) {
+                    case SCREEN_KEY_UP:
+                        serial_out(UP);
+                        break;
+                    case SCREEN_KEY_DOWN:
+                        serial_out(DOWN);
+                        break;
+                    case SCREEN_KEY_LEFT:
+                        serial_out(LEFT);
+                        break;
+                    case SCREEN_KEY_RIGHT:
+                        serial_out(RIGHT);
+                        break;
+                    default:
+                        break;
                 }
             } else {
                 // Send data to serial port and echo if avtivated

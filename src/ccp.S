@@ -386,17 +386,8 @@ zproc entry_DIR
         zuntil_mi
     zendif
 
-    ; Set the drive.
-
-    ldx userfcb+FCB_DR
-    dex
-    zif_mi
-        ldx drive
-    zendif
-    txa
-    jsr bdos_SELECTDISK
-
     ; Find number of files to print per line
+
     jsr set_dirlen
 
     ; Start iterating.

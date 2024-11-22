@@ -128,7 +128,6 @@ banner_wait:
     ldx zp_base
     jsr bios_RELOCATE
 
-
     ; Open CPMFS
     	
     lda #CPMFS_A_OFFSET
@@ -314,7 +313,7 @@ zproc tty_conin
     lda pending_key
     zif_eq
 tty_input_wait:
-	lda #IO_page_uart
+	    lda #IO_page_uart
         sta IO_page_reg
         lda uart_rx_avail
         beq tty_input_keyb
@@ -327,6 +326,11 @@ tty_input_keyb:
         lda keyb_data_avail
         beq tty_input_wait
         lda keyb_data
+        ; Filter out arrow keys
+        cmp #$80
+        zif_cs
+            lda #0
+        zendif
         clc
         rts
     zendif
@@ -487,6 +491,36 @@ screen_getchar_data_keyb:
     jmp screen_getchar_data_bsfix
 screen_getchar_data:
     lda uart_rx_data
+    ; Handle escape codes for arrow keys
+    cmp #$1B
+    bne screen_getchar_data_bsfix
+    jsr esc_delay
+
+    lda uart_rx_avail
+    beq screen_getchar_noesc
+    lda uart_rx_data
+    cmp #$41
+    bne screen_getchar_down
+    ; Up
+    lda #$8B
+    jmp notbs
+screen_getchar_down:
+    cmp #$42
+    bne screen_getchar_right
+    lda #$8A
+    jmp notbs
+screen_getchar_right:
+    cmp #$43
+    bne screen_getchar_left
+    lda #$89
+    jmp notbs
+screen_getchar_left:      
+    cmp #$44
+    bne screen_getchar_noesc
+    lda #$88
+    jmp notbs
+screen_getchar_noesc:
+    lda #$1B
 screen_getchar_data_bsfix:
     cmp #$08
     bne notbs
@@ -551,6 +585,18 @@ zproc screen_setstyle
 normal_style:
     lda #$00
     sta vid_style
+    rts
+zendproc
+
+zproc esc_delay
+    ldx #$ff
+    zrepeat
+        ldy #$ff
+        zrepeat
+            dey
+        zuntil_eq
+        dex
+    zuntil_eq    
     rts
 zendproc
 
@@ -896,7 +942,7 @@ zproc bios_WRITE
     sta sd_write_strobe
 
     jsr sd_wait   
-    
+    clc 
     rts
 zendproc
 

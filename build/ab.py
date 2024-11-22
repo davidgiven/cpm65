@@ -16,6 +16,7 @@ from importlib.machinery import (
 import inspect
 import string
 import sys
+import hashlib
 
 verbose = False
 quiet = False
@@ -31,7 +32,8 @@ old_import = builtins.__import__
 
 class PathFinderImpl(PathFinder):
     def find_spec(self, fullname, path, target=None):
-        if not path:
+        # The second test here is needed for Python 3.9.
+        if not path or not path[0]:
             path = ["."]
         if len(path) != 1:
             return None
@@ -113,7 +115,7 @@ def Rule(func):
         t.callback = func
         t.traits.add(func.__name__)
         if "args" in kwargs:
-            t.args |= kwargs["args"]
+            t.args.update(kwargs["args"])
             del kwargs["args"]
         if "traits" in kwargs:
             t.traits |= kwargs["traits"]
@@ -147,11 +149,15 @@ class Target:
         self.dir = join("$(OBJ)", name)
         self.ins = []
         self.outs = []
+        self.deps = []
         self.materialised = False
         self.args = {}
 
     def __eq__(self, other):
         return self.name is other.name
+
+    def __lt__(self, other):
+        return self.name < other.name
 
     def __hash__(self):
         return id(self)
@@ -313,7 +319,12 @@ def targetof(value, cwd=None):
             # Load the new build file.
 
             path = join(path, "build.py")
-            loadbuildfile(path)
+            try:
+                loadbuildfile(path)
+            except ModuleNotFoundError:
+                error(
+                    f"no such build file '{path}' while trying to resolve '{value}'"
+                )
             assert (
                 value in targets
             ), f"build file at '{path}' doesn't contain '+{target}' when trying to resolve '{value}'"
@@ -344,8 +355,15 @@ class TargetsMap:
         return output
 
 
+def _removesuffix(self, suffix):
+    # suffix='' should not call self[:-0].
+    if suffix and self.endswith(suffix):
+        return self[:-len(suffix)]
+    else:
+        return self[:]
+
 def loadbuildfile(filename):
-    filename = filename.replace("/", ".").removesuffix(".py")
+    filename = _removesuffix(filename.replace("/", "."), ".py")
     builtins.__import__(filename)
 
 
@@ -387,9 +405,12 @@ def filenameof(x):
     return xs[0]
 
 
-def emit(*args):
-    outputFp.write(" ".join(args))
-    outputFp.write("\n")
+def emit(*args, into=None):
+    s = " ".join(args) + "\n"
+    if into is not None:
+        into += [s]
+    else:
+        outputFp.write(s)
 
 
 def emit_rule(name, ins, outs, cmds=[], label=None):
@@ -398,26 +419,43 @@ def emit_rule(name, ins, outs, cmds=[], label=None):
     nonobjs = [f for f in fouts if not f.startswith("$(OBJ)")]
 
     emit("")
-    if nonobjs:
-        emit("clean::")
-        emit("\t$(hide) rm -f", *nonobjs)
 
-    emit(".PHONY:", name)
+    lines = []
+    if nonobjs:
+        emit("clean::", into=lines)
+        emit("\t$(hide) rm -f", *nonobjs, into=lines)
+
+    emit(".PHONY:", name, into=lines)
     if outs:
-        emit(name, ":", *fouts)
-        if cmds:
-            emit(*fouts, "&:", *fins)
+        emit(name, ":", *fouts, into=lines)
+        if len(fouts) == 1:
+            emit(*fouts, ":", *fins, "\x01", into=lines)
         else:
-            emit(*fouts, ":", *fins)
+            emit("ifeq ($(MAKE4.3),yes)", into=lines)
+            emit(*fouts, "&:", *fins, "\x01", into=lines)
+            emit("else", into=lines)
+            emit(*(fouts[1:]), ":", fouts[0], into=lines)
+            emit(fouts[0], ":", *fins, "\x01", into=lines)
+            emit("endif", into=lines)
 
         if label:
-            emit("\t$(hide)", "$(ECHO)", label)
+            emit("\t$(hide)", "$(ECHO) $(PROGRESSINFO)", label, into=lines)
         for c in cmds:
-            emit("\t$(hide)", c)
+            emit("\t$(hide)", c, into=lines)
     else:
         assert len(cmds) == 0, "rules with no outputs cannot have commands"
-        emit(name, ":", *fins)
+        emit(name, ":", *fins, into=lines)
 
+    cmd = "".join(lines)
+    hash = hashlib.sha1(bytes(cmd, "utf-8")).hexdigest()
+
+    outputFp.write(cmd.replace("\x01", f"$(OBJ)/.hashes/{hash}"))
+
+    if outs:
+        emit(f"$(OBJ)/.hashes/{hash}:")
+        emit(
+            f"\t$(hide) mkdir -p $(OBJ)/.hashes && touch $(OBJ)/.hashes/{hash}"
+        )
     emit("")
 
 
@@ -451,7 +489,7 @@ def simplerule(
         name=self.name,
         ins=ins + deps,
         outs=outs,
-        label=self.templateexpand("{label} {name}"),
+        label=self.templateexpand("{label} {name}") if label else None,
         cmds=cs,
     )
 
@@ -476,8 +514,8 @@ def export(self, name=None, items: TargetsMap = {}, deps: Targets = []):
             cwd=self.cwd,
             ins=[srcs[0]],
             outs=[destf],
-            commands=["cp %s %s" % (srcs[0], destf)],
-            label="CP",
+            commands=["$(CP) %s %s" % (srcs[0], destf)],
+            label="",
         )
         subrule.materialise()
 

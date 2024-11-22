@@ -582,6 +582,11 @@ zproc tty_conin
         lda #0xff
         ldx #0xff
         jsr screen_getchar
+        ; Filter out arrow keys
+        cmp #$80
+        zif_cs
+            lda #0
+        zendif
     zuntil_cc
 
     rts
@@ -768,8 +773,8 @@ shift_change:
 
 keyboard_decode_tab:
 #if defined PET4032
-    .byte 0x00, 0x00, '_',  '(',  '&',  '%',  '#',  '!'  ; 0x00
-    .byte 0x7f, 0x00, 0x00, ')',  '\\', '\'', '$',  '"'  ; 0x08
+    .byte 0x89, 0x00, '_',  '(',  '&',  '%',  '#',  '!'  ; 0x00
+    .byte 0x7f, 0x8a, 0x00, ')',  '\\', '\'', '$',  '"'  ; 0x08
     .byte '9',  '7',  '^',  'o',  'u',  't',  'e',  'q'  ; 0x10
     .byte '/',  '8',  0x00, 'p',  'i',  'y',  'r',  'w'  ; 0x18
     .byte '6',  '4',  0x00, 'l',  'j',  'g',  'd',  'a'  ; 0x20
@@ -779,12 +784,12 @@ keyboard_decode_tab:
     .byte '-',  '0',  0x00, '>',  0x00, ']',  '@',  0x00 ; 0x40
     .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
 #elif defined PET8032 || defined PET8096
-    .byte '.',  0x00, 0x00, '8',  '-',  '8',  '5',  '2'  ; 0x00
+    .byte '.',  0x00, 0x89, '8',  '-',  '8',  '5',  '2'  ; 0x00
     .byte '9',  0x00, '^',  '7',  '0',  '7',  '4',  '1'  ; 0x08
     .byte '5',  ';',  'k',  ']',  'h',  'f',  's',  0x1b ; 0x10
     .byte '6',  '@',  'l',  0x0d, 'j',  'g',  'd',  'a'  ; 0x18
     .byte 0x7f, 'p',  'i',  '\\', 'y',  'r',  'w',  0x09 ; 0x20
-    .byte '4',  '[',  'o',  0x00, 'u',  't',  'e',  'q'  ; 0x28
+    .byte '4',  '[',  'o',  0x8a, 'u',  't',  'e',  'q'  ; 0x28
     .byte '3',  0x00, 0x00, '.',  '.',  'b',  'c',  0x00 ; 0x30
     .byte '2',  0x00, 0x00, '0',  ',',  'n',  'v',  'z'  ; 0x38
     .byte '1',  '/',  0x00, 0x00, 'm',  ' ',  'x',  0x00 ; 0x40
@@ -793,8 +798,8 @@ keyboard_decode_tab:
 
 keyboard_decode_tab_shifted:
 #if defined PET4032
-    .byte 0x00, 0x00, '_',  '(',  '&',  '%',  '#',  '!'  ; 0x00
-    .byte 0x7f, 0x00, 0x00, ')',  '\\', '\'', '$',  '"'  ; 0x08
+    .byte 0x88, 0x00, '_',  '(',  '&',  '%',  '#',  '!'  ; 0x00
+    .byte 0x7f, 0x8b, 0x00, ')',  '\\', '\'', '$',  '"'  ; 0x08
     .byte '9',  '7',  '^',  'O',  'U',  'T',  'E',  'Q'  ; 0x10
     .byte '/',  '8',  0x00, 'P',  'I',  'Y',  'R',  'W'  ; 0x18
     .byte '6',  '4',  0x00, 'L',  'J',  'G',  'D',  'A'  ; 0x20
@@ -804,12 +809,12 @@ keyboard_decode_tab_shifted:
     .byte '-',  '0',  0x00, '>',  0x00, ']',  '@',  0x00 ; 0x40
     .byte '=',  '.',  0x00, 0x1b, '<',  ' ',  '[',  0x00 ; 0x48
 #elif defined PET8032 || defined PET8096
-    .byte '.',  0x00, 0x00, '8',  '=',  '(',  '%',  '"'  ; 0x00
+    .byte '.',  0x00, 0x88, '8',  '=',  '(',  '%',  '"'  ; 0x00
     .byte '9',  0x00, '^',  '7',  '0',  '\'', '$',  '!'  ; 0x08
     .byte '5',  '+',  'K',  ']',  'H',  'F',  'S',  0x1b ; 0x10
     .byte '6',  '@',  'L',  0x0D, 'J',  'G',  'D',  'A'  ; 0x18
     .byte 0x7f, 'P',  'I',  '\\', 'Y',  'R',  'W',  0x09 ; 0x20
-    .byte '4',  '[',  'O',  0x00, 'U',  'T',  'E',  'Q'  ; 0x28
+    .byte '4',  '[',  'O',  0x8b, 'U',  'T',  'E',  'Q'  ; 0x28
     .byte '3',  0x00, 0x00, '.',  '>',  'B',  'C',  0x00 ; 0x30
     .byte '2',  0x00, 0x00, '0',  '<',  'N',  'V',  'Z'  ; 0x38
     .byte '1',  '?',  0x00, 0x00, 'M',  ' ',  'X',  0x00 ; 0x40

@@ -535,6 +535,28 @@ zproc screen_getchar
 
     jsr toggle_cursor
     jsr tty_conin
+    
+    ; Translate arrow keys
+    cmp #$1c ; Up
+    zif_eq
+        lda #$8b
+    zendif
+
+    cmp #$1d ; Down
+    zif_eq
+        lda #$8a
+    zendif
+    
+    cmp #$1e ; Left
+    zif_eq
+        lda #$88
+    zendif
+    
+    cmp #$1f ; Right
+    zif_eq
+        lda #$89
+    zendif
+
     clc
     rts
 zendproc

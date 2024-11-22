@@ -7,6 +7,8 @@ from config import (
     BIG_APPS_SRCS,
     SCREEN_APPS,
     SCREEN_APPS_SRCS,
+    BIG_SCREEN_APPS,
+    PASCAL_APPS,
 )
 
 llvmclibrary(
@@ -69,26 +71,27 @@ mkcpmfs(
         "0:scrndrv.com": "src/arch/apple2e/utils+scrndrv",
         "0:scrntest.com": "apps+scrntest",
         "0:cls.com": "apps+cls",
-    }
-    | MINIMAL_APPS
-    | BIG_APPS
-    | SCREEN_APPS,
-)
-
-mkcpmfs(
-    name="diskimage2",
-    format="appleiie",
-    bootimage=".+bios_shuffled",
-    size=143360,
-    items={
         "0:atbasic.com": "third_party/altirrabasic",
         "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
         "0:qe.com": "apps+qe",
     }
-    | MINIMAL_APPS_SRCS
-    | BIG_APPS_SRCS
-    | SCREEN_APPS_SRCS,
+    | MINIMAL_APPS
+    | MINIMAL_APPS_SRCS,
 )
+
+mkcpmfs(
+    name="diskimage_b",
+    format="appleiie",
+    bootimage=".+bios_shuffled",
+    size=143360,
+    items={
+    }
+    | SCREEN_APPS
+    | SCREEN_APPS_SRCS
+    | BIG_SCREEN_APPS
+    | PASCAL_APPS,
+)
+
 
 mametest(
     name="mametest",

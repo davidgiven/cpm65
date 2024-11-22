@@ -4,14 +4,14 @@ on: [push, pull_request]
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
       with:
         repository: 'davidgiven/cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils mame srecord
+      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils mame srecord 64tass libreadline-dev
 
     - name: install llvm-mos
       run: |
@@ -27,29 +27,42 @@ jobs:
     #    limit-access-to-actor: true
 
     - name: make
-      run: make LLVM=$HOME/llvm-mos/bin -j`nproc` +all +mametest
+      run: make LLVM=$HOME/llvm-mos/bin +all +mametest
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ github.event.repository.name }}.${{ github.sha }}
         path: |
-          apple2e.po
-          atari800.atr
-          atari800b.atr
-          atari800c.atr
-          atari800hd.atr
-          atari800xlhd.atr
-          bbcmicro.ssd
-          c64.d64
-          diskdefs
-          kim-1-iec.zip
-          kim-1-k1013.zip
-          kim-1-sdcard.zip
-          neo6502.zip
-          oric.dsk
-          pet4032.d64
-          pet8032.d64
-          pet8096.d64
-          x16.zip
+          images/apple2e.po
+          images/apple2e_b.po
+          images/atari800.atr
+          images/atari800b.atr
+          images/atari800c.atr
+          images/atari800hd.atr
+          images/atari800xlhd.atr
+          images/bbcmicro.ssd
+          images/c64.d64
+          images/diskdefs
+          images/kim-1-iec.zip
+          images/kim-1-k1013.zip
+          images/kim-1-sdcard.zip
+          images/neo6502.zip
+          images/oric.dsk
+          images/osi400f.os8
+          images/osi400mf.os5
+          images/osi500f.os8
+          images/osi500mf.os5
+          images/osi600f.os8
+          images/osi600mf.os5
+          images/osif-b.os8
+          images/osimf-b.os5
+          images/osimf-c.os5
+          images/osimf-d.os5
+          images/osiserf.os8
+          images/pet4032.d64
+          images/pet8032.d64
+          images/pet8096.d64
+          images/snes.smc
+          images/x16.zip
 

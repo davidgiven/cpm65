@@ -689,6 +689,7 @@ zproc tty_const
     zendif
 
     lda pending_key
+   
     zif_ne
         lda #0xff
     zendif
@@ -704,6 +705,11 @@ zproc tty_conin
         lda #0xff
         ldx #0xff
         jsr screen_getchar
+        ; Filter out arrow keys
+        cmp #$80
+        zif_cs
+            lda #0
+        zendif
     zuntil_cc
 
     rts
@@ -1190,7 +1196,7 @@ keyboard_decode_tab:
     .byte 'd', 'q', 27,  0, 'f', 'r', 't', 'j'
     .byte 'c', '2', 'z', 0, '4', 'b', '6', 'm'
     .byte '\'', '\\', 0, 0, '-', ';', '9', 'k'
-    .byte 0,   0,   0,   0, 0,   '.', ',', ' '
+    .byte 137, 138, 136, 0, 139, '.', ',', ' '
     .byte '[', ']', 127, 0, 'p', 'o', 'i', 'u'
     .byte 'w', 's', 'a', 0, 'e', 'g', 'h', 'y'
     .byte '=',  0,  13,  0, '/', '0', 'l', '8'

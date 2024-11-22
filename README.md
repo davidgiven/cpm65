@@ -27,6 +27,10 @@ to the 6502. So far it runs on:
   - Oric 1 and Oric Atmos (but not, currently, the Telestrat) with Microdisc
     interface; TPA 44kB.
 
+  - The Super Nintendo. Yes, really. You get a 1440kB romdisk, a 128kB
+    battery-backed ramdisk in cartridge memory, and one 1440kB floppy drive --- if
+    you have the right hardware. TPA 58kB.
+
   - Sorbus homebrew 6502-based computer.
   
   - Olimex' neo6502 6502-based computer.
@@ -34,6 +38,8 @@ to the 6502. So far it runs on:
   - nano6502 6502-based SoC for the Tang Nano 20K FPGA board; TPA is 55kB.
 
   - KIM-1 with K-1013 FDC, directly connected SD card module or 1541 drive.
+
+  - Ohio Scientific series with 16kB RAM or more, and a floppy drive. TPA up to 39kB.
 
 Unlike the original, it supports relocatable binaries, so allowing unmodified
 binaries to run on any system: this is necessary as 6502 systems tend to be
@@ -59,10 +65,12 @@ No, it won't let you run 8080 programs on the 6502!
 <a href="doc/vic20.png"><img src="doc/vic20.png" style="width:40%" alt="CP/M-65 running on a Commodore VIC-20"></a>
 <a href="doc/atari800.png"><img src="doc/atari800.png" style="width:40%" alt="CP/M-65 running on an Atari 800XL"></a>
 <a href="doc/oric.png"><img src="doc/oric.png" style="width:40%" alt="CP/M-65 running on an Tangerine Oric 1"></a>
+<a href="doc/snes.png"><img src="doc/snes.png" style="width:40%" alt="CP/M-65 running on the Super Nintendo"></a>
 <a href="doc/sorbus.png"><img src="doc/sorbus.png" style="width:40%" alt="CP/M-65 running on the Sorbus Computer"></a>
 <a href="doc/neo6502.png"><img src="doc/neo6502.png" style="width:40%" alt="CP/M-65 running on the Olimex neo6502"></a>
 <a href="doc/nano6502.png"><img src="doc/nano6502.png" style="width:40%" alt="CP/M-65 running on the nano6502"></a>
 <a href="doc/kim-1.png"><img src="doc/kim-1.png" style="width:40%" alt="CP/M-65 running on the KIM-1"></a>
+<a href="doc/osi.png"><img src="doc/osi.png" style="width:40%" alt="CP/M-65 running on the Ohio Scientific"></a>
 </div>
 
 
@@ -92,19 +100,19 @@ You have two options:
 
 To build it, you will need the [llvm-mos](https://llvm-mos.org) toolchain.
 CP/M-65 support is available out of the box. Once installed, you should just be
-able to run the Makefile and you'll get bootable disk images for the Commodore
-64 (with 1541 drive) and BBC Micro (producing a 200kB SSSD DFS disk):
+able to run the Makefile and you'll get bootable disk images for all supported
+platforms in the `images` directory:
 
-    make LLVM=<your llvm-mos bin directory here>/ -j$(nproc)
+    make LLVM=<your llvm-mos bin directory here>/
 
 Building CP/M-65 is a bit of a performance because it's aggregating lots of
-other software, all of which need building in turn. You'll need: a C and C++
-compiler, cc1541 (for creating 1541 disk images), cpmtools (for creating CP/M
-disk images), libfmt (all the C++ tools use this), python3 (for the build
-system), and FreePascal (because the MADS assembler is written in Pascal). Use
-these Debian packages:
+other software, all of which need building in turn. You'll need primarily: a C
+and C++ compiler, cc1541 (for creating 1541 disk images), cpmtools (for creating
+CP/M disk images), libfmt (all the C++ tools use this), python3 (for the build
+system), FreePascal (because the MADS assembler is written in Pascal), 64tass
+(for the Super Nintendo 65816 stuff). Use these Debian packages:
 
-    cc1541 cpmtools libfmt-dev python3 fp-compiler srecord
+    cc1541 cpmtools libfmt-dev fp-compiler moreutils mame srecord 64tass libreadline-dev
 
 There are also automated tests which use `mame` to emulate a reasonable number
 of the platforms, to verify that they actually work. To use this, install
@@ -220,9 +228,10 @@ the same time.
   - To use, place the contents of the `appleiie.po` file onto a disk and boot
     it. The disk image has been munged according to ProDOS sector ordering.
 
-  - It supports a single drive on slot 6 drive 1. You need a 80-column card
-    (but not any aux memory). The console is a standard 80x24, and there is
-    a SCREEN driver.
+  - The contents of the `appleiie_b.po`can be placed on the second drive.
+
+  - It supports two drives on slot 6. You need a 80-column card (but not any
+  aux memory). The console is a standard 80x24, and there is a SCREEN driver.
 
   - This port runs completely bare-metal and does not use any ROM routines.
 
@@ -274,6 +283,34 @@ the same time.
   - The console is 40x28. It has a SCREEN driver.
 
   - The port runs completely bare-metal and does not use any ROM routines.
+
+### Super Nintendo notes
+
+  - Yes, it works! You get a 2MB HiRom cartridge with 128kB SRAM and an embedded
+    1440kB romdisk. It boots from the romdisk, meaning you can't change the BDOS
+    or CCP, or run submit files (because these operate through temporary files
+    on drive A:, which on the SNES is read only).
+
+  - If you want to interact with it, you'll need some completely unavailable
+    unreleased Nintendo prototype hardware which provides a keyboard and floppy
+    drive. It's so rare I can't even link to a page about it. More likely you'll
+    want to use this version of BSNES-Plus which has been patched to support this
+    hardware: https://github.com/MrL314/bsnes-plus/tree/sfx-dos It might be
+    possible to port it to use one of the [several floppy-disk-based cartridge
+    copiers](https://en.wikipedia.org/wiki/Game_backup_device) and the very rare
+    [XBAND
+    keyboard](https://ia903404.us.archive.org/22/items/x-band-keyboard/X-Band%20Keyboard_text.pdf).
+    If anyone knows of an emulator which supports these, please [let me
+    know](https://github.com/davidgiven/cpm65/discussions/new/choose) because I'd
+    really like to support these.
+
+  - Drive A is a 1440kB romdisk. Drive B is a 128kB ramdisk stored in the
+    (emulated) cartridge battery backed RAM. Drive C is the floppy drive. Out of
+    the box, both drives B and C are unformatted; do `mkfs b` or `mkfs c` to
+    create filesystems on them.
+
+  - It's super quick; the SNES has a 7MHz 65816. There's a SCREEN driver. The
+    console is 64.
 
 ### Sorbus notes
 
@@ -381,6 +418,30 @@ the same time.
 
   - If not, load the `bootiec-kim` or  `bootiec-pal` bootloader into 0x200 and execute it.
 
+### Ohio Scientific notes
+
+- Supported systems are:
+  - 400 series, with Model 440 32x32 video, Model 470 disk controller (5.25" or 8"), and an ASCII keyboard.
+  - 500 series, with Model 540 64x32 video, Model 505 disk controller (5.25" or 8"), and 542 polled keyboard.
+  - 600 series, with on board 64x16 video, Model 610 disk controller (5.25" or 8"), and polled keyboard.
+  - serial system, without video, Model 470 or 505 disk controller (8" only), and serial ACIA at $fc00.
+
+- All systems need at least 16kB of RAM, but detect up to 40kB with BASIC present, and 48kB if BASIC is replaced by RAM.
+  Some boot ROMs do not boot when BASIC is absent. For example, SYN600 relies on BASIC ROM routines to load the boot sector.
+
+- The generated disk images can be used directly with
+  [osiemu](https://github.com/ivop/osiemu), or converted to HFE format with its
+  `osi2hfe` if you want to create real floppies or use it with a Gotek on real
+  hardware.  For use with one of the two WinOSI emulators [Mark's
+  Lab](https://osi.marks-lab.com/software/tools.html) has a tool to convert HFE
+  images to 65D format.
+
+- All systems boot with a plain TTY driver. If you have a 540B graphics card
+  with the optional color option enabled, you can load a screen driver called
+  `TTY540B` (located on drive D: on MF systems).  For the Model 630 graphics card
+  there's `TTY630`.  On serial systems, you can load `SCRVT100` to enable the
+  screen driver if you are connected with a VT100 terminal.
+
 ### Supported programs
 
 Commands include `DUMP`, `STAT`, `COPY`, `SUBMIT`, `ASM`, `QE` and `BEDIT` plus
@@ -428,7 +489,7 @@ Atari BASIC is rather different from Microsoft BASIC. Please consult [the user
 manual](https://www.virtualdub.org/downloads/Altirra%20BASIC%20Reference%20Manual.pdf).
 
 **Important!** Do not contact the author of Altirra BASIC for anything related
-*to the CP/M-65 port! Any bugs are strictly my fault.
+to the CP/M-65 port! Any bugs are strictly my fault.
 
 ### The editors
 
@@ -443,6 +504,12 @@ QE is a much less simple vi-inspired screen editor, written in C. it's much
 more comfortable to use than BEDIT, but is about five times the size, and will
 only run on systems with a SCREEN driver, as noted above (you can also use the
 `DEVICES` command to see what devices your system supports).
+
+DwarfStar is another screen editor. It has the same keybindings as WordStar,
+so those familiar with that will feel right at home. For a refresher, see
+the [documentation](third_party/dwarfstar/ds.txt), which was written in DS
+itself and is also available within CP/M-65 on the systems that have DS.COM
+installed.
 
 ### The Pascal
 
@@ -498,8 +565,7 @@ Who?
 
 You may contact me at dg@cowlark.com, or visit my website at
 http://www.cowlark.com.  There may or may not be anything interesting there.
-The CP/M-65 project was designed and written by me, David Given. 
-
+The CP/M-65 project was designed and written by me, David Given.
 
 License
 -------
@@ -534,3 +600,11 @@ Biela and is available under the terms of the MIT license.  See
 bytecode compiler and interpreter, which is © 1978-2021 Niklaus Wirth, Mark
 Rustad and Hans Otten and is available under the terms of the MIT license. See
 `third_party/pascal-m/LICENSE` for the full text.
+
+`third_party/dwarfstar` contains DwarfStar, which is © 2024 by Ivo van Poorten
+and is available under the terms of the BSD 2-Clause License. See
+`third_party/dwarfstar/LICENSE` for the full text.
+
+`third_party/zmalloc` contains a copy of zmalloc, which is © 2024 by Ivo van
+Poorten and is available under the terms of the 0BSD License. See
+`third_party/zmalloc/LICENSE` for the full text.

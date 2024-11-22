@@ -11,8 +11,8 @@ def asm(self, name, src: Target = None, deps: Targets = []):
         outs=["=out.com"],
         deps=["tools/cpmemu", "apps+asm"] + deps,
         commands=[
-            "chronic sh -c \"{deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})"
-            + " a:$(notdir {ins[0]}) b:$(notdir {outs[0]}); test -f {outs[0]}\""
+            'chronic sh -c "{deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})'
+            + ' a:$(notdir {ins[0]}) b:$(notdir {outs[0]}); test -f {outs[0]}"'
         ],
         label="ASM",
     )
@@ -37,15 +37,32 @@ for prog in [
     "vt52drv",
     "vt52test",
 ]:
-    asm(name=prog, src=("./%s.asm" % prog), deps=["./cpm65.inc", "./drivers.inc"])
+    asm(
+        name=prog,
+        src=("./%s.asm" % prog),
+        deps=["./cpm65.inc", "./drivers.inc"],
+    )
 
 # Simple C programs.
 
-for prog in ["asm", "attr", "copy", "stat", "submit", "tetris", "objdump", "qe", "life", "ansiterm"]:
+for prog in [
+    "ansiterm",
+    "asm",
+    "attr",
+    "copy",
+    "life",
+    "mbrot",
+    "mkfs",
+    "objdump",
+    "qe",
+    "stat",
+    "submit",
+    "tetris",
+]:
     llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
 
 # Source code.
-    
+
 for prog in ["cls", "bedit", "dump", "ls"]:
     unixtocpm(name="%s_asm_cpm" % prog, src="./%s.asm" % prog)
 for include in ["cpm65", "drivers"]:
