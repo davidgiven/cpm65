@@ -1,13 +1,24 @@
-; CP/M-65 Copyright Â© 2023 David Given
+; CP/M-65 Copyright © 2023 David Given
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
 #include "zif.inc"
 #include "cpm65.inc"
-#include "apple2e.inc"
 #include "wait.inc"
 #include "driver.inc"
 #include "jumptables.inc"
+
+SCREEN_80STOREOFF = 0xc000
+SCREEN_80STOREON  = 0xc001
+SCREEN_80COLOFF   = 0xc00c
+SCREEN_80COLON    = 0xc00d
+SCREEN_STDCHARSET = 0xc00e
+SCREEN_ALTCHARSET = 0xc00f
+SCREEN_PAGE2OFF   = 0xc054
+SCREEN_PAGE2ON    = 0xc055
+
+KBD_READ        = 0xc000
+KBD_STROBERESET = 0xc010
 
 ; It's tempting to bake in the 0x60 offset for the drive unit at slot 6... but this
 ; changes the timing of the instructions which access these registers, and then
@@ -38,7 +49,29 @@ DECODE_TABLE_START = 0x96
 SCREENF_CURSORSHOWN = 0x80
 SCREENF_INVERSE = 0x40
 
+;#define APPLE2
+;#define APPLE2PLUS
+;#define APPLE2EUROPLUS
+;#define APPLE2JPLUS
+;#define APPLE2E
+;#define APPLE2EENHANCED
+;#define APPLE2C
+;#define APPLE2GS
+
+#define TTY_MODE_40COLUMNS 1
+#define TTY_MODE_80COLUMNS 2
+
+#if defined APPLE2C || defined APPLE2GS || defined APPLE2EENHANCED || defined APPLE2E
+#define TTY_MODE TTY_MODE_80COLUMNS
 SCRWIDTH = 80
+; TODO: we might to want 40 columns on newer models (really?)
+#elif defined APPLE2JPLUS || defined APPLE2EUROPLUS || defined APPLE2PLUS || defined APPLE2
+#define TTY_MODE TTY_MODE_40COLUMNS
+SCRWIDTH = 40
+; TOPO: we might have a Videx and use that one for 80 columns mode
+#else
+#error Unknown Apple II model
+#endif
 SCRHEIGHT = 24
 
 .extern biosentry
@@ -306,9 +339,11 @@ zproc screen_clear
         txa
         zrepeat
             dey
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2ON
             sta (ptr), y
             sta SCREEN_PAGE2OFF
+#endif
             sta (ptr), y
         zuntil_eq
 
@@ -410,12 +445,19 @@ zproc screen_scrollup
         txa
         jsr calculate_screen_address ; ptr is source pointer
 
+#if TTY_MODE == TTY_MODE_80COLUMNS
         ldy #(SCRWIDTH/2)-1
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        ldy #(SCRWIDTH)-1
+#endif
         zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2OFF
             lda (ptr), y
             sta (ptr1), y
             sta SCREEN_PAGE2ON
+#endif
             lda (ptr), y
             sta (ptr1), y
             dey
@@ -443,12 +485,19 @@ zproc screen_scrolldown
         txa
         jsr calculate_screen_address ; ptr is source pointer
 
+#if TTY_MODE == TTY_MODE_80COLUMNS
         ldy #(SCRWIDTH/2)-1
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        ldy #(SCRWIDTH)-1
+#endif
         zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2OFF
             lda (ptr), y
             sta (ptr1), y
             sta SCREEN_PAGE2ON
+#endif
             lda (ptr), y
             sta (ptr1), y
             dey
@@ -459,13 +508,20 @@ zproc screen_scrolldown
 zendproc
     ; fall through
 zproc clear_line_at_ptr
-    ldy #(SCRWIDTH/2)-1
+#if TTY_MODE == TTY_MODE_80COLUMNS
+        ldy #(SCRWIDTH/2)-1
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        ldy #(SCRWIDTH)-1
+#endif
     lda #32
     jsr apply_style
     zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
         sta SCREEN_PAGE2OFF
         sta (ptr), y
         sta SCREEN_PAGE2ON
+#endif
         sta (ptr), y
         dey
     zuntil_mi
@@ -712,11 +768,8 @@ zproc tty_conin
     sta motor_countdown
 
     ; Display the cursor.
-    jsr prepare_for_screen_write
-    lda (ptr), y
-    sta cursork
-    lda #0x60           ; flashing block
-    sta (ptr), y
+
+    jsr draw_cursor
 
     ; Wait for the key.
 
@@ -728,10 +781,6 @@ zproc tty_conin
     clc
 
     ; Cursor off again.
-    tax
-    lda cursork
-    sta (ptr), y
-    txa
 
     rts
 zendproc
@@ -1425,7 +1474,6 @@ encode_tab:         .fill 64 ; must be within one page
 .bss
 cursorx:            .fill 1
 cursory:            .fill 1
-cursork:            .fill 1
 cursorf:            .fill 1 ; SCREEN flags
 current_bank:       .fill 1
 current_phase:      .fill 1
