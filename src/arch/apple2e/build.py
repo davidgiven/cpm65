@@ -14,8 +14,8 @@ from config import (
 llvmcfile(
     name="bios_obj",
     srcs=["./apple2e.S"],
-#    cflags=["-DAPPLE2E"],
-    cflags=["-DAPPLE2PLUS"],
+    cflags=["-DAPPLE2E"],
+#    cflags=["-DAPPLE2PLUS"],
     deps=["include", "src/lib+bioslib"],
 )
 
@@ -23,8 +23,8 @@ llvmrawprogram(
     name="bios_prelink",
     srcs=[".+bios_obj"],
     deps=["src/lib+bioslib"],
-#    cflags=["-DAPPLE2E"],
-    cflags=["-DAPPLE2PLUS"],
+    cflags=["-DAPPLE2E"],
+#    cflags=["-DAPPLE2PLUS"],
     linkscript="./apple2e-prelink.ld",
     ldflags=["--defsym=BIOS_SIZE=0x4000"],
 )
