@@ -57,7 +57,6 @@ for prog in [
     "qe",
     "stat",
     "submit",
-    "tetris",
 ]:
     llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
 
