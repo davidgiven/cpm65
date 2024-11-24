@@ -537,6 +537,7 @@ zproc screen_cleartoeol
     ldx cursorx
     zrepeat
         txa
+#if TTY_MODE == TTY_MODE_80COLUMNS
         lsr a
         pha
         rol a
@@ -546,13 +547,19 @@ zproc screen_cleartoeol
         sta SCREEN_PAGE2OFF, y
 
         pla
+#endif
         tay
         lda #32
         jsr apply_style
         sta (ptr), y
 
         inx
+#if TTY_MODE == TTY_MODE_80COLUMNS
         cpx #SCRWIDTH
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        cpx #40
+#endif
     zuntil_eq
     rts
 zendproc
