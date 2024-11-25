@@ -319,6 +319,10 @@ zproc apply_style
     bit cursorf
     zif_vc
         ora #0x80 ; non inverted
+#if TTY_MODE == TTY_MODE_40COLUMNS
+    zelse
+        and #0x3f ; inverted 40 columns
+#endif
     zendif
     rts
 zendproc
