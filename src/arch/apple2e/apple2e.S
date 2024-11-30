@@ -48,6 +48,7 @@ DECODE_TABLE_START = 0x96
 
 SCREENF_CURSORSHOWN = 0x80
 SCREENF_INVERSE = 0x40
+SCREENF_CURSORENABLED = 0x20
 
 ;#define APPLE2
 ;#define APPLE2PLUS
@@ -131,6 +132,7 @@ _start:
 
     jsr initdrivers
     lda #0
+    ora #(SCREENF_CURSORENABLED)
     sta cursorf
 
     ; Print the startup banner.
@@ -276,7 +278,7 @@ screen_jmptable_lo:
     jmptablo screen_putchar
     jmptablo screen_putstring
     jmptablo screen_getchar
-    jmptablo fail ; screen_showcursor
+    jmptablo screen_showcursor
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
@@ -290,7 +292,7 @@ screen_jmptable_hi:
     jmptabhi screen_putchar
     jmptabhi screen_putstring
     jmptabhi screen_getchar
-    jmptabhi fail
+    jmptabhi screen_showcursor
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
@@ -410,7 +412,12 @@ zproc screen_putstring
     rts
 zendproc
 
+; XA = timeout in cs
+
 zproc screen_getchar
+    sta ptr
+    stx ptr+1
+
     ; Turn the disk motor off.
 
     ldx #DISK_SLOT
@@ -430,6 +437,28 @@ zproc screen_getchar
     sta KBD_STROBERESET
     and #0x7f
     clc
+    rts
+zendproc
+
+zproc screen_showcursor
+    cmp #0
+    zif_eq
+        jsr prepare_for_screen_write
+        lda (ptr), y
+        ora #0x80
+        sta (ptr), y
+        lda cursorf
+        and #(~SCREENF_CURSORENABLED) & 0xff ; unset bit 5, cursor is disabled
+        sta cursorf
+    zelse
+        lda cursorf
+        ora #SCREENF_CURSORENABLED ; set bit 5, cursor is enabled
+        sta cursorf
+        jsr prepare_for_screen_write
+        lda (ptr), y
+        and #0x7f
+        sta (ptr), y
+    zendif
     rts
 zendproc
 
@@ -611,10 +640,14 @@ zproc hide_cursor
 zendproc
 
 zproc toggle_cursor
-    jsr prepare_for_screen_write
-    lda (ptr), y
-    eor #0x80
-    sta (ptr), y
+    lda cursorf
+    and #(SCREENF_CURSORENABLED)    ; draw cursor only if bit 5 it set
+    zif_ne
+        jsr prepare_for_screen_write
+        lda (ptr), y
+        eor #0x80
+        sta (ptr), y
+    zendif
 
     lda cursorf
     eor #SCREENF_CURSORSHOWN
