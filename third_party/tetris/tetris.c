@@ -22,12 +22,12 @@
 #include <string.h>
 #include "lib/screen.h"
 
-#define WIDTH  12
-#define HEIGHT 20
+#define WIDTH  (uint8_t)12
+#define HEIGHT (uint8_t)20
 
 #define W (WIDTH + 2)
 #define H (HEIGHT + 1)
-#define WXH (W * H)
+#define WXH (uint16_t)(W * H)
 
 #define E '.'
 #define F '#'
@@ -56,7 +56,7 @@ uint16_t figure[][4] = {
 uint8_t field[WXH];
 
 struct player {
-	uint8_t figure_index, rot, x, y;
+	int8_t figure_index, rot, x, y;
 } gp;
 
 static void cr()
@@ -81,8 +81,12 @@ int init()
 	screen_showcursor(0);		// invisible cursor
 
 	// Init random generator
-	srand(42);
-	
+	// TODO: can we access the zero page from a user program? Or do we
+	// need a system call to get sort of a time since boot?
+//	uint16_t seed = (*((uint8_t *)0x004F) << 8) | *((uint8_t *)0x004E) ;
+	uint16_t seed = 21342;
+	srand( seed );
+
 	// Init field
 	memset(field, E, WXH-W);
 
@@ -112,7 +116,7 @@ int figure_draw(char ch, struct player p)
 	for (y = 0; y < 4; y++) {
 		for (x = 0; x < 4; x++) {
 			if (figure[p.figure_index][p.rot] & mask) {
-				int offset = (y + p.y) * W + x + p.x;
+				int16_t offset = (y + p.y) * W + x + p.x;
 
 				if (ch == F && field[offset] != E)
 					return 0;
@@ -179,7 +183,7 @@ void end(uint16_t score)
 	cpm_warmboot();
 }
 
-void field_print(int score)
+void field_print(uint16_t score)
 {
 	uint8_t y, x, sy, sx;
 
@@ -212,7 +216,7 @@ int main()
 		if (draw_next == 1) {
 			draw_next = 0;
 
-			gp.figure_index = rand() % 7;
+			gp.figure_index = (uint8_t)rand() % 7;
 			gp.x = W / 2 - 2;
 			gp.y = 0;
 			gp.rot = 0;
@@ -228,7 +232,7 @@ int main()
 		}
 
 		p = gp;
-		key = screen_getchar(10);
+//		key = screen_getchar(10);
 
 		switch (key) {
 			case 'w':
