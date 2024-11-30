@@ -54,6 +54,8 @@
     
     lda #1
     sta cur_vis
+    ldy #SCREEN_SHOWCURSOR
+    jsr SCREEN
 
     lda #0
     sta style
