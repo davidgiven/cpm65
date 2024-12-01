@@ -412,11 +412,20 @@ zproc screen_putstring
     rts
 zendproc
 
-; XA = timeout in cs
+; XA = timeout in cs (X=MSB, A=LSB)
+; carry set on timeout
+; carry clean when A=key
 
 zproc screen_getchar
     sta ptr
     stx ptr+1
+    ; this feels wrong, but how is otherwise X=0 working with DEC and underflows?
+    inc ptr+1
+    
+    ; TODO: adjust here
+    ;~ clc
+    ;~ rol ptr+1
+    ;~ rol ptr
 
     ; Turn the disk motor off.
 
@@ -429,14 +438,26 @@ zproc screen_getchar
 
     jsr draw_cursor
 
-    ; Wait for the key.
+    ; Wait for the key, or time out
 
-    zrepeat
-        lda KBD_READ
-    zuntil_mi
+_wait_loop:
+    ldy #$ff            ; 255 * 5 cycles
+_inner_loop:
+    lda KBD_READ        ; 4 cycles
+    bpl _no_key         ; 3 cycles, branch usually taken
+    ; got a key
     sta KBD_STROBERESET
     and #0x7f
     clc
+    rts
+_no_key:
+    dey                 ; 2 cycles
+    bne _inner_loop      ; 3 cycles usually (unless 0)    
+    dec ptr             ; 5 cycles
+    bne _wait_loop      ; 3 cycles (2 if 0)
+    dec ptr+1           ; 5 cycles
+    bne _wait_loop      ; 3 cycles (2 if 0)
+    sec
     rts
 zendproc
 
