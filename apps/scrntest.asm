@@ -115,14 +115,14 @@ timeout:
         ldy #0
     .zendif
     sty spinner_pos
+    \ldx kbd_blocking
+    \.zif ne
+    \    lda #'*'
+    \.zendif
     ldx kbd_blocking
-    .zif ne
-        lda #'*'
-    .zendif
-    ldx kbd_blocking
-    .zif eq
+    \.zif eq
         lda chars_spinner, y
-    .zendif
+    \.zendif
     ldy #SCREEN_PUTCHAR
     jsr SCREEN 
 
@@ -148,7 +148,7 @@ timeout:
     .zendif
     ldy kbd_blocking
     .zif eq
-        lda #0x10
+        lda #10          \ 0.1 second timeout
         ldx #0x0
     .zendif
     ldy #SCREEN_GETCHAR
