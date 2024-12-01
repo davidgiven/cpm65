@@ -33,7 +33,7 @@
 #define F '#'
 
 // Simple acceleration calculation (unplayable over 9000 points)
-#define ACCEL (100 - score / 100)
+#define ACCEL (50 - score / 100)
 
 /* Example: figure "J" rotation 0
  * 0b0100010001100000
@@ -232,7 +232,7 @@ int main()
 		}
 
 		p = gp;
-//		key = screen_getchar(10);
+		key = screen_getchar(10);
 
 		switch (key) {
 			case 'w':
