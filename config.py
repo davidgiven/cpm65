@@ -45,6 +45,7 @@ SCREEN_APPS = {
     "0:qe.com": "apps+qe",
     "0:scrntest.com": "apps+scrntest",
     "0:tetris.com": "third_party/tetris",
+    "0:tetris2.com": "third_party/tetris2",
     "0:vt52drv.com": "apps+vt52drv",
     "0:vt52test.com": "apps+vt52test",
     "0:kbdtest.com": "apps+kbdtest",
