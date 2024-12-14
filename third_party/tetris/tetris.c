@@ -33,7 +33,7 @@
 #define F '#'
 
 // Simple acceleration calculation (unplayable over 9000 points)
-#define ACCEL (50 - score / 100)
+#define ACCEL (10 - score / 100)
 
 /* Example: figure "J" rotation 0
  * 0b0100010001100000
