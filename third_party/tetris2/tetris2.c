@@ -5,6 +5,7 @@
 #include <cpm.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -15,7 +16,7 @@
 #define BoardWidth      10
 #define NofShapes       5
 
-static uint8_t Shapes[5][4][4] = {
+static uint8_t Shapes[NofShapes][4][4] = {
   /* I */
   { { 0, 0, 0, 0 },
     { 1, 1, 1, 1 },
@@ -36,7 +37,7 @@ static uint8_t Shapes[5][4][4] = {
     { 1, 1, 1, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 } },
-   /* Z */
+  /* Z */
   { { 1, 1, 0, 0 },
     { 0, 1, 1, 0 },
     { 0, 0, 0, 0 },
@@ -45,7 +46,8 @@ static uint8_t Shapes[5][4][4] = {
 
 uint8_t Board[BoardHeight][BoardWidth];
 bool GameOver;
-uint8_t CurrentPiece, CurrentRotation, PosX, PosY;
+uint8_t CurrentPiece, CurrentRotation;
+int8_t PosX, PosY;
 
 static void InitializeBoard(void)
 {
@@ -95,7 +97,7 @@ static bool CanMove(int8_t dx, int8_t dy)
         if (PosX + x + dx < 1 || PosX + x + dx > BoardWidth ||
             PosY + y + dy > BoardHeight ||
             Board[PosY + y + dy - 1][PosX + x + dx - 1] == 1)
-        return false;
+          return false;
       }
     }
   }
@@ -229,7 +231,7 @@ int main(void)
   screen_clear();
   screen_showcursor(0);
 
-	srand( 21342 );
+  srand( 21342 );
   InitializeBoard();
   DrawBoard();
   GameOver = false;
@@ -249,9 +251,9 @@ int main(void)
     if (PosY >= BoardHeight)
       GameOver = true;
   }
-	screen_clear();
+  screen_clear();
   printf("Thanks for playing.\n");
   screen_showcursor(1);
 
-	cpm_warmboot();
+  cpm_warmboot();
 }
