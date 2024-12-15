@@ -1,0 +1,6 @@
+Pascal-M
+--------
+
+pint pasc.obb hello.pas hello.obp
+pload hello.obp hello.obb
+pint hello.obb
