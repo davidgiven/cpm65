@@ -14,7 +14,7 @@
 #define Delay           100
 #define BoardHeight     20
 #define BoardWidth      10
-#define NofShapes       5
+#define NofShapes       7
 
 static uint8_t Shapes[NofShapes][4][4] = {
   /* I */
@@ -32,9 +32,19 @@ static uint8_t Shapes[NofShapes][4][4] = {
     { 1, 1, 1, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 } },
+  /* J */
+  { { 1, 0, 0, 0 },
+    { 1, 1, 1, 0 },
+    { 0, 0, 0, 0 },
+    { 0, 0, 0, 0 } },
   /* L */
   { { 0, 0, 1, 0 },
     { 1, 1, 1, 0 },
+    { 0, 0, 0, 0 },
+    { 0, 0, 0, 0 } },
+  /* S */
+  { { 0, 1, 1, 0 },
+    { 1, 1, 0, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 } },
   /* Z */
@@ -46,12 +56,12 @@ static uint8_t Shapes[NofShapes][4][4] = {
 
 uint8_t Board[BoardHeight][BoardWidth];
 bool GameOver;
-uint8_t CurrentPiece, CurrentRotation;
+uint8_t CurrentPiece;
 int8_t PosX, PosY;
 
 static void InitializeBoard(void)
 {
-  memset(Board, 0, sizeof(uint8_t) * BoardWidth * sizeof(uint8_t) * 10);
+  memset(Board, 0, sizeof(uint8_t) * BoardWidth * sizeof(uint8_t) * BoardWidth);
 }
 
 static void DrawBoard(void)
@@ -107,7 +117,6 @@ static bool CanMove(int8_t dx, int8_t dy)
 static void NewPiece(void)
 {
   CurrentPiece = (uint8_t)rand() % NofShapes;
-  CurrentRotation = 0;
   PosX = BoardWidth / 2 - 2;
   PosY = 1;
   if (!CanMove(0, 0))
@@ -117,18 +126,22 @@ static void NewPiece(void)
 static void RotatePiece(void)
 {
   uint8_t Temp[4][4];
+  uint8_t Save[4][4];
   uint8_t x, y;
 
-  for (y = 0; y <= 3; y++) {
+  for (y = 0; y <= 3; y++)
+    for (x = 0; x <= 3; x++)
+      Save[y][x] = Shapes[CurrentPiece][y][x];
+  for (y = 0; y <= 3; y++)
     for (x = 0; x <= 3; x++)
       Temp[y][x] = Shapes[CurrentPiece][3 - x][y];
-  }
-  if (!CanMove(0, 0))
-    return;
-  for (y = 0; y <= 3; y++) {
+  for (y = 0; y <= 3; y++)
     for (x = 0; x <= 3; x++)
       Shapes[CurrentPiece][y][x] = Temp[y][x];
-  }
+  if (!CanMove(0, 0))
+    for (y = 0; y <= 3; y++)
+      for (x = 0; x <= 3; x++)
+        Shapes[CurrentPiece][y][x] = Save[y][x];
 }
 
 static void PlacePiece(void)
@@ -143,7 +156,7 @@ static void PlacePiece(void)
   }
 }
 
-static void ClearLines(void)
+static bool ClearLines(void)
 {
   uint8_t x, y, ny;
   bool Full;
@@ -165,8 +178,7 @@ static void ClearLines(void)
       Redraw = true;
     }
   }
-  if (Redraw)
-    DrawBoard();
+  return Redraw;
 }
 
 static void HandleInput(void)
@@ -175,9 +187,8 @@ static void HandleInput(void)
 
   c = screen_getchar(Delay);
   if (c > 0) {
-    c = toupper(c);
     switch (c) {
-    case 'A':
+    case 'A': case 'a':
       if (CanMove(-1, 0)) {
         DrawPiece(true);
         PosX--;
@@ -185,7 +196,7 @@ static void HandleInput(void)
       }
       break;
 
-    case 'D':
+    case 'D': case 'd':
       if (CanMove(1, 0)) {
         DrawPiece(true);
         PosX++;
@@ -193,7 +204,7 @@ static void HandleInput(void)
       }
       break;
 
-    case 'S':
+    case 'S': case 's':
       if (CanMove(0, 1)) {
         DrawPiece(true);
         PosY++;
@@ -209,13 +220,13 @@ static void HandleInput(void)
       }
       break;
 
-    case 'W':
+    case 'W': case 'w':
       DrawPiece(true);
       RotatePiece();
       DrawPiece(false);
       break;
 
-    case 'Q':
+    case 'Q': case 'q':
       GameOver = true;
       break;
     }
@@ -245,7 +256,9 @@ int main(void)
       DrawPiece(false);
     } else {
       PlacePiece();
-      ClearLines();
+      while (ClearLines()) {
+        DrawBoard();
+      }
       NewPiece();
     }
     if (PosY >= BoardHeight)
