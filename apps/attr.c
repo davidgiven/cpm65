@@ -109,8 +109,6 @@ int main()
     while (r != 0xff)
     {
         DIRE* de = (DIRE*)cpm_default_dma + r;
-        if (de->rc == 0x80)
-            continue;
 
         if (modify)
         {
@@ -122,6 +120,10 @@ int main()
 
             de->us = dr; /* Convert to an FCB */
             cpm_set_file_attributes((FCB*)de);
+
+            /* cpm_set_file_attributes() resets directory index, so */
+            /* recover index for last file match */
+            cpm_findfirst((FCB*)de);
         }
 
         cpm_conout((de->f[8] & 0x80) ? 'R' : '-');
