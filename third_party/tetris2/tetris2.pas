@@ -16,11 +16,13 @@ CONST
     ((0,0,1,0),(1,1,1,0),(0,0,0,0),(0,0,0,0)),   (* L *)
     ((0,1,1,0),(1,1,0,0),(0,0,0,0),(0,0,0,0)),   (* S *)
     ((1,1,0,0),(0,1,1,0),(0,0,0,0),(0,0,0,0)));  (* Z *)
+  ShapeChars : ARRAY[0..7] OF Char =
+    (' ','I','O','T','J','L','S','Z');
 
 VAR
   Board : ARRAY[1..BoardHeight,1..BoardWidth] OF Byte;
   GameOver : Boolean;
-  CurrentPiece : Integer;
+  CurrentPiece, NextPiece : Integer;
   PosX, PosY : Integer;
 
 PROCEDURE InitializeBoard;
@@ -37,27 +39,27 @@ BEGIN
     FOR x := 1 TO BoardWidth DO
     BEGIN
       GotoXY(x,y);
-      IF Board[y,x] = 1 THEN
-        Write('#')
+      IF Board[y,x] >= 1 THEN
+        Write(ShapeChars[Board[y,x]])
       ELSE
         Write('.')
     END
   END
 END;
 
-PROCEDURE DrawPiece(Erase : Boolean);
+PROCEDURE DrawPiece(Piece : Integer; x, y : Integer; Erase : Boolean);
 VAR
-  x, y : Integer;
+  nx, ny : Integer;
 BEGIN
-  FOR y := 0 TO 3 DO
-    FOR x := 0 TO 3 DO
-      IF Shapes[CurrentPiece,y,x] = 1 THEN
+  FOR ny := 0 TO 3 DO
+    FOR nx := 0 TO 3 DO
+      IF Shapes[Piece,ny,nx] = 1 THEN
       BEGIN
-        GotoXY(PosX+x,PosY+y);
+        GotoXY(nx+x,ny+y);
         IF Erase THEN
           Write('.')
         ELSE
-          Write('#')
+          Write(ShapeChars[Piece])
       END
 END;
 
@@ -89,9 +91,24 @@ BEGIN
       END
 END;
 
+PROCEDURE DrawNextPiece;
+VAR
+  x, y : Integer;
+BEGIN
+  FOR y := 10 TO 13 DO
+    FOR x := 12 TO 15 DO
+      BEGIN
+        GotoXY(x,y);
+        Write('.')
+      END;
+  DrawPiece(NextPiece,12,10,False);
+END;
+
 PROCEDURE NewPiece;
 BEGIN
-  CurrentPiece := 1+Random(NofShapes);
+  CurrentPiece := NextPiece;
+  NextPiece := 1+Random(NofShapes);
+  DrawNextPiece;
   PosX := (BoardWidth div 2)-2;
   PosY := 1;
   IF NOT CanMove(0,0) THEN
@@ -134,7 +151,7 @@ VAR
   Full : Boolean;
 BEGIN
   ClearLines := False;
-  FOR y := BoardHeight DOWNTO 1 DO
+  FOR y := 1 TO BoardHeight DO
   BEGIN
     Full := True;
     FOR x := 1 TO BoardWidth DO
@@ -169,36 +186,48 @@ BEGIN
         'A','a',#8:
           IF CanMove(-1,0) THEN
           BEGIN
-            DrawPiece(True);
+            DrawPiece(CurrentPiece,PosX,PosY,True);
             PosX := PosX-1;
-            DrawPiece(False)
+            DrawPiece(CurrentPiece,PosX,PosY,False)
           END;
         'D','d',#9:
           IF CanMove(1,0) THEN
           BEGIN
-            DrawPiece(True);
+            DrawPiece(CurrentPiece,PosX,PosY,True);
             PosX := PosX+1;
-            DrawPiece(False)
+            DrawPiece(CurrentPiece,PosX,PosY,False)
           END;
         'S','s',#10:
           IF CanMove(0,1) THEN
           BEGIN
-            DrawPiece(True);
+            DrawPiece(CurrentPiece,PosX,PosY,True);
             PosY := PosY+1;
-            DrawPiece(False)
+            DrawPiece(CurrentPiece,PosX,PosY,False)
           END;
         ' ':
           WHILE CanMove(0,1) DO
           BEGIN
-            DrawPiece(True);
+            DrawPiece(CurrentPiece,PosX,PosY,True);
             PosY := PosY+1;
-            DrawPiece(False)
+            DrawPiece(CurrentPiece,PosX,PosY,False)
           END;
         'W','w',#11:
           BEGIN
-            DrawPiece(True);
+            DrawPiece(CurrentPiece,PosX,PosY,True);
             RotatePiece;
-            DrawPiece(False)
+            DrawPiece(CurrentPiece,PosX,PosY,False)
+          END;
+        'P','p':
+          BEGIN
+            GotoXY(12,7);
+            Write('Game paused.');
+            GotoXY(12,8);
+            Write('Press any key to continue.');
+            WHILE NOT KeyPressed DO
+              Delay(10);
+            ClrScr;
+            DrawBoard;
+            DrawNextPiece
           END;
         'Q','q':
           GameOver := True;
@@ -216,16 +245,17 @@ BEGIN
   ClrScr;
   DrawBoard;
   GameOver := False;
+  NextPiece := 1+Random(NofShapes);
   NewPiece;
   WHILE NOT GameOver DO
   BEGIN
-    DrawPiece(False);
+    DrawPiece(CurrentPiece,PosX,PosY,False);
     HandleInput;
     IF CanMove(0,1) THEN
     BEGIN
-      DrawPiece(True);
+      DrawPiece(CurrentPiece,PosX,PosY,True);
       PosY := PosY+1;
-      DrawPiece(False)
+      DrawPiece(CurrentPiece,PosX,PosY,False)
     END
     ELSE
     BEGIN
@@ -237,5 +267,6 @@ BEGIN
   END;
   ClrScr;
   WriteLn('Thanks for playing.');
+  Delay(2000);
   CrtExit;
 END.

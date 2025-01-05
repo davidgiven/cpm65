@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include "lib/screen.h"
 
-#define Delay           100
+#define Delay           200
 #define BoardHeight     20
 #define BoardWidth      10
 #define NofShapes       7
@@ -53,15 +53,16 @@ static uint8_t Shapes[NofShapes][4][4] = {
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 } }
 };
+static uint8_t ShapeChars[NofShapes] = {'I', 'O', 'T', 'J', 'L', 'S', 'Z' };
 
 uint8_t Board[BoardHeight][BoardWidth];
 bool GameOver;
-uint8_t CurrentPiece;
+uint8_t CurrentPiece, NextPiece;
 int8_t PosX, PosY;
 
 static void InitializeBoard(void)
 {
-  memset(Board, 0, sizeof(uint8_t) * BoardWidth * sizeof(uint8_t) * BoardWidth);
+  memset(Board, 0xFF, sizeof(Board));
 }
 
 static void DrawBoard(void)
@@ -71,8 +72,8 @@ static void DrawBoard(void)
   for (y = 1; y <= BoardHeight; y++) {
     for (x = 1; x <= BoardWidth; x++) {
       screen_setcursor(x,y);
-      if (Board[y-1][x-1] == 1)
-        screen_putchar('#');
+      if (Board[y-1][x-1] != 0xFF)
+        screen_putchar(ShapeChars[Board[y-1][x-1]]);
       else
         screen_putchar('.');
     }
@@ -80,18 +81,18 @@ static void DrawBoard(void)
 }
 
 
-static void DrawPiece(bool Erase)
+static void DrawPiece(uint8_t piece, int8_t x, int8_t y,bool Erase)
 {
-  uint8_t x, y;
+  uint8_t nx, ny;
 
-  for (y = 0; y <= 3; y++) {
-    for (x = 0; x <= 3; x++) {
-      if (Shapes[CurrentPiece][y][x] == 1) {
-        screen_setcursor(PosX + x, PosY + y);
+  for (ny = 0; ny <= 3; ny++) {
+    for (nx = 0; nx <= 3; nx++) {
+      if (Shapes[piece][ny][nx] == 1) {
+        screen_setcursor(x + nx, y + ny);
         if (Erase)
           screen_putchar('.');
         else
-          screen_putchar('#');
+          screen_putchar(ShapeChars[piece]);
       }
     }
   }
@@ -106,7 +107,7 @@ static bool CanMove(int8_t dx, int8_t dy)
       if (Shapes[CurrentPiece][y][x] == 1) {
         if (PosX + x + dx < 1 || PosX + x + dx > BoardWidth ||
             PosY + y + dy > BoardHeight ||
-            Board[PosY + y + dy - 1][PosX + x + dx - 1] == 1)
+            Board[PosY + y + dy - 1][PosX + x + dx - 1] != 0xFF)
           return false;
       }
     }
@@ -114,9 +115,24 @@ static bool CanMove(int8_t dx, int8_t dy)
   return true;
 }
 
+static void DrawNextPiece(void)
+{
+  int8_t x, y;
+
+  for (y = 10; y <= 13; y++) {
+    for (x = 12; x <= 15; x++) {
+      screen_setcursor(x, y);
+      screen_putchar('.');
+    }
+  }
+  DrawPiece(NextPiece, 12, 10, false);  
+}
+
 static void NewPiece(void)
 {
-  CurrentPiece = (uint8_t)rand() % NofShapes;
+  CurrentPiece = NextPiece;
+  NextPiece = (uint8_t)rand() % NofShapes;
+  DrawNextPiece();
   PosX = BoardWidth / 2 - 2;
   PosY = 1;
   if (!CanMove(0, 0))
@@ -151,7 +167,7 @@ static void PlacePiece(void)
   for (y = 0; y <= 3; y++) {
     for (x = 0; x <= 3; x++) {
       if (Shapes[CurrentPiece][y][x] == 1)
-        Board[PosY + y - 1][PosX + x - 1] = 1;
+        Board[PosY + y - 1][PosX + x - 1] = CurrentPiece;
     }
   }
 }
@@ -162,10 +178,10 @@ static bool ClearLines(void)
   bool Full;
   bool Redraw = false;
 
-  for (y = BoardHeight; y >= 1; y--) {
+  for (y = 1; y <= BoardHeight; y++) {
     Full = true;
     for (x = 0; x < BoardWidth; x++) {
-      if (Board[y-1][x] == 0)
+      if (Board[y-1][x] == 0xFF)
         Full = false;
     }
     if (Full) {
@@ -174,7 +190,7 @@ static bool ClearLines(void)
           Board[ny-1][x] = Board[ny-2][x];
       }
       for (x = 0; x < BoardWidth; x++)
-        Board[0][x] = 0;
+        Board[0][x] = 0xFF;
       Redraw = true;
     }
   }
@@ -190,40 +206,51 @@ static void HandleInput(void)
     switch (c) {
     case 'A': case 'a':
       if (CanMove(-1, 0)) {
-        DrawPiece(true);
+        DrawPiece(CurrentPiece, PosX, PosY, true);
         PosX--;
-        DrawPiece(false);
+        DrawPiece(CurrentPiece, PosX, PosY, false);
       }
       break;
 
     case 'D': case 'd':
       if (CanMove(1, 0)) {
-        DrawPiece(true);
+        DrawPiece(CurrentPiece, PosX, PosY, true);
         PosX++;
-        DrawPiece(false);
+        DrawPiece(CurrentPiece, PosX, PosY, false);
       }
       break;
 
     case 'S': case 's':
       if (CanMove(0, 1)) {
-        DrawPiece(true);
+        DrawPiece(CurrentPiece, PosX, PosY, true);
         PosY++;
-        DrawPiece(false);
+        DrawPiece(CurrentPiece, PosX, PosY, false);
       }
       break;
 
     case ' ':
       while (CanMove(0, 1)) {
-        DrawPiece(true);
+        DrawPiece(CurrentPiece, PosX, PosY, true);
         PosY++;
-        DrawPiece(false);
+        DrawPiece(CurrentPiece, PosX, PosY, false);
       }
       break;
 
     case 'W': case 'w':
-      DrawPiece(true);
+      DrawPiece(CurrentPiece, PosX, PosY, true);
       RotatePiece();
-      DrawPiece(false);
+      DrawPiece(CurrentPiece, PosX, PosY, false);
+      break;
+
+    case 'P': case 'p':
+      screen_setcursor(12,7);
+      cpm_printstring("Game paused.");
+      screen_setcursor(12,8);
+      cpm_printstring("Press any key to continue.");
+      screen_waitchar();
+      screen_clear();
+      DrawBoard();
+      DrawNextPiece();
       break;
 
     case 'Q': case 'q':
@@ -246,14 +273,15 @@ int main(void)
   InitializeBoard();
   DrawBoard();
   GameOver = false;
+  NextPiece = (uint8_t)rand() % NofShapes;
   NewPiece();
   while (!GameOver) {
-    DrawPiece(false);
+    DrawPiece(CurrentPiece, PosX, PosY, false);
     HandleInput();
     if (CanMove(0, 1)) {
-      DrawPiece(true);
+      DrawPiece(CurrentPiece, PosX, PosY, true);
       PosY++;
-      DrawPiece(false);
+      DrawPiece(CurrentPiece, PosX, PosY, false);
     } else {
       PlacePiece();
       while (ClearLines()) {
