@@ -72,12 +72,16 @@ static void DrawBoard(void)
   for (y = 1; y <= BoardHeight; y++) {
     for (x = 1; x <= BoardWidth; x++) {
       screen_setcursor(x,y);
-      if (Board[y-1][x-1] != 0xFF)
+      if (Board[y-1][x-1] != 0xFF) {
+	screen_setstyle(1);
         screen_putchar(ShapeChars[Board[y-1][x-1]]);
-      else
+      } else {
+        screen_setstyle(0);
         screen_putchar('.');
+      }
     }
   }
+  screen_setstyle(0);
 }
 
 
@@ -85,6 +89,7 @@ static void DrawPiece(uint8_t piece, int8_t x, int8_t y,bool Erase)
 {
   uint8_t nx, ny;
 
+  screen_setstyle(!Erase);
   for (ny = 0; ny <= 3; ny++) {
     for (nx = 0; nx <= 3; nx++) {
       if (Shapes[piece][ny][nx] == 1) {
@@ -96,6 +101,7 @@ static void DrawPiece(uint8_t piece, int8_t x, int8_t y,bool Erase)
       }
     }
   }
+  screen_setstyle(0);
 }
 
 static bool CanMove(int8_t dx, int8_t dy)
@@ -204,7 +210,7 @@ static void HandleInput(void)
   c = screen_getchar(Delay);
   if (c > 0) {
     switch (c) {
-    case 'A': case 'a':
+    case 'A': case 'a': case SCREEN_KEY_LEFT:
       if (CanMove(-1, 0)) {
         DrawPiece(CurrentPiece, PosX, PosY, true);
         PosX--;
@@ -212,7 +218,7 @@ static void HandleInput(void)
       }
       break;
 
-    case 'D': case 'd':
+    case 'D': case 'd': case SCREEN_KEY_RIGHT:
       if (CanMove(1, 0)) {
         DrawPiece(CurrentPiece, PosX, PosY, true);
         PosX++;
@@ -220,7 +226,7 @@ static void HandleInput(void)
       }
       break;
 
-    case 'S': case 's':
+    case 'S': case 's': case SCREEN_KEY_DOWN:
       if (CanMove(0, 1)) {
         DrawPiece(CurrentPiece, PosX, PosY, true);
         PosY++;
@@ -236,7 +242,7 @@ static void HandleInput(void)
       }
       break;
 
-    case 'W': case 'w':
+    case 'W': case 'w': case SCREEN_KEY_UP:
       DrawPiece(CurrentPiece, PosX, PosY, true);
       RotatePiece();
       DrawPiece(CurrentPiece, PosX, PosY, false);
