@@ -11,11 +11,12 @@
 
 .global system_init
 zproc system_init, loader
-    lda #0
-    sta zp_sd_currentsector+3           ; Always 0
+    ldy #0
+    sty current_drive
+    sty zp_sd_currentsector+3           ; Always 0
 
-    lda #0xff
-    sta zp_sd_currentsector+2           ; Mark buffer data as invalid
+    dey
+    sty zp_sd_currentsector+2           ; Mark buffer data as invalid
 
     lda #<DISK_BUFFER
     sta zp_sd_address+0

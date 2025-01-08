@@ -11,8 +11,11 @@
 
 .global system_init
 zproc system_init, loader
-    lda #0xff
-    sta buffered_host_sector
+    ldy #0
+    sty current_drive
+
+    dey
+    sty buffered_host_sector            ; Mark buffer data as invalid
 
     ; Init drives 1-3. Ignore errors as drives may not be present.
     ldy #1
