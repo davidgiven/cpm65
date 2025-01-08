@@ -239,7 +239,8 @@ static void copy_file(void)
     while (i == 0);
 
     cpm_close_file(&dst_fcb);
-    dst_fcb.f[8] |= 0x80;                       /* Restore the read-only attribute */
+    dst_fcb.f[8] |= 0x80;                       /* Set read-only and system attributes */
+    dst_fcb.f[9] |= 0x80;
     cpm_set_file_attributes(&dst_fcb);
 
     cr();
