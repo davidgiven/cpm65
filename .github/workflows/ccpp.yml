@@ -55,10 +55,14 @@ jobs:
           images/osi500mf.os5
           images/osi600f.os8
           images/osi600mf.os5
+          images/osi600mf80.osi
           images/osif-b.os8
           images/osimf-b.os5
           images/osimf-c.os5
           images/osimf-d.os5
+          images/osimf80-b.osi
+          images/osimf80-c.os
+          images/osimf80-d.osi
           images/osiserf.os8
           images/pet4032.d64
           images/pet8032.d64
