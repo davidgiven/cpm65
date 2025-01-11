@@ -68,7 +68,7 @@ tass64(
 simplerule(
     name="snes_cartridge",
     ins=[".+snes_cartridge_bin", "./checksum.py"],
-    outs=["snes.img"],
+    outs=["=snes.img"],
     commands=[
         "cp {ins[0]} {outs[0]}",
         "truncate -s %d {outs[0]}" % (2048 * 1024),
