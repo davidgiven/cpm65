@@ -66,11 +66,15 @@ jobs:
           osi500mf.os5
           osi600f.os8
           osi600mf.os5
+          osi600mf80.osi
           osiserv.os8
           osif-b.os8
           osimf-b.os5
           osimf-c.os5
           osimf-d.os5
+          osimf80-b.osi
+          osimf80-c.osi
+          osimf80-d.osi
           osiserf.os8
           pet4032.d64
           pet8032.d64
