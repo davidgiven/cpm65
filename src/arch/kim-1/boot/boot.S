@@ -157,11 +157,11 @@ readdatr:
 
 e2: inc errorc          ; 02 READ ERROR CODE
 e1: inc errorc          ; 01 RECALIBRATE ERROR CODE
-    ldy #0
-1:  lda errmsg, y
+    ldx #0
+1:  lda errmsg, x
     beq 2f
     jsr OUTCH
-    iny
+    inx
     bne 1b
 2:  lda errorc
     jsr PRTBYT
