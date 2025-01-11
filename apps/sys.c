@@ -298,8 +298,8 @@ int main()
     }
     else
     {
-        if (src_reserved > dst_reserved)
-            fatal_drv("Not enough space on drive '", dst_drive);
+        if (src_reserved != dst_reserved)
+            fatal_drv("Different number of reserved sectors on drive '", dst_drive);
 
         cpm_printstring("Transferring boot sectors:\n\r");
 
