@@ -110,10 +110,14 @@ jobs:
           cpm65/images/osi500mf.os5
           cpm65/images/osi600f.os8
           cpm65/images/osi600mf.os5
+          cpm65/images/osi600mf80.osi
           cpm65/images/osif-b.os8
           cpm65/images/osimf-b.os5
           cpm65/images/osimf-c.os5
           cpm65/images/osimf-d.os5
+          cpm65/images/osimf80-b.osi
+          cpm65/images/osimf80-c.osi
+          cpm65/images/osimf80-d.osi
           cpm65/images/osiserf.os8
           cpm65/images/pet4032.d64
           cpm65/images/pet8032.d64
