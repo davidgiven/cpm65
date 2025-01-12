@@ -57,6 +57,7 @@ for prog in [
     "qe",
     "stat",
     "submit",
+    "sys"
 ]:
     llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
 
