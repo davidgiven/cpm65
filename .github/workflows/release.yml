@@ -66,11 +66,15 @@ jobs:
           osi500mf.os5
           osi600f.os8
           osi600mf.os5
+          osi600mf80.osi
           osiserv.os8
           osif-b.os8
           osimf-b.os5
           osimf-c.os5
           osimf-d.os5
+          osimf80-b.osi
+          osimf80-c.osi
+          osimf80-d.osi
           osiserf.os8
           pet4032.d64
           pet8032.d64
@@ -107,10 +111,14 @@ jobs:
           cpm65/images/osi500mf.os5
           cpm65/images/osi600f.os8
           cpm65/images/osi600mf.os5
+          cpm65/images/osi600mf80.osi
           cpm65/images/osif-b.os8
           cpm65/images/osimf-b.os5
           cpm65/images/osimf-c.os5
           cpm65/images/osimf-d.os5
+          cpm65/images/osimf80-b.osi
+          cpm65/images/osimf80-c.osi
+          cpm65/images/osimf80-d.osi
           cpm65/images/osiserf.os8
           cpm65/images/pet4032.d64
           cpm65/images/pet8032.d64

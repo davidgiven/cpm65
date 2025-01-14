@@ -2,5 +2,5 @@
 .*.swp
 .obj
 bin
-images/*
 __pycache__
+images

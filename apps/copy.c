@@ -151,7 +151,7 @@ int main()
 			i = cpm_findnext(&wildcard_fcb);
 		}
 
-		if (stash == (FCB*)cpm_ram)
+		if (stash == (FCB*)top)
 			fatal("no files match");
 		buffer_size = ((uint16_t)stash - (uint16_t)cpm_ram) / 128;
 

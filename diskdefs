@@ -125,6 +125,7 @@ diskdef sdcard
     os 2.2
 end
 
+# OSI 5.25", 40 tracks, 300rpm, 125kbps
 # 640 sectors = 80kB
 diskdef osi5
     seclen 128
@@ -136,11 +137,24 @@ diskdef osi5
     os 2.2
 end
 
+# OSI 8", 77 tracks, 360rpm, 250kbps
 # 1848 sectors = 231kB
 diskdef osi8
     seclen 128
     tracks 77
     sectrk 24
+    blocksize 1024
+    maxdir 64
+    boottrk 1
+    os 2.2
+end
+
+# OSI 5.25"/3.5", 80 tracks, 300rpm, 125kbps
+# 1280 sectors = 160kB
+diskdef osi5_80
+    seclen 128
+    tracks 80
+    sectrk 16
     blocksize 1024
     maxdir 64
     boottrk 1
