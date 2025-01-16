@@ -7,7 +7,7 @@
 #include <ctype.h>
 #include "lib/printi.h"
 
-static const FCB wildcard_fcb = {
+static FCB wildcard_fcb = {
     /* dr */ 0,
     /* f  */ "???????????"};
 
@@ -97,12 +97,16 @@ int main()
         }
 
     FCB* fcb = &cpm_fcb;
-    if (fcb->f[0] == ' ')
-        fcb = (FCB*)&wildcard_fcb;
 
     uint8_t dr = fcb->dr;
     if (!dr)
         dr = cpm_get_current_drive() + 1;
+
+    if (fcb->f[0] == ' ')
+    {
+        fcb = (FCB*)&wildcard_fcb;
+        fcb->dr = dr;
+    }
 
     cpm_set_dma(cpm_default_dma);
     uint8_t r = cpm_findfirst(fcb);

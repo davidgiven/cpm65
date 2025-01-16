@@ -33,6 +33,7 @@ BIG_APPS = {
     "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
     "0:objdump.com": "apps+objdump",
     "0:mkfs.com": "apps+mkfs",
+    "0:sys.com": "apps+sys",
 }
 
 BIG_APPS_SRCS = {}
