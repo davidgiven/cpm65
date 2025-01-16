@@ -16,8 +16,8 @@
 
 #define SYSTEM_FILES 2
 const char sys_files[SYSTEM_FILES][11] = {
-    "BDOS    SYS",
-    "CCP     SYS"
+    "CCP     SYS",
+    "BDOS    SYS"
 };
 
 DPH* dph;
