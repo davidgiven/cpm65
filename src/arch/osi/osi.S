@@ -163,10 +163,12 @@ init:
         lda ptr+1
         cmp #$c0
         zbreakif_eq
+        lda #$3f
         sta (ptr),y
         cmp (ptr),y
     zuntil_ne
 
+    lda ptr+1
     sec
     sbc #PAGES_PER_TRACK
     sta ptrkbuf                     ; put track buffer at ramtop
