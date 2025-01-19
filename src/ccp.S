@@ -438,11 +438,10 @@ zproc entry_DIR
             cmp #$00
             zif_eq
                 ldy userfcb
-                zif_eq
+                dey
+                tya
+                zif_mi
                     jsr bdos_GETDRIVE
-                zelse
-                    dey
-                    tya
                 zendif
                 clc
                 adc #'A'
