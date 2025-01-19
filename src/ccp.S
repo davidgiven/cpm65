@@ -437,7 +437,13 @@ zproc entry_DIR
             stx file_counter
             cmp #$00
             zif_eq
-                jsr bdos_GETDRIVE
+                ldy userfcb
+                zif_eq
+                    jsr bdos_GETDRIVE
+                zelse
+                    dey
+                    tya
+                zendif
                 clc
                 adc #'A'
                 jsr bdos_CONOUT
