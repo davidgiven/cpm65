@@ -160,6 +160,8 @@ int main()
 			src_fcb = *stash;
 			dest_fcb = *stash;
 			dest_fcb.dr = cpm_fcb2.dr;
+			for (uint8_t b=0; b < 11; b++)
+				dest_fcb.f[b] &= ~0x80;
 			stash++;
 
 			copy_file();
