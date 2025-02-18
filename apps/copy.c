@@ -16,6 +16,34 @@ static FCB wildcard_fcb;
 static FCB src_fcb;
 static FCB dest_fcb;
 static uint16_t buffer_size;
+static char* cmdptr = cpm_cmdline;
+static bool s_flag = false;
+
+static const char* getword()
+{
+	const char* word = cmdptr;
+	if (*cmdptr)
+	{
+		while (*cmdptr == ' ')
+			cmdptr++;
+
+		for (;;)
+		{
+			char c = *cmdptr;
+			if (!c)
+				break;
+			if (c == ' ')
+			{
+				*cmdptr++ = '\0';
+				break;
+			}
+
+			cmdptr++;
+		}
+	}
+
+	return word;
+}
 
 static void cr(void)
 {
@@ -77,7 +105,7 @@ static void copy_file(void)
 
 	src_fcb.ex = 0;
 	src_fcb.cr = 0;
-	if (cpm_open_file(&src_fcb))
+	if (cpm_open_file(&src_fcb) || ((src_fcb.f[9] & 0x80) && !s_flag))
 	{
 		cr();
 		fatal("cannot open source file");
@@ -122,8 +150,40 @@ static void copy_file(void)
 	cr();
 }
 
+void parse_cmdline()
+{
+	const char *arg;
+
+	cpm_fcb.f[0] = ' ';
+	cpm_fcb2.f[0] = ' ';
+
+	while (*(arg = getword()))
+	{
+		if ('/' == *arg)
+		{
+			if('S' == *++arg)
+				++s_flag;
+			else
+				fatal("Invalid switch");
+		}
+		else if (cpm_fcb.f[0] == ' ')
+		{
+			cpm_set_dma(&cpm_fcb);
+			cpm_parse_filename(arg);
+		}
+		else if (cpm_fcb2.f[0] == ' ')
+		{
+			cpm_set_dma(&cpm_fcb2);
+			cpm_parse_filename(arg);
+			break;
+		}
+	}
+}
+
 int main()
 {
+	parse_cmdline();
+
 	if (cpm_fcb.f[0] == ' ')
 		fatal("source must contain a filename");
 	if (has_wildcard(&cpm_fcb2))
@@ -146,7 +206,8 @@ int main()
 		while (i != 0xff)
 		{
 			FCB* dire = (FCB*) (cpm_default_dma + i*32);
-			*--stash = *dire;
+			if (!(dire->f[9] & 0x80) || s_flag)
+				*--stash = *dire;
 
 			i = cpm_findnext(&wildcard_fcb);
 		}
