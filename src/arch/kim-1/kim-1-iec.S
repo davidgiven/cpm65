@@ -6,6 +6,7 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "kim-1.inc"
 
 DEFDRIVE = $08          ; Default drive number
 
@@ -31,18 +32,8 @@ ACPTR   = $f407
 
 .section loader, "ax"
 
-    .word _start
-
-#include "kim-1.S"
-
-    ; System init
-
+.global system_init
 zproc system_init, loader
-    lda #0
-    sta current_drive
-    sta pending_key
-    sta buffer_dirty
-
     lda #0xff
     sta buffered_sector+0
     sta buffered_sector+1
@@ -86,9 +77,26 @@ zproc system_init, loader
     jsr UNLSN
 
     rts
-zendproc
 
 .text
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc bios_SELDSK
+    cmp #0
+    zif_ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
+    lda #<dph0
+    ldx #>dph0
+    clc
+    rts
+zendproc
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
@@ -409,5 +417,6 @@ define_drive dph0, 136*10, 1024, 64, 0
 
 .bss
 
+buffer_offset:   .fill 1 ; Offset of CP/M sector into host sector buffer
 sector_num:      .fill 3 ; current absolute sector number
 buffered_sector: .fill 3 ; sector currently in disk buffer

@@ -56,32 +56,44 @@ llvmclibrary(
     name="k-1013", srcs=["./k-1013.S"], cflags=["-I ."], deps=["include"]
 )
 
+llvmclibrary(
+    name="kim-1-k1013", srcs=["./kim-1-k1013.S"], cflags=["-I ."], deps=["include", ".+k-1013"]
+)
+
+llvmclibrary(
+    name="kim-1-sdcard", srcs=["./kim-1-sdcard.S"], cflags=["-I ."], deps=["include", ".+libsd"]
+)
+
+llvmclibrary(
+    name="kim-1-iec", srcs=["./kim-1-iec.S"], cflags=["-I ."], deps=["include"]
+)
+
 llvmrawprogram(
     name="bios-k1013",
-    srcs=["./kim-1-k1013.S"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib", ".+k-1013"],
+    srcs=["./kim-1.S"],
+    deps=["./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-k1013"],
     linkscript="./kim-1-k1013.ld",
 )
 
 llvmrawprogram(
     name="bios-sdcard",
-    srcs=["./kim-1-sdcard.S"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib", ".+libsd"],
+    srcs=["./kim-1.S"],
+    deps=["./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-sdcard"],
     linkscript="./kim-1-sdcard.ld",
 )
 
 llvmrawprogram(
     name="bios-iec-kim",
-    srcs=["./kim-1-iec.S"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib"],
+    srcs=["./kim-1.S"],
+    deps=[  "./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-iec"],
     linkscript="./kim-1-iec.ld",
 )
 
 llvmrawprogram(
     name="bios-iec-pal",
-    srcs=["./kim-1-iec.S"],
+    srcs=["./kim-1.S"],
     cflags=["-DPAL_1"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib"],
+    deps=["./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-iec"],
     linkscript="./kim-1-iec.ld",
 )
 
@@ -90,8 +102,10 @@ mkcpmfs(
     format="k-1013",
     bootimage=".+bios-k1013",
     size=256 * 77 * 26,
-    items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
-    | {"0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm"}
+    items={
+        "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
+    }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
@@ -104,8 +118,10 @@ mkcpmfs(
     format="sdcard",
     bootimage=".+bios-sdcard",
     size=512 * 4096 * 16,
-    items={"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
-    | {"0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm"}
+    items={
+        "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
+    }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS

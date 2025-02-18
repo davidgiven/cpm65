@@ -7,21 +7,16 @@
 #include "zif.inc"
 #include "cpm65.inc"
 
-#include "kim-1.S"
-
 .section loader, "ax"
 
-    ; System init
-
+.global system_init
 zproc system_init, loader
-    lda #0
-    sta current_drive
-    sta pending_key
-    sta buffer_dirty
-    sta zp_sd_currentsector+3           ; Always 0
+    ldy #0
+    sty current_drive
+    sty zp_sd_currentsector+3           ; Always 0
 
-    lda #0xff
-    sta zp_sd_currentsector+2           ; Mark buffer data as invalid
+    dey
+    sty zp_sd_currentsector+2           ; Mark buffer data as invalid
 
     lda #<DISK_BUFFER
     sta zp_sd_address+0
@@ -58,9 +53,26 @@ zproc system_init, loader
     sta mem_end
 
     rts
-zendproc
 
 .text
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc bios_SELDSK
+    cmp #0
+    zif_ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
+    lda #<dph0
+    ldx #>dph0
+    clc
+    rts
+zendproc
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
@@ -194,4 +206,6 @@ define_drive dph0, 4096*64, 4096, 1024, 64
 
 .bss
 
+current_drive:          .fill 1     ; Current selected disk drive number
+buffer_offset:          .fill 1     ; Offset of CP/M sector into host sector buffer
 requested_cpm_sector:   .fill 3     ; CP/M sector requested by user
