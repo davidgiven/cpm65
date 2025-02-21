@@ -104,6 +104,7 @@ mkcpmfs(
     size=256 * 77 * 26,
     items={
         "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:sys.com": "apps+sys",
         "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
     }
     | MINIMAL_APPS
