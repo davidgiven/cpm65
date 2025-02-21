@@ -384,7 +384,7 @@ the same time.
 
   - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into 0x0200 and execute it.
 
-  - Only 1 disk is supported. Multi-disk is not stable in CP/M-65 yet.
+  - Up to 4 disks are supported.
 
   - Only TTY interface for now, no SCREEN driver.
 
