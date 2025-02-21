@@ -17,9 +17,8 @@
 
 NSTAG = 8                   ; Number of sectors to stagger per track
 
-DMA_AREA = $f4              ; We are using the 256-byte page just below the
-                            ; disk buffer ($fd00), which encodes to $f4.
-                            ; See K-1013 manual.
+DMA_BUFFER = $fd00          ; We are using the 256-byte page just below the disk
+                            ; buffer ($fd00), which encodes to $f4. See K-1013 manual.
 
     .bss
 
@@ -65,16 +64,16 @@ zproc format
         ldy #0              ; Initialize pointer into format data area
         zrepeat
             lda track       ; Put track number,
-            sta DMA_AREA,Y
+            sta DMA_BUFFER,Y
             iny
             lda side        ; side number
-            sta DMA_AREA,Y
+            sta DMA_BUFFER,Y
             iny
             lda alttab,X    ; Lookup sector number in alternate table
-            sta DMA_AREA,Y
+            sta DMA_BUFFER,Y
             iny
             lda #1          ; 256 bytes per sector
-            sta DMA_AREA,Y
+            sta DMA_BUFFER,Y
             iny
             inx             ; Increment sector number pointer
             txa             ; Mod 26

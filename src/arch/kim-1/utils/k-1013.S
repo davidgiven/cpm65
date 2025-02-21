@@ -10,6 +10,9 @@
 #include "kim-1.inc"
 #include "k-1013.inc"
 
+DMA_AREA = $f4                  ; We are using the 256-byte page just below the disk
+                                ; buffer ($fd00), which encodes to $f4. See K-1013 manual.
+
 zproc fdc_exec_specify, .text.fdc_exec_specify
     ; Save cylinder for later check
 
@@ -122,7 +125,7 @@ zproc fdc_exec_format, .text.fdc_exec_format
 
     sty fdc_format+2              ; Put drive in second byte of command
 
-    lda #BUFFER_DMA
+    lda #DMA_AREA
     sta ADMA
 
     ldx #fdc_format-fdc_commands  ; Command index into X
