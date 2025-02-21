@@ -328,10 +328,12 @@ mkcpmfs(
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
         "0:tty630.com": "src/arch/osi/utils+tty630",
+        "0:pint.com": "third_party/pascal-m+pint",
+        "0:pasc.obb": "third_party/pascal-m+pasc-obb",
+        "0:pload.com": "third_party/pascal-m+loader",
     }
     | MINIMAL_APPS
     | BIG_APPS
-    | PASCAL_APPS
     | SCREEN_APPS
     | BIG_SCREEN_APPS
 )
@@ -341,6 +343,7 @@ mkcpmfs(
     format="osi5_80",
     size=128 * 1280,
     items={
+        "0:hello.pas": "cpmfs+hello_pas_cpm",
     }
     | MINIMAL_APPS_SRCS
     | BIG_APPS_SRCS
