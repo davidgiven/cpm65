@@ -104,6 +104,10 @@ mkcpmfs(
     size=256 * 77 * 26,
     items={
         "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:format.com": "src/arch/kim-1/utils+format",
+        "0:format.txt": "src/arch/kim-1/cpmfs/format.txt",
+        "0:imu.com": "src/arch/kim-1/utils+imu",
+        "0:imu.txt": "src/arch/kim-1/cpmfs/imu.txt",
         "0:sys.com": "apps+sys",
         "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
     }
