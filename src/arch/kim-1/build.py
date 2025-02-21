@@ -53,7 +53,7 @@ llvmclibrary(
 )
 
 llvmclibrary(
-    name="k-1013", srcs=["./k-1013.S"], cflags=["-I ."], deps=["include"]
+    name="k-1013", srcs=["./k-1013.S"], cflags=["-I ."], deps=["include", "./k-1013.inc"]
 )
 
 llvmclibrary(
