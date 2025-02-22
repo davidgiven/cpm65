@@ -2,7 +2,7 @@
 ;
 ; Image Manipulation Utility
 ;
-; Copyright (C) 2025 Eduardo Casino
+; Copyright © 2025 Eduardo Casino
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 ;
