@@ -961,12 +961,14 @@ zproc fdc_exec_extended
     ldx #fdc_extended-fdc_commands  ; Command index into X
     jsr fdc_exec_command
     zif_cc
-        ; Read results into memory
         zrepeat
             lda HSRC                ; Wait for interrupt
         zuntil_pl
-        jsr fdc_read_result
     zendif
+    ; Read results into memory even if it failed (should be
+    ; unsupported command)
+    ;
+    jsr fdc_read_result
     rts
 zendproc
 
@@ -1165,8 +1167,6 @@ zproc inf_done
     ldx #>done_msg
     jmp pr_str
 zendproc
-
-    .data
 
     .data
 
