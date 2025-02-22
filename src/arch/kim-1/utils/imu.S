@@ -12,6 +12,9 @@
 #include "cpm65.inc"
 #include "k-1013.inc"
 
+DMA_BUFFER = $fd00          ; We are using the 256-byte page just below the disk
+DMA_AREA = $f4              ; buffer ($fd00), which encodes to $f4. See K-1013 manual.
+
 ZEROPAGE
 
 string:         .fill 2             ; Pointer for file name operations
@@ -219,7 +222,7 @@ zendproc
 ; Copies the image name from the command line into
 ; (buffer1),Y
 ;
-; At exit, Y points to the first position in DISK_BUFFER after
+; At exit, Y points to the first position in DMA_BUFFER after
 ; the null character.
 ;
 zproc set_image_name
@@ -374,9 +377,9 @@ zendproc
 
 zproc init
 
-    lda #<DISK_BUFFER
+    lda #<DMA_BUFFER
     sta buffer1+0
-    lda #>DISK_BUFFER
+    lda #>DMA_BUFFER
     sta buffer1+1
 
     ; Put the disk controller in a sane state
@@ -475,7 +478,7 @@ zproc list_mounts
     
     ; Set buffer for receiving file names
 
-    lda #BUFFER_DMA
+    lda #DMA_AREA
     sta ADMA
 
     zloop
@@ -505,7 +508,7 @@ zproc list_images
 
     ; Set buffer for receiving file names
 
-    lda #BUFFER_DMA
+    lda #DMA_AREA
     sta ADMA
 
     zloop
@@ -532,8 +535,8 @@ zproc list_images
             jmp err_withmsg         ; Error reading directory
         zendif
 
-        lda #<DISK_BUFFER           ; Print it
-        ldx #>DISK_BUFFER
+        lda #<DMA_BUFFER           ; Print it
+        ldx #>DMA_BUFFER
         ldy #BDOS_WRITE_STRING
         jsr BDOS
         jsr pr_crlf
@@ -550,13 +553,13 @@ zproc mount_image
 
     ; Set buffer for sending mount info
 
-    lda #BUFFER_DMA
+    lda #DMA_AREA
     sta ADMA
 
     lda ro_flag
-    sta DISK_BUFFER+1
+    sta DMA_BUFFER+1
     lda drive
-    sta DISK_BUFFER+0
+    sta DMA_BUFFER+0
     ora #EXT_CMD_MNT
     tay
     jsr fdc_exec_extended           ; Mount image
@@ -684,14 +687,14 @@ zproc create_image
     
     ; Set filename1
     ;
-    ; NOTE: We can do this because DISK_BUFFER is page aligned!
+    ; NOTE: We can do this because DMA_BUFFER is page aligned!
     ;
     ldy #4                          ; Skip image parameters
-    lda #>DISK_BUFFER
+    lda #>DMA_BUFFER
     sty filename1+0
     sta filename1+1
 
-    jsr set_image_name              ; Copy image name at DISK_BUFFER,Y
+    jsr set_image_name              ; Copy image name at DMA_BUFFER,Y
                                     ; On exit, Y points to the next char after
                                     ; image name in command line
     jsr skip_sp
@@ -726,20 +729,20 @@ zproc create_image
 
     ; Set buffer for sending mount info
 
-    lda #BUFFER_DMA
+    lda #DMA_AREA
     sta ADMA
 
     ; Prepare the command data
 
     lda #77                         ; Tracks
-    sta DISK_BUFFER+0
+    sta DMA_BUFFER+0
     lda #26                         ; Sectors
-    sta DISK_BUFFER+1
+    sta DMA_BUFFER+1
     lda #1                          ; Sector size ( 1 == 256bytes )
     ora pk_flag                     ; Whether or not is a packaged image
-    sta DISK_BUFFER+2
+    sta DMA_BUFFER+2
     lda #0xe5                       ; Filler byte
-    sta DISK_BUFFER+3
+    sta DMA_BUFFER+3
     ldy #EXT_CMD_NEW                ; Create image
     jsr fdc_exec_extended
     zif_cs
@@ -800,7 +803,7 @@ zproc delete_file
 
     ; Set buffer for sending mount info
 
-    lda #BUFFER_DMA
+    lda #DMA_AREA
     sta ADMA
 
     ; Prepare the command data
@@ -875,7 +878,7 @@ zproc copy_or_move_file
 
     ; Set buffer for sending mount info
 
-    lda #BUFFER_DMA
+    lda #DMA_AREA
     sta ADMA
 
     ; Prepare the command data
