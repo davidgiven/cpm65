@@ -19,6 +19,7 @@ NSTAG = 8                   ; Number of sectors to stagger per track
 
 DMA_BUFFER = $fd00          ; We are using the 256-byte page just below the disk
 DMA_AREA = $f4              ; buffer ($fd00), which encodes to $f4. See K-1013 manual.
+FILLER = 0xe5               ; Data field filler byte
 
     .bss
 
@@ -127,6 +128,70 @@ zproc mod26
     rts
 zendproc
 
+zproc verify
+    ; Recalibrate (send heads to track 0)
+
+    ldy drive
+    jsr fdc_exec_recal
+    zif_cs
+        jmp recal_error
+    zendif
+
+    lda #1                  ; Set DMA write mode, unprotect SYSRAM
+    sta HSRC
+
+    lda #0
+    sta side                ; Initialize disk side,
+    sta track               ; track,
+
+    zloop
+        jsr print_dot
+
+        lda #0              ; Init sector number
+        sta sector
+
+        zrepeat
+            lda sector
+            ldx track
+            ldy drive
+
+            jsr fdc_exec_read
+            zif_cs
+                jmp verify_error
+            zendif
+
+            ldy #0
+            zrepeat
+                lda DMA_BUFFER,Y
+                cmp #FILLER
+                zif_ne
+                    jmp verify_error
+                zendif
+                iny
+            zuntil_eq
+
+            inc sector
+            lda sector
+            cmp #26
+        zuntil_eq
+
+        inc track           ; Increment track number
+        lda track
+        cmp #77             ; Test if all tracks verified
+        zbreakif_eq         ; If so, finished
+
+        ldy drive           ; Seek to the new track
+        jsr fdc_exec_seek
+        zif_cs
+            jmp seek_error
+        zendif
+    zendloop
+
+    clc
+    rts
+
+zendproc
+
 zproc main
     ; Get drive from command line
 
@@ -177,10 +242,19 @@ zproc main
     jsr format
 
     zif_cc
-        lda #<done_msg
-        ldx #>done_msg
+        lda #<verify_msg
+        ldx #>verify_msg
         ldy #BDOS_WRITE_STRING
-        jmp BDOS
+        jsr BDOS
+
+        jsr verify
+
+        zif_cc
+            lda #<done_msg
+            ldx #>done_msg
+            ldy #BDOS_WRITE_STRING
+            jmp BDOS
+        zendif
     zendif
 
     rts
@@ -234,6 +308,24 @@ zproc print_dot
     lda #'.'
     ldy #BIOS_CONOUT
     jmp BIOS
+zendproc
+
+zproc verify_error
+    lda #<vererr_msg
+    ldx #>vererr_msg
+    ldy #BDOS_WRITE_STRING
+    jsr BDOS
+    lda sector
+    jsr print_byte
+    lda #<vererr_msg2
+    ldx #>vererr_msg2
+    ldy #BDOS_WRITE_STRING
+    jsr BDOS
+    lda track
+    jsr print_byte
+    lda #<vererr_msg3
+    ldx #>vererr_msg3
+    jmp print_err
 zendproc
 
 zproc format_error
@@ -384,11 +476,6 @@ zproc fdc_exec_senseint
     rts
 zendproc
 
-zproc fdc_fail
-    sec
-    rts
-zendproc
-
 ; Format track
 ; Drive in Y, track data in area pointed by ADMA
 
@@ -432,7 +519,66 @@ zproc fdc_exec_format
 
     clc
     rts
+zendproc
 
+zproc fdc_fail
+    sec
+    rts
+zendproc
+
+; Sector num in A, cylinder in X, drive in Y
+
+zproc fdc_exec_read
+
+    stx fdc_read+3      ; Put cylinder in third byte of command
+    sta fdc_read+5      ; Put sector in fifth byte of command
+    sta fdc_read+7      ; Put last sector in seventh byte of command
+    sty fdc_read+2      ; Put drive in second byte of command
+
+    lda #DMA_AREA
+    sta ADMA
+
+    ; Read/Write data into/from disk buffer
+
+    ldx #fdc_read-fdc_commands ; Command index into X
+    jsr fdc_exec_command
+    zif_cs
+        rts
+    zendif
+
+    ; Wait until IRQ from FDC
+
+    zrepeat
+        lda HSRC        ; Wait until IRQ from FDC
+    zuntil_pl
+
+    ; Read results into memory
+
+    jsr fdc_read_result
+    zif_cs
+        rts
+    zendif
+
+    ; Look for error in the status registers
+
+    lda disk_status     ; Check ST0
+    and #0xd8           ; Delete don't care bits
+    zif_ne
+        ; ST0 is not clear, dig further
+        cmp #0x40           ; Test if abnormal termination
+        bne fdc_fail        ; Real error if not
+        lda disk_status+1   ; If abnormal termination, check ST1 for end of cylinder
+        bpl fdc_fail        ; Nope, then it is an error
+    zendif
+    lda disk_status+1   ; Check ST1
+    and #0x37           ; Mask out non-error bits
+    bne fdc_fail        ; Error if any remainder set
+    lda disk_status+2   ; Check ST2
+    and #0x33           ; Mask out non-error bits
+    bne fdc_fail        ; Error if any remainder set
+
+    clc
+    rts
 zendproc
 
 ; Command index in X
@@ -529,7 +675,19 @@ fdc_format:
     .byte 1             ; Specify 256 bytes/sector
     .byte 0x1a          ; Specify 26 sectors/track
     .byte 0x36          ; Gap length for 26 sectors, 256 bytes/sect
-    .byte 0xe5          ; Data field filler byte
+    .byte FILLER        ; Data field filler byte
+
+fdc_read:
+    .byte 9             ; Command length
+    .byte 0x46          ; Read command code.
+    .byte 0             ; Drive number in bits 0-1, side number in bit 2
+    .byte 0             ; C: Present cylinder number. Must match current track
+    .byte 0             ; H: Head
+    .byte 0             ; R: Sector number to read
+    .byte 1             ; N: Code for 256 bytes per sector
+    .byte 0             ; EOT: Last sector to read
+    .byte 0xe           ; GPL: Gap length for 26 sectors, 256 bytes/sect
+    .byte 0xff          ; DTL: Data length = 0xff since N is non-zero
 
 ; Messages
 
@@ -552,6 +710,10 @@ abort_msg:      .byte 13,10
                 .ascii "Aborted by user."
                 .byte 13,10,0
 
+verify_msg:     .byte 13,10
+                .ascii "Verifying:"
+                .byte 13,10,0
+
 done_msg:       .byte 13,10
                 .ascii "Done."
                 .byte 13,10,0
@@ -560,6 +722,13 @@ format_msg:     .byte 13,10
                 .ascii "Error: Unable to format track "
                 .byte 0
 format_msg2:    .byte '.',13,10,0
+
+vererr_msg:     .byte 13,10
+                .ascii "Error reading sector "
+                .byte 0
+vererr_msg2:    .ascii ", track "
+                .byte 0
+vererr_msg3:    .byte '.',13,10,0
 
 recal_msg:      .ascii "Error: Unable to retract head to track 0."
                 .byte 13,10,0
