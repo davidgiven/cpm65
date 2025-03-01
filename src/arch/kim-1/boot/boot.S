@@ -84,7 +84,7 @@ init:
 
     ldx #$01            ; Set DMA direction bit to write
     stx HSRC          
-    sta ADMA            ; Set destination address to the DMA access register
+
     ldx #READ           ; Execute read
     jsr cmdexec
 1:  lda HSRC            ; Wait for command completion

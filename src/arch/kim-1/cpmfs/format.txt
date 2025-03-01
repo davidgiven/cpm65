@@ -1,0 +1,8 @@
+Low Level Disk Format
+=====================
+
+Usage:  format <drive>
+
+The program asks for confirmation before starting, so it is
+possible to use it even if there is only one drive in the
+system.

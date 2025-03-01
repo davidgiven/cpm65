@@ -1,0 +1,33 @@
+Image Manipulation Utility
+==========================
+
+Usage:  imu [/L]
+        imu /M <drive> <image> [/O]
+        imu /U <drive>
+        imu /N <image> [/P]
+        imu /D <image>
+        imu {/C | /R} <src image> <dst image>
+
+IMU, without arguments, lists the mounted units.
+
+Options
+-------
+
+/L      - Lists the available disk images on the SD card.
+
+/M <drive> <image> [/O]
+        - Mounts <image> into <drive>. Option /O makes it read-only.
+
+/U <drive>
+        - Unmounts image from <drive>
+
+/N <image> [/P]
+        - Creates a formatted, empty image file on the SD card. With
+          the /P option, the imaged is created in a packed format,
+          which optimizes space usage, but may be slower.
+
+/D <image>
+        - Deletes an image file from the SD card.
+
+/C | /R <src image> <dst image>
+        - Copies / Renames an image file.

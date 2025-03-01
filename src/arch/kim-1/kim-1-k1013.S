@@ -6,16 +6,22 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "k-1013.inc"
+
+SEEK_RETRIES = 2
+CHCK_RETRIES = 5
+READ_RETRIES = 5
+WRIT_RETRIES = 10
 
 .section loader, "ax"
 
 .global system_init
 zproc system_init, loader
     ldy #0
-    sty current_drive
+    sty selected_drive
 
     dey
-    sty buffered_host_sector            ; Mark buffer data as invalid
+    sty buffered_track              ; Mark buffer data as invalid
 
     ; Init drives 1-3. Ignore errors as drives may not be present.
     ldy #1
@@ -35,15 +41,44 @@ zproc system_init, loader
 ; Sets carry on error.
 
 zproc bios_SELDSK
-    cmp #0
-    zif_ne
-        sec                 ; invalid drive
-        rts
-    zendif
 
-    lda #<dph0
-    ldx #>dph0
-    clc
+    cmp #(dphtab_end-dphtab)/2      ; Check if drive number is supported
+    bcs 1f                          ; drive > max. drive number
+
+    ldy #CHCK_RETRIES
+    sty tmp1
+    zrepeat
+        jsr check_drive_ready       ; Check drive status
+        zif_cc
+            sta selected_drive
+            asl a
+            tay
+            lda dphtab+0, y
+            ldx dphtab+1, y
+            rts
+        zendif
+        dec tmp1                    ; Decrement retries counter
+    zuntil_eq
+    sec
+1:  rts
+zendproc
+
+; Check if drive is ready.
+; A is drive number
+; Returns carry clear if ready, set otherwise
+; Preserves A
+
+zproc check_drive_ready
+    pha
+    tay
+    jsr fdc_exec_sensestatus        ; Check drive status
+    bcs 1f                          ; Command failed
+
+    and #ST3_RY                     ; Check if ready flag is set
+    zif_eq
+        sec
+    zendif
+1:  pla
     rts
 zendproc
 
@@ -117,7 +152,7 @@ zproc change_sector
         lda requested_track
         cmp buffered_track
         zif_eq
-            lda current_drive
+            lda selected_drive
             cmp buffered_drive
             zif_eq
                 ; Buffered disk/track/sector not changing, so do no work.
@@ -140,7 +175,7 @@ zproc change_sector
 
     ; Change sector
 
-    lda current_drive
+    lda selected_drive
     sta buffered_drive
     lda requested_track
     sta buffered_track
@@ -156,7 +191,7 @@ zproc change_sector
 
     ; Read sector from disk
 
-    lda #2                          ; Retries
+    lda #READ_RETRIES
     sta tmp1
     zrepeat
         lda buffered_host_sector
@@ -171,44 +206,54 @@ zproc change_sector
     zuntil_eq
 
     ; Some kind of read error. The data in the buffer is corrupt.
-
+zendproc
+;
+; Fall through
+;
+zproc invalidate_buffer
     lda #0xff
-    sta buffered_host_sector
-
+    sta buffered_track
+    sec
     rts
 zendproc
 
 zproc flush_buffer
     jsr seek_track
-    zif_cs
-        rts
+    zif_cc
+        lda #WRIT_RETRIES
+        sta tmp1
+        zrepeat
+            lda buffered_host_sector
+            ldx buffered_track
+            ldy buffered_drive
+
+            jsr fdc_exec_write
+            zif_cc
+                ; A successful write, so mark the buffer as clean.
+
+                lda #0
+                sta buffer_dirty
+
+                ; Wait at least 500uS after write to allow the write current
+                ; to decay before seeking again
+
+                ldx #0
+                zrepeat
+                    dex
+                zuntil_eq
+
+                rts
+            zendif
+
+            dec tmp1
+        zuntil_eq
+        sec
     zendif
-
-    lda #2                          ; Retries
-    sta tmp1
-    zrepeat
-        lda buffered_host_sector
-        ldx buffered_track
-        ldy buffered_drive
-
-        jsr fdc_exec_write
-        zif_cc
-            ; A successful write, so mark the buffer as clean.
-
-            lda #0
-            sta buffer_dirty
-            rts
-        zendif
-
-        dec tmp1
-    zuntil_eq
-
-    sec
     rts
 zendproc
 
 zproc seek_track
-    lda #2                          ; Retries
+    lda #SEEK_RETRIES
     sta tmp1
     zloop
         lda buffered_track
@@ -225,10 +270,7 @@ zproc seek_track
 
         ; No more retries. Seek error, invalidate buffered track
 
-        lda #0xff
-        sta buffered_track
-        sec
-        rts
+        jmp invalidate_buffer
     zendloop
     rts
 zendproc
@@ -237,13 +279,21 @@ zendproc
 
 .data
 
-; DPH for drive 0
+dphtab:
+    .word dph0
+    .word dph1
+    .word dph2
+    .word dph3
+dphtab_end:
 
 define_drive dph0, 77*52, 2048, 128, 52
+define_drive dph1, 77*52, 2048, 128, 52
+define_drive dph2, 77*52, 2048, 128, 52
+define_drive dph3, 77*52, 2048, 128, 52
 
 .bss
 
-current_drive:          .fill 1     ; Current selected disk drive number
+selected_drive:         .fill 1     ; Current selected disk drive number
 buffer_offset:          .fill 1     ; Offset of CP/M sector into host sector buffer
 requested_cpm_sector:   .fill 1     ; CP/M sector requested by user
 requested_track:        .fill 1     ; track requested by user
