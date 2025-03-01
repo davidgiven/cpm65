@@ -1916,7 +1916,7 @@ getch:
         ldy #$00            ; no EOLN flag
 getch1: sty eolb
         rts
-getch2: cmp #$0D            ; CR, then fake space and EOLN true
+getch2: cmp #LF             ; LF, then fake space and EOLN true
         bne getch3          ; ignore other control chars except OF
         lda #$20
         ldy #$01
