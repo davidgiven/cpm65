@@ -30,13 +30,10 @@ zproc fdc_exec_recal, .text.fdc_exec_recal
 
     ldx #fdc_recal-fdc_commands ; Command index into X
     jsr fdc_exec_command
-    zif_cs
-1:      pla
-        rts
-    zendif
+    bcs fdc_pla_ret
 
     jsr fdc_exec_senseint
-    bcs 1b
+    bcs fdc_pla_ret
 
     ; Compare cylinder number with desired one in ST1
 
@@ -47,6 +44,11 @@ zproc fdc_exec_recal, .text.fdc_exec_recal
         rts
     zendif
     clc
+    rts
+zendproc
+
+zproc fdc_pla_ret, .text.fdc_pla_ret, local
+    pla
     rts
 zendproc
 
@@ -65,10 +67,10 @@ zproc fdc_exec_seek, .text.fdc_exec_seek
 
     ldx #fdc_seek-fdc_commands  ; Command index into X
     jsr fdc_exec_command
-    bcs 1b
+    bcs fdc_pla_ret
 
     jsr fdc_exec_senseint
-    bcs 1b
+    bcs fdc_pla_ret
 
     ; Compare cylinder number with desired one in ST1
 
@@ -235,14 +237,30 @@ zendproc
 ; Command index in X
 
 zproc fdc_exec_command, .text.fdc_exec_command, local
-    lda MSTR                ; Load Main Status Register
-    and #0x10               ; Check if busy
-    bne fdc_fail
+    zloop
+        lda #0x10           ; Check if uPD765 is busy processing a command
+        and MSTR            ;   (should not occur, but happens)
+        zbreakif_eq         ; Not busy, go execute command
+                            ; Yes, execute recovery procedure
+        zrepeat
+            bit MSTR        ; wait until ready to read or write
+        zuntil_mi
+
+        zif_vc              ; Data register ready to write
+            lda #$00        ; Try to complete command sequence
+            sta DATR
+            beq 1f          ; And try again
+        zendif
+                            ; Else, data register needs to be read
+        lda DATR            ; Read status register
+1:      nop                 ; Wait a few cycles
+        nop
+    zendloop
 
     ldy fdc_commands, x     ; Load command length
     inx
 
-    zloop
+    zrepeat
         zrepeat
             lda MSTR        ; Wait until RQM from controller
         zuntil_mi
@@ -273,8 +291,8 @@ zproc fdc_read_result, .text.fdc_read_result, local
         inx                 ; Next byte
         nop                 ; Give the controller time to update
         nop                 ; the MSTR with a valid busy status
-        lda #0x40           ; Check if still talking and go get another
-        and MSTR            ; byte while so
+        lda MSTR            ; Check if still busy and get next
+        and #0x10           ; byte while so
     zuntil_eq
 
     clc
