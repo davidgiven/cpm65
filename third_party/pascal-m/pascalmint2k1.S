@@ -2391,11 +2391,7 @@ wrt1:   clc
 
 ttyout:
         txa
-        cmp #CR
-        bne ttyout1
         jsr bdos_CONOUT
-        lda #LF
-ttyout1:jsr bdos_CONOUT
         ldy ytmp
         rts
 
