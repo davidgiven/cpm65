@@ -269,6 +269,7 @@ incpca: rts
         ;
         ; to HEX
         ;
+#if 0                   // Dead code, not referenced elsewhere
 hexit:  cmp #$3A
         php
         and #$0F
@@ -276,6 +277,7 @@ hexit:  cmp #$3A
         bcc hexit1      ; 0 .. 9
         adc #$08         
 hexit1: rts
+#endif
         ;
         ; stack operations PULL and PUSH
         ; PULL2 and PUSH2
@@ -2471,6 +2473,7 @@ writepc: lda #' '
         lda #13
         jmp bdos_CONOUT
 
+#if 0                  // enable for tracing
 writesp: lda #'~'
         jsr bdos_CONOUT
 
@@ -2478,6 +2481,7 @@ writesp: lda #'~'
         jsr phex2
         lda stack
         jmp phex2
+#endif
 
 con_cr:
         lda #<crlf_msg
