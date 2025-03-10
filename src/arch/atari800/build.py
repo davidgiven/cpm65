@@ -33,8 +33,8 @@ mkcpmfs(
         "1:tty80drv.com": "src/arch/atari800/utils+tty80drv",
         "1:olivetti.fnt": "third_party/fonts/atari/olivetti.fnt",
     }
-    | MINIMAL_APPS
-    | SCREEN_APPS,
+    | MINIMAL_APPS,
+#    | SCREEN_APPS,
 )
 
 simplerule(
