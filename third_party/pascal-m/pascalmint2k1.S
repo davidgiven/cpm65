@@ -269,6 +269,7 @@ incpca: rts
         ;
         ; to HEX
         ;
+#if 0                   // Dead code, not referenced elsewhere
 hexit:  cmp #$3A
         php
         and #$0F
@@ -276,6 +277,7 @@ hexit:  cmp #$3A
         bcc hexit1      ; 0 .. 9
         adc #$08         
 hexit1: rts
+#endif
         ;
         ; stack operations PULL and PUSH
         ; PULL2 and PUSH2
@@ -1491,6 +1493,7 @@ csptab: .word   wri         ;  0 write integer
         .word   clsf        ; 10 close file
         .word   asnf        ; 11 assign file
         .word   getparams   ; 12 get command line parameters
+        .word   rds         ; 13 read string
         ;
         ; BE CUP1
         ;
@@ -1908,6 +1911,7 @@ stp:    jmp bdos_EXIT       ; just stop
         ; routines
         ;
 getch:  
+        sty ytmp
         jsr rdt         ; read from input
         cmp #$20            ; printable?
         bcc getch2
@@ -1915,6 +1919,7 @@ getch:
         beq getch           ; ignore rubout
         ldy #$00            ; no EOLN flag
 getch1: sty eolb
+        ldy ytmp
         rts
 getch2: cmp #LF             ; LF, then fake space and EOLN true
         bne getch3          ; ignore other control chars except OF
@@ -2046,6 +2051,24 @@ getparams1:
         ldy #0
         sta (tmp2l2), y
         jmp interpr
+        ;
+        ; PROC 13 RDS
+        ;
+rds:    jsr setup2          ; Pointer to string in tmp2l2, size in tmp3l2
+        ldy #$ff            ; Init string index
+rds1:   iny                 ; Increment index
+        cpy tmp3l2
+        bcs rds3            ; No space left in string
+        jsr getch           ; Get netx char
+        sta (tmp2l2),y
+        ldx eolb            ; eol set?
+        beq rds1            ; No, next char
+rds2:   iny                 ; Fill with spaces
+        cpy tmp3l2
+        bcs rds3
+        sta (tmp2l2),y
+        bcc rds2
+rds3:   jmp interpr
         ;
         ; MUL10 multiply tmp1l8 by 10
 mul10:  asl tmp1l8
@@ -2276,8 +2299,7 @@ compa4: incr tmp2l2
 ;
 ; Read one char from TTY without the KIM hardware echo
 ;
-rdt:	sty ytmp
-        lda fa+1
+rdt:	lda fa+1
         beq ttyin
 
         ldy #FP_POS
@@ -2309,16 +2331,21 @@ rdt1:   clc
         sta (fa), y
         pla
 
-        ldy ytmp
         rts
 
 rdeof:  lda #$1a
-        ldy ytmp
         rts
 
 ttyin:  jsr bdos_CONIN
-        ldy ytmp
-        rts
+        cmp #CR
+        bne ttyin1
+        lda #LF
+ttyin1: cmp #LF
+        bne ttyin2
+        pha 
+        jsr con_cr              ; Echo when EOL
+        pla
+ttyin2: rts
 ; 
 ; Write one char to TTY
 ;
@@ -2364,11 +2391,7 @@ wrt1:   clc
 
 ttyout:
         txa
-        cmp #CR
-        bne ttyout1
         jsr bdos_CONOUT
-        lda #LF
-ttyout1:jsr bdos_CONOUT
         ldy ytmp
         rts
 
@@ -2446,6 +2469,7 @@ writepc: lda #' '
         lda #13
         jmp bdos_CONOUT
 
+#if 0                  // enable for tracing
 writesp: lda #'~'
         jsr bdos_CONOUT
 
@@ -2453,6 +2477,7 @@ writesp: lda #'~'
         jsr phex2
         lda stack
         jmp phex2
+#endif
 
 con_cr:
         lda #<crlf_msg
