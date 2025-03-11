@@ -288,7 +288,7 @@ mkcpmfs(
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
-        "0:scrvt100.com": "src/arch/osi/utils+scrvt100",
+        "0:scrvt100.com": "apps+scrvt100",
     }
     | MINIMAL_APPS
     | BIG_APPS

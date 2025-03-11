@@ -11,7 +11,8 @@ from config import (
 )
 
 COMMODORE_ITEMS = (
-    {"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
+    {"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+     "0:scrvt100.com": "apps+scrvt100"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
@@ -104,6 +105,7 @@ mkcpmfs(
     size=256 * 77 * 26,
     items={
         "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:scrvt100.com": "apps+scrvt100",
         "0:format.com": "src/arch/kim-1/utils+format",
         "0:format.txt": "src/arch/kim-1/cpmfs/format.txt",
         "0:imu.com": "src/arch/kim-1/utils+imu",
@@ -125,6 +127,7 @@ mkcpmfs(
     size=512 * 4096 * 16,
     items={
         "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:scrvt100.com": "apps+scrvt100",
         "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
     }
     | MINIMAL_APPS

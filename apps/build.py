@@ -75,3 +75,11 @@ llvmprogram(
         "include",
     ],
 )
+
+llvmprogram(
+    name="scrvt100",
+    srcs=["./scrvt100.S"],
+    deps=[
+        "include",
+    ],
+)
