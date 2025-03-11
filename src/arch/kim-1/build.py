@@ -7,6 +7,8 @@ from config import (
     MINIMAL_APPS_SRCS,
     BIG_APPS,
     BIG_APPS_SRCS,
+    SCREEN_APPS,
+    BIG_SCREEN_APPS,
     PASCAL_APPS,
 )
 
@@ -17,6 +19,7 @@ COMMODORE_ITEMS = (
     | MINIMAL_APPS_SRCS
     | BIG_APPS
     | BIG_APPS_SRCS
+    | SCREEN_APPS
 )
 
 
@@ -117,6 +120,8 @@ mkcpmfs(
     | MINIMAL_APPS_SRCS
     | BIG_APPS
     | BIG_APPS_SRCS
+    | SCREEN_APPS
+    | BIG_SCREEN_APPS
     | PASCAL_APPS,
 )
 
@@ -134,6 +139,8 @@ mkcpmfs(
     | MINIMAL_APPS_SRCS
     | BIG_APPS
     | BIG_APPS_SRCS
+    | SCREEN_APPS
+    | BIG_SCREEN_APPS
     | PASCAL_APPS,
 )
 
