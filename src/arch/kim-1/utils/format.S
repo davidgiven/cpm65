@@ -398,13 +398,10 @@ zproc fdc_exec_recal
 
     ldx #fdc_recal-fdc_commands ; Command index into X
     jsr fdc_exec_command
-    zif_cs
-1:      pla
-        rts
-    zendif
+    bcs fdc_pla_ret
 
     jsr fdc_exec_senseint
-    bcs 1b
+    bcs fdc_pla_ret
 
     ; Compare cylinder number with desired one in ST1
 
@@ -415,6 +412,11 @@ zproc fdc_exec_recal
         rts
     zendif
     clc
+    rts
+zendproc
+
+zproc fdc_pla_ret
+    pla
     rts
 zendproc
 
@@ -433,10 +435,10 @@ zproc fdc_exec_seek
 
     ldx #fdc_seek-fdc_commands  ; Command index into X
     jsr fdc_exec_command
-    bcs 1b
+    bcs fdc_pla_ret
 
     jsr fdc_exec_senseint
-    bcs 1b
+    bcs fdc_pla_ret
 
     ; Compare cylinder number with desired one in ST1
 
@@ -521,6 +523,28 @@ zproc fdc_exec_format
     rts
 zendproc
 
+zproc fdc_read_result
+    ldx #0
+    zloop
+        zrepeat
+            lda MSTR        ; Wait until RQM from controller
+        zuntil_mi
+        and #0x40           ; Test data direction bit
+        beq fdc_fail        ; Error if controller wants to listen
+
+        lda DATR            ; Get status byte from data register
+        sta disk_status, x  ; Put it into memory
+        inx                 ; Next byte
+        nop                 ; Give the controller time to update
+        nop                 ; the MSTR with a valid busy status
+        lda MSTR            ; Check if still busy and get next
+        and #0x10           ; byte while so
+    zuntil_eq
+
+    clc
+    rts
+zendproc
+
 zproc fdc_fail
     sec
     rts
@@ -584,9 +608,25 @@ zendproc
 ; Command index in X
 
 zproc fdc_exec_command
-    lda MSTR                ; Load Main Status Register
-    and #0x10               ; Check if busy
-    bne fdc_fail
+    zloop
+        lda #0x10           ; Check if uPD765 is busy processing a command
+        and MSTR            ;   (should not occur, but happens)
+        zbreakif_eq         ; Not busy, go execute command
+                            ; Yes, execute recovery procedure
+        zrepeat
+            bit MSTR        ; wait until ready to read or write
+        zuntil_mi
+
+        zif_vc              ; Data register ready to write
+            lda #$00        ; Try to complete command sequence
+            sta DATR
+            beq 1f          ; And try again
+        zendif
+                            ; Else, data register needs to be read
+        lda DATR            ; Read status register
+1:      nop                 ; Wait a few cycles
+        nop
+    zendloop
 
     ldy fdc_commands, x     ; Load command length
     inx
@@ -602,28 +642,6 @@ zproc fdc_exec_command
         sta DATR            ; Store into FDC data register
         inx                 ; Next command byte
         dey
-    zuntil_eq
-
-    clc
-    rts
-zendproc
-
-zproc fdc_read_result
-    ldx #0
-    zloop
-        zrepeat
-            lda MSTR        ; Wait until RQM from controller
-        zuntil_mi
-        and #0x40           ; Test data direction bit
-        beq fdc_fail        ; Error if controller wants to listen
-
-        lda DATR            ; Get status byte from data register
-        sta disk_status, x  ; Put it into memory
-        inx                 ; Next byte
-        nop                 ; Give the controller time to update
-        nop                 ; the MSTR with a valid busy status
-        lda #0x40           ; Check if still talking and go get another
-        and MSTR            ; byte while so
     zuntil_eq
 
     clc

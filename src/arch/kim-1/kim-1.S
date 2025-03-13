@@ -146,48 +146,37 @@ zendproc
 
 zproc tty_conin
     lda pending_key
-    zif_eq
-        sty tmp1        ; Save Y
-        lda SBD         ; Supress echo
-        and #0xfe
-        sta SBD
-        jsr GETCH
-        pha
-        lda SBD         ; Restore echo
-        ora #1
-        sta SBD
-        pla
-        cmp #0x20       ; Echo control characters
-        zif_cc
-            pha
-            jsr OUTCH
-            pla
-        zendif
-        ldy tmp1        ; Restore Y
-    zendif
-    ldx #0
-    stx pending_key
+    bne 1f
 
-    cmp #20             ; DEL
-    zif_eq
-        lda #8
-    zendif
+    lda SBD             ; Supress echo
+    and #0xfe
+    sta SBD
+
+    jsr _tty_bgetch
+
+    pha                 ; Restore echo
+    lda SBD
+    ora #1
+    sta SBD
+    pla
+
+1:  ldy #0
+    sty pending_key
 
     clc
     rts
 zendproc
 
 zproc tty_conout
-    sty tmp1            ; Save Y
-    cmp #'\n'
+    cmp #127
     zif_eq
-        pha
-        lda #'\r'
+        lda #8
         jsr OUTCH
-        pla
+        lda #' '
+        jsr OUTCH
+        lda #8
     zendif
     jsr OUTCH
-    ldy tmp1            ; Restore Y
     clc
     rts
 zendproc
@@ -195,7 +184,7 @@ zendproc
 zproc tty_const
     lda pending_key
     zif_eq
-        jsr tty_nbgetch
+        jsr _tty_nbgetch
         sta pending_key
         zif_eq
             clc
@@ -208,18 +197,36 @@ zproc tty_const
     rts
 zendproc
 
+; Blocking tty read. Wait until char ready, then
+; put it into A
+
+zproc _tty_bgetch
+    lda #1
+    zrepeat
+        bit SAD         ; Check start bit
+        bne 1f
+    zuntil_pl
+    bpl _tty_getch      ; Always jump
+1:  lda #0
+    rts
+zendproc
+
 ; Non-blocking tty read. If there is a char ready,
 ; put it into A. Otherwise, return 0x00. Adapted
 ; from the KIM-1 ROM
 
-zproc tty_nbgetch
-    sty tmp1            ; Save XY
-    stx tmp2
-    ldx #8              ; Set up 8 bit count
+zproc _tty_nbgetch
     lda #1
     bit SAD             ; Check start bit
-    bne 1f
-    bmi 1f              ; No start bit
+    bne 1b
+    bmi 1b              ; No start bit
+zendproc
+;
+; Fall through
+;
+zproc _tty_getch
+    ldx #8              ; Set up 8 bit count
+    lda #1
     jsr DELAY           ; Delay 1 bit
     jsr DEHALF          ; Delay 1/2 bit time
     zrepeat             ; Get 8 bits loop
@@ -235,10 +242,6 @@ zproc tty_nbgetch
     lda CHAR
     rol a               ; Shift off parity
     lsr a
-    bne 2f
-1:  lda #0
-2:  ldx tmp2            ; Restore XY
-    ldy tmp1
     rts
 zendproc
 
