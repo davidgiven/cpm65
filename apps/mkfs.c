@@ -135,12 +135,12 @@ void main(void)
 
     print("About to create a filesystem on drive ");
     cpm_conout(cpm_fcb.dr + '@');
-    printx(",\ndestroying everything on it.");
+    printx(",\r\ndestroying everything on it.");
     print("Press Y to proceed, anything else to cancel: ");
     if (cpm_conin() != 'y')
         fatal("Aborted.");
 
-    printx("\nFormatting now...");
+    printx("\r\nFormatting now...");
 
     cpm_bios_setdma(cpm_default_dma);
     memset(cpm_default_dma, 0xe5, 128);
