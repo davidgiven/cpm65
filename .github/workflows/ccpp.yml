@@ -30,7 +30,7 @@ jobs:
       run: make LLVM=$HOME/llvm-mos/bin -j`nproc` +all +mametest
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ github.event.repository.name }}.${{ github.sha }}
         path: |
