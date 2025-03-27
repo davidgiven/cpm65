@@ -4,9 +4,9 @@ from build.ab import (
     simplerule,
     filenameof,
     TargetsMap,
-    filenamesof,
 )
 from build.c import cxxprogram, cprogram
+from glob import glob
 
 cxxprogram(name="multilink", srcs=["./multilink.cc"], deps=["+libfmt"])
 cxxprogram(name="xextobin", srcs=["./xextobin.cc"], deps=["+libfmt"])
@@ -233,7 +233,7 @@ def mametest(
         replaces=self,
         ins=[diskimage, script],
         outs=["=stamp"],
-        deps=[runscript],
+        deps=[runscript] + glob("roms/*"),
         commands=[
             "sh $[deps[0]] %s %s %s %s"
             % (target, filenameof(diskimage), filenameof(script), imagetype),
