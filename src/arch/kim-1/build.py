@@ -21,23 +21,23 @@ COMMODORE_ITEMS = (
 
 @Rule
 def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
-    cs = ["rm -f {outs[0]}"]
+    cs = ["rm -f $[outs[0]]"]
     ins = []
 
     cmd = "chronic cc1541 -q "
     if id:
         cmd += "-i %d " % id
-    cmd += '-n "%s" {outs[0]}' % title
+    cmd += '-n "%s" $[outs[0]]' % title
     cs += [cmd]
 
     for k, v in items.items():
         cs += [
-            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s {outs[0]}"
+            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s $[outs[0]]"
             % (k, filenameof(v))
         ]
         ins += [v]
 
-    cs += ["{deps[0]} -f {outs[0]}"]
+    cs += ["$[deps[0]] -f $[outs[0]]"]
     simplerule(
         replaces=self,
         ins=ins,
@@ -48,12 +48,10 @@ def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
     )
 
 
-llvmclibrary(
-    name="libsd", srcs=["./libsd.S"], cflags=["-I ."], deps=["include"]
-)
+llvmclibrary(name="libsd", srcs=["./libsd.S"], deps=["include", "./kim-1.inc"])
 
 llvmclibrary(
-    name="k-1013", srcs=["./k-1013.S"], cflags=["-I ."], deps=["include"]
+    name="k-1013", srcs=["./k-1013.S"], deps=["include", "./kim-1.inc"]
 )
 
 llvmrawprogram(

@@ -27,7 +27,7 @@ mkcpmfs(
     | BIG_APPS
     | BIG_APPS_SRCS
     | PASCAL_APPS
-    | SERIAL_APPS
+    | SERIAL_APPS,
 )
 
 zip(

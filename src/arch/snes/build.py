@@ -15,7 +15,7 @@ from config import (
 llvmrawprogram(
     name="bios",
     srcs=["./loader.S", "./bios.S"],
-    deps=["include", "src/lib+bioslib", "src/bdos+bdoslib","./globals.inc"],
+    deps=["include", "src/lib+bioslib", "src/bdos+bdoslib", "./globals.inc"],
     cflags=[
         "-mcpu=mosw65c02",
     ],
@@ -43,7 +43,7 @@ simplerule(
     name="font",
     ins=["src/arch/snes/tools+mkfont"],
     outs=["=4bpp.bin", "=2bpp.bin"],
-    commands=["{ins[0]} {outs}"],
+    commands=["$[ins[0]] $[outs]"],
     label="MKFONT",
 )
 
@@ -70,9 +70,9 @@ simplerule(
     ins=[".+snes_cartridge_bin", "./checksum.py"],
     outs=["snes.img"],
     commands=[
-        "cp {ins[0]} {outs[0]}",
-        "truncate -s %d {outs[0]}" % (2048 * 1024),
-        "chronic python3 {ins[1]} HIROM {outs[0]}",
+        "cp $[ins[0]] $[outs[0]]",
+        "truncate -s %d $[outs[0]]" % (2048 * 1024),
+        "chronic python3 $[ins[1]] HIROM $[outs[0]]",
     ],
     label="MKCARTRIDGE",
 )

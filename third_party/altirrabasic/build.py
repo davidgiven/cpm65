@@ -29,6 +29,9 @@ for name, defines in VARIANTS.items():
             "./source/evaluator.s",
             "./source/memory.s",
             "./source/data.s",
+            "./source/system.inc",
+            "./source/tokens.inc",
+            "./source/cpm65.inc",
         ],
         defines=defines,
     )

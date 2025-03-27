@@ -20,7 +20,7 @@ cprogram(name="mkimd", srcs=["./mkimd.c"])
 cprogram(
     name="fontconvert", srcs=["./fontconvert.c", "./libbdf.c", "./libbdf.h"]
 )
-cprogram(name="img2osi", srcs=["./img2osi.c"])
+cprogram(name="img2osi", srcs=["./img2osi.c", "./osi.h"])
 
 
 @Rule
@@ -30,7 +30,7 @@ def unixtocpm(self, name, src: Target = None):
         ins=[src],
         outs=[f"={name}.txt"],
         deps=["tools+unixtocpm"],
-        commands=["{deps[0]} < {ins[0]} > {outs[0]}"],
+        commands=["$[deps[0]] < $[ins[0]] > $[outs[0]]"],
         label="UNIXTOCPM",
     )
 
@@ -44,7 +44,7 @@ def multilink(
         ins=[core, zp, tpa],
         outs=[f"={name}.com"],
         deps=["tools+multilink"],
-        commands=["{deps[0]} -o {outs[0]} {ins}"],
+        commands=["$[deps[0]] -o $[outs[0]] $[ins]"],
         label="MULTILINK",
     )
 
@@ -56,7 +56,7 @@ def xextobin(self, name=None, src: Target = None, address=0):
         ins=[src],
         outs=[f"={name}.bin"],
         deps=["tools+xextobin"],
-        commands=["{deps[0]} -i {ins[0]} -o {outs[0]} -b %d" % address],
+        commands=["$[deps[0]] -i $[ins[0]] -o $[outs[0]] -b %d" % address],
         label="XEXTOBIN",
     )
 
@@ -73,15 +73,15 @@ def mkcpmfs(
 ):
     cs = []
     if template:
-        cs += ["cp %s {outs[0]}" % filenameof(template)]
+        cs += ["cp %s $[outs[0]]" % filenameof(template)]
     else:
         # Some versions of mkfs.cpm don't work right if the input file
         # doesn't exist.
-        cs += ["{deps[1]} -f {outs[0]} -b 0xe5 -n 100000"]
+        cs += ["$[deps[1]] -f $[outs[0]] -b 0xe5 -n 100000"]
         mkfs = "mkfs.cpm -f %s" % format
         if bootimage:
             mkfs += " -b %s" % filenameof(bootimage)
-        mkfs += " {outs[0]}"
+        mkfs += " $[outs[0]]"
         cs += [mkfs]
 
     ins = []
@@ -90,13 +90,13 @@ def mkcpmfs(
         if "@" in k:
             k, flags = k.split("@")
 
-        cs += ["cpmcp -f %s {outs[0]} %s %s" % (format, filenameof(v), k)]
+        cs += ["cpmcp -f %s $[outs[0]] %s %s" % (format, filenameof(v), k)]
         if flags:
-            cs += ["cpmchattr -f %s {outs[0]} %s %s" % (format, flags, k)]
+            cs += ["cpmchattr -f %s $[outs[0]] %s %s" % (format, flags, k)]
         ins += [v]
 
     if size:
-        cs += ["truncate -s %d {outs[0]}" % size]
+        cs += ["truncate -s %d $[outs[0]]" % size]
 
     simplerule(
         replaces=self,
@@ -135,7 +135,7 @@ def mkdfs(self, name, title="DFS", opt=0, items: TargetsMap = {}):
         outs=["=dfs.ssd"],
         deps=["tools+mkdfs"],
         commands=[
-            ("{deps[0]} -O {outs[0]} -B %d -N %s " % (opt, title))
+            ("$[deps[0]] -O $[outs[0]] -B %d -N %s " % (opt, title))
             + " ".join(cs)
         ],
         label="MKDFS",
@@ -152,7 +152,7 @@ def shuffle(
         outs=[f"={name}.bin"],
         deps=["tools+shuffle"],
         commands=[
-            "{deps[0]} -i {ins[0]} -o {outs[0]} -b %d -t %d -r -m %s"
+            "$[deps[0]] -i $[ins[0]] -o $[outs[0]] -b %d -t %d -r -m %s"
             % (blocksize, blockspertrack, map)
         ],
         label="SHUFFLE",
@@ -166,7 +166,7 @@ def fontconvert(self, name, src: Target = None):
         ins=[src],
         outs=[f"={name}.inc"],
         deps=["tools+fontconvert"],
-        commands=["{deps[0]} {ins[0]} > {outs[0]}"],
+        commands=["$[deps[0]] $[ins[0]] > $[outs[0]]"],
         label="FONTCONVERT",
     )
 
@@ -178,7 +178,7 @@ def mkoricdsk(self, name, src: Target = None):
         ins=[src],
         outs=[f"={name}.img"],
         deps=["tools+mkoricdsk"],
-        commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
+        commands=["$[deps[0]] -i $[ins[0]] -o $[outs[0]]"],
         label="MKORICDSK",
     )
 
@@ -190,7 +190,7 @@ def mkimd(self, name, src: Target = None):
         ins=[src],
         outs=[f"={name}.imd"],
         deps=["tools+mkimd"],
-        commands=["{deps[0]} -i {ins[0]} -o {outs[0]}"],
+        commands=["$[deps[0]] -i $[ins[0]] -o $[outs[0]]"],
         label="MKIMD",
     )
 
@@ -202,7 +202,7 @@ def img2os5(self, name, src: Target = None):
         ins=[src],
         outs=[f"={name}.os5"],
         deps=["tools+img2osi"],
-        commands=["{deps[0]} {ins[0]} {outs[0]}"],
+        commands=["$[deps[0]] $[ins[0]] $[outs[0]]"],
         label="IMG2OS5",
     )
 
@@ -214,7 +214,7 @@ def img2os8(self, name, src: Target = None):
         ins=[src],
         outs=[f"={name}.os8"],
         deps=["tools+img2osi"],
-        commands=["{deps[0]} {ins[0]} {outs[0]}"],
+        commands=["$[deps[0]] $[ins[0]] $[outs[0]]"],
         label="IMG2OS8",
     )
 
@@ -235,9 +235,9 @@ def mametest(
         outs=["=stamp"],
         deps=[runscript],
         commands=[
-            "sh {deps[0]} %s %s %s %s"
+            "sh $[deps[0]] %s %s %s %s"
             % (target, filenameof(diskimage), filenameof(script), imagetype),
-            "touch {outs[0]}",
+            "touch $[outs[0]]",
         ],
         label="MAMETEST",
     )
