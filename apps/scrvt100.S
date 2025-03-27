@@ -12,7 +12,7 @@
 
 ; force clang version and not the asm.com version
 
-#include "../include/cpm65.inc"
+#include "cpm65.inc"
 #include "driver.inc"
 #include "jumptables.inc"
 
