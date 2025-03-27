@@ -51,47 +51,67 @@ def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
         label="MKCBMFS",
     )
 
-
 llvmclibrary(
     name="k-1013",
-    srcs=["./k-1013.S", "./kim-1.S"],
+    srcs=["./k-1013.S", "./kim-1-k1013.S"],
     deps=["include"],
     hdrs={"k-1013.inc": "./k-1013.inc", "kim-1.inc": "./kim-1.inc"},
 )
 
-llvmclibrary(name="libsd", srcs=["./libsd.S"], deps=["include", ".+k-1013"])
+llvmclibrary(
+    name="pario",
+    srcs=["./pario.S"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
+)
+
+llvmclibrary(
+    name="sdcard",
+    srcs=["./libsd.S", "./kim-1-sdcard.S"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
+)
+
+llvmclibrary(
+    name="iec-kim",
+    srcs=["./kim-1-iec.S"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
+)
+
+llvmclibrary(
+    name="iec-pal",
+    srcs=["./kim-1-iec.S"],
+    cflags=["-DPAL_1"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
+)
 
 llvmrawprogram(
     name="bios-k1013",
-    srcs=["./kim-1-k1013.S"],
+    srcs=["./kim-1.S", "./kim-1.inc"],
     deps=["include", "src/lib+bioslib", ".+k-1013"],
     linkscript="./kim-1-k1013.ld",
 )
 
 llvmrawprogram(
     name="bios-sdcard",
-    srcs=["./kim-1-sdcard.S"],
-    deps=[
-        "include",
-        "src/lib+bioslib",
-        ".+k-1013",
-        ".+libsd",
-    ],
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+sdcard"],
     linkscript="./kim-1-sdcard.ld",
 )
 
 llvmrawprogram(
     name="bios-iec-kim",
-    srcs=["./kim-1-iec.S"],
-    deps=["include", "src/lib+bioslib", ".+k-1013"],
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+iec-kim"],
     linkscript="./kim-1-iec.ld",
 )
 
 llvmrawprogram(
     name="bios-iec-pal",
-    srcs=["./kim-1-iec.S"],
-    cflags=["-DPAL_1"],
-    deps=["include", "src/lib+bioslib", ".+k-1013"],
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+iec-pal"],
     linkscript="./kim-1-iec.ld",
 )
 
