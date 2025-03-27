@@ -27,7 +27,7 @@ mkcpmfs(
     | BIG_APPS_SRCS
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
-    | PASCAL_APPS
+    | PASCAL_APPS,
 )
 
 mkdfs(

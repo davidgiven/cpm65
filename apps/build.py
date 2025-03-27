@@ -11,8 +11,8 @@ def asm(self, name, src: Target = None, deps: Targets = []):
         outs=["=out.com"],
         deps=["tools/cpmemu", "apps+asm"] + deps,
         commands=[
-            'chronic sh -c "{deps[0]} {deps[1]} -pA=$(dir {ins[0]}) -pB=$(dir {outs[0]})'
-            + ' a:$(notdir {ins[0]}) b:$(notdir {outs[0]}); test -f {outs[0]}"'
+            'chronic sh -c "$[deps[0]] $[deps[1]] -pA=$(dir $[ins[0]]) -pB=$(dir $[outs[0]])'
+            + ' a:$(notdir $[ins[0]]) b:$(notdir $[outs[0]]); test -f $[outs[0]]"'
         ],
         label="ASM",
     )
@@ -40,7 +40,7 @@ for prog in [
     asm(
         name=prog,
         src=("./%s.asm" % prog),
-        deps=["./cpm65.inc", "./drivers.inc"],
+        deps=["./cpm65.inc", "./drivers.inc", "third_party/lib6502/6502data.h"],
     )
 
 # Simple C programs.
@@ -59,7 +59,11 @@ for prog in [
     "submit",
     "sys"
 ]:
-    llvmprogram(name=prog, srcs=["./%s.c" % prog], deps=["lib+cpm65"])
+    llvmprogram(
+        name=prog,
+        srcs=["./%s.c" % prog],
+        deps=["lib+cpm65", "third_party/lib6502/6502data.h"],
+    )
 
 # Source code.
 

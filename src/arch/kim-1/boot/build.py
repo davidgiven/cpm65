@@ -9,7 +9,7 @@ def mkpap(self, name, src: Target = None):
         ins=[src],
         outs=[f"={name}"],
         commands=[
-            "srec_cat {ins[0]} -binary -offset 0x0200 -o {outs[0]} -MOS_Technologies"
+            "srec_cat $[ins[0]] -binary -offset 0x0200 -o $[outs[0]] -MOS_Technologies"
         ],
         label="SREC",
     )
