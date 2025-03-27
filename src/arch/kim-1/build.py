@@ -48,30 +48,38 @@ def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
     )
 
 
-llvmclibrary(name="libsd", srcs=["./libsd.S"], deps=["include", "./kim-1.inc"])
-
 llvmclibrary(
-    name="k-1013", srcs=["./k-1013.S"], deps=["include", "./kim-1.inc"]
+    name="k-1013",
+    srcs=["./k-1013.S", "./kim-1.S"],
+    deps=["include"],
+    hdrs={"k-1013.inc": "./k-1013.inc", "kim-1.inc": "./kim-1.inc"},
 )
+
+llvmclibrary(name="libsd", srcs=["./libsd.S"], deps=["include", ".+k-1013"])
 
 llvmrawprogram(
     name="bios-k1013",
     srcs=["./kim-1-k1013.S"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib", ".+k-1013"],
+    deps=["include", "src/lib+bioslib", ".+k-1013"],
     linkscript="./kim-1-k1013.ld",
 )
 
 llvmrawprogram(
     name="bios-sdcard",
     srcs=["./kim-1-sdcard.S"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib", ".+libsd"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        ".+k-1013",
+        ".+libsd",
+    ],
     linkscript="./kim-1-sdcard.ld",
 )
 
 llvmrawprogram(
     name="bios-iec-kim",
     srcs=["./kim-1-iec.S"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib"],
+    deps=["include", "src/lib+bioslib", ".+k-1013"],
     linkscript="./kim-1-iec.ld",
 )
 
@@ -79,7 +87,7 @@ llvmrawprogram(
     name="bios-iec-pal",
     srcs=["./kim-1-iec.S"],
     cflags=["-DPAL_1"],
-    deps=["./kim-1.S", "./kim-1.inc", "include", "src/lib+bioslib"],
+    deps=["include", "src/lib+bioslib", ".+k-1013"],
     linkscript="./kim-1-iec.ld",
 )
 

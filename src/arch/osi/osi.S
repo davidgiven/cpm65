@@ -163,10 +163,12 @@ init:
         lda ptr+1
         cmp #$c0
         zbreakif_eq
+        lda #$3f
         sta (ptr),y
         cmp (ptr),y
     zuntil_ne
 
+    lda ptr+1
     sec
     sbc #PAGES_PER_TRACK
     sta ptrkbuf                     ; put track buffer at ramtop
@@ -801,10 +803,17 @@ mem_base: .byte __USERTPA_START__@mos16hi
 ; number of sectors, blocksize, direntries, reserved _sectors_
 
 #ifndef FLOPPY8
+#ifdef TRACKS80
+define_drive dph_a, 1280, 1024, 64, 16
+define_drive dph_b, 1280, 1024, 64, 16
+define_drive dph_c, 1280, 1024, 64, 16
+define_drive dph_d, 1280, 1024, 64, 16
+#else
 define_drive dph_a, 640, 1024, 64, 16
 define_drive dph_b, 640, 1024, 64, 16
 define_drive dph_c, 640, 1024, 64, 16
 define_drive dph_d, 640, 1024, 64, 16
+#endif
 #else
 define_drive dph_a, 1848, 1024, 64, 24
 define_drive dph_b, 1848, 1024, 64, 24

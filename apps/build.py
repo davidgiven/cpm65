@@ -57,6 +57,7 @@ for prog in [
     "qe",
     "stat",
     "submit",
+    "sys"
 ]:
     llvmprogram(
         name=prog,

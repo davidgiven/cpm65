@@ -66,10 +66,15 @@ jobs:
           osi500mf.os5
           osi600f.os8
           osi600mf.os5
+          osi600mf80.osi
+          osiserv.os8
           osif-b.os8
           osimf-b.os5
           osimf-c.os5
           osimf-d.os5
+          osimf80-b.osi
+          osimf80-c.osi
+          osimf80-d.osi
           osiserf.os8
           pet4032.d64
           pet8032.d64
@@ -84,38 +89,42 @@ jobs:
       with:
         name: Development build ${{ env.RELEASE_DATE }}
         files: |
-          cpm65/apple2e.po
-          cpm65/atari800.atr
-          cpm65/atari800b.atr
-          cpm65/atari800c.atr
-          cpm65/atari800hd.atr
-          cpm65/atari800xlhd.atr
-          cpm65/bbcmicro.ssd
-          cpm65/c64.d64
-          cpm65/kim-1-iec.zip
-          cpm65/kim-1-k1013.zip
-          cpm65/kim-1-sdcard.zip
-          cpm65/nano6502.img
-          cpm65/nano6502_sysonly.img
-          cpm65/neo6502.zip
-          cpm65/oric.dsk
-          cpm65/osi400f.os8
-          cpm65/osi400mf.os5
-          cpm65/osi500f.os8
-          cpm65/osi500mf.os5
-          cpm65/osi600f.os8
-          cpm65/osi600mf.os5
-          cpm65/osif-b.os8
-          cpm65/osimf-b.os5
-          cpm65/osimf-c.os5
-          cpm65/osimf-d.os5
-          cpm65/osiserf.os8
-          cpm65/pet4032.d64
-          cpm65/pet8032.d64
-          cpm65/pet8096.d64
-          cpm65/snes.smc
-          cpm65/vic20.d64
-          cpm65/x16.zip
+          cpm65/images/apple2e.po
+          cpm65/images/atari800.atr
+          cpm65/images/atari800b.atr
+          cpm65/images/atari800c.atr
+          cpm65/images/atari800hd.atr
+          cpm65/images/atari800xlhd.atr
+          cpm65/images/bbcmicro.ssd
+          cpm65/images/c64.d64
+          cpm65/images/kim-1-iec.zip
+          cpm65/images/kim-1-k1013.zip
+          cpm65/images/kim-1-sdcard.zip
+          cpm65/images/nano6502.img
+          cpm65/images/nano6502_sysonly.img
+          cpm65/images/neo6502.zip
+          cpm65/images/oric.dsk
+          cpm65/images/osi400f.os8
+          cpm65/images/osi400mf.os5
+          cpm65/images/osi500f.os8
+          cpm65/images/osi500mf.os5
+          cpm65/images/osi600f.os8
+          cpm65/images/osi600mf.os5
+          cpm65/images/osi600mf80.osi
+          cpm65/images/osif-b.os8
+          cpm65/images/osimf-b.os5
+          cpm65/images/osimf-c.os5
+          cpm65/images/osimf-d.os5
+          cpm65/images/osimf80-b.osi
+          cpm65/images/osimf80-c.osi
+          cpm65/images/osimf80-d.osi
+          cpm65/images/osiserf.os8
+          cpm65/images/pet4032.d64
+          cpm65/images/pet8032.d64
+          cpm65/images/pet8096.d64
+          cpm65/images/snes.smc
+          cpm65/images/vic20.d64
+          cpm65/images/x16.zip
         tag_name: dev
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

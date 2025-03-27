@@ -100,19 +100,19 @@ You have two options:
 
 To build it, you will need the [llvm-mos](https://llvm-mos.org) toolchain.
 CP/M-65 support is available out of the box. Once installed, you should just be
-able to run the Makefile and you'll get bootable disk images for the Commodore
-64 (with 1541 drive) and BBC Micro (producing a 200kB SSSD DFS disk):
+able to run the Makefile and you'll get bootable disk images for all supported
+platforms in the `images` directory:
 
-    make LLVM=<your llvm-mos bin directory here>/ -j$(nproc)
+    make LLVM=<your llvm-mos bin directory here>/
 
 Building CP/M-65 is a bit of a performance because it's aggregating lots of
-other software, all of which need building in turn. You'll need: a C and C++
-compiler, cc1541 (for creating 1541 disk images), cpmtools (for creating CP/M
-disk images), libfmt (all the C++ tools use this), python3 (for the build
-system), and FreePascal (because the MADS assembler is written in Pascal). Use
-these Debian packages:
+other software, all of which need building in turn. You'll need primarily: a C
+and C++ compiler, cc1541 (for creating 1541 disk images), cpmtools (for creating
+CP/M disk images), libfmt (all the C++ tools use this), python3 (for the build
+system), FreePascal (because the MADS assembler is written in Pascal), 64tass
+(for the Super Nintendo 65816 stuff). Use these Debian packages:
 
-    cc1541 cpmtools libfmt-dev python3 fp-compiler srecord
+    cc1541 cpmtools libfmt-dev fp-compiler moreutils mame srecord 64tass libreadline-dev
 
 There are also automated tests which use `mame` to emulate a reasonable number
 of the platforms, to verify that they actually work. To use this, install
@@ -384,7 +384,7 @@ the same time.
 
   - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into 0x0200 and execute it.
 
-  - Only 1 disk is supported. Multi-disk is not stable in CP/M-65 yet.
+  - Up to 4 disks are supported.
 
   - Only TTY interface for now, no SCREEN driver.
 
@@ -428,10 +428,23 @@ the same time.
 
 - All systems need at least 16kB of RAM, but detect up to 40kB with BASIC present, and 48kB if BASIC is replaced by RAM.
   Some boot ROMs do not boot when BASIC is absent. For example, SYN600 relies on BASIC ROM routines to load the boot sector.
-- The generated disk images can be used directly with [osiemu](https://github.com/ivop/osiemu), or converted to HFE format with its `osi2hfe` if you want to create real floppies or use it with a Gotek on real hardware.
-For use with one of the two WinOSI emulators [Mark's Lab](https://osi.marks-lab.com/software/tools.html) has a tool to convert HFE images to 65D format.
-- All systems boot with a plain TTY driver. If you have a 540B graphics card with the optional color option enabled, you can load a screen driver called `TTY540B` (located on drive D: on MF systems).
-On serial systems, you can load `SCRVT100` to enable the screen driver if you are connected with a VT100 terminal.
+
+- The generated disk images can be used directly with
+  [osiemu](https://github.com/ivop/osiemu), or converted to HFE format with its
+  `osi2hfe` if you want to create real floppies or use it with a Gotek on real
+  hardware.  For use with one of the two WinOSI emulators [Mark's
+  Lab](https://osi.marks-lab.com/software/tools.html) has a tool to convert HFE
+  images to 65D format.
+
+- All systems boot with a plain TTY driver. If you have a 540B graphics card
+  with the optional color option enabled, you can load a screen driver called
+  `TTY540B` (located on drive D: on MF systems).  For the Model 630 graphics card
+  there's `TTY630`.  On serial systems, you can load `SCRVT100` to enable the
+  screen driver if you are connected with a VT100 terminal.
+
+- The *600mf80* images are for a Superboard II/C1PMF with a non-standard
+  5.25" drive with *80 tracks* instead of the standard 40 tracks. A 3.5"
+  single density drive with 80 tracks would work, too.
 
 ### Supported programs
 
@@ -556,8 +569,7 @@ Who?
 
 You may contact me at dg@cowlark.com, or visit my website at
 http://www.cowlark.com.  There may or may not be anything interesting there.
-The CP/M-65 project was designed and written by me, David Given. 
-
+The CP/M-65 project was designed and written by me, David Given.
 
 License
 -------
@@ -600,4 +612,3 @@ and is available under the terms of the BSD 2-Clause License. See
 `third_party/zmalloc` contains a copy of zmalloc, which is © 2024 by Ivo van
 Poorten and is available under the terms of the 0BSD License. See
 `third_party/zmalloc/LICENSE` for the full text.
-

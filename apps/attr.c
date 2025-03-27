@@ -7,7 +7,7 @@
 #include <ctype.h>
 #include "lib/printi.h"
 
-static const FCB wildcard_fcb = {
+static FCB wildcard_fcb = {
     /* dr */ 0,
     /* f  */ "???????????"};
 
@@ -97,20 +97,22 @@ int main()
         }
 
     FCB* fcb = &cpm_fcb;
-    if (fcb->f[0] == ' ')
-        fcb = (FCB*)&wildcard_fcb;
 
     uint8_t dr = fcb->dr;
     if (!dr)
         dr = cpm_get_current_drive() + 1;
+
+    if (fcb->f[0] == ' ')
+    {
+        fcb = (FCB*)&wildcard_fcb;
+        fcb->dr = dr;
+    }
 
     cpm_set_dma(cpm_default_dma);
     uint8_t r = cpm_findfirst(fcb);
     while (r != 0xff)
     {
         DIRE* de = (DIRE*)cpm_default_dma + r;
-        if (de->rc == 0x80)
-            continue;
 
         if (modify)
         {
@@ -122,6 +124,10 @@ int main()
 
             de->us = dr; /* Convert to an FCB */
             cpm_set_file_attributes((FCB*)de);
+
+            /* cpm_set_file_attributes() resets directory index, so */
+            /* recover index for last file match */
+            cpm_findfirst((FCB*)de);
         }
 
         cpm_conout((de->f[8] & 0x80) ? 'R' : '-');

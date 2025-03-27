@@ -639,8 +639,9 @@ use_limit_as_end:
 		;##ASSERT dw(fr1+4) <= dw(fr0+4)
 
 		;address += start
-		ldy		#fr1+2
+		ldy		#$80
 		sty		expType				;!! - set expression type to string!
+		ldy		#fr1+2
 		jsr		IntAddToFR0
 
 		;capacity -= start

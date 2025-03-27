@@ -4,6 +4,8 @@
 
 ; KIM-1 port Copyright © 2024 Eduardo Casino
 
+#include "zif.inc"
+#include "cpm65.inc"
 #include "driver.inc"
 #include "kim-1.inc"
 
@@ -11,6 +13,7 @@ ZEROPAGE
 
 .global ptr
 .global ptr1
+.global tmp1
 ptr: .fill 2
 ptr1: .fill 2
 dma: .fill 2            ; current DMA address
@@ -65,6 +68,11 @@ _start:
     cmp #>__bios_end
     bne 1b
 
+    ; System initialisation
+    lda #0
+    sta pending_key
+    sta buffer_dirty
+
     jsr system_init
 
     ; BIOS initialisation.
@@ -99,6 +107,7 @@ loading_msg:
 
 bdos_filename:
     .ascii "BDOS    SYS"
+zendproc
 
 ; Actual BIOS code.
 
@@ -235,26 +244,6 @@ zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
 
-; Select a disk.
-; A is the disk number.
-; Returns the DPH in XA.
-; Sets carry on error.
-
-zproc bios_SELDSK
-    cmp #0
-    zif_ne
-        sec                 ; invalid drive
-        rts
-    zendif
-
-    sta current_drive
-
-    lda #<dph0
-    ldx #>dph0
-    clc
-    rts
-zendproc
-
 zproc bios_GETTPA
     lda mem_base
     ldx mem_end
@@ -357,13 +346,15 @@ zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA_START__@mos16hi
 mem_end:    .byte __TPA_END__@mos16hi
 
+.global mem_end
+
 .bss
 
 directory_buffer:       .fill 128   ; used by the BDOS
 
 .global directory_buffer
 
-pending_key:            .byte 0
-current_drive:          .fill 1     ; Current selected disk drive number
+pending_key:            .fill 1
 buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
-buffer_offset:          .fill 1     ; Offset of CP/M sector into host sector buffer
+
+.global buffer_dirty

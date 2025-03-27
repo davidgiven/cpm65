@@ -14,3 +14,11 @@ llvmprogram(
         "include",
     ],
 )
+llvmprogram(
+    name="tty630",
+    srcs=["./tty540b.S"],
+    deps=[
+        "include",
+    ],
+    cflags=["-DOSI630"],
+)

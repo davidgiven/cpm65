@@ -84,7 +84,7 @@ init:
 
     ldx #$01            ; Set DMA direction bit to write
     stx HSRC          
-    sta ADMA            ; Set destination address to the DMA access register
+
     ldx #READ           ; Execute read
     jsr cmdexec
 1:  lda HSRC            ; Wait for command completion
@@ -157,11 +157,11 @@ readdatr:
 
 e2: inc errorc          ; 02 READ ERROR CODE
 e1: inc errorc          ; 01 RECALIBRATE ERROR CODE
-    ldy #0
-1:  lda errmsg, y
+    ldx #0
+1:  lda errmsg, x
     beq 2f
     jsr OUTCH
-    iny
+    inx
     bne 1b
 2:  lda errorc
     jsr PRTBYT

@@ -196,26 +196,14 @@ def mkimd(self, name, src: Target = None):
 
 
 @Rule
-def img2os5(self, name, src: Target = None):
+def img2osi(self, name, src: Target = None):
     simplerule(
         replaces=self,
         ins=[src],
-        outs=[f"={name}.os5"],
+        outs=[f"={name}.osi"],
         deps=["tools+img2osi"],
         commands=["$[deps[0]] $[ins[0]] $[outs[0]]"],
-        label="IMG2OS5",
-    )
-
-
-@Rule
-def img2os8(self, name, src: Target = None):
-    simplerule(
-        replaces=self,
-        ins=[src],
-        outs=[f"={name}.os8"],
-        deps=["tools+img2osi"],
-        commands=["$[deps[0]] $[ins[0]] $[outs[0]]"],
-        label="IMG2OS8",
+        label="IMG2OSI",
     )
 
 

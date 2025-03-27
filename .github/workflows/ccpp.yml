@@ -27,42 +27,46 @@ jobs:
     #    limit-access-to-actor: true
 
     - name: make
-      run: make LLVM=$HOME/llvm-mos/bin -j`nproc` +all +mametest
+      run: make LLVM=$HOME/llvm-mos/bin +all +mametest
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: ${{ github.event.repository.name }}.${{ github.sha }}
         path: |
-          apple2e.po
-          apple2e_b.po
-          atari800.atr
-          atari800b.atr
-          atari800c.atr
-          atari800hd.atr
-          atari800xlhd.atr
-          bbcmicro.ssd
-          c64.d64
-          diskdefs
-          kim-1-iec.zip
-          kim-1-k1013.zip
-          kim-1-sdcard.zip
-          neo6502.zip
-          oric.dsk
-          osi400f.os8
-          osi400mf.os5
-          osi500f.os8
-          osi500mf.os5
-          osi600f.os8
-          osi600mf.os5
-          osif-b.os8
-          osimf-b.os5
-          osimf-c.os5
-          osimf-d.os5
-          osiserf.os8
-          pet4032.d64
-          pet8032.d64
-          pet8096.d64
-          snes.smc
-          x16.zip
+          images/apple2e.po
+          images/apple2e_b.po
+          images/atari800.atr
+          images/atari800b.atr
+          images/atari800c.atr
+          images/atari800hd.atr
+          images/atari800xlhd.atr
+          images/bbcmicro.ssd
+          images/c64.d64
+          images/diskdefs
+          images/kim-1-iec.zip
+          images/kim-1-k1013.zip
+          images/kim-1-sdcard.zip
+          images/neo6502.zip
+          images/oric.dsk
+          images/osi400f.os8
+          images/osi400mf.os5
+          images/osi500f.os8
+          images/osi500mf.os5
+          images/osi600f.os8
+          images/osi600mf.os5
+          images/osi600mf80.osi
+          images/osif-b.os8
+          images/osimf-b.os5
+          images/osimf-c.os5
+          images/osimf-d.os5
+          images/osimf80-b.osi
+          images/osimf80-c.os
+          images/osimf80-d.osi
+          images/osiserf.os8
+          images/pet4032.d64
+          images/pet8032.d64
+          images/pet8096.d64
+          images/snes.smc
+          images/x16.zip
 

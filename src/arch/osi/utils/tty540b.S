@@ -27,12 +27,35 @@ cury:       .fill 1
 
 drv_zp_end:
 
+#if OSI630
+
+SCREEN_WIDTH = 64
+SCREEN_HEIGHT = 16
+
+CONTROL = $d800
+
+ENABLE_64 = 0x01
+ENABLE_COLOR = 0x02
+
+NORMAL    = $00
+INVERSE   = $01
+CURSORXOR = (NORMAL ^ INVERSE)
+
+SCREENMEM   = $d000
+SECLASTLINE = $d380
+LASTLINE    = $d3c0
+
+COLORMEM    = $d400
+COLORXOR    = ((SCREENMEM ^ COLORMEM) / 256)
+
+#else
+
 SCREEN_WIDTH = 64
 SCREEN_HEIGHT = 32
 
 CONTROL = $de00
 
-ENABLE_64X32 = 0x01
+ENABLE_64 = 0x01
 ENABLE_COLOR = 0x04
 
 NORMAL    = $0e
@@ -45,6 +68,8 @@ LASTLINE    = $d7c0
 
 COLORMEM    = $e000
 COLORXOR    = ((SCREENMEM ^ COLORMEM) / 256)
+
+#endif
 
 ; -------------------------------------------------------------------------
 
@@ -60,7 +85,11 @@ drv_screen540b:
     .word DRVID_SCREEN
     .word drv_screen540b_strat
     .word 0
+#if OSI630
+    .ascii "SCREEN630"
+#else
     .ascii "SCREEN540B"
+#endif
     .byte 0
 
 zproc drv_screen540b_strat
@@ -105,7 +134,11 @@ drv_tty540b:
     .word DRVID_TTY
     .word drv_tty540b_strat
     .word 0
+#if OSI630
+    .ascii "TTY630"
+#else
     .ascii "TTY540B"
+#endif
     .byte 0
 
 zproc drv_tty540b_strat
@@ -173,7 +206,7 @@ zproc init
 
     jsr screen540b_clear
 
-    lda #(ENABLE_64X32 | ENABLE_COLOR)
+    lda #(ENABLE_64 | ENABLE_COLOR)
     sta CONTROL
 
     lda #<banner
@@ -207,19 +240,23 @@ clearscrn:
     sta SCREENMEM+1*256,y
     sta SCREENMEM+2*256,y
     sta SCREENMEM+3*256,y
+#ifndef OSI630
     sta SCREENMEM+4*256,y
     sta SCREENMEM+5*256,y
     sta SCREENMEM+6*256,y
     sta SCREENMEM+7*256,y
+#endif
     lda #NORMAL
     sta COLORMEM+0*256,y
     sta COLORMEM+1*256,y
     sta COLORMEM+2*256,y
     sta COLORMEM+3*256,y
+#ifndef OSI630
     sta COLORMEM+4*256,y
     sta COLORMEM+5*256,y
     sta COLORMEM+6*256,y
     sta COLORMEM+7*256,y
+#endif
     dey
     bne clearscrn
 
@@ -591,7 +628,11 @@ zendproc
     .data
 
 banner:
+#if OSI630
+    .ascii "tty630/screen630 driver loaded."
+#else
     .ascii "tty540b/screen540b driver loaded."
+#endif
     .byte 13, 10, 0
 
 ; -------------------------------------------------------------------------
