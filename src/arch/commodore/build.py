@@ -23,23 +23,23 @@ COMMODORE_ITEMS_WITH_SCREEN = COMMODORE_ITEMS | SCREEN_APPS | SCREEN_APPS_SRCS
 
 @Rule
 def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
-    cs = ["rm -f {outs[0]}"]
+    cs = ["rm -f $[outs[0]]"]
     ins = []
 
     cmd = "chronic cc1541 -q "
     if id:
         cmd += "-i %d " % id
-    cmd += '-n "%s" {outs[0]}' % title
+    cmd += '-n "%s" $[outs[0]]' % title
     cs += [cmd]
 
     for k, v in items.items():
         cs += [
-            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s {outs[0]}"
+            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s $[outs[0]]"
             % (k, filenameof(v))
         ]
         ins += [v]
 
-    cs += ["{deps[0]} -f {outs[0]}"]
+    cs += ["$[deps[0]] -f $[outs[0]]"]
     simplerule(
         replaces=self,
         ins=ins,

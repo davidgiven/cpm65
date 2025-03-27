@@ -35,7 +35,7 @@ llvmrawprogram(
     ],
     linkscript="./apple2e.ld",
     ldflags=[
-        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers {deps[0]} "
+        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers $[deps[0]] "
         + "| gawk --non-decimal-data -f scripts/size.awk)"
     ],
 )
@@ -71,12 +71,7 @@ mkcpmfs(
     format="appleiie",
     bootimage=".+bios_shuffled",
     size=143360,
-    items={
-    }
-    | SCREEN_APPS
-    | SCREEN_APPS_SRCS
-    | BIG_SCREEN_APPS
-    | PASCAL_APPS,
+    items={} | SCREEN_APPS | SCREEN_APPS_SRCS | BIG_SCREEN_APPS | PASCAL_APPS,
 )
 
 
