@@ -58,21 +58,41 @@ drive_number:   .fill 1
 sector_num:     .fill 3
 dma:            .fill 2
 
+; Invisible overscan areas:
+;
+; 32x32 --> 24x26 worst case, hidden: 6L, 2R, 3T, 3B
+; 64x32 --> 48x26 worst case, hidden: 13L, 3R, 3T, 3B
+; 64x16 --> 48x12 worst case, hidden: 13L, 3R, 2T, 2B
+
 #if OSI400
-    SCREEN_WIDTH  = 32
-    SCREEN_HEIGHT = 32
-    SCREEN_PAGES  = 4
+    XSCREEN_WIDTH  = 32
+    XSCREEN_HEIGHT = 32
+    XSCREEN_PAGES  = 4
+    SCREEN_WIDTH   = 24
+    SCREEN_HEIGHT  = 26
+    SCREEN_LMARGIN = 6
+    SCREEN_TMARGIN = 3
 #elif OSI500
-    SCREEN_WIDTH  = 64
-    SCREEN_HEIGHT = 32
-    SCREEN_PAGES  = 8
+    XSCREEN_WIDTH  = 64
+    XSCREEN_HEIGHT = 32
+    XSCREEN_PAGES  = 8
+    SCREEN_WIDTH   = 48
+    SCREEN_HEIGHT  = 26
+    SCREEN_LMARGIN = 13
+    SCREEN_TMARGIN = 3
     CONTROL = $de00
 #elif OSI600
-    SCREEN_WIDTH  = 64
-    SCREEN_HEIGHT = 16
-    SCREEN_PAGES  = 4
+    XSCREEN_WIDTH  = 64
+    XSCREEN_HEIGHT = 16
+    XSCREEN_PAGES  = 4
+    SCREEN_WIDTH   = 48
+    SCREEN_HEIGHT  = 12
+    SCREEN_LMARGIN = 13
+    SCREEN_TMARGIN = 2
     CONTROL = $d800
 #endif
+
+#define SCREEN_HOMEPOS_OFFSET SCREEN_LMARGIN+(SCREEN_TMARGIN * XSCREEN_WIDTH)
 
 #ifdef FLOPPY8
 PAGES_PER_TRACK = 12
@@ -105,7 +125,7 @@ init:
 
     lda #>SCREENMEM
     sta ptr+1
-    ldx #SCREEN_PAGES
+    ldx #XSCREEN_PAGES
     lda #' '
 
     zloop                   ; clear screen
@@ -413,16 +433,25 @@ zproc calculate_cursor_address
         inc ptr+1
     zendif
 
+    lda ptr
+    clc
+    adc #SCREEN_HOMEPOS_OFFSET  ; offset is always < 256
+    sta ptr
+    zif_cs
+        inc ptr+1
+    zendif
     rts
 zendproc
 
 zproc scroll_up
-    lda #<(SCREENMEM)
+    lda #<(SCREENMEM+SCREEN_TMARGIN*XSCREEN_WIDTH)
     sta ptr
-    lda #<(SCREENMEM+SCREEN_WIDTH)
-    sta ptr1
-    lda #>SCREENMEM
+    lda #>(SCREENMEM+SCREEN_TMARGIN*XSCREEN_WIDTH)
     sta ptr+1
+
+    lda #<(SCREENMEM+(SCREEN_TMARGIN+1)*XSCREEN_WIDTH)
+    sta ptr1
+    lda #>(SCREENMEM+(SCREEN_TMARGIN+1)*XSCREEN_WIDTH)
     sta ptr1+1
 
     ldy #0
@@ -438,14 +467,14 @@ zproc scroll_up
             inc ptr1+1
         zendif
         lda ptr1+1
-        cmp #>(SCREENMEM+SCREEN_PAGES*256)
+        cmp #>(SCREENMEM+XSCREEN_PAGES*256)
     zuntil_eq
 
     lda #' '
     zloop                       ; Clear last line
         sta (ptr),y
         iny
-        cpy #SCREEN_WIDTH
+        cpy #XSCREEN_WIDTH
     zuntil_eq
 
     rts

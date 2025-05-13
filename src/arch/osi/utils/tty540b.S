@@ -27,10 +27,21 @@ cury:       .fill 1
 
 drv_zp_end:
 
+; Invisible overscan areas:
+;
+; 64x32 --> 48x26 worst case, hidden: 13L, 3R, 3T, 3B
+; 64x16 --> 48x12 worst case, hidden: 13L, 3R, 2T, 2B
+
 #if OSI630
 
-SCREEN_WIDTH = 64
-SCREEN_HEIGHT = 16
+XSCREEN_WIDTH = 64
+XSCREEN_HEIGHT = 16
+
+SCREEN_WIDTH   = 48
+SCREEN_HEIGHT  = 12
+SCREEN_LMARGIN = 13
+SCREEN_TMARGIN = 2
+SCREEN_BMARGIN = 2
 
 CONTROL = $d800
 
@@ -42,16 +53,24 @@ INVERSE   = $01
 CURSORXOR = (NORMAL ^ INVERSE)
 
 SCREENMEM   = $d000
-SECLASTLINE = $d380
-LASTLINE    = $d3c0
+SECLASTLINE = $d380 - SCREEN_BMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
+LASTLINE    = $d3c0 - SCREEN_BMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
+FIRSTLINE   = $d000 + SCREEN_TMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
+SECLINE     = $d040 + SCREEN_TMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
 
 COLORMEM    = $d400
 COLORXOR    = ((SCREENMEM ^ COLORMEM) / 256)
 
 #else
 
-SCREEN_WIDTH = 64
-SCREEN_HEIGHT = 32
+XSCREEN_WIDTH = 64
+XSCREEN_HEIGHT = 32
+
+SCREEN_WIDTH   = 48
+SCREEN_HEIGHT  = 26
+SCREEN_LMARGIN = 13
+SCREEN_TMARGIN = 3
+SCREEN_BMARGIN = 3
 
 CONTROL = $de00
 
@@ -63,13 +82,17 @@ INVERSE   = $0f
 CURSORXOR = (NORMAL ^ INVERSE)
 
 SCREENMEM   = $d000
-SECLASTLINE = $d780
-LASTLINE    = $d7c0
+SECLASTLINE = $d780 - SCREEN_BMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
+LASTLINE    = $d7c0 - SCREEN_BMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
+FIRSTLINE   = $d000 + SCREEN_TMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
+SECLINE     = $d040 + SCREEN_TMARGIN*XSCREEN_WIDTH + SCREEN_LMARGIN
 
 COLORMEM    = $e000
 COLORXOR    = ((SCREENMEM ^ COLORMEM) / 256)
 
 #endif
+
+#define SCREEN_HOMEPOS_OFFSET SCREEN_LMARGIN+(SCREEN_TMARGIN * XSCREEN_WIDTH)
 
 ; -------------------------------------------------------------------------
 
@@ -317,7 +340,7 @@ stylebg=.+1
     lda #NORMAL
     sta (ptr1),y
 
-    cpy #SCREEN_WIDTH-1
+    cpy #XSCREEN_WIDTH-1
     zif_ne
         inc curx
     zendif
@@ -369,17 +392,20 @@ zproc screen540b_getchar
 zendproc
 
 zproc screen540b_scrollup
-    lda #0
+    lda #<FIRSTLINE
     sta ptr
     sta ptr2
-    lda #SCREEN_WIDTH
-    sta ptr1
-    sta ptr3
-    lda #>SCREENMEM
+    lda #>FIRSTLINE
     sta ptr+1
-    sta ptr1+1
     eor #COLORXOR
     sta ptr2+1
+
+    lda #<SECLINE
+    sta ptr1
+    sta ptr3
+    lda #>SECLINE
+    sta ptr1+1
+    eor #COLORXOR
     sta ptr3+1
 
     ldx #SCREEN_HEIGHT-1
@@ -403,9 +429,8 @@ zproc screen540b_scrollup
 
         lda ptr1
         clc
-        adc #SCREEN_WIDTH
+        adc #XSCREEN_WIDTH
         sta ptr1
-        sta ptr3
         zif_cs
             inc ptr1+1
             inc ptr3+1
@@ -435,11 +460,13 @@ zproc screen540b_scrolldown
     sta ptr
     sta ptr2
     lda #>LASTLINE
-    sta ptr1+1
     sta ptr+1
     eor #COLORXOR
-    sta ptr3+1
     sta ptr2+1
+    lda #>SECLASTLINE
+    sta ptr1+1
+    eor #COLORXOR
+    sta ptr3+1
 
     ldx #SCREEN_HEIGHT-1
     zloop
@@ -462,7 +489,7 @@ zproc screen540b_scrolldown
 
         lda ptr1
         sec
-        sbc #SCREEN_WIDTH
+        sbc #XSCREEN_WIDTH
         sta ptr1
         sta ptr3
         zif_cc
@@ -591,10 +618,18 @@ zproc calculate_cursor_address
     adc #>SCREENMEM     ; only MSB because SCREENMEM is page aligned
     sta ptr+1
 
+    lda ptr
+    clc
+    adc #SCREEN_HOMEPOS_OFFSET  ; offset is always < 256
+    sta ptr
+    sta ptr1
+    zif_cs
+        inc ptr+1
+    zendif
+
+    lda ptr+1
     eor #COLORXOR
     sta ptr1+1
-    lda ptr
-    sta ptr1
 
     rts
 zendproc
