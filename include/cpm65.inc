@@ -230,8 +230,8 @@
     .byte extent_mask   ; extent mask
     .word blocks_on_disk - 1 ; number of blocks on the disk
     .word \dirents - 1  ; number of directory entries
-    .byte allocation_bitmap@mos16hi
-    .byte allocation_bitmap@mos16lo
+    .byte allocation_bitmap >> 8
+    .byte allocation_bitmap & 0xff
     .word checksum_buffer_size ; checksum vector size
     .word \reserved     ; number of reserved _sectors_ on disk
 
