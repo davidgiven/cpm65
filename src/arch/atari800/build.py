@@ -42,8 +42,8 @@ simplerule(
     ins=[".+atari800_rawdiskimage"],
     outs=["=atari800.atr"],
     commands=[
-        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
-        "cat {ins[0]} >> {outs[0]}",
+        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $[outs[0]]",
+        "cat $[ins[0]] >> $[outs[0]]",
     ],
     label="MAKEATR",
 )
@@ -52,11 +52,7 @@ mkcpmfs(
     name="atari800b_rawdiskimage",
     format="atari90",
     size=128 * 720,
-    items={
-    }
-    | BIG_APPS
-    | BIG_SCREEN_APPS
-    | PASCAL_APPS
+    items={} | BIG_APPS | BIG_SCREEN_APPS | PASCAL_APPS,
 )
 
 simplerule(
@@ -64,8 +60,8 @@ simplerule(
     ins=[".+atari800b_rawdiskimage"],
     outs=["=atari800b.atr"],
     commands=[
-        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
-        "cat {ins[0]} >> {outs[0]}",
+        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $[outs[0]]",
+        "cat $[ins[0]] >> $[outs[0]]",
     ],
     label="MAKEATR",
 )
@@ -74,11 +70,7 @@ mkcpmfs(
     name="atari800c_rawdiskimage",
     format="atari90",
     size=128 * 720,
-    items={
-    }
-    | MINIMAL_APPS_SRCS
-    | SCREEN_APPS_SRCS
-    | BIG_APPS_SRCS
+    items={} | MINIMAL_APPS_SRCS | SCREEN_APPS_SRCS | BIG_APPS_SRCS,
 )
 
 simplerule(
@@ -86,8 +78,8 @@ simplerule(
     ins=[".+atari800c_rawdiskimage"],
     outs=["=atari800c.atr"],
     commands=[
-        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
-        "cat {ins[0]} >> {outs[0]}",
+        r"/usr/bin/printf '\x96\x02\x80\x16\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $[outs[0]]",
+        "cat $[ins[0]] >> $[outs[0]]",
     ],
     label="MAKEATR",
 )
@@ -97,7 +89,7 @@ llvmrawprogram(
     srcs=["./atari800.S"],
     deps=["include", "src/lib+bioslib", ".+headers"],
     cflags=["-DATARI_HD"],
-    linkscript="./atari800hd.ld",
+    linkscript="./atari800.ld",
 )
 
 mkcpmfs(
@@ -135,8 +127,8 @@ simplerule(
     ins=[".+atari800hd_rawdiskimage"],
     outs=["=atari800hd.atr"],
     commands=[
-        r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
-        "cat {ins[0]} >> {outs[0]}",
+        r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $[outs[0]]",
+        "cat $[ins[0]] >> $[outs[0]]",
     ],
     label="MAKEATR",
 )
@@ -184,8 +176,8 @@ simplerule(
     ins=[".+atari800xlhd_rawdiskimage"],
     outs=["=atari800xlhd.atr"],
     commands=[
-        r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > {outs[0]}",
-        "cat {ins[0]} >> {outs[0]}",
+        r"/usr/bin/printf '\x96\x02\xf0\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $[outs[0]]",
+        "cat $[ins[0]] >> $[outs[0]]",
     ],
     label="MAKEATR",
 )

@@ -6,7 +6,10 @@ llvmclibrary(name="xfcb", srcs=["./xfcb.S"], deps=["include"])
 llvmclibrary(
     name="cpm65",
     srcs=["./printi.S", "./screen.S", "./serial.S"],
-    hdrs={"lib/printi.h": "./printi.h", "lib/screen.h": "./screen.h", 
-	  "lib/serial.h": "./serial.h"},
+    hdrs={
+        "lib/printi.h": "./printi.h",
+        "lib/screen.h": "./screen.h",
+        "lib/serial.h": "./serial.h",
+    },
     deps=["include"],
 )

@@ -47,7 +47,7 @@ llvmrawprogram(
     ],
     linkscript="./neo6502.ld",
     ldflags=[
-        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers {deps[0]} "
+        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers $[deps[0]] "
         + "| gawk --non-decimal-data -f scripts/size.awk)"
     ],
 )

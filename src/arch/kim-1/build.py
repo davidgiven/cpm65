@@ -7,37 +7,41 @@ from config import (
     MINIMAL_APPS_SRCS,
     BIG_APPS,
     BIG_APPS_SRCS,
+    SCREEN_APPS,
+    BIG_SCREEN_APPS,
     PASCAL_APPS,
 )
 
 COMMODORE_ITEMS = (
-    {"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos"}
+    {"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+     "0:scrvt100.com": "apps+scrvt100"}
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
     | BIG_APPS_SRCS
+    | SCREEN_APPS
 )
 
 
 @Rule
 def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
-    cs = ["rm -f {outs[0]}"]
+    cs = ["rm -f $[outs[0]]"]
     ins = []
 
     cmd = "chronic cc1541 -q "
     if id:
         cmd += "-i %d " % id
-    cmd += '-n "%s" {outs[0]}' % title
+    cmd += '-n "%s" $[outs[0]]' % title
     cs += [cmd]
 
     for k, v in items.items():
         cs += [
-            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s {outs[0]}"
+            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s $[outs[0]]"
             % (k, filenameof(v))
         ]
         ins += [v]
 
-    cs += ["{deps[0]} -f {outs[0]}"]
+    cs += ["$[deps[0]] -f $[outs[0]]"]
     simplerule(
         replaces=self,
         ins=ins,
@@ -47,53 +51,67 @@ def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
         label="MKCBMFS",
     )
 
-
 llvmclibrary(
-    name="libsd", srcs=["./libsd.S"], cflags=["-I ."], deps=["include"]
+    name="k-1013",
+    srcs=["./k-1013.S", "./kim-1-k1013.S"],
+    deps=["include"],
+    hdrs={"k-1013.inc": "./k-1013.inc", "kim-1.inc": "./kim-1.inc"},
 )
 
 llvmclibrary(
-    name="k-1013", srcs=["./k-1013.S"], cflags=["-I ."], deps=["include", "./k-1013.inc"]
+    name="pario",
+    srcs=["./pario.S"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
 )
 
 llvmclibrary(
-    name="kim-1-k1013", srcs=["./kim-1-k1013.S"], cflags=["-I ."], deps=["include", ".+k-1013"]
+    name="sdcard",
+    srcs=["./libsd.S", "./kim-1-sdcard.S"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
 )
 
 llvmclibrary(
-    name="kim-1-sdcard", srcs=["./kim-1-sdcard.S"], cflags=["-I ."], deps=["include", ".+libsd"]
+    name="iec-kim",
+    srcs=["./kim-1-iec.S"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
 )
 
 llvmclibrary(
-    name="kim-1-iec", srcs=["./kim-1-iec.S"], cflags=["-I ."], deps=["include"]
+    name="iec-pal",
+    srcs=["./kim-1-iec.S"],
+    cflags=["-DPAL_1"],
+    deps=["include"],
+    hdrs={"kim-1.inc": "./kim-1.inc"},
 )
 
 llvmrawprogram(
     name="bios-k1013",
-    srcs=["./kim-1.S"],
-    deps=["./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-k1013"],
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+k-1013"],
     linkscript="./kim-1-k1013.ld",
 )
 
 llvmrawprogram(
     name="bios-sdcard",
-    srcs=["./kim-1.S"],
-    deps=["./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-sdcard"],
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+sdcard"],
     linkscript="./kim-1-sdcard.ld",
 )
 
 llvmrawprogram(
     name="bios-iec-kim",
-    srcs=["./kim-1.S"],
-    deps=[  "./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-iec"],
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+iec-kim"],
     linkscript="./kim-1-iec.ld",
 )
 
 llvmrawprogram(
     name="bios-iec-pal",
-    srcs=["./kim-1.S"],
-    cflags=["-DPAL_1"],
-    deps=["./kim-1.inc", "include", "src/lib+bioslib", ".+kim-1-iec"],
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+iec-pal"],
     linkscript="./kim-1-iec.ld",
 )
 
@@ -104,6 +122,7 @@ mkcpmfs(
     size=256 * 77 * 26,
     items={
         "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:scrvt100.com": "apps+scrvt100",
         "0:format.com": "src/arch/kim-1/utils+format",
         "0:format.txt": "src/arch/kim-1/cpmfs/format.txt",
         "0:imu.com": "src/arch/kim-1/utils+imu",
@@ -115,6 +134,8 @@ mkcpmfs(
     | MINIMAL_APPS_SRCS
     | BIG_APPS
     | BIG_APPS_SRCS
+    | SCREEN_APPS
+    | BIG_SCREEN_APPS
     | PASCAL_APPS,
 )
 
@@ -125,12 +146,15 @@ mkcpmfs(
     size=512 * 4096 * 16,
     items={
         "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:scrvt100.com": "apps+scrvt100",
         "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
     | BIG_APPS_SRCS
+    | SCREEN_APPS
+    | BIG_SCREEN_APPS
     | PASCAL_APPS,
 )
 

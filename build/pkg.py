@@ -1,5 +1,4 @@
-from build.ab import Rule, emit, Target, filenamesof
-from types import SimpleNamespace
+from build.ab import Rule, Target
 import os
 import subprocess
 
@@ -33,6 +32,7 @@ class _PkgConfig:
 
 
 TargetPkgConfig = _PkgConfig(os.getenv("PKG_CONFIG"))
+HostPkgConfig = _PkgConfig(os.getenv("HOST_PKG_CONFIG"))
 
 
 def _package(self, name, package, fallback, pkgconfig):
@@ -50,7 +50,7 @@ def _package(self, name, package, fallback, pkgconfig):
 
     assert (
         fallback
-    ), f"Required package '{package}' not installed when materialising target '{name}'"
+    ), f"Required package '{package}' not installed when materialising target '$[name]'"
 
     if "cheader_deps" in fallback.args:
         self.args["cheader_deps"] = fallback.args["cheader_deps"]
@@ -69,3 +69,16 @@ def _package(self, name, package, fallback, pkgconfig):
 @Rule
 def package(self, name, package=None, fallback: Target = None):
     _package(self, name, package, fallback, TargetPkgConfig)
+
+
+@Rule
+def hostpackage(self, name, package=None, fallback: Target = None):
+    _package(self, name, package, fallback, HostPkgConfig)
+
+
+def has_package(name):
+    return TargetPkgConfig.has_package(name)
+
+
+def has_host_package(name):
+    return HostPkgConfig.has_package(name)

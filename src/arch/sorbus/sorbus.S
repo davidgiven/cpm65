@@ -18,8 +18,8 @@ UART_WBUFSIZ = $DF0F; can be $00-$7f in normal operation
 
 ; IO Register for Disk-Access.
 ; Write Sector LBA ( 128 Byte sectors ), Address of the DMA-buffer
-; then trigger the read  ( write 0x55 to SECTOR_CMD_READ )
-; or the           write ( write 0x44 to SECTOR_CMD_WRITE )
+; then trigger the read  ( strobe write to SECTOR_CMD_READ )
+; or the           write ( strobe write to SECTOR_CMD_WRITE )
 ; DMA-adress and LBA will be auto-incremented, be aware to set them properly before trigger !
 
 SECTOR_LBA_L = $DF70
@@ -317,9 +317,14 @@ zproc bios_READ
     lda dma+1
     sta SECTOR_DMA_H
 
-    lda #$88        // iniate read with DMA
     sta SECTOR_CMD_READ
+    zrepeat
+        lda SECTOR_CMD_READ
+    zuntil_mi
     clc
+    zif_vs
+        sec
+    zendif
     rts
 zendproc
 
@@ -340,12 +345,15 @@ zproc bios_WRITE
    ; jsr print_hex_number
    ; pla
    ; jsr print_hex_number
-    lda #$44        // iniate write with DMA
     sta SECTOR_CMD_WRITE
-
+    zrepeat
+        lda SECTOR_CMD_WRITE
+    zuntil_mi
     clc
+    zif_vs
+        sec
+    zendif
     rts
-
 zendproc
 
 ; Prints an 8-bit hex number in A.
