@@ -105,9 +105,9 @@ success:
     lda (dpb),y
     clc
     adc #1
-    .zif cs
+    zif cs
         inx
-    .zendif
+    zendif
     jsr print16padded
 
     lda #<direntries
@@ -181,38 +181,38 @@ success:
 
 .label stop
 
-    .zrepeat
+    zrepeat
         lda (ptr1),y
         ldx #7
-        .zrepeat
+        zrepeat
             lsr A
-            .zif cc
+            zif cc
                 inc val1
-                .zif eq
+                zif eq
                     inc val1+1
-                .zendif
-            .zendif
+                zendif
+            zendif
             inc count
-            .zif eq
+            zif eq
                 inc count+1
-            .zendif
+            zendif
             pha
             lda count+1
             cmp dsm+1
-            .zif eq
+            zif eq
                 lda count
                 cmp dsm
                 beq stop    \ stop condition
-            .zendif
+            zendif
             pla
             dex
-        .zuntil mi
+        zuntil mi
 
         inc ptr1
-        .zif eq
+        zif eq
             inc ptr1+1
-        .zendif
-    .zuntil eq          \ which is never
+        zendif
+    zuntil eq          \ which is never
 
 stop:
     pla                 \ leftover byte
@@ -222,9 +222,9 @@ stop:
     dex
     dex
     stx count           \ save bsh-3 for later
-    .zif ne
+    zif ne
         jsr shift_val1_left_by_x
-    .zendif
+    zendif
 
     lda val1
     ldx val1+1
@@ -244,9 +244,9 @@ stop:
     lda dsm+1
     sta val1+1
     ldx count
-    .zif ne
+    zif ne
         jsr shift_val1_left_by_x
-    .zendif
+    zendif
 
     lda val1
     ldx val1+1
@@ -261,28 +261,28 @@ stop:
     ldx #>crlf
     jmp printstring     \ finished
 
-.zproc shift_val1_left_by_x
+zproc shift_val1_left_by_x
     clc
-    .zrepeat
+    zrepeat
         rol val1
         rol val1+1
         dex
-    .zuntil eq
+    zuntil eq
     rts
-.zendproc
+zendproc
 
-.zproc printstring
+zproc printstring
     ldy #BDOS_PRINTSTRING
     jmp BDOS
-.zendproc
+zendproc
 
 \ Prints XA in decimal. Y is the padding char or 0 for no padding.
 
-.zproc print16padded
+zproc print16padded
     ldy #' '            \ always pad with ' '
-.zendproc
+zendproc
 
-.zproc print16paddedY
+zproc print16paddedY
     sta ptr1+0
     stx ptr1+1
     sty pad
@@ -292,10 +292,10 @@ stop:
     .label justprint
 
     ldy #8
-    .zrepeat
+    zrepeat
         ldx #0xff
         sec
-        .zrepeat
+        zrepeat
             lda ptr1+0
             sbc dec_table+0, y
             sta ptr1+0
@@ -305,7 +305,7 @@ stop:
             sta ptr1+1
 
             inx
-        .zuntil cc
+        zuntil cc
 
         lda ptr1+0
         adc dec_table+0, y
@@ -320,11 +320,11 @@ stop:
         txa
         pha
 
-        .zif eq                     \ if digit is zero, check padding
+        zif eq                     \ if digit is zero, check padding
             lda pad                 \ get the padding character
             beq skip                \ if zero, no padding
             bne justprint           \ otherwise, use it
-        .zendif
+        zendif
 
         ldx #'0'                    \ printing a digit, so reset padding
         stx pad
@@ -340,12 +340,12 @@ stop:
 
         dey
         dey
-    .zuntil mi
+    zuntil mi
     rts
 
 dec_table:
    .word 1, 10, 100, 1000, 10000
-.zendproc
+zendproc
 
 error:
     .byte "drive error"

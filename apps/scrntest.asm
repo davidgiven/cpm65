@@ -24,7 +24,7 @@
 .label print16
 .label putchar
 
-.zproc start
+zproc start
 
     \ Find screen driver
 
@@ -39,9 +39,9 @@
     jsr BIOS
     
     \ Exit if no driver is found
-    .zif cs
+    zif cs
         rts
-    .zendif
+    zendif
     sta SCREEN+1
     stx SCREEN+2
 
@@ -109,145 +109,145 @@ mainloop:
 case_done:
     \ Cursor left
     cmp #SCREEN_KEY_LEFT
-    .zif eq
+    zif eq
         lda #'A'
-    .zendif
+    zendif
     cmp #'A'
-    .zif eq
+    zif eq
         lda #0
         cmp cur_x
-        .zif ne
+        zif ne
             dec cur_x
-        .zendif
+        zendif
         jsr update_cursor
         jmp mainloop
-    .zendif
+    zendif
     
     \ Cursor right
     cmp #SCREEN_KEY_RIGHT
-    .zif eq
+    zif eq
         lda #'D'
-    .zendif
+    zendif
     cmp #'D'
-    .zif eq
+    zif eq
         lda max_x
         cmp cur_x
-        .zif ne
+        zif ne
             inc cur_x
-        .zendif
+        zendif
         jsr update_cursor
         jmp mainloop
-    .zendif
+    zendif
    
     \ Cursor up
     cmp #SCREEN_KEY_UP
-    .zif eq
+    zif eq
         lda #'W'
-    .zendif 
+    zendif 
     cmp #'W'
-    .zif eq
+    zif eq
         lda #0
         cmp cur_y
-        .zif ne
+        zif ne
             dec cur_y
-        .zendif
+        zendif
         jsr update_cursor
         jmp mainloop
-    .zendif
+    zendif
    
     \ Cursor down
     cmp #SCREEN_KEY_DOWN
-    .zif eq
+    zif eq
         lda #'S'
-    .zendif 
+    zendif 
     cmp #'S'
-    .zif eq
+    zif eq
         lda max_y
         cmp cur_y
-        .zif ne
+        zif ne
             inc cur_y
-        .zendif
+        zendif
         jsr update_cursor
         jmp mainloop
-    .zendif
+    zendif
 
     \ Put string
     cmp #'P'
-    .zif eq
+    zif eq
         lda #<string_a
         ldx #>string_a
         ldy #SCREEN_PUTSTRING
         jsr SCREEN
         jmp mainloop
-    .zendif
+    zendif
 
     \ Put character
     cmp #'C'
-    .zif eq
+    zif eq
         lda #'C'
         ldy #SCREEN_PUTCHAR
         jsr SCREEN
-    .zendif
+    zendif
 
     \ Toggle cursor
     cmp #'V'
-    .zif eq
+    zif eq
         lda #0
         cmp cur_vis
-        .zif ne
+        zif ne
             sta cur_vis
             ldy #SCREEN_SHOWCURSOR
             jsr SCREEN
             jmp mainloop 
-        .zendif
+        zendif
         lda #1
         sta cur_vis
         ldy #SCREEN_SHOWCURSOR
         jsr SCREEN
         jmp mainloop
-    .zendif
+    zendif
 
     \ Scroll up
     cmp #'U'
-    .zif eq
+    zif eq
         ldy #SCREEN_SCROLLUP
         jsr SCREEN
         jmp mainloop
-    .zendif
+    zendif
 
     \ Scroll down
     cmp #'J'
-    .zif eq
+    zif eq
         ldy #SCREEN_SCROLLDOWN
         jsr SCREEN
         jmp mainloop
-    .zendif
+    zendif
 
     \ Clear to end of line
     cmp #'L'
-    .zif eq
+    zif eq
         ldy #SCREEN_CLEARTOEOL
         jsr SCREEN
         jmp mainloop
-    .zendif
+    zendif
 
     \ Toggle style
     cmp #'I'
-    .zif eq
+    zif eq
         lda #0
         cmp style
-        .zif ne
+        zif ne
             sta style
             ldy #SCREEN_SETSTYLE
             jsr SCREEN
             jmp mainloop
-        .zendif
+        zendif
         lda #1
         sta style
         ldy #SCREEN_SETSTYLE
         jsr SCREEN
         jmp mainloop
-    .zendif
+    zendif
   
     \ Clear screen and print help 
     cmp #'H'
@@ -255,14 +255,14 @@ case_done:
 
     \ Clear screen and quit 
     cmp #'Q'
-    .zif eq
+    zif eq
         ldy #SCREEN_CLEAR
         jsr SCREEN
         rts
-    .zendif
+    zendif
     
     jmp mainloop
-.zendproc
+zendproc
 
 BIOS:
     jmp 0
@@ -271,56 +271,56 @@ SCREEN:
     jmp 0    
 
 
-.zproc update_cursor
+zproc update_cursor
     lda cur_x
     ldx cur_y
     ldy #SCREEN_SETCURSOR
     jsr SCREEN
 
     rts
-.zendproc
+zendproc
 
 \ Prints an inline string. The text string must immediately follow the
 \ subroutine call.
 
-.zproc printi
+zproc printi
     pla
     sta ptr1+0
     pla
     sta ptr1+1
 
-    .zloop
+    zloop
         ldy #1
         lda (ptr1), y
-        .zbreak eq
-        .zbreak mi
+        zbreak eq
+        zbreak mi
         jsr putchar
 
         inc ptr1+0
-        .zif eq
+        zif eq
             inc ptr1+1
-        .zendif
-    .zendloop
+        zendif
+    zendloop
 
     inc ptr1+0
-    .zif eq
+    zif eq
         inc ptr1+1
-    .zendif
+    zendif
     inc ptr1+0
-    .zif eq
+    zif eq
         inc ptr1+1
-    .zendif
+    zendif
 
     jmp (ptr1)
-.zendproc
+zendproc
 
 \ Prints XA in decimal. Y is the padding char or 0 for no padding.
 
-.zproc print16
+zproc print16
     ldy #0
-.zendproc
+zendproc
 \ falls through
-.zproc print16padded
+zproc print16padded
     sta ptr1+0
     stx ptr1+1
     sty ptr2+0
@@ -330,10 +330,10 @@ SCREEN:
     .label justprint
 
     ldy #8
-    .zrepeat
+    zrepeat
         ldx #0xff
         sec
-        .zrepeat
+        zrepeat
             lda ptr1+0
             sbc dec_table+0, y
             sta ptr1+0
@@ -343,7 +343,7 @@ SCREEN:
             sta ptr1+1
 
             inx
-        .zuntil cc
+        zuntil cc
 
         lda ptr1+0
         adc dec_table+0, y
@@ -358,11 +358,11 @@ SCREEN:
         txa
         pha
 
-        .zif eq                     \ if digit is zero, check padding
+        zif eq                     \ if digit is zero, check padding
             lda ptr2+0              \ get the padding character
             beq skip                \ if zero, no padding
             bne justprint           \ otherwise, use it
-        .zendif
+        zendif
 
         ldx #'0'                    \ printing a digit, so reset padding
         stx ptr2+0
@@ -377,17 +377,17 @@ SCREEN:
 
         dey
         dey
-    .zuntil mi
+    zuntil mi
     rts
 
 dec_table:
    .word 1, 10, 100, 1000, 10000
-.zendproc
+zendproc
 
-.zproc putchar
+zproc putchar
     ldy #BDOS_CONIO
     jmp BDOS
-.zendproc
+zendproc
 
 string_init:
     .byte "W,A,S,D or arrow keys - Move cursor\r\n"

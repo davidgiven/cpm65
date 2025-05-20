@@ -11,9 +11,9 @@
 
 \ --- Resident part starts at the top of the file ---------------------------
 
-.zproc start
+zproc start
     jmp entry
-.zendproc
+zendproc
 
 driver:
     .word DRVID_TTY
@@ -21,25 +21,25 @@ driver:
     .word 0
     .byte "CapsTTY", 0
 
-.zproc strategy
+zproc strategy
     cpy #TTY_CONOUT
-    .zif eq
+    zif eq
         cmp #'a'
-        .zif cs
+        zif cs
             cmp #'z'+1
-            .zif cc
+            zif cc
                 and #0xdf
-            .zendif
-        .zendif
-    .zendif
+            zendif
+        zendif
+    zendif
     jmp (next)
-.zendproc
+zendproc
 
 next: .word 0
 
 \ --- Resident part stops here -------------------------------------------
 
-.zproc entry
+zproc entry
     lda #<banner
     ldx #>banner
     ldy #BDOS_PRINTSTRING
@@ -56,7 +56,7 @@ next: .word 0
     ldx #>DRVID_TTY
     ldy #BIOS_FINDDRV
     jsr BIOS
-    .zif cc
+    zif cc
         sta next+0
         stx next+1
 
@@ -66,7 +66,7 @@ next: .word 0
         ldx #>driver
         ldy #BIOS_ADDDRV
         jsr BIOS
-        .zif cc
+        zif cc
 
             \ Our driver uses no ZP, so we don't need to adjust that. But it does use
             \ TPA.
@@ -82,8 +82,8 @@ next: .word 0
             \ Finished --- don't even need to warm boot.
 
             rts
-        .zendif
-    .zendif
+        zendif
+    zendif
 
     lda #<failed
     ldx #>failed

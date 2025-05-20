@@ -21,7 +21,7 @@
 .expand 1
 .label printchar
 
-.zproc start
+zproc start
 	\ Did we get a parameter?
 
 	lda cpm_fcb + 1
@@ -51,41 +51,41 @@
 	ldy #BDOS_SET_DMA
 	jsr BDOS
 
-	.zloop
+	zloop
 		lda #<cpm_fcb
 		ldx #>cpm_fcb
 		ldy #BDOS_READ_SEQUENTIAL
 		jsr BDOS
-		.zbreak cs
+		zbreak cs
 
-		.zrepeat
+		zrepeat
 			jsr dump_line
 			lda address+0
 			and #0x7f
-		.zuntil eq
-	.zendloop
+		zuntil eq
+	zendloop
 	rts
-.zendproc
+zendproc
 	
-.zproc syntax_error
+zproc syntax_error
 	lda #<msg
 	ldx #>msg
 	ldy #BDOS_PRINTSTRING
 	jmp BDOS
 msg:
 	.byte "Syntax error", 13, 10, 0
-.zendproc
+zendproc
 
-.zproc cannot_open
+zproc cannot_open
 	lda #<msg
 	ldx #>msg
 	ldy #BDOS_PRINTSTRING
 	jmp BDOS
 msg:
 	.byte "Cannot open file", 13, 10, 0
-.zendproc
+zendproc
 
-.zproc dump_line
+zproc dump_line
 	\ Print the address.
 
 	lda address+2
@@ -100,7 +100,7 @@ msg:
 
 	lda #0
 	sta index
-	.zrepeat
+	zrepeat
 		lda address+0
 		and #0x7f
 		ora index
@@ -113,13 +113,13 @@ msg:
 		inc index
 		lda index
 		cmp #8
-	.zuntil eq
+	zuntil eq
 
 	\ Print ASCII.
 
 	lda #0
 	sta index
-	.zrepeat
+	zrepeat
 		lda address+0
 		and #0x7f
 		ora index
@@ -127,19 +127,19 @@ msg:
 
 		lda cpm_default_dma, x
 		cmp #32
-		.zif cc
+		zif cc
 			lda #'.'
-		.zendif
+		zendif
 		cmp #127
-		.zif cs
+		zif cs
 			lda #'.'
-		.zendif
+		zendif
         jsr printchar
 
 		inc index
 		lda index
 		cmp #8
-	.zuntil eq
+	zuntil eq
 
 	\ Advance address.
 
@@ -147,18 +147,18 @@ msg:
 	clc
 	adc #8
 	sta address+0
-	.zif eq
+	zif eq
 		inc address+1
-		.zif eq
+		zif eq
 			inc address+2
-		.zendif
-	.zendif
+		zendif
+	zendif
 
 	jmp newline
-.zendproc
+zendproc
 
 \ Prints an 8-bit hex number in A.
-.zproc print_hex_number
+zproc print_hex_number
 	pha
 	lsr a
 	lsr a
@@ -170,30 +170,30 @@ print:
 	and #0x0f
 	ora #48
 	cmp #58
-    .zif cs
+    zif cs
         adc #6
-    .zendif
+    zendif
 	pha
 	jsr printchar
 	pla
 	rts
-.zendproc
+zendproc
 
-.zproc space
+zproc space
 	lda #' '
-.zendproc
+zendproc
     \ fall through
-.zproc printchar
+zproc printchar
     ldy #BDOS_CONOUT
     jmp BDOS
-.zendproc
+zendproc
 
-.zproc newline
+zproc newline
 	lda #13
 	jsr printchar
 	lda #10
 	jmp printchar
-.zendproc
+zendproc
 
 \ vim: filetype=asm sw=4 ts=4 et
 

@@ -3,7 +3,7 @@
 .label test_string
 .label BIOS
 
-.zproc start
+zproc start
     lda #<test_string
     ldx #>test_string
     ldy #BDOS_PRINTSTRING
@@ -20,7 +20,7 @@ BIOS:
     jsr $1234
 
     rts
-.zendproc
+zendproc
 
 test_string:
     .byte 26, "ADM-3A TEST - Screen cleared", 11,11, 13,10
