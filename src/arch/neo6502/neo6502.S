@@ -708,26 +708,23 @@ zproc bdos_RENAMEFILE
     ; New name: param+16
 
     jsr get_closed_file_table_entry
-    phx
+    txa
+    clc
+    adc #<(file_table+FT_FILENAMELEN)
+    sta CP_PARAM+0
+    lda #>(file_table+FT_FILENAMELEN)
+    adc #0
+    sta CP_PARAM+1
 
     clc
     lda param+0
     adc #16
     sta param+0
-    zif_eq
+    zif_cs
         inc param+1
     zendif
 
-    jsr get_closed_file_table_entry
-
-    pla
-    inc a
-    clc
-    adc #<file_table
-    sta CP_PARAM+0
-    lda #>file_table
-    adc #0
-    sta CP_PARAM+1
+    jsr convert_filename
 
     lda #<(temp_file_entry+FT_FILENAMELEN)
     sta CP_PARAM+2
@@ -1240,7 +1237,6 @@ zproc open_file_table_entry
 
     ; Update the LRU list.
 
-update_lru_list_debug:
     ldx #NUM_FILES-1
     ldy #NUM_FILES-1
     zrepeat
