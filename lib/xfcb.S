@@ -18,7 +18,7 @@ zproc xfcb_clear
         sta (__fcb), y
         iny
         cpy #FCB_R2+1
-    zuntil_eq
+    zuntil eq
 
     pla
     rts

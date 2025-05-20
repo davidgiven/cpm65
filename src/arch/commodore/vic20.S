@@ -77,22 +77,22 @@ _start:
         sta bios_exec_addr
 
         inc load1+1
-        zif_eq
+        zif eq
             inc load1+2
         zendif
 
         inc store1+1
-        zif_eq
+        zif eq
             inc store1+2
-            zbreakif_eq
+            zbreakif eq
         zendif
 
         lda store1+1
         cmp #<bios_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda store1+2
         cmp #>bios_end_addr
-    zuntil_eq
+    zuntil eq
 
     ; Relocate the init code --- we can't execute it here because BASIC will
     ; load it right into the middle of what we're going to use as video memory.
@@ -104,22 +104,22 @@ _start:
         sta init_exec_addr
 
         inc load2+1
-        zif_eq
+        zif eq
             inc load2+2
         zendif
 
         inc store2+1
-        zif_eq
+        zif eq
             inc store2+2
-            zbreakif_eq
+            zbreakif eq
         zendif
 
         lda store2+1
         cmp #<init_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda store2+2
         cmp #>init_end_addr
-    zuntil_eq
+    zuntil eq
 
     jmp _init
 
@@ -131,7 +131,7 @@ zproc _init, .init
         lda vic_tab-1, x
         sta 0x9000-1, x
         dex
-    zuntil_eq
+    zuntil eq
 
     lda #0x08           ; black border, black background, inverted
     sta 0x900f
@@ -148,7 +148,7 @@ zproc _init, .init
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Miscellaneous initialisation.
 
@@ -162,7 +162,7 @@ zproc _init, .init
     zrepeat
         sta keyboard_state, y
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Set up for sector I/O.
 
@@ -173,7 +173,7 @@ zproc _init, .init
         lda allocate_cmd-1, x
         jsr ieee_write
         dex
-    zuntil_eq
+    zuntil eq
     jsr ieee_unlisten
 
     ; Load the BDOS.
@@ -290,7 +290,7 @@ zproc tty_const
     jsr scan_keyboard
 
     lda pending_key
-    zif_ne
+    zif ne
         lda #0xff
     zendif
 
@@ -304,11 +304,11 @@ zproc tty_conin
     jsr toggle_cursor
 
     lda pending_key
-    zif_eq
+    zif eq
         zrepeat
             jsr scan_keyboard
             lda pending_key
-        zuntil_ne
+        zuntil ne
     zendif
 
     ldx #0
@@ -334,11 +334,11 @@ zproc scan_keyboard
         zrepeat
             ldx VIA2_PA
             cpx VIA2_PA
-        zuntil_eq
+        zuntil eq
 
         txa
         eor keyboard_state, y
-        zif_ne
+        zif ne
             ; Any set bits in A correspond to a key which has changes state.
             ; The corresponding bit in X tells us whether it went up or down.
 
@@ -362,7 +362,7 @@ zproc scan_keyboard
 
             zrepeat
                 bit ptr1+0
-                zif_mi
+                zif mi
                     ; This key has changed.
 
                     tya
@@ -375,7 +375,7 @@ zproc scan_keyboard
                 iny
                 asl ptr1+1
                 asl ptr1+0
-            zuntil_eq
+            zuntil eq
 
             pla
             tay
@@ -389,7 +389,7 @@ zproc scan_keyboard
 
         iny
         cpy #8
-    zuntil_eq
+    zuntil eq
     rts
 rts
 
@@ -398,7 +398,7 @@ rts
 
 zproc change_key_state
     bit ptr1+1
-    zif_pl
+    zif pl
         lda keyboard_state+2
         and #0x01
         beq control_pressed
@@ -457,15 +457,15 @@ zendproc
 
 zproc tty_conout
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec cursorx
-        zif_mi
+        zif mi
             inc cursorx
         zendif
         jsr calculate_cursor_address
@@ -484,7 +484,7 @@ zproc tty_conout
     inc cursorx
     lda cursorx
     cmp #40
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         jmp write_nl
@@ -496,7 +496,7 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #24
-    zif_ne
+    zif ne
         rts
     zendif
 
@@ -510,14 +510,14 @@ zproc write_nl
     zrepeat
         sta (ptr), y
         iny
-    zuntil_eq
+    zuntil eq
 
     inc ptr+1
     ldy #0x3f
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
 
     lda #22
     sta cursory
@@ -535,7 +535,7 @@ zproc roll_up
         lda TEXT, y
         pha
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Now scroll the entire screen.
 
@@ -544,7 +544,7 @@ zproc roll_up
         sta TEXT, y
         iny
         cpy #220
-    zuntil_eq
+    zuntil eq
 
     ; Restore the bottom row.
 
@@ -555,7 +555,7 @@ zproc roll_up
         sta TEXT+220, y
         iny
         dex
-    zuntil_eq
+    zuntil eq
 
     ; Increment the scroll compensator.
 
@@ -563,7 +563,7 @@ zproc roll_up
     inx
     inx
     cpx #24
-    zif_eq
+    zif eq
         ldx #0
     zendif
     stx scroll_compensation
@@ -581,7 +581,7 @@ zproc clear_screen
         lda #1
         sta COLOURRAM-0x10, x
         inx
-    zuntil_eq
+    zuntil eq
 
     ; Clear the bitmap itself.
 
@@ -597,9 +597,9 @@ zproc clear_screen
             dec ptr+1
             lda ptr+1
             cmp #>(FRAMEBUFFER - 0x100)
-        zuntil_eq
+        zuntil eq
         iny
-    zuntil_eq
+    zuntil eq
 
     lda #0
     sta cursorx
@@ -619,7 +619,7 @@ zproc calculate_line_address
     clc
     adc scroll_compensation ; compensate for scrolling
     cmp #24
-    zif_cs
+    zif cs
         sec
         sbc #24
     zendif
@@ -633,7 +633,7 @@ zproc calculate_line_address
     adc ptr+0       ; =x20; may overflow
     sta ptr+0
     lda #0
-    zif_cs
+    zif cs
         lda #1
     zendif
 
@@ -658,12 +658,12 @@ zproc calculate_line_address
 
     pla
     ror a
-    zif_cs
+    zif cs
         clc
         lda #8
         adc ptr+0
         sta ptr+0
-        zif_cs
+        zif cs
             inc ptr+1
         zendif
     zendif
@@ -739,7 +739,7 @@ zproc draw_glyph
     ror a
     lda #0x0f
     ldy #0xf0
-    zif_cs
+    zif cs
         ; Off address.
 
         lda #0xf0
@@ -761,7 +761,7 @@ zproc draw_glyph
         sta (ptr), y
 
         dey
-    zuntil_eq
+    zuntil eq
     rts
 
 font_tab:
@@ -771,7 +771,7 @@ zendproc
 zproc toggle_cursor
     jsr calculate_cursor_address
     ldx #0xf0
-    zif_cs
+    zif cs
         ldx #0x0f
     zendif
 
@@ -781,7 +781,7 @@ zproc toggle_cursor
         eor (ptr), y
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -840,7 +840,7 @@ zproc ieee_getb
     zrepeat
         lda VIA2_IFR
         and #VIA2_IFR_T2
-        zif_ne
+        zif ne
             ; Timeout. Acknowledge EOI by toggling data.
 
             jsr iec_assert_data
@@ -850,7 +850,7 @@ zproc ieee_getb
         zendif
 
         jsr get_iec_status
-    zuntil_pl ; until clock is asserted
+    zuntil pl ; until clock is asserted
 
     ; The talker will clock in bits on clock release edges.
 
@@ -863,7 +863,7 @@ zproc ieee_getb
         jsr wait_for_iec_clock_assert
 
         dex
-    zuntil_eq
+    zuntil eq
     pla
     tax
 
@@ -897,7 +897,7 @@ zproc ieee_putb
 
     jsr iec_release_data
     jsr get_iec_status
-    zif_cs
+    zif cs
         ; Device not present.
 
         sec
@@ -913,7 +913,7 @@ zproc ieee_putb
     ; sure how this behaves with multiple receivers?)
 
     lda ieee_eoi
-    zif_ne
+    zif ne
         jsr wait_for_iec_data_release
         jsr wait_for_iec_data_assert
     zendif
@@ -936,10 +936,10 @@ zproc ieee_putb
         zrepeat
             lda VIA1_DRA
             cmp VIA1_DRA
-        zuntil_eq
+        zuntil eq
         ror a
         ror a           ; put data into carry
-        zif_cs
+        zif cs
             ; timeout
         zendif
 
@@ -956,7 +956,7 @@ zproc ieee_putb
         sta VIA2_PCR                        ; 4; total delay, 26 cycles
 
         dex
-    zuntil_eq
+    zuntil eq
     pla
     tax
 
@@ -985,14 +985,14 @@ zendproc
 zproc wait_for_iec_data_release
     zrepeat
         jsr get_iec_status
-    zuntil_cs
+    zuntil cs
     rts
 zendproc
 
 zproc wait_for_iec_data_assert
     zrepeat
         jsr get_iec_status
-    zuntil_cc
+    zuntil cc
     rts
 zendproc
 
@@ -1006,14 +1006,14 @@ zendproc
 zproc wait_for_iec_clock_release
     zrepeat
         jsr get_iec_status
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
 zproc wait_for_iec_clock_assert
     zrepeat
         jsr get_iec_status
-    zuntil_pl
+    zuntil pl
     rts
 zendproc
 
@@ -1053,7 +1053,7 @@ zproc get_iec_status
     zrepeat
         lda VIA1_DRA
         cmp VIA1_DRA
-    zuntil_eq
+    zuntil eq
     ror a
     ror a
     rts
@@ -1079,7 +1079,7 @@ timer_wait:
     zrepeat
         lda VIA2_IFR
         and #VIA2_IFR_T2
-    zuntil_ne
+    zuntil ne
     rts
 zendproc
 
@@ -1095,7 +1095,7 @@ print:
     and #0x0f
     ora #48
     cmp #58
-    zif_cs
+    zif cs
         adc #6
     zendif
     pha

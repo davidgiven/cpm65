@@ -71,7 +71,7 @@ zproc DiskReadSector, .text.DiskReadSector
         jsr xParReadByte
         sta (zp_sds_buffer),y
         iny
-    zuntil_eq
+    zuntil eq
 ;
 ; All done
 ;
@@ -108,7 +108,7 @@ zproc DiskWriteSector, .text.DiskWriteSector
         lda (zp_sds_buffer),y
         jsr xParWriteByte
         iny
-    zuntil_eq
+    zuntil eq
 ;
 ; Now get response.
 ;

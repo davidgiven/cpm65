@@ -119,7 +119,7 @@ zproc xParWriteByte, .text.xParWriteByte
     zrepeat
         lda PIAREGB     ;check status
         and #ACK
-    zuntil_eq           ;wait for ACK to go low
+    zuntil eq           ;wait for ACK to go low
 
 ;
 ; Now put the data onto the bus
@@ -140,7 +140,7 @@ zproc xParWriteByte, .text.xParWriteByte
     zrepeat
         lda PIAREGB
         and #ACK
-    zuntil_ne
+    zuntil ne
 
 ;
 ; Now lower the strobe, then wait for the Arduino to
@@ -152,7 +152,7 @@ zproc xParWriteByte, .text.xParWriteByte
     zrepeat
         lda PIAREGB
         and #ACK
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -178,7 +178,7 @@ zproc xParReadByte, .text.xParReadByte
     zrepeat
         lda PIAREGB
         and #ACK        ;is their strobe high?
-    zuntil_ne           ;nope, no data
+    zuntil ne           ;nope, no data
 ;
 ; Data is available, so grab and save it.
 ;
@@ -194,7 +194,7 @@ zproc xParReadByte, .text.xParReadByte
     zrepeat
         lda PIAREGB
         and #ACK
-    zuntil_eq           ;still active 
+    zuntil eq           ;still active 
 ;
 ; Lower our ack, then we're done.
 ;

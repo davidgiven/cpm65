@@ -42,7 +42,7 @@ zproc system_init, loader
         cmp #0xaa
         bne 1f
         iny
-        zif_eq
+        zif eq
             inc ptr+1
             lda ptr+1
             cmp #0xff
@@ -63,7 +63,7 @@ zproc system_init, loader
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
+    zif ne
         sec                 ; invalid drive
         rts
     zendif
@@ -88,7 +88,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta requested_cpm_sector, y
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Divide by 4, keeping the 2 LSB of the CPM sector as the
     ; 2 MSB of buffer_offset
@@ -102,7 +102,7 @@ zproc bios_SETSEC
         ror requested_cpm_sector+0
         ror buffer_offset
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Use the disk number to set the offset into the sd card
 
@@ -124,10 +124,10 @@ zproc set_disk_buffer_offset
     sta ptr+1
 
     bit buffer_offset
-    zif_mi
+    zif mi
         inc ptr+1
     zendif
-    zif_vs
+    zif vs
         lda #0x80
         sta ptr+0
     zendif
@@ -144,7 +144,7 @@ zproc change_sector
         cmp zp_sd_currentsector, y
         bne 1f
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Buffered sector not changing, so do no work.
 
@@ -154,9 +154,9 @@ zproc change_sector
     ; If requested sector is not buffered, flush buffer before changing
 
 1:  bit buffer_dirty
-    zif_mi
+    zif mi
         jsr flush_buffer
-        zif_cs
+        zif cs
             rts
         zendif
     zendif
@@ -168,12 +168,12 @@ zproc change_sector
         lda requested_cpm_sector, y
         sta zp_sd_currentsector, y
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Read sector from disk
 
     jsr sd_readsector
-    zif_cs
+    zif cs
         ; Some kind of read error. The data in the buffer is corrupt.
 
         lda #0xff
@@ -185,7 +185,7 @@ zendproc
 
 zproc flush_buffer
     jsr sd_writesector
-    zif_cc
+    zif cc
         ; A successful write, so mark the buffer as clean.
 
          lda #0

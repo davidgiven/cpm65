@@ -36,7 +36,7 @@ zendproc
 zproc _serial_inp, .text._serial_inp
     ldy #SERIAL_INP
     jsr _call_serial
-    zif_cs
+    zif cs
         ldx #0
         rts
     zendif

@@ -142,7 +142,7 @@ zproc _convert_to_screen_decimal
     adc #1
     zloop
         cmp #10
-        zbreakif_cc
+        zbreakif cc
         sbc #10
         iny
     zendloop
@@ -172,7 +172,7 @@ zproc screen_setcursor
         jsr screen_putchar
         inx
         cpx #8
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -185,7 +185,7 @@ zproc _parse_decimal
         jsr screen_getchar
 1:
         cmp #';'
-        zbreakif_eq
+        zbreakif eq
         pha
 
         ldy #9
@@ -194,7 +194,7 @@ zproc _parse_decimal
         zrepeat
             adc val
             dey
-        zuntil_eq
+        zuntil eq
         sta val
 
         pla
@@ -220,11 +220,11 @@ zproc screen_getcursor
     zloop
         jsr screen_getchar
         cmp #27
-    zuntil_eq
+    zuntil eq
 
     jsr screen_getchar
     cmp #'['
-    zif_eq
+    zif eq
         lda #';'
         jsr _parse_decimal
         stx 2f+1
@@ -242,7 +242,7 @@ zendproc
 
 zproc screen_setstyle
     cmp #STYLE_REVERSE
-    zif_eq
+    zif eq
         lda #'7'
     zelse
         lda #'0'
@@ -266,7 +266,7 @@ zproc screen_putstring
     zloop
     1:
         lda $1234,x
-        zbreakif_eq
+        zbreakif eq
 
         jsr screen_putchar
         inx
@@ -296,7 +296,7 @@ zendproc
 
 zproc screen_showcursor
     cmp #0
-    zif_eq
+    zif eq
         lda #<hidecursor
         ldx #>hidecursor
     zelse

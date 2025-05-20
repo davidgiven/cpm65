@@ -74,7 +74,7 @@ zproc screen_waitchar, .text.screen_waitchar
         ldx #0x7f
         ldy #SCREEN_GETCHAR
         jsr _call_screen
-    zuntil_cc
+    zuntil cc
     rts
 zendproc
 

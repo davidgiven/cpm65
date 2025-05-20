@@ -114,7 +114,7 @@ banner_wait:
         lda banner - 1, y        
         sta tty_write 
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Load the BDOS image.
     lda #BDOS_OFFSET
@@ -189,7 +189,7 @@ zproc load_bdos
         ; Wait for read to finish
         zrepeat
             lda sd_busy
-        zuntil_eq
+        zuntil eq
 
         ; Copy data to RAM
         zrepeat
@@ -200,31 +200,31 @@ zproc load_bdos
                 lda sd_base,X
                 sta (ptr),Y 
                 iny
-                zif_eq     
+                zif eq     
                     ;bne bdos_copy_cont
                     inc ptr+1
                 zendif
                 ;bdos_copy_cont:
                 inx
-            zuntil_eq
+            zuntil eq
             ;bne bdos_copy_loop
 
             inc sd_page_zp
             jsr sync_sd_offset
             lda sd_page_zp
             cmp #04
-        zuntil_eq
+        zuntil eq
     
         dec ptr1
 
         ; Increase SD sector address
-        zif_ne
+        zif ne
             inc sd_sector
-            zif_eq
+            zif eq
                 inc sd_sector+1
-                zif_eq
+                zif eq
                     inc sd_sector+2
-                    zif_eq
+                    zif eq
                         inc sd_sector+3
                     zendif
                 zendif
@@ -235,7 +235,7 @@ zproc load_bdos
         zendif
         
         lda ptr1
-    zuntil_eq
+    zuntil eq
     
     rts
 zendproc
@@ -311,7 +311,7 @@ zendproc
 
 zproc tty_conin
     lda pending_key
-    zif_eq
+    zif eq
 tty_input_wait:
 	    lda #IO_page_uart
         sta IO_page_reg
@@ -328,7 +328,7 @@ tty_input_keyb:
         lda keyb_data
         ; Filter out arrow keys
         cmp #$80
-        zif_cs
+        zif cs
             lda #0
         zendif
         clc
@@ -343,7 +343,7 @@ zendproc
 
 zproc tty_conout
 	cmp #127
-	zif_eq
+	zif eq
 		lda #8
 	zendif
     jsr video_init
@@ -594,9 +594,9 @@ zproc esc_delay
         ldy #$ff
         zrepeat
             dey
-        zuntil_eq
+        zuntil eq
         dex
-    zuntil_eq    
+    zuntil eq    
     rts
 zendproc
 
@@ -631,7 +631,7 @@ zproc serial_inp
     lda #IO_page_uart
     sta IO_page_reg
     lda uart_b_rx_avail
-    zif_eq
+    zif eq
     	; No data available
 
         ; Short delay to prevent premature timeout in applications
@@ -672,7 +672,7 @@ zproc serial_outp
     sta IO_page_reg
 
     lda uart_b_tx_done
-    zif_eq
+    zif eq
         sec
         rts
     zendif 
@@ -700,7 +700,7 @@ zproc serial_delay
     sta ptr1
     zrepeat
         dec ptr1
-    zuntil_eq    
+    zuntil eq    
     lda ptr
     rts
 zendproc
@@ -722,7 +722,7 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_eq
+    zif eq
         lda #CPMFS_A_OFFSET
         sta sd_offset
         lda #<dph_a
@@ -732,7 +732,7 @@ zproc bios_SELDSK
     zendif
 
     cmp #1
-    zif_eq
+    zif eq
         lda #CPMFS_B_OFFSET
         sta sd_offset
         lda #<dph_b
@@ -742,7 +742,7 @@ zproc bios_SELDSK
     zendif
 
     cmp #2
-    zif_eq
+    zif eq
         lda #CPMFS_C_OFFSET
         sta sd_offset
         lda #<dph_c
@@ -752,7 +752,7 @@ zproc bios_SELDSK
     zendif
     
     cmp #3
-    zif_eq
+    zif eq
         lda #CPMFS_D_OFFSET
         sta sd_offset
         lda #<dph_d
@@ -762,7 +762,7 @@ zproc bios_SELDSK
     zendif
  
     cmp #4
-    zif_eq
+    zif eq
         lda #CPMFS_E_OFFSET
         sta sd_offset
         lda #<dph_e
@@ -772,7 +772,7 @@ zproc bios_SELDSK
     zendif
 
     cmp #5
-    zif_eq
+    zif eq
         lda #CPMFS_F_OFFSET
         sta sd_offset
         lda #<dph_f
@@ -782,7 +782,7 @@ zproc bios_SELDSK
     zendif
 
     cmp #6
-    zif_eq
+    zif eq
         lda #CPMFS_G_OFFSET
         sta sd_offset
         lda #<dph_g
@@ -792,7 +792,7 @@ zproc bios_SELDSK
     zendif
     
     cmp #7
-    zif_eq
+    zif eq
         lda #CPMFS_H_OFFSET
         sta sd_offset
         lda #<dph_h
@@ -802,7 +802,7 @@ zproc bios_SELDSK
     zendif
  
     cmp #8
-    zif_eq
+    zif eq
         lda #CPMFS_I_OFFSET
         sta sd_offset
         lda #<dph_i
@@ -812,7 +812,7 @@ zproc bios_SELDSK
     zendif
 
     cmp #9
-    zif_eq
+    zif eq
         lda #CPMFS_J_OFFSET
         sta sd_offset
         lda #<dph_j
@@ -822,7 +822,7 @@ zproc bios_SELDSK
     zendif
     
     cmp #10
-    zif_eq
+    zif eq
         lda #CPMFS_K_OFFSET
         sta sd_offset
         lda #<dph_k
@@ -832,7 +832,7 @@ zproc bios_SELDSK
     zendif
 
     cmp #11
-    zif_eq
+    zif eq
         lda #CPMFS_L_OFFSET
         sta sd_offset
         lda #<dph_l
@@ -842,7 +842,7 @@ zproc bios_SELDSK
     zendif
 
     cmp #12
-    zif_eq
+    zif eq
         lda #CPMFS_M_OFFSET
         sta sd_offset
         lda #<dph_m
@@ -852,7 +852,7 @@ zproc bios_SELDSK
     zendif
     
     cmp #13
-    zif_eq
+    zif eq
         lda #CPMFS_N_OFFSET
         sta sd_offset
         lda #<dph_d
@@ -862,7 +862,7 @@ zproc bios_SELDSK
     zendif
  
     cmp #14
-    zif_eq
+    zif eq
         lda #CPMFS_O_OFFSET
         sta sd_offset
         lda #<dph_o
@@ -872,7 +872,7 @@ zproc bios_SELDSK
     zendif
     
     cmp #15
-    zif_eq
+    zif eq
         lda #CPMFS_P_OFFSET
         sta sd_offset
         lda #<dph_p
@@ -901,7 +901,7 @@ zproc bios_SETSEC
         sta cpm_sector,y
         iny
         cpy #3
-    zuntil_eq
+    zuntil eq
     
     clc
     rts
@@ -919,7 +919,7 @@ zproc bios_READ
         sta (dma),y
         iny
         cpy #$80
-    zuntil_eq
+    zuntil eq
     
     clc
     rts
@@ -936,7 +936,7 @@ zproc bios_WRITE
         sta sd_data, y
         iny
         cpy #$80
-    zuntil_eq
+    zuntil eq
 
     ; Write back to SD-card
     sta sd_write_strobe
@@ -990,7 +990,7 @@ zendproc
 zproc video_wait
     zrepeat
         lda tty_busy
-    zuntil_eq
+    zuntil eq
     rts 
 zendproc
 
@@ -1033,7 +1033,7 @@ zproc calculate_sd_address
         ror     
         sta cpm_sector,y   
         dex
-    zuntil_eq
+    zuntil eq
 
     ; Store calculated sector
     lda #0
@@ -1057,7 +1057,7 @@ zproc calculate_sd_address
     adc sd_offset
     sta sd_sector+1
     
-    zif_cs
+    zif cs
         inc sd_sector+2
     zendif
   
@@ -1089,7 +1089,7 @@ zendproc
 zproc sd_wait
     zrepeat
         lda sd_busy
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 

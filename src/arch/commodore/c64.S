@@ -167,7 +167,7 @@ zproc screen_putchar
     jsr convert_ascii_to_screencode
     sta (ptr),y
     cpy #SCREEN_WIDTH-1
-    zif_cc
+    zif cc
         iny
     zendif
     sty CURSOR_X
@@ -188,29 +188,29 @@ zproc screen_putstring
     clc
     adc ptr+0
     sta ptr+0
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
 
     ldy #0
     zrepeat
         lda (ptr1),y
-        zbreakif_eq
+        zbreakif eq
         jsr convert_ascii_to_screencode
         ldx CURSOR_X
         cpx #SCREEN_WIDTH
         ; Do not linewrap
-        zif_cc
+        zif cc
             sta (ptr),y
             inc CURSOR_X
         zendif
         iny
-    zuntil_eq
+    zuntil eq
     
     ; Restore cursor to last character on line if needed
     ldx CURSOR_X
     cpx #SCREEN_WIDTH-1
-    zif_cs
+    zif cs
         dec CURSOR_X
     zendif
     jsr MOVE_CURSOR
@@ -222,7 +222,7 @@ zendproc
 zproc screen_getchar
     ; Ignore timeout for now, just do a non-blocking read
     jsr GETIN
-    zif_eq
+    zif eq
         sec
         rts
     zendif
@@ -249,17 +249,17 @@ zproc screen_scrollup
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #SCREEN_HEIGHT-1
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #' '
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -282,17 +282,17 @@ zproc screen_scrolldown
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #0
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #' '
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -306,7 +306,7 @@ zproc screen_cleartoeol
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
-    zuntil_eq
+    zuntil eq
     
     rts 
 zendproc
@@ -316,7 +316,7 @@ zproc screen_setstyle
 zendproc
 
 zproc screen_showcursor
-    zif_eq
+    zif eq
         lda #01
         sta SHOW_CURSOR
         clc
@@ -355,17 +355,17 @@ zendproc
 
 zproc tty_conin
     lda pending_key
-    zif_eq
+    zif eq
         zrepeat
             jsr GETIN
             tax
-        zuntil_ne
+        zuntil ne
     zendif
     ldx #0
     stx pending_key
 
     cmp #20         ; DEL
-    zif_eq
+    zif eq
         lda #8
     zendif
 
@@ -382,10 +382,10 @@ zendproc
 
 zproc tty_const
     lda pending_key
-    zif_eq
+    zif eq
         jsr GETIN
         sta pending_key
-        zif_eq
+        zif eq
             lda #0
             clc
             rts
@@ -413,7 +413,7 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
+    zif ne
         sec                 ; invalid drive
         rts
     zendif
@@ -435,7 +435,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
     clc
     rts
 zendproc
@@ -488,7 +488,7 @@ zproc bios_READ
         iny
         inx
         cpy #$80
-    zuntil_eq
+    zuntil eq
 
     clc
     rts
@@ -513,13 +513,13 @@ zproc bios_WRITE
         iny
         inx
         cpy #$80
-    zuntil_eq
+    zuntil eq
 
     lda #$80
     sta buffer_dirty
 
     pla
-    zif_ne
+    zif ne
         jsr flush_buffered_sector
     zendif
 
@@ -533,13 +533,13 @@ zproc change_sectors
     lda sector_num+0
     and #$fe
     cmp buffered_sector+0
-    zif_eq
+    zif eq
         lda sector_num+1
         cmp buffered_sector+1
-        zif_eq
+        zif eq
             lda sector_num+2
             cmp buffered_sector+2
-            zif_eq
+            zif eq
                 rts
             zendif
         zendif
@@ -578,7 +578,7 @@ zendproc
 
 zproc flush_buffered_sector
     lda buffer_dirty
-    zif_mi
+    zif mi
         jsr buffered_sector_to_lba
         jsr write_sector
 
@@ -628,7 +628,7 @@ zproc read_sector
         jsr ACPTR
         sta disk_buffer, y
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr UNTALK
     rts
@@ -667,7 +667,7 @@ zproc write_sector
         lda disk_buffer, y
         jsr CIOUT
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr UNLSN
 
@@ -717,7 +717,7 @@ h4:
     and #0x0f ; %00001111
     ora #'0'
     cmp #'9'+1
-    zif_cs
+    zif cs
         adc #6
     zendif
     pha
@@ -736,7 +736,7 @@ zproc get_status
         jsr ACPTR
         jsr CHROUT
         cmp #13
-    zuntil_eq
+    zuntil eq
 
     jsr UNTALK
     rts
@@ -748,9 +748,9 @@ zproc convert_to_ts
     ldy #0
     zloop
         cpx #0
-        zif_eq
+        zif eq
             cmp track_size_table, y
-            zif_cc
+            zif cc
                 iny     ; tracks are one-based.
                 rts
             zendif
@@ -758,7 +758,7 @@ zproc convert_to_ts
 
         sec
         sbc track_size_table, y
-        zif_cc
+        zif cc
             dex
         zendif
         iny
@@ -784,7 +784,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #100
-    zuntil_cc
+    zuntil cc
     adc #100
     jsr digit
 
@@ -793,7 +793,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #10
-    zuntil_cc
+    zuntil cc
     adc #10
     jsr digit
     tax
@@ -813,7 +813,7 @@ zproc string_out
     ldy #0
     zloop
         lda (ptr), y
-        zif_eq
+        zif eq
             rts
         zendif
         jsr CIOUT
@@ -830,7 +830,7 @@ zproc print
     ldy #0
     zloop
         lda (ptr), y
-        zbreakif_eq
+        zbreakif eq
 
         jsr topetscii
         jsr CHROUT
@@ -852,7 +852,7 @@ zproc init_system
     ldy #0
     zloop
         lda loading_msg, y
-        zbreakif_eq
+        zbreakif eq
         jsr CHROUT
         iny
     zendloop
@@ -904,7 +904,7 @@ zproc calculate_line_address
     clc
     adc ptr+0
     sta ptr+0
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
  
@@ -922,15 +922,15 @@ zproc convert_ascii_to_screencode
     ; Flip case.
 
     cmp #'A'
-    zif_cs
+    zif cs
         cmp #'Z'+1
         bcc swapcase
     zendif
 
     cmp #'a'
-    zif_cs
+    zif cs
         cmp #'z'+1
-        zif_cc
+        zif cc
         swapcase:
             eor #0x20
         zendif

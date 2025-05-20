@@ -11,7 +11,7 @@ column_position:        .byte 0
 
 zproc bdos_CONIN
     lda buffered_key
-    zif_eq
+    zif eq
         jsr bios_CONIN
         tax
     zelse
@@ -21,7 +21,7 @@ zproc bdos_CONIN
     txa
     pha
     cmp #31
-    zif_cs
+    zif cs
         sta param+0
         jsr bdos_CONOUT
     zendif
@@ -38,10 +38,10 @@ zproc internal_CONOUT
     pha
     jsr bios_CONST
     cmp #0
-    zif_ne                  ; is there a key pending?
+    zif ne                  ; is there a key pending?
         jsr bios_CONIN      ; read it
         cmp #19             ; was it ^S?
-        zif_eq
+        zif eq
             jsr bios_CONIN  ; wait for another key press
             cmp #3
             beq reboot$
@@ -66,7 +66,7 @@ continue$:
     cmp #127
     beq backspace$
     cmp #9
-    zif_eq
+    zif eq
         inx
         tax
         and #<~7
@@ -92,7 +92,7 @@ zendproc
 
 zproc bdos_GETCONSOLESTATUS
     lda buffered_key
-    zif_eq
+    zif eq
         jsr bios_CONST
     zendif
     clc
@@ -106,13 +106,13 @@ zendproc
 zproc bdos_DIRECTIO
     ldx param+1
     cpx #$ff    
-    zif_eq
+    zif eq
         lda buffered_key
         ; A is either a character, or zero
-        zif_eq
+        zif eq
             jsr bios_CONST
             cmp #$ff
-            zif_eq
+            zif eq
                 jsr bios_CONIN
             zendif
             ; A is either a character, or zero
@@ -122,7 +122,7 @@ zproc bdos_DIRECTIO
     zendif
 
     cpx #$fd
-    zif_eq
+    zif eq
         jmp bios_CONIN
     zendif
 
@@ -141,14 +141,14 @@ zproc bdos_WRITESTRING
     zloop
         ldy #0
         lda (param), y
-        zbreakif_eq
+        zbreakif eq
         cmp #'$'
-        zbreakif_eq
+        zbreakif eq
 
         jsr internal_CONOUT
 
         inc param+0
-        zif_eq
+        zif eq
             inc param+1
         zendif
     zendloop
@@ -176,7 +176,7 @@ zproc bdos_READLINE
         ; Read a key without echo.
 
         lda buffered_key
-        zif_eq
+        zif eq
             jsr bios_CONIN
             tax
         zendif
@@ -186,14 +186,14 @@ zproc bdos_READLINE
         ; Delete?
 
         cmp #8
-        zif_eq
+        zif eq
             lda #127
         zendif
         cmp #127
-        zif_eq
+        zif eq
             ldy buffer_pos
             cpy #2
-            zif_ne
+            zif ne
                 dec buffer_pos
                 dec current_column_position
                 jsr bios_CONOUT
@@ -204,10 +204,10 @@ zproc bdos_READLINE
         ; Reboot?
 
         cmp #3
-        zif_eq
+        zif eq
             ldy buffer_pos
             cpy #2
-            zif_eq
+            zif eq
                 jmp bdos_EXIT
             zendif
             zcontinue
@@ -216,14 +216,14 @@ zproc bdos_READLINE
         ; Retype line?
 
         cmp #18
-        zif_eq
+        zif eq
             jsr indent_new_line
             ldy #2
             sty count
             zloop
                 ldy count
                 cpy buffer_pos
-                zbreakif_eq
+                zbreakif eq
 
                 lda (param), y
                 jsr bios_CONOUT
@@ -236,7 +236,7 @@ zproc bdos_READLINE
         ; Delete line?
 
         cmp #21
-        zif_eq
+        zif eq
             lda #'#'
             jsr bios_CONOUT
             jsr indent_new_line
@@ -249,17 +249,17 @@ zproc bdos_READLINE
         ; Finished?
 
         cmp #13
-        zbreakif_eq
+        zbreakif eq
         cmp #10
-        zbreakif_eq
+        zbreakif eq
 
         ; Graphic character?
 
         cmp #32
-        zif_cs
+        zif cs
             ldy buffer_max
             cpy buffer_pos
-            zif_cs
+            zif cs
                 ldy buffer_pos
                 sta (param), y
                 jsr bios_CONOUT
@@ -286,7 +286,7 @@ indent_new_line:
     zloop
         lda current_column_position
         cmp start_column_position
-        zbreakif_eq
+        zbreakif eq
         lda #' '
         jsr bios_CONOUT
         inc current_column_position

@@ -28,7 +28,7 @@ zproc ieee_init, ".init"
         lda #0xff
         sta buffered_sector-1, y
         dey
-    zuntil_eq
+    zuntil eq
 
     rts
 zendproc
@@ -39,7 +39,7 @@ zendproc
 zproc ieee_write
     pha
     lda ieee_has_buffered_char
-    zif_ne
+    zif ne
         lda ieee_buffered_char
         jsr ieee_putb
     zendif
@@ -55,7 +55,7 @@ zendproc
 
 zproc ieee_flush
     lda ieee_has_buffered_char
-    zif_ne
+    zif ne
         lda ieee_buffered_char
         jsr ieee_puteoib
         lda #0
@@ -126,7 +126,7 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
+    zif ne
         sec                 ; invalid drive
         rts
     zendif
@@ -148,14 +148,14 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
     clc
     rts
 zendproc
 
 zproc bios_READ
     jsr change_sectors
-    zif_cc
+    zif cc
         lda sector_num+0
         ror a               ; bottom bit -> C
         lda #0
@@ -169,7 +169,7 @@ zproc bios_READ
             iny
             inx
             cpy #$80
-        zuntil_eq
+        zuntil eq
 
         clc
     zendif
@@ -181,7 +181,7 @@ zendproc
 zproc bios_WRITE
     pha
     jsr change_sectors
-    zif_cs
+    zif cs
         pla
         sec
         rts
@@ -200,13 +200,13 @@ zproc bios_WRITE
         iny
         inx
         cpy #$80
-    zuntil_eq
+    zuntil eq
 
     lda #$80
     sta buffer_dirty
 
     pla
-    zif_ne
+    zif ne
         jmp flush_buffered_sector
     zendif
 
@@ -222,13 +222,13 @@ zproc change_sectors
     lda sector_num+0
     and #$fe
     cmp buffered_sector+0
-    zif_eq
+    zif eq
         lda sector_num+1
         cmp buffered_sector+1
-        zif_eq
+        zif eq
             lda sector_num+2
             cmp buffered_sector+2
-            zif_eq
+            zif eq
                 clc
                 rts
             zendif
@@ -269,7 +269,7 @@ zproc read_sector
         lda u1_string-1, x
         jsr ieee_write
         dex
-    zuntil_eq
+    zuntil eq
 
     pla
     jsr decimal_out
@@ -286,7 +286,7 @@ zproc read_sector
         jsr ieee_getb
         sta disk_buffer, y
         iny
-    zuntil_cs
+    zuntil cs
 
     jsr ieee_untalk
     clc
@@ -315,7 +315,7 @@ zproc write_sector
         lda bp_string-1, x
         jsr ieee_write
         dex
-    zuntil_eq
+    zuntil eq
 
     jsr ieee_unlisten
 
@@ -329,7 +329,7 @@ zproc write_sector
         lda disk_buffer, y
         jsr ieee_write
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr ieee_unlisten
 
@@ -343,7 +343,7 @@ zproc write_sector
         lda u2_string-1, x
         jsr ieee_write
         dex
-    zuntil_eq
+    zuntil eq
 
     pla
     jsr decimal_out
@@ -371,7 +371,7 @@ zproc getstatus
 
     zloop
         jsr ieee_getb
-        zbreakif_cs
+        zbreakif cs
         jsr bios_CONOUT
     zendloop
 
@@ -397,7 +397,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #100
-    zuntil_cc
+    zuntil cc
     adc #100
     jsr digit
 
@@ -406,7 +406,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #10
-    zuntil_cc
+    zuntil cc
     adc #10
     jsr digit
     tax
@@ -425,9 +425,9 @@ zproc convert_to_ts
     ldy #0
     zloop
         cpx #0
-        zif_eq
+        zif eq
             cmp track_size_table, y
-            zif_cc
+            zif cc
                 iny     ; tracks are one-based.
                 rts
             zendif
@@ -435,7 +435,7 @@ zproc convert_to_ts
 
         sec
         sbc track_size_table, y
-        zif_cc
+        zif cc
             dex
         zendif
         iny
@@ -461,7 +461,7 @@ zendproc
 
 zproc flush_buffered_sector
     bit buffer_dirty
-    zif_mi
+    zif mi
         jsr buffered_sector_to_lba
         jsr write_sector
 

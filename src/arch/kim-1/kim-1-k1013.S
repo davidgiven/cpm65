@@ -49,7 +49,7 @@ zproc bios_SELDSK
     sty tmp1
     zrepeat
         jsr check_drive_ready       ; Check drive status
-        zif_cc
+        zif cc
             sta selected_drive
             asl a
             tay
@@ -58,7 +58,7 @@ zproc bios_SELDSK
             rts
         zendif
         dec tmp1                    ; Decrement retries counter
-    zuntil_eq
+    zuntil eq
     sec
 1:  rts
 zendproc
@@ -75,7 +75,7 @@ zproc check_drive_ready
     bcs 1f                          ; Command failed
 
     and #ST3_RY                     ; Check if ready flag is set
-    zif_eq
+    zif eq
         sec
     zendif
 1:  pla
@@ -108,12 +108,12 @@ zproc bios_SETSEC
         rol ptr1+1
         rol a
         cmp #52
-        zif_cs
+        zif cs
             sbc #52
             inc ptr1+0
         zendif
         dex
-    zuntil_eq
+    zuntil eq
 
     ; Host sectors are 256 bytes long, so divide by 2 and put carry as MSB of
     ; buffer_offset
@@ -148,13 +148,13 @@ zproc change_sector
 
     lda requested_cpm_sector
     cmp buffered_host_sector
-    zif_eq
+    zif eq
         lda requested_track
         cmp buffered_track
-        zif_eq
+        zif eq
             lda selected_drive
             cmp buffered_drive
-            zif_eq
+            zif eq
                 ; Buffered disk/track/sector not changing, so do no work.
 
                 clc
@@ -166,9 +166,9 @@ zproc change_sector
     ; If requested sector is not buffered, flush buffer before changing
 
     bit buffer_dirty
-    zif_mi
+    zif mi
         jsr flush_buffer
-        zif_cs
+        zif cs
             rts
         zendif
     zendif
@@ -185,7 +185,7 @@ zproc change_sector
     ; Seek track
 
     jsr seek_track
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -198,12 +198,12 @@ zproc change_sector
         ldx buffered_track
         ldy buffered_drive
         jsr fdc_exec_read
-        zif_cc
+        zif cc
             rts
         zendif
 
         dec tmp1
-    zuntil_eq
+    zuntil eq
 
     ; Some kind of read error. The data in the buffer is corrupt.
 zendproc
@@ -219,7 +219,7 @@ zendproc
 
 zproc flush_buffer
     jsr seek_track
-    zif_cc
+    zif cc
         lda #WRIT_RETRIES
         sta tmp1
         zrepeat
@@ -228,7 +228,7 @@ zproc flush_buffer
             ldy buffered_drive
 
             jsr fdc_exec_write
-            zif_cc
+            zif cc
                 ; A successful write, so mark the buffer as clean.
 
                 lda #0
@@ -240,13 +240,13 @@ zproc flush_buffer
                 ldx #0
                 zrepeat
                     dex
-                zuntil_eq
+                zuntil eq
 
                 rts
             zendif
 
             dec tmp1
-        zuntil_eq
+        zuntil eq
         sec
     zendif
     rts
@@ -259,10 +259,10 @@ zproc seek_track
         lda buffered_track
         ldy buffered_drive
         jsr fdc_exec_seek
-        zbreakif_cc
+        zbreakif cc
 
         dec tmp1
-        zif_ne
+        zif ne
             ldy buffered_drive
             jsr fdc_exec_recal
             zcontinue

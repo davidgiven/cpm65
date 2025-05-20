@@ -115,21 +115,21 @@ cursory:          .fill 1
         sta (ptr1), y
 
         inc ptr+0
-        zif_eq
+        zif eq
             inc ptr+1
         zendif
 
         inc ptr1+0
-        zif_eq
+        zif eq
             inc ptr1+1
         zendif
 
         lda ptr1+0
         cmp #<init_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda ptr1+1
         cmp #>init_end_addr
-    zuntil_eq
+    zuntil eq
 
     jmp _start
 
@@ -147,21 +147,21 @@ zproc _start, .init
         sta bios_exec_addr
 
         inc load+1
-        zif_eq
+        zif eq
             inc load+2
         zendif
 
         inc store+1
-        zif_eq
+        zif eq
             inc store+2
         zendif
 
         lda store+1
         cmp #<bios_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda store+2
         cmp #>bios_end_addr
-    zuntil_eq
+    zuntil eq
 
     ; Initialise the screen.
 
@@ -180,7 +180,7 @@ zproc _start, .init
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Miscellaneous initialisation.
 
@@ -197,7 +197,7 @@ zproc _start, .init
     zrepeat
         sta keyboard_state, x
         dex
-    zuntil_mi
+    zuntil mi
 
     ; Set up sector IO.
 
@@ -208,7 +208,7 @@ zproc _start, .init
         lda allocate_cmd-1, x
         jsr ieee_write
         dex
-    zuntil_eq
+    zuntil eq
     jsr ieee_unlisten
 
     ; Load the BDOS.
@@ -352,13 +352,13 @@ zproc screen_clear
         zrepeat
             sta (ptr), y
             dey
-        zuntil_mi
+        zuntil mi
 
         pla
         clc
         adc #1
         cmp #SCREEN_HEIGHT
-    zuntil_eq
+    zuntil eq
     IO_OFF
 
     ; SCREEN doesn't specify where the cursor ends up, but this code is used by
@@ -393,7 +393,7 @@ zproc screen_getchar
     zrepeat
         jsr scan_keyboard
         lda pending_key
-    zuntil_ne
+    zuntil ne
 
     ldx #0
     stx pending_key
@@ -421,7 +421,7 @@ zproc screen_putchar
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
-    zif_ne
+    zif ne
         inc cursorx
     zendif
 
@@ -439,7 +439,7 @@ zproc screen_putstring
     zloop
     1:
         lda 0xffff, x
-        zbreakif_eq
+        zbreakif eq
 
         jsr convert_ascii_to_screencode
         sta (ptr), y
@@ -471,17 +471,17 @@ zproc screen_scrollup
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #SCREEN_HEIGHT-1
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #' '
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     IO_OFF
     rts
 zendproc
@@ -506,17 +506,17 @@ zproc screen_scrolldown
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #0
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #' '
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     IO_OFF
     rts
 zendproc
@@ -530,7 +530,7 @@ zproc screen_cleartoeol
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
-    zuntil_eq
+    zuntil eq
     IO_OFF
     rts
 zendproc
@@ -567,7 +567,7 @@ zproc tty_const
     IO_OFF
 
     lda pending_key
-    zif_ne
+    zif ne
         lda #0xff
     zendif
 
@@ -584,10 +584,10 @@ zproc tty_conin
         jsr screen_getchar
         ; Filter out arrow keys
         cmp #$80
-        zif_cs
+        zif cs
             lda #0
         zendif
-    zuntil_cc
+    zuntil cc
 
     rts
 zendproc
@@ -596,20 +596,20 @@ zendproc
 
 zproc tty_conout
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec cursorx
-        zif_mi
+        zif mi
             lda #SCREEN_WIDTH-1
             sta cursorx
 
             dec cursory
-            zif_mi
+            zif mi
                 lda #0
                 sta cursory
                 jsr screen_scrolldown
@@ -644,7 +644,7 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #SCREEN_HEIGHT
-    zif_eq
+    zif eq
         dec cursory
         jmp screen_scrollup
     zendif
@@ -668,7 +668,7 @@ zproc scan_keyboard
         ldx PIA1_PB
         txa
         eor keyboard_state, y
-        zif_ne
+        zif ne
             ; Any set bits in A correspond to a key which has changes state.
             ; The corresponding bit in X tells us whether it went up or down.
 
@@ -692,7 +692,7 @@ zproc scan_keyboard
 
             zrepeat
                 bit ptr1+0
-                zif_mi
+                zif mi
                     ; This key has changed.
 
                     tya
@@ -705,7 +705,7 @@ zproc scan_keyboard
                 iny
                 asl ptr1+1
                 asl ptr1+0
-            zuntil_eq
+            zuntil eq
 
             pla
             tay
@@ -716,7 +716,7 @@ zproc scan_keyboard
 
         iny
         cpy #0x0a
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -737,10 +737,10 @@ zproc change_key_state
 #endif
 
     bit ptr1+1
-    zif_pl
+    zif pl
         lda keyboard_decode_tab, y
         bit shift_pressed
-        zif_pl
+        zif pl
             lda keyboard_decode_tab_shifted, y
         zendif
         sta pending_key
@@ -827,15 +827,15 @@ zproc convert_ascii_to_screencode
     ; Flip case.
 
     cmp #'A'
-    zif_cs
+    zif cs
         cmp #'Z'+1
         bcc swapcase
     zendif
 
     cmp #'a'
-    zif_cs
+    zif cs
         cmp #'z'+1
-        zif_cc
+        zif cc
         swapcase:
             eor #0x20
         zendif
@@ -913,7 +913,7 @@ zproc calculate_line_address
     clc
     adc ptr+0
     sta ptr+0
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
 
@@ -995,7 +995,7 @@ zproc ieee_putb
     zrepeat
         lda VIA_PB
         and #VIA_PB_NRFD_IN
-    zuntil_ne
+    zuntil ne
     pla
 
     ; Send data, inverted.
@@ -1012,7 +1012,7 @@ zproc ieee_putb
     zrepeat
         lda VIA_PB
         and #VIA_PB_NDAC_IN
-    zuntil_ne
+    zuntil ne
 
     ; Release DAV, EOI, and the data bus.
 
@@ -1042,7 +1042,7 @@ zproc ieee_getb
     zrepeat
         lda VIA_PB
         and #VIA_PB_DAV_IN
-    zuntil_eq
+    zuntil eq
 
     ; Not ready for data.
 
@@ -1059,7 +1059,7 @@ zproc ieee_getb
     lda PIA1_PA
     and #PIA1_PA_EOI_IN
     clc
-    zif_eq
+    zif eq
         sec
     zendif
 
@@ -1072,7 +1072,7 @@ zproc ieee_getb
     zrepeat
         lda VIA_PB
         and #VIA_PB_DAV_IN
-    zuntil_ne
+    zuntil ne
 
     ; Release NDAC and the data bus.
 

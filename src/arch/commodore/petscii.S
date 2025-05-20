@@ -8,24 +8,24 @@
 
 zproc topetscii
     cmp #8
-    zif_eq
+    zif eq
         lda #20
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         lda #20
         rts
     zendif
 
     cmp #'A'
-    zif_cs
+    zif cs
         cmp #'Z'+1
         bcc swapcase
     zendif
 
     cmp #'a'
-    zif_cs
+    zif cs
         cmp #'z'+1
         bcc swapcase
     zendif

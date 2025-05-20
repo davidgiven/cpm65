@@ -35,7 +35,7 @@ _start:
     ldy #0
     zloop
         lda loading_msg, y
-        zbreakif_eq
+        zbreakif eq
         sty tmp1
         jsr OUTCH
         ldy tmp1
@@ -51,12 +51,12 @@ _start:
     sta __bios_start
 
     inc srcp+0
-    zif_eq
+    zif eq
         inc srcp+1
     zendif
 
     inc destp+0
-    zif_eq
+    zif eq
         inc destp+1
     zendif
 
@@ -169,7 +169,7 @@ zendproc
 
 zproc tty_conout
     cmp #127
-    zif_eq
+    zif eq
         lda #8
         jsr OUTCH
         lda #' '
@@ -183,10 +183,10 @@ zendproc
 
 zproc tty_const
     lda pending_key
-    zif_eq
+    zif eq
         jsr _tty_nbgetch
         sta pending_key
-        zif_eq
+        zif eq
             clc
             rts
         zendif
@@ -205,7 +205,7 @@ zproc _tty_bgetch
     zrepeat
         bit SAD         ; Check start bit
         bne 1f
-    zuntil_pl
+    zuntil pl
     bpl _tty_getch      ; Always jump
 1:  lda #0
     rts
@@ -237,7 +237,7 @@ zproc _tty_getch
         sta CHAR
         jsr DELAY
         dex
-    zuntil_eq
+    zuntil eq
     jsr DEHALF
     lda CHAR
     rol a               ; Shift off parity
@@ -291,7 +291,7 @@ zendproc
 
 zproc bios_READ
     jsr change_sector
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -304,7 +304,7 @@ zproc bios_READ
         lda (ptr), y
         sta (dma), y
         dey
-    zuntil_mi
+    zuntil mi
     clc
     rts
 zendproc
@@ -314,7 +314,7 @@ zproc bios_WRITE
     jsr change_sector
     pla
 
-    zif_cc
+    zif cc
         pha
 
         ; Calculate offset in DISK_BUFFER
@@ -326,14 +326,14 @@ zproc bios_WRITE
             lda (dma), y
             sta (ptr), y
             dey
-        zuntil_mi
+        zuntil mi
 
         lda #0x80
         sta buffer_dirty
 
         clc
         pla
-        zif_ne
+        zif ne
             jsr flush_buffer
         zendif
     zendif

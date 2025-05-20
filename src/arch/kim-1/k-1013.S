@@ -39,7 +39,7 @@ zproc fdc_exec_recal, .text.fdc_exec_recal
 
     pla
     cmp disk_status+1
-    zif_ne
+    zif ne
         sec
         rts
     zendif
@@ -121,7 +121,7 @@ zproc fdc_exec_rw, .text.fdc_exec_rw, local
 
     ldx #fdc_rw-fdc_commands ; Command index into X
     jsr fdc_exec_command
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -129,12 +129,12 @@ zproc fdc_exec_rw, .text.fdc_exec_rw, local
 
     zrepeat
         lda HSRC        ; Wait until IRQ from FDC
-    zuntil_pl
+    zuntil pl
 
     ; Read results into memory
 
     jsr fdc_read_result
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -142,7 +142,7 @@ zproc fdc_exec_rw, .text.fdc_exec_rw, local
 
     lda disk_status     ; Check ST0
     and #0xd8           ; Delete don't care bits
-    zif_ne
+    zif ne
         ; ST0 is not clear, dig further
         cmp #0x40           ; Test if abnormal termination
         bne fdc_fail        ; Real error if not
@@ -165,17 +165,17 @@ zproc fdc_exec_senseint, .text.fdc_exec_senseint
 
     zrepeat
         lda HSRC
-    zuntil_pl
+    zuntil pl
 
     ; Execute Sense Interrupt command
 
     ldx #fdc_senseint-fdc_commands
     jsr fdc_exec_command
-    zif_cc
+    zif cc
         ; Read results into memory
 
         jsr fdc_read_result
-        zif_cc
+        zif cc
             ; Look for error in the status registers
 
             lda disk_status     ; Check ST0
@@ -221,11 +221,11 @@ zproc fdc_exec_sensestatus, .text.fdc_exec_sensestatus
 
     ldx #fdc_status-fdc_commands
     jsr fdc_exec_command
-    zif_cc
+    zif cc
         ; Read results into memory
 
         jsr fdc_read_result
-        zif_cc
+        zif cc
             ; And return status in A
 
             lda disk_status     ; Load ST3
@@ -240,13 +240,13 @@ zproc fdc_exec_command, .text.fdc_exec_command, local
     zloop
         lda #0x10           ; Check if uPD765 is busy processing a command
         and MSTR            ;   (should not occur, but happens)
-        zbreakif_eq         ; Not busy, go execute command
+        zbreakif eq         ; Not busy, go execute command
                             ; Yes, execute recovery procedure
         zrepeat
             bit MSTR        ; wait until ready to read or write
-        zuntil_mi
+        zuntil mi
 
-        zif_vc              ; Data register ready to write
+        zif vc              ; Data register ready to write
             lda #$00        ; Try to complete command sequence
             sta DATR
             beq 1f          ; And try again
@@ -263,7 +263,7 @@ zproc fdc_exec_command, .text.fdc_exec_command, local
     zrepeat
         zrepeat
             lda MSTR        ; Wait until RQM from controller
-        zuntil_mi
+        zuntil mi
         and #0x40           ; Test data direction bit
         bne fdc_fail        ; Error if controller wants to talk
 
@@ -271,7 +271,7 @@ zproc fdc_exec_command, .text.fdc_exec_command, local
         sta DATR            ; Store into FDC data register
         inx                 ; Next command byte
         dey
-    zuntil_eq
+    zuntil eq
 
     clc
     rts
@@ -282,7 +282,7 @@ zproc fdc_read_result, .text.fdc_read_result, local
     zloop
         zrepeat
             lda MSTR        ; Wait until RQM from controller
-        zuntil_mi
+        zuntil mi
         and #0x40           ; Test data direction bit
         beq fdc_fail        ; Error if controller wants to listen
 
@@ -293,7 +293,7 @@ zproc fdc_read_result, .text.fdc_read_result, local
         nop                 ; the MSTR with a valid busy status
         lda MSTR            ; Check if still busy and get next
         and #0x10           ; byte while so
-    zuntil_eq
+    zuntil eq
 
     clc
     rts

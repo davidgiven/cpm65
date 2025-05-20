@@ -237,13 +237,13 @@ zproc init
             sta display_list,y
             iny
             dex
-        zuntil_eq
+        zuntil eq
 
         lda #0
         sta display_list,y
         iny
         dec ptr
-    zuntil_eq
+    zuntil eq
 
     sta end_dl+1
     lda #$41                ; end of display list
@@ -323,7 +323,7 @@ zproc screen80_clear
             sta (ptr1),y
             iny
             cpy #(SCREEN_WIDTH/2)*6
-        zuntil_eq
+        zuntil eq
 
         lda ptr
         clc
@@ -331,7 +331,7 @@ zproc screen80_clear
         sta ptr             ; msb always stays on the same page
 
         dex
-    zuntil_eq
+    zuntil eq
 
     stx cursorx
     stx cursory
@@ -342,14 +342,14 @@ zendproc
 
 zproc screen80_setcursor
     cmp #SCREEN_WIDTH
-    zif_cs
+    zif cs
         lda #SCREEN_WIDTH-1
     zendif
     sta cursorx
 
     txa
     cmp #SCREEN_HEIGHT
-    zif_cs
+    zif cs
         lda #SCREEN_HEIGHT-1
     zendif
     sta cursory
@@ -370,7 +370,7 @@ putchar_for_putstring:
     pha
     and #$7f                ; just to be sure
     cmp #32
-    zif_cc
+    zif cc
         lda #32
     zendif
 
@@ -392,7 +392,7 @@ putchar_for_putstring:
     pla
     adc ptr1
     sta ptr1
-    zif_cs
+    zif cs
         inc ptr1+1
     zendif                  ; A*6 in (ptr1)
 
@@ -421,7 +421,7 @@ char_left:
 set_mask:
     sta mask1
     ldx style
-    zif_ne
+    zif ne
         sta style
     zendif
     eor #$ff
@@ -449,17 +449,17 @@ set_mask:
         adc #SCREEN_WIDTH/2
         tay
         dex
-    zuntil_mi
+    zuntil mi
 
     pla
     cmp #127                ; we did backspace space
-    zif_eq
+    zif eq
         rts
     zendif
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
-    zif_ne
+    zif ne
         inc cursorx
     zendif
 
@@ -484,10 +484,10 @@ zproc screen80_putstring
     zloop
 string=.+1
         lda $1234
-        zbreakif_eq
+        zbreakif eq
         jsr putchar_for_putstring
         inc string
-        zif_cs
+        zif cs
             inc string+1
         zendif
     zendloop
@@ -539,7 +539,7 @@ zproc screen80_scrollup
         sta ptr1
 
         dex
-    zuntil_eq
+    zuntil eq
 
 same_code_for_scroll_down:
     pla                         ; put top line at the bottom
@@ -555,7 +555,7 @@ same_code_for_scroll_down:
         sta (ptr),y
         dey
         cpy #$ff
-    zuntil_eq
+    zuntil eq
 
     rts
 zendproc
@@ -590,7 +590,7 @@ zproc screen80_scrolldown
         sta ptr1
 
         dex
-    zuntil_eq
+    zuntil eq
 
     jmp same_code_for_scroll_down       ; but top line instead of bottom
 zendproc
@@ -600,7 +600,7 @@ zproc screen80_cleartoeol
     lsr
     pha
     php                         ; carry is set if cursorx is odd
-    zif_cs
+    zif cs
         lda #127                ; if cursorx is odd, we first clear the
         jsr screen80_putchar    ; right half of the bytes
     zendif
@@ -625,7 +625,7 @@ zproc screen80_cleartoeol
             sta (ptr),y
             iny
             cpy #SCREEN_WIDTH/2
-        zuntil_eq
+        zuntil eq
 
         lda ptr
         clc
@@ -634,7 +634,7 @@ zproc screen80_cleartoeol
         ldy ptr1                    ; restart from cursor position (+0 or 1)
         lda #0
         dex
-    zuntil_mi
+    zuntil mi
 
 skip_clearing_bytes:
     rts
@@ -642,7 +642,7 @@ zendproc
 
 zproc screen80_showcursor
     cmp #0
-    zif_eq
+    zif eq
         lda #$60                    ; rts instruction
     zelse
         lda #$20                    ; jsr instruction
@@ -675,20 +675,20 @@ zendproc
 
 zproc tty80_conout
     cmp #13                     ; Carriage Return
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         rts
     zendif
     cmp #127                    ; Backspace
-    zif_eq
+    zif eq
         dec cursorx
-        zif_mi
+        zif mi
             lda #SCREEN_WIDTH-1
             sta cursorx
 
             dec cursory
-            zif_mi
+            zif mi
                 lda #0
                 sta cursory
                 jsr screen80_scrolldown
@@ -725,7 +725,7 @@ zproc wait_for_vbi
     lda RTCLOK
     zrepeat
         cmp RTCLOK
-    zuntil_ne
+    zuntil ne
     rts
 zendproc
 
@@ -738,7 +738,7 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #SCREEN_HEIGHT
-    zif_eq
+    zif eq
         dec cursory
         jmp screen80_scrollup
     zendif
@@ -778,7 +778,7 @@ do_eor:
         adc #SCREEN_WIDTH/2
         tay
         dex
-    zuntil_mi
+    zuntil mi
 
     rts
 zendproc

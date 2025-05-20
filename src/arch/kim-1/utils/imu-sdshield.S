@@ -62,8 +62,8 @@ zproc drive_exists
     jsr DiskGetDrives
     
     cmp drive
-    zif_cs
-        zif_ne
+    zif cs
+        zif ne
             clc
             rts
         zendif
@@ -93,11 +93,11 @@ zproc check_valid_file
         inx
         iny
         lda cpm_cmdline,y    
-        zbreakif_eq
+        zbreakif eq
         cmp #'.'
-        zbreakif_eq
+        zbreakif eq
         cmp #' '
-    zuntil_eq
+    zuntil eq
 
     ; Check it is between positions 1 and 8, fail if not
 
@@ -109,7 +109,7 @@ zproc check_valid_file
     ; End of file?
 
     cmp #'.'
-    zif_ne
+    zif ne
         clc
         rts
     zendif
@@ -121,9 +121,9 @@ zproc check_valid_file
         inx
         iny
         lda cpm_cmdline,y
-        zbreakif_eq
+        zbreakif eq
         cmp #' '
-    zuntil_eq
+    zuntil eq
     cpx #4
     bcc 2f                          ; Can't be greater than 3
 1:  lda #<imagerr_msg
@@ -140,7 +140,7 @@ zproc list_mounts
     jsr set_buffer                  ; Output to buffer1
     zloop
         jsr DiskNextMountedDrv      ; Get entry
-        zbreakif_cs                 ; No more
+        zbreakif cs                 ; No more
         jsr print_mount             ; Print it
     zendloop
     rts
@@ -153,7 +153,7 @@ zproc list_images
     zloop
         jsr set_buffer              ; Output to buffer1
         jsr DiskDirNext             ; Get entry
-        zbreakif_cs                 ; No more
+        zbreakif cs                 ; No more
         lda buffer1+0               ; Print it
         ldx buffer1+1
         ldy #BDOS_WRITE_STRING
@@ -193,7 +193,7 @@ zproc mount_image
     lda drive
     jsr DiskStatus
     and #1                          ; Mounted flag
-    zif_ne
+    zif ne
         ; Drive is mounted
         ldx drive_letter
         lda #<mountederr_msg
@@ -222,7 +222,7 @@ zproc mount_image
 
     jsr DiskMount                   ; Mount image
 
-    zif_cc
+    zif cc
         ; All went well
         jmp print_mount             ; Print the mount info
     zendif
@@ -230,7 +230,7 @@ zproc mount_image
     ; If we are here, there was an error
 
     cmp #ERR_NOT_FOUND              ; Image not found?
-    zif_ne
+    zif ne
         ; No, print generic mount error and exit
         ldx drive_letter
         lda #<mounterr_msg
@@ -248,12 +248,12 @@ zendproc
 zproc unmount_drive
     
     jsr get_drive
-    zif_cs
+    zif cs
         jmp err_usage
     zendif
 
     jsr drive_exists
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -262,7 +262,7 @@ zproc unmount_drive
     lda drive
     jsr DiskStatus
     and #1                          ; Mounted flag
-    zif_eq
+    zif eq
         ; Was not mounted
         ldx drive_letter
         lda #<notmntederr_msg
@@ -272,7 +272,7 @@ zproc unmount_drive
 
     lda drive
     jsr DiskUnmount
-    zif_cs
+    zif cs
         ; There was an unexpected error
         ldx drive_letter
         lda #<unmnterr_msg
@@ -291,7 +291,7 @@ zendproc
 zproc save_config
     lda #1
     cmp version
-    zif_cs
+    zif cs
         jsr err_firmware            ; Protocol < 2
         sec
     zendif
@@ -299,7 +299,7 @@ zproc save_config
     jsr inf_working                 ; It is a slow operation
 
     jsr SaveConfig
-    zif_cs
+    zif cs
         lda #<config_msg
         ldx #>config_msg
         jmp err_withmsg
@@ -325,21 +325,21 @@ zproc is_image_mounted
     jsr set_buffer_two              ; Output to buffer2
     zloop
         jsr DiskNextMountedDrv      ; Get entry
-        zbreakif_cs                 ; No more
+        zbreakif cs                 ; No more
         ldy #0
         zrepeat
             lda (string),y
             iny
             iny
             cmp (buffer2),y         ; If different, go check next file
-            zbreakif_ne
+            zbreakif ne
             cmp #0                  ; Equal. End of file name?
-            zif_eq
+            zif eq
                 inc mn_flag
             zendif
             dey
             cmp #0                  ; Check if end of file name again
-        zuntil_eq
+        zuntil eq
     zendloop
     rts
 zendproc
@@ -354,7 +354,7 @@ zproc file_common
 
     lda #1
     cmp version
-    zif_cs
+    zif cs
         jsr err_firmware            ; Protocol < 2
         sec
         rts
@@ -371,13 +371,13 @@ zendproc
 zproc create_image
 
     jsr file_common
-    zif_cs
+    zif cs
         rts
     zendif
 
     ldy cmdline_index
     lda cpm_cmdline,y
-    zif_ne
+    zif ne
         jmp err_usage               ; No more parameters expected
     zendif
 
@@ -397,9 +397,9 @@ zproc create_image
 
     jsr DiskFormat                  ; Create image
 
-    zif_cs
+    zif cs
         cmp #ERR_FILE_EXISTS
-        zif_eq
+        zif eq
             lda #<exists_msg
             ldx #>exists_msg
             jmp err_withmsg
@@ -422,13 +422,13 @@ zendproc
 zproc delete_file
 
     jsr file_common
-    zif_cs
+    zif cs
         rts
     zendif
 
     ldy cmdline_index
     lda cpm_cmdline,y
-    zif_ne
+    zif ne
         jmp err_usage               ; No more parameters expected
     zendif
 
@@ -436,7 +436,7 @@ zproc delete_file
     ldx filename1+1
     jsr is_image_mounted            ; Check if file is a mounted image
     lda mn_flag
-    zif_ne
+    zif ne
         lda filename1+0
         ldx filename1+1
         jmp err_imgmounted
@@ -450,7 +450,7 @@ zproc delete_file
     ldy #BDOS_CONSOLE_INPUT
     jsr BDOS
     cmp #'y'
-    zif_ne
+    zif ne
         jmp inf_usrabort
     zendif
     jsr pr_crlf
@@ -458,15 +458,15 @@ zproc delete_file
     jsr set_buffer                  ; Set buffer for image name at buffer1
     jsr DiskErase                   ; Delete file
 
-    zif_cs
+    zif cs
         cmp #ERR_FEATURE_DISABLED   ; Disabled by hardware switch?
-        zif_eq
+        zif eq
             lda #<disabled_msg
             ldx #>disabled_msg
             jmp err_withmsg
         zendif
         cmp #ERR_NOT_FOUND
-        zif_eq
+        zif eq
             lda filename1+0
             ldx filename1+1
             jmp err_notfound
@@ -487,20 +487,20 @@ zendproc
 zproc copy_or_move_file
 
     jsr file_common 
-    zif_cs
+    zif cs
         rts
     zendif
 
     ; Set second file name into buffer
 
     jsr set_second_image_name
-    zif_cs
+    zif cs
         rts
     zendif
 
     ldy cmdline_index
     lda cpm_cmdline,y
-    zif_ne
+    zif ne
         jmp err_usage               ; Should be 0 (no more parameters)
     zendif
 
@@ -510,14 +510,14 @@ zproc copy_or_move_file
     ldx filename2+1
     jsr is_image_mounted
     lda mn_flag
-    zif_ne
+    zif ne
         lda filename2+0
         ldx filename2+1
         jmp err_imgmounted
     zendif
 
     lda rn_flag
-    zif_eq
+    zif eq
         jsr inf_working             ; It is a slow operation
         jsr set_buffer              ; Set buffer for image name at buffer1
         jsr DiskCopy                ; Copy file
@@ -527,7 +527,7 @@ zproc copy_or_move_file
         ldx filename1+1
         jsr is_image_mounted        ; Check if file is a mounted image
         lda mn_flag
-        zif_ne
+        zif ne
             lda filename1+0
             ldx filename1+1
             jmp err_imgmounted
@@ -537,21 +537,21 @@ zproc copy_or_move_file
         jsr DiskRename              ; Move/rename
     zendif
 
-    zif_cs
+    zif cs
         cmp #ERR_FEATURE_DISABLED   ; Disabled by hardware switch?
-        zif_eq
+        zif eq
             lda #<disabled_msg
             ldx #>disabled_msg
             jmp err_withmsg
         zendif
         cmp #ERR_NOT_FOUND
-        zif_eq
+        zif eq
             lda filename1+0
             ldx filename1+1
             jmp err_notfound
         zendif
         cmp #ERR_FILE_EXISTS
-        zif_eq
+        zif eq
             lda #<exists_msg
             ldx #>exists_msg
             jmp err_withmsg

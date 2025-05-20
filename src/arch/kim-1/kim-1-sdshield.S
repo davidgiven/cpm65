@@ -47,7 +47,7 @@ zproc system_init, loader
         cmp #0xaa
         bne 1f
         iny
-        zif_eq
+        zif eq
             inc ptr+1
             lda ptr+1
             cmp #0xff
@@ -68,7 +68,7 @@ zproc system_init, loader
 
 zproc bios_SELDSK
     cmp #(dphtab_end-dphtab)/2
-    zif_cs
+    zif cs
 1:      sec                 ; invalid drive
         rts
     zendif
@@ -117,12 +117,12 @@ zproc bios_SETSEC
         rol ptr1+1
         rol a
         cmp #52
-        zif_cs
+        zif cs
             sbc #52
             inc ptr1+0
         zendif
         dex
-    zuntil_eq
+    zuntil eq
 
     ; Host sectors are 256 bytes long, so divide by 2 and put carry as MSB of
     ; buffer_offset
@@ -159,13 +159,13 @@ zproc change_sector
 
     lda requested_cpm_sector
     cmp buffered_host_sector
-    zif_eq
+    zif eq
         lda requested_track
         cmp buffered_track
-        zif_eq
+        zif eq
             lda selected_drive
             cmp buffered_drive
-            zif_eq
+            zif eq
                 ; Buffered disk/track/sector not changing, so do no work.
 
                 clc
@@ -177,9 +177,9 @@ zproc change_sector
     ; If requested sector is not buffered, flush buffer before changing
 
     bit buffer_dirty
-    zif_mi
+    zif mi
         jsr flush_buffer
-        zif_cs
+        zif cs
             rts
         zendif
     zendif
@@ -203,7 +203,7 @@ zproc change_sector
     sta zp_sds_drive
 
     jsr DiskReadSector
-    zif_cc
+    zif cc
         rts
     zendif
 
@@ -224,7 +224,7 @@ zproc flush_buffer
     sta zp_sds_drive
 
     jsr DiskWriteSector
-    zif_cc
+    zif cc
         ; A successful write, so mark the buffer as clean.
 
         lda #0

@@ -120,10 +120,10 @@ zendproc
 zproc wait_past_index_hole
     zloop                   ; not above hole, might be a no-op if index is
         lda PORTA           ; already triggered
-    zuntil_pl
+    zuntil pl
     zloop                   ; above hole
         lda PORTA
-    zuntil_mi
+    zuntil mi
     rts                     ; not above hole
 zendproc
 
@@ -173,10 +173,10 @@ zproc seek_to_track0
     zloop
         lda #HEAD_NOT_TRACK0_MASK
         bit PORTA               ; bit 1 is 0, means track 0 sensor is triggered
-        zbreakif_eq             ; fallthrough to long delay
+        zbreakif eq             ; fallthrough to long delay
 
         jsr step_out            ; step_out ends with long_delay_X, hence Z=1
-    zuntil_ne                   ; so this is a branch always
+    zuntil ne                   ; so this is a branch always
 
     ; [[fallthrough]]
 zendproc
@@ -196,10 +196,10 @@ zproc long_delay_X
 _short_delay_X_Y:                ; enter here with Y set, and X=1
         zloop
             dey                 ; 2 cycles
-        zuntil_eq               ; 3 cycles if looped, $f8*5-1 = 1239 cycles
+        zuntil eq               ; 3 cycles if looped, $f8*5-1 = 1239 cycles
 
         dex                     ; 2 cycles
-     zuntil_eq                  ; 3 cycles if looped, $18*1244-1 = 29855 cycles
+     zuntil eq                  ; 3 cycles if looped, $18*1244-1 = 29855 cycles
 
     ; [[fallthrough]]
 zendproc
@@ -254,13 +254,13 @@ zproc tobcd
     ldx #0
     zloop
         cmp #10
-        zbreakif_cc
+        zbreakif cc
 
         inx
 
         ; carry is always set
         sbc #10
-    zuntil_cc
+    zuntil cc
 
     sta trkbcd
 
@@ -283,7 +283,7 @@ zproc read_byte                 ; Returns result from disk in A
     zloop
         lda ACIA_STATUS         ; wait for STATUS_RDRF_MASK (0x01), RDR full
         lsr
-    zuntil_cs
+    zuntil cs
 
     lda ACIA_RDR
     rts
@@ -294,7 +294,7 @@ zproc write_byte                ; Write byte in X to disk
         lda ACIA_STATUS         ; wait for STATUS_TDRE_MASK (0x02), TDR empty
         lsr
         lsr
-    zuntil_cs
+    zuntil cs
 
     stx ACIA_TDR
     rts
@@ -362,11 +362,11 @@ zproc read_track
             jsr read_byte
             sta (ptr),y
             iny
-        zuntil_eq
+        zuntil eq
 
         inc ptr+1
         dex
-    zuntil_eq
+    zuntil eq
 
 read_ok_out:
 write_ok_out:
@@ -392,7 +392,7 @@ zproc write_track
 #ifdef FLOPPY8
     lda curtrk
     cmp #44
-    zif_cs
+    zif cs
         lda PORTB
         and #LOW_CURRENT_MASK^0xff
         sta PORTB
@@ -422,11 +422,11 @@ zproc write_track
             tax
             jsr write_byte
             iny
-        zuntil_eq
+        zuntil eq
 
         inc ptr+1
         dec save_x
-    zuntil_eq
+    zuntil eq
 
     ldx #$47
     jsr write_byte
@@ -436,7 +436,7 @@ zproc write_track
 
     zloop                   ; wait until index hole
         lda PORTA
-    zuntil_pl
+    zuntil pl
 
     jsr disable_write_and_erase
 
@@ -454,7 +454,7 @@ zendproc
 zproc select_drive_number
     lda drive_number
     and #1
-    zif_eq
+    zif eq
         lda #DRIVE0_SELECT_MASK
     zelse
         lda #0
@@ -463,7 +463,7 @@ zproc select_drive_number
 
     lda drive_number
     and #2
-    zif_eq
+    zif eq
         lda PORTB
         ora #DRIVE_01_23_MASK
     zelse

@@ -92,14 +92,14 @@ _start:
         sta bios_exec_addr
 
         inc load+1
-        zif_eq
+        zif eq
             inc load+2
         zendif
 
         inc store+1
-        zif_eq
+        zif eq
             inc store+2
-            zbreakif_eq
+            zbreakif eq
         zendif
     zendloop
 
@@ -121,7 +121,7 @@ _start:
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Build the GCR tables.
 
@@ -140,7 +140,7 @@ _start:
         zrepeat
             bcs reject
             lsr a
-        zuntil_eq
+        zuntil eq
 
         txa
         ora #0x80
@@ -152,7 +152,7 @@ _start:
         iny
     reject:
         inx
-    zuntil_mi
+    zuntil mi
 
     ; Initialise the disks.
 
@@ -293,7 +293,7 @@ zendproc
 
 zproc apply_style
     bit cursorf
-    zif_vc
+    zif vc
         ora #0x80 ; non inverted
     zendif
     rts
@@ -319,10 +319,10 @@ zproc screen_clear
             sta (ptr), y
             sta SCREEN_PAGE2OFF
             sta (ptr), y
-        zuntil_eq
+        zuntil eq
 
         dec ptr1
-    zuntil_mi
+    zuntil mi
     lda #0
     sta cursorx
     sta cursory
@@ -366,12 +366,12 @@ zproc screen_putstring
     zloop
     1:
         lda 0xffff
-        zbreakif_eq
+        zbreakif eq
 
         jsr screen_putchar
 
         inc 1b+1
-        zif_eq
+        zif eq
             inc 1b+2
         zendif
     zendloop
@@ -396,7 +396,7 @@ zproc screen_getchar
 
     zrepeat
         lda KBD_READ
-    zuntil_mi
+    zuntil mi
     sta KBD_STROBERESET
     and #0x7f
     clc
@@ -428,10 +428,10 @@ zproc screen_scrollup
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #SCRHEIGHT-1
-    zuntil_eq
+    zuntil eq
 
     jmp clear_line_at_ptr
 zendproc
@@ -461,10 +461,10 @@ zproc screen_scrolldown
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         txa
-    zuntil_eq
+    zuntil eq
 zendproc
     ; fall through
 zproc clear_line_at_ptr
@@ -477,7 +477,7 @@ zproc clear_line_at_ptr
         sta SCREEN_PAGE2ON
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -506,14 +506,14 @@ zproc screen_cleartoeol
 
         inx
         cpx #SCRWIDTH
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
 zproc screen_setstyle
     ldx #0
     and #STYLE_REVERSE
-    zif_eq ; reverse off
+    zif eq ; reverse off
         lda cursorf
         and #(~SCREENF_INVERSE) & 0xff
         sta cursorf
@@ -531,7 +531,7 @@ zendproc
 zproc draw_cursor
     pha
     lda cursorf
-    zif_pl                  ; if bit 7 zero, cursor is hidden
+    zif pl                  ; if bit 7 zero, cursor is hidden
         jsr toggle_cursor
     zendif
     pla
@@ -543,7 +543,7 @@ zproc hide_cursor
     txa
     pha
     lda cursorf
-    zif_mi                  ; if bit 7 non-zero, cursor is shown
+    zif mi                  ; if bit 7 non-zero, cursor is shown
         jsr toggle_cursor
     zendif
     pla
@@ -595,15 +595,15 @@ zproc tty_conout
     jsr hide_cursor
 
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec cursorx
-        zif_mi
+        zif mi
             inc cursorx
         zendif
         jsr prepare_for_screen_write
@@ -618,7 +618,7 @@ zproc tty_conout
 
     lda cursorx
     cmp #SCRWIDTH
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         jmp write_nl
@@ -630,7 +630,7 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #SCRHEIGHT
-    zif_eq
+    zif eq
         dec cursory
         jmp screen_scrollup
     zendif
@@ -689,9 +689,9 @@ zendproc
 
 zproc tty_const
     ldx motor_countdown
-    zif_ne
+    zif ne
         dec motor_countdown
-        zif_eq
+        zif eq
             ldx #DISK_SLOT
             lda DISK_MOTOROFF, x
         zendif
@@ -699,7 +699,7 @@ zproc tty_const
 
     ldy #0
     ldx KBD_READ
-    zif_mi
+    zif mi
         dey
     zendif
 
@@ -724,7 +724,7 @@ zproc tty_conin
 
     zrepeat
         lda KBD_READ
-    zuntil_mi
+    zuntil mi
     sta KBD_STROBERESET
     and #0x7f
     clc
@@ -752,19 +752,19 @@ zendproc
 
 zproc bios_SELDSK
     cmp #2
-    zif_pl
+    zif pl
         sec                 ; invalid drive
         rts
     zendif
 
     cmp selected_drive
-    zif_ne
+    zif ne
         jsr change_drive
     zendif
 
     lda selected_drive
     cmp #0
-    zif_eq
+    zif eq
         ; Drive A:
         lda #<dph
         ldx #>dph
@@ -782,7 +782,7 @@ zendproc
 zproc change_drive
     pha
     lda buffer_dirty
-    zif_ne
+    zif ne
         jsr write_track
     zendif
     lda #$FF
@@ -791,7 +791,7 @@ zproc change_drive
 
     sta selected_drive
     cmp #0
-    zif_eq
+    zif eq
         ; B: to A:
         ldx #DISK_SLOT
         lda DISK_DRIVE1, x
@@ -811,7 +811,7 @@ zproc change_drive
     sta current_phase_a
     lda current_phase_b
     sta current_phase
-    zif_ne
+    zif ne
         ; The head position is unknown. Seek to track 0.
         lda #80
         sta current_phase
@@ -864,7 +864,7 @@ zendproc
 
 zproc bios_READ
     jsr change_tracks
-    zif_cc
+    zif cc
         lda wanted_trackoffset+0
         sta ptr+0
         lda wanted_trackoffset+1
@@ -875,7 +875,7 @@ zproc bios_READ
             lda (ptr), y
             sta (dma), y
             dey
-        zuntil_mi
+        zuntil mi
         clc
     zendif
     rts
@@ -887,7 +887,7 @@ zproc bios_WRITE
     pha
     jsr change_tracks
     pla
-    zif_cc
+    zif cc
         pha
 
         lda wanted_trackoffset+0
@@ -900,10 +900,10 @@ zproc bios_WRITE
             lda (dma), y
             sta (ptr), y
             dey
-        zuntil_mi
+        zuntil mi
 
         pla
-        zif_ne
+        zif ne
             jmp write_track
         zendif
 
@@ -919,14 +919,14 @@ zendproc
 zproc change_tracks
     lda wanted_track
     cmp buffered_track
-    zif_eq
+    zif eq
         ; If we're changing to the same track, do nothing.
         clc
         rts
     zendif
 
     lda buffer_dirty
-    zif_ne
+    zif ne
         jsr write_track
     zendif
 
@@ -949,7 +949,7 @@ zproc read_track
     zrepeat
         sta track_flags, x
         dex
-    zuntil_mi
+    zuntil mi
 
     ; Low byte of ptr1 remains 0 throughout.
 
@@ -967,7 +967,7 @@ zproc read_track
                     zrepeat
                         jsr read_header
                         cpy #0x96
-                    zuntil_eq
+                    zuntil eq
                     jsr read_gcr44
                     jsr read_gcr44
                     jsr read_gcr44
@@ -979,7 +979,7 @@ zproc read_track
                     lda prodos_reverse_sector_map, x
                     tax
                     ldy track_flags, x
-                zuntil_ne
+                zuntil ne
 
                 ; Set up ptr1 to point to this sector's buffer.
 
@@ -991,7 +991,7 @@ zproc read_track
 
                 jsr read_header
                 cpy #0xad
-            zuntil_eq
+            zuntil eq
 
             ; Reads the first section of the sector data (the twos) into the special
             ; buffer.
@@ -1003,12 +1003,12 @@ zproc read_track
                 sty ptr+0
                 zrepeat
                     ldy DISK_SHIFT, x
-                zuntil_mi
+                zuntil mi
                 eor decode_tab-DECODE_TABLE_START, y
                 ldy ptr+0
                 dey
                 sta disk_twos_buffer, y
-            zuntil_eq
+            zuntil eq
 
             ; Reads the second section (the sixes) into the output buffer.
             ; Y is 0 on entry. X is DISK_SLOT.
@@ -1017,21 +1017,21 @@ zproc read_track
                 sty ptr+0
                 zrepeat
                     ldy DISK_SHIFT, x
-                zuntil_mi
+                zuntil mi
                 eor decode_tab-DECODE_TABLE_START, y
                 ldy ptr+0
                 sta (ptr1), y
                 iny
-            zuntil_eq
+            zuntil eq
 
             ; Read the checksum byte.
             ; X is still DISK_SLOT.
 
             zrepeat
                 ldy DISK_SHIFT, x
-            zuntil_mi
+            zuntil mi
             eor decode_tab-DECODE_TABLE_START, y
-        zuntil_eq
+        zuntil eq
 
         ; We now have a successfully read sector. We just need to decode it.
 
@@ -1039,7 +1039,7 @@ zproc read_track
         ldx #0x56
         zrepeat
             dex
-            zif_mi
+            zif mi
                 ldx #0x55
             zendif
             lda (ptr1), y
@@ -1049,7 +1049,7 @@ zproc read_track
             rol a
             sta (ptr1), y
             iny
-        zuntil_eq
+        zuntil eq
 
         ; Mark this sector as having been successfully read.
 
@@ -1067,9 +1067,9 @@ zproc read_track
         zrepeat
             adc track_flags, x
             dex
-        zuntil_mi
+        zuntil mi
         tax
-        zbreakif_eq
+        zbreakif eq
     zendloop
 
     clc
@@ -1084,11 +1084,11 @@ zproc seek_to_track
     asl a               ; convert to phase number
     zloop
         cmp current_phase
-        zif_eq
+        zif eq
             rts
         zendif
         ldy #0xff           ; default to counting down
-        zif_cs
+        zif cs
             ; A > track, count up
             ldy #1
         zendif
@@ -1127,10 +1127,10 @@ change_phase:
         pha
         zrepeat
             sbc #1
-        zuntil_eq
+        zuntil eq
         pla
         sbc #1
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -1143,17 +1143,17 @@ zproc read_header
         zrepeat
             zrepeat
                 ldy DISK_SHIFT, x
-            zuntil_mi
+            zuntil mi
             cpy #0xd5
-        zuntil_eq
+        zuntil eq
         zrepeat
             ldy DISK_SHIFT, x
-        zuntil_mi
+        zuntil mi
         cpy #0xaa
-    zuntil_eq
+    zuntil eq
     zrepeat
         ldy DISK_SHIFT, x
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -1163,12 +1163,12 @@ zendproc
 zproc read_gcr44
     zrepeat
         lda DISK_SHIFT, x
-    zuntil_mi
+    zuntil mi
     rol a
     sta ptr+0
     zrepeat
         lda DISK_SHIFT, x
-    zuntil_mi
+    zuntil mi
     and ptr+0
     rts
 zendproc
@@ -1227,11 +1227,11 @@ zendproc
 
                 inx
                 cpx #0x56
-            zuntil_cs
+            zuntil cs
 
             ldx #0
             tya
-        zuntil_eq
+        zuntil eq
 
         ldx #0x55
         zrepeat
@@ -1239,7 +1239,7 @@ zendproc
             and #0x3f
             sta disk_twos_buffer, x
             dex
-        zuntil_mi
+        zuntil mi
 
         ; Wait for the right sector header.
 
@@ -1247,7 +1247,7 @@ zendproc
             zrepeat
                 jsr read_header
                 cpy #0x96
-            zuntil_eq
+            zuntil eq
             jsr read_gcr44
             jsr read_gcr44
             jsr read_gcr44
@@ -1259,7 +1259,7 @@ zendproc
             lda ptr1+1
             and #0x0f
             cmp prodos_reverse_sector_map, x
-        zuntil_eq
+        zuntil eq
 
         ; Skip the tail of the sector header.
 
@@ -1268,12 +1268,12 @@ zendproc
         zrepeat
             WAIT3           ; 3
             dey             ; 2
-        zuntil_eq           ; 3 for every iteration
+        zuntil eq           ; 3 for every iteration
 
         ldx #DISK_SLOT
         lda DISK_LOAD, x    ; prime drive
         lda DISK_READ, x
-        zif_mi
+        zif mi
             sec             ; write protected
             rts
         zendif
@@ -1295,7 +1295,7 @@ zendproc
 /* 32 */        sta DISK_LOAD, x              ; 5
 /* 36 */        cmp DISK_SHIFT, x             ; 4
 /*  0 */        dey                           ; 2
-/*  2 */    zuntil_eq       ; 3 if taken, 2 if not
+/*  2 */    zuntil eq       ; 3 if taken, 2 if not
 /*  4 */
 /* -- */    WAIT9 ; waste four cycles for the last 40-cycle sync byte.
                   ; plus five to sync up with the loop below.
@@ -1311,7 +1311,7 @@ zendproc
 /* 28 */        cmp DISK_SHIFT, x         ; 4
 /*  0 */        WAIT2                     ; 2
 /*  2 */        dey                       ; 2
-/*  4 */    zuntil_eq       ; 3 if taken, 2 if not
+/*  4 */    zuntil eq       ; 3 if taken, 2 if not
 /*  6 */
 
             ; Write out the 2s buffer.
@@ -1328,7 +1328,7 @@ zendproc
 /* 28 */        cmp DISK_SHIFT, x         ; 4
 /*  0 */        lda disk_twos_buffer-1, y ; 5 (always crosses page boundary)
 /*  5 */        dey                       ; 2
-/*  7 */    zuntil_eq       ; 3 if taken, 2 is not
+/*  7 */    zuntil eq       ; 3 if taken, 2 is not
 /*  9 */
 
             ; Write out the 6s buffer.
@@ -1344,7 +1344,7 @@ zendproc
 /* 28 */        ora DISK_SHIFT, x         ; 4
 /*  0 */        lda disk_sixes_buffer, y  ; 4
 /*  4 */        iny                       ; 2
-/*  6 */    zuntil_eq       ; 3 if taken, 2 if not
+/*  6 */    zuntil eq       ; 3 if taken, 2 if not
 /*  8 */
 
             ; Write checksum byte.
@@ -1370,7 +1370,7 @@ zendproc
 /* 28 */        ora DISK_SHIFT, x         ; 4
 /*  0 */        WAIT10                    ; 10
 /* 10 */        dey                       ; 2
-/* 12 */    zuntil_eq       ; 3 if taken, 2 if not
+/* 12 */    zuntil eq       ; 3 if taken, 2 if not
 
         ; Finished with the timing-critical stuff. Write mode off.
         ; X is still DISK_SLOT.
@@ -1383,7 +1383,7 @@ zendproc
         inc ptr1+1
         lda ptr1+1
         and #0x0f
-        zif_eq
+        zif eq
             lda #0
             sta buffer_dirty
             clc
