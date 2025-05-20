@@ -6,9 +6,9 @@
 
 zproc uppercase
     cmp #'a'
-    zif_cs
+    zif cs
         cmp #'z'+1
-        zif_cc
+        zif cc
             and #$5f
         zendif
     zendif

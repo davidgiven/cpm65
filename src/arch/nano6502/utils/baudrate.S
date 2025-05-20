@@ -34,7 +34,7 @@ get_selection:
     jsr BDOS
     
     cmp #$2F
-    zif_cs
+    zif cs
         cmp #$36
         bcc ok_selection
         
@@ -79,42 +79,42 @@ zproc print_baudrate
     
     lda uart_b_baudrate
     cmp #0
-    zif_eq
+    zif eq
         lda #<br_4800
         ldx #>br_4800
         jmp print_br
     zendif
     
     cmp #1
-    zif_eq
+    zif eq
         lda #<br_9600
         ldx #>br_9600
         jmp print_br
     zendif
 
     cmp #2
-    zif_eq
+    zif eq
         lda #<br_19200
         ldx #>br_19200
         jmp print_br
     zendif
 
     cmp #3
-    zif_eq
+    zif eq
         lda #<br_38400
         ldx #>br_38400
         jmp print_br
     zendif
 
     cmp #4
-    zif_eq
+    zif eq
         lda #<br_57600
         ldx #>br_57600
         jmp print_br
     zendif
 
     cmp #5
-    zif_eq
+    zif eq
         lda #<br_115200
         ldx #>br_115200
         jmp print_br

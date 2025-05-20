@@ -33,7 +33,7 @@ zproc init
     ; Put the disk controller in a sane state
     ;
     lda HSRC                        ; Test if an interrupt is pending
-    zif_pl
+    zif pl
         jsr fdc_exec_senseint
     zendif
 
@@ -44,10 +44,10 @@ zproc init
 
     ldy #EXT_CMD_DIR
     jsr fdc_exec_extended           ; Get SD card directory listing
-    zif_cc
+    zif cc
         ; Dig further for errors
         lda disk_status
-        zif_pl
+        zif pl
             clc
             rts
         zendif
@@ -68,7 +68,7 @@ zendproc
 zproc drive_exists
     lda drive
     cmp #4
-    zif_cs    
+    zif cs    
         ldx drive_letter
         lda #<invalid_msg
         ldy #>invalid_msg
@@ -97,13 +97,13 @@ zproc check_valid_file
         inx
         iny
         lda cpm_cmdline,y
-        zbreakif_mi                 ; Safeguard, stop if len > 128 chars
-    zuntil_eq
+        zbreakif mi                 ; Safeguard, stop if len > 128 chars
+    zuntil eq
 
     ; Check it is shorter that 64 chars, fail if not
 
     cpx #64
-    zif_cs
+    zif cs
         lda #<imagerr_msg           ; Cant be past the 64th pos
         ldx #>imagerr_msg
         jsr err_withmsg
@@ -118,7 +118,7 @@ zproc list_mounts
 
     ldy #EXT_CMD_MNTS
     jsr fdc_exec_extended           ; Get SD card directory listing
-    zif_cs
+    zif cs
         lda #<fdc_msg
         ldx #>fdc_msg
         jmp err_withmsg             ; Controller error
@@ -132,7 +132,7 @@ zproc list_mounts
     zloop
         ldy #EXT_CMD_NXT_MNT
         jsr fdc_exec_extended       ; Get SD card directory entry
-        zif_cs
+        zif cs
             lda #<fdc_msg
             ldx #>fdc_msg
             jmp err_withmsg         ; Controller error
@@ -142,7 +142,7 @@ zproc list_mounts
 
         lda disk_status
         and #ST4_NO_DATA
-        zbreakif_ne
+        zbreakif ne
 
         jsr print_mount
 
@@ -162,7 +162,7 @@ zproc list_images
     zloop
         ldy #EXT_CMD_NXT
         jsr fdc_exec_extended       ; Get SD card directory entry
-        zif_cs
+        zif cs
             lda #<fdc_msg
             ldx #>fdc_msg
             jmp err_withmsg         ; Controller error
@@ -175,9 +175,9 @@ zproc list_images
         lda #ST4_NO_DATA
         bit disk_status
         ; Testing for ST4_NO_DATA
-        zbreakif_ne
+        zbreakif ne
         ; Testing for ST4_ABNORMAL_TERM (0b0100000)
-        zif_vs
+        zif vs
             lda #<readdir_msg
             ldx #>readdir_msg
             jmp err_withmsg         ; Error reading directory
@@ -211,7 +211,7 @@ zproc mount_image
     ora #EXT_CMD_MNT
     tay
     jsr fdc_exec_extended           ; Mount image
-    zif_cs
+    zif cs
         lda #<fdc_msg
         ldx #>fdc_msg
         jmp err_withmsg             ; Controller error
@@ -222,15 +222,15 @@ zproc mount_image
     lda #ST4_NOT_FOUND
     bit disk_status
     ; Testing for ST4_NOT_FOUND
-    zif_ne
+    zif ne
         lda filename1+0
         ldx filename1+1
         jmp err_notfound
     zendif
-    zif_vs
+    zif vs
         lda disk_status+1
         and #ST5_DRV_MOUNTED
-        zif_ne
+        zif ne
             ; Was not mounted
             ldx drive_letter
             lda #<mountederr_msg
@@ -239,7 +239,7 @@ zproc mount_image
         zendif
         lda disk_status+1
         and #ST5_IMG_MOUNTED
-        zif_ne
+        zif ne
             ; Was not mounted
             lda filename1+0
             ldx filename1+1
@@ -247,7 +247,7 @@ zproc mount_image
         zendif
         lda disk_status+1
         and #ST5_IMG_INVALID
-        zif_ne
+        zif ne
             ; It is not a valid IMD file
             lda filename1+0
             ldx filename1+1
@@ -270,12 +270,12 @@ zendproc
 zproc unmount_drive
 
     jsr get_drive
-    zif_cs
+    zif cs
         jmp err_usage
     zendif
 
     jsr drive_exists
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -283,7 +283,7 @@ zproc unmount_drive
     ora #EXT_CMD_UMNT               ; Unmount drive
     tay
     jsr fdc_exec_extended 
-    zif_cs
+    zif cs
         lda #<fdc_msg
         ldx #>fdc_msg
         jmp err_withmsg             ; Controller error
@@ -292,10 +292,10 @@ zproc unmount_drive
     ; Dig further for errors
 
     and #ST4_ABNORMAL_TERM
-    zif_ne
+    zif ne
         lda disk_status+1
         and #ST5_DRV_NOT_MOUNTED
-        zif_ne
+        zif ne
             ; Was not mounted
             ldx drive_letter
             lda #<notmntederr_msg
@@ -328,7 +328,7 @@ zendproc
 zproc create_image
 
     jsr validate_image_name
-    zif_cs
+    zif cs
         rts
     zendif
     
@@ -347,13 +347,13 @@ zproc create_image
     jsr skip_sp
  
     cmp #0                          ; End of command line?
-    zif_ne
+    zif ne
         jsr get_option              ; No, get option
-        zif_cs
+        zif cs
             jmp err_usage           ; Syntax error
         zendif
         cpx #'P'                    ; Create packaged image
-        zif_eq
+        zif eq
             ldx #PACKAGED_IMG
             stx pk_flag
         zelse
@@ -367,7 +367,7 @@ zproc create_image
     jsr skip_sp
 
     cmp #0
-    zif_ne
+    zif ne
         jmp err_usage               ; Nothing else expected
     zendif
 
@@ -392,7 +392,7 @@ zproc create_image
     sta DMA_BUFFER+3
     ldy #EXT_CMD_NEW                ; Create image
     jsr fdc_exec_extended
-    zif_cs
+    zif cs
         lda #<fdc_msg
         ldx #>fdc_msg
         jmp err_withmsg             ; Controller error
@@ -402,23 +402,23 @@ zproc create_image
 
     lda disk_status
     and #ST4_ABNORMAL_TERM
-    zif_ne
+    zif ne
         lda #ST5_IMG_NAME
         bit disk_status+1
         ; Testing for ST5_IMG_NAME
-        zif_ne
+        zif ne
             lda #<imagerr_msg
             ldx #>imagerr_msg
             jmp err_withmsg
         zendif
         ; Testing for ST5_DISK_FULL (0b10000000)
-        zif_mi
+        zif mi
             lda #<diskfull_msg
             ldx #>diskfull_msg
             jmp err_withmsg
         zendif
         ; Testing for ST5_IMG_EXISTS ( 0b0100000)
-        zif_vs
+        zif vs
             lda #<exists_msg
             ldx #>exists_msg
             jmp err_withmsg
@@ -436,12 +436,12 @@ zendproc
 ;
 zproc delete_file
     jsr set_first_image_name
-    zif_cs
+    zif cs
         rts
     zendif
 
     cmp #0
-    zif_ne
+    zif ne
         jmp err_usage               ; Nothing else expected
     zendif
 
@@ -457,7 +457,7 @@ zproc delete_file
 
     ldy #EXT_CMD_ERA                ; Delete image
     jsr fdc_exec_extended
-    zif_cs
+    zif cs
         lda #<fdc_msg
         ldx #>fdc_msg
         jmp err_withmsg             ; Controller error
@@ -468,16 +468,16 @@ zproc delete_file
     lda #ST4_NOT_FOUND
     bit disk_status
     ; Testing for ST4_NOT_FOUND
-    zif_ne
+    zif ne
         lda filename1+0
         ldx filename1+1
         jmp err_notfound
     zendif
     ; Testing for ST4_ABNORMAL_TERM (0b01000000)
-    zif_vs
+    zif vs
         lda disk_status+1
         and #ST5_IMG_NAME
-        zif_ne
+        zif ne
             ; Invalid image name
             lda #<imagerr_msg
             ldx #>imagerr_msg
@@ -485,7 +485,7 @@ zproc delete_file
         zendif
         lda disk_status+1
         and #ST5_IMG_MOUNTED
-        zif_ne
+        zif ne
             ; Was not mounted
             lda filename1+0
             ldx filename1+1
@@ -504,19 +504,19 @@ zendproc
 ;
 zproc copy_or_move_file
     jsr set_first_image_name
-    zif_cs
+    zif cs
         rts
     zendif
 
     ; Set second file name into buffer
 
     jsr set_second_image_name
-    zif_cs
+    zif cs
         rts
     zendif
 
     cmp #0
-    zif_ne
+    zif ne
         jmp err_usage               ; Nothing else expected
     zendif
 
@@ -531,14 +531,14 @@ zproc copy_or_move_file
     ; Prepare the command data
 
     lda rn_flag
-    zif_ne
+    zif ne
         ldy #EXT_CMD_MOV            ; Move/rename image
     zelse
         ldy #EXT_CMD_CPY            ; Copy image
     zendif
 
     jsr fdc_exec_extended
-    zif_cs
+    zif cs
         lda #<fdc_msg
         ldx #>fdc_msg
         jmp err_withmsg             ; Controller error
@@ -549,36 +549,36 @@ zproc copy_or_move_file
     lda #ST4_NOT_FOUND
     bit disk_status
     ; Testing for ST4_NOT_FOUND
-    zif_ne
+    zif ne
         lda filename1+0
         ldx filename1+1
         jmp err_notfound
     zendif
     ; Testing for ST4_ABNORMAL_TERM (0b01000000)
-    zif_vs
+    zif vs
         lda #ST5_IMG_NAME
         bit disk_status+1
         ; Testing for ST5_IMG_NAME
-        zif_ne
+        zif ne
             lda #<imagerr_msg
             ldx #>imagerr_msg
             jmp err_withmsg
         zendif
         ; Testing for ST5_DISK_FULL (0b10000000)
-        zif_mi
+        zif mi
             lda #<diskfull_msg
             ldx #>diskfull_msg
             jmp err_withmsg
         zendif
         ; Testing for ST5_IMG_EXISTS ( 0b0100000)
-        zif_vs
+        zif vs
             lda #<exists_msg
             ldx #>exists_msg
             jmp err_withmsg
         zendif
         lda disk_status+1
         and #ST5_IMG_MOUNTED
-        zif_ne
+        zif ne
             ; Was not mounted
             lda filename1+0
             ldx filename1+1
@@ -586,7 +586,7 @@ zproc copy_or_move_file
         zendif
         lda disk_status+1
         and #ST5_IMG2_MOUNTED
-        zif_ne
+        zif ne
             ; Was not mounted
             lda filename2+0
             ldx filename2+1
@@ -610,10 +610,10 @@ zproc fdc_exec_extended
 
     ldx #fdc_extended-fdc_commands  ; Command index into X
     jsr fdc_exec_command
-    zif_cc
+    zif cc
         zrepeat
             lda HSRC                ; Wait for interrupt
-        zuntil_pl
+        zuntil pl
     zendif
     ; Read results into memory even if it failed (should be
     ; unsupported command)
@@ -627,17 +627,17 @@ zproc fdc_exec_senseint
 
     zrepeat
         lda HSRC
-    zuntil_pl
+    zuntil pl
 
     ; Execute Sense Interrupt command
 
     ldx #fdc_senseint-fdc_commands
     jsr fdc_exec_command
-    zif_cc
+    zif cc
         ; Read results into memory
 
         jsr fdc_read_result
-        zif_cc
+        zif cc
 
             ; Look for error in the status registers
 
@@ -668,7 +668,7 @@ zproc fdc_exec_command
     zloop
         zrepeat
             lda MSTR                ; Wait until RQM from controller
-        zuntil_mi
+        zuntil mi
         and #0x40                   ; Test data direction bit
         bne fdc_fail                ; Error if controller wants to talk
 
@@ -676,7 +676,7 @@ zproc fdc_exec_command
         sta DATR                    ; Store into FDC data register
         inx                         ; Next command byte
         dey
-    zuntil_eq
+    zuntil eq
 
     clc
     rts
@@ -687,7 +687,7 @@ zproc fdc_read_result
     zloop
         zrepeat
             lda MSTR                ; Wait until RQM from controller
-        zuntil_mi
+        zuntil mi
         and #0x40                   ; Test data direction bit
         beq fdc_fail                ; Error if controller wants to listen
 
@@ -698,7 +698,7 @@ zproc fdc_read_result
         nop                         ; the MSTR with a valid busy status
         lda #0x10                   ; Check if busy and go get another
         and MSTR                    ; byte while so
-    zuntil_eq
+    zuntil eq
 
     clc
     rts

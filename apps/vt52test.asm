@@ -18,7 +18,7 @@
 .label string_cl_line
 .label string_cur_addr 
 
-.zproc start
+zproc start
 
 help:
     \ Print help
@@ -44,129 +44,129 @@ mainloop:
 case_done:
     \ Cursor left
     cmp #'A'
-    .zif eq
+    zif eq
         lda #<string_left
         ldx #>string_left
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
     
     \ Cursor right
     cmp #'D'
-    .zif eq
+    zif eq
         lda #<string_right
         ldx #>string_right
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
    
     \ Cursor up 
     cmp #'W'
-    .zif eq
+    zif eq
         lda #<string_up
         ldx #>string_up
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
    
     \ Cursor down 
     cmp #'S'
-    .zif eq
+    zif eq
         lda #<string_down
         ldx #>string_down
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Cursor home
     cmp #'H'
-    .zif eq
+    zif eq
         lda #<string_home
         ldx #>string_home
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Reverse linefeed
     cmp #'I'
-    .zif eq
+    zif eq
         lda #<string_rev_lf
         ldx #>string_rev_lf
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Clear to end of screen
     cmp #'J'
-    .zif eq
+    zif eq
         lda #<string_cl_end
         ldx #>string_cl_end
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Clear to end of line
     cmp #'K'
-    .zif eq
+    zif eq
         lda #<string_cl_line
         ldx #>string_cl_line
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Cursor addressing
     cmp #'Y'
-    .zif eq
+    zif eq
         lda #<string_cur_addr
         ldx #>string_cur_addr
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Tab
     cmp #'T'
-    .zif eq
+    zif eq
         lda #0x09
         ldy #BDOS_CONOUT
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Backspace
     cmp #'B'
-    .zif eq
+    zif eq
         lda #0x08
         ldy #BDOS_CONOUT
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
   
     \ CR
     cmp #'C'
-    .zif eq
+    zif eq
         lda #0x0d
         ldy #BDOS_CONOUT
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
     
     \ LF
     cmp #'L'
-    .zif eq
+    zif eq
         lda #0x0a
         ldy #BDOS_CONOUT
         jsr BDOS
         jmp mainloop
-    .zendif
+    zendif
 
     \ Print help 
     cmp #'P'
@@ -174,12 +174,12 @@ case_done:
 
     \ Quit 
     cmp #'Q'
-    .zif eq
+    zif eq
         rts
-    .zendif
+    zendif
     
     jmp mainloop
-.zendproc
+zendproc
 
 string_init:
     .byte "CP/M-65 VT52 driver tester\r\n\r\n"

@@ -69,20 +69,20 @@ found_serial:
     lda cpm_fcb+1
     cmp #' '
     .label filename_not_given
-    .zif eq
+    zif eq
         \ No parameter given.
         lda #<filename_not_given
         ldx #>filename_not_given
         jmp print_string    \ exits
 
-    .zendif
+    zendif
     jsr open_file_from_fcb
     .label cant_open_file
-    .zif cs
+    zif cs
         lda #<cant_open_file
         ldx #>cant_open_file
         jmp print_string    \ exits
-    .zendif
+    zendif
 
     lda #<start_transmission
     ldx #>start_transmission
@@ -252,60 +252,60 @@ print_fcb:
     \ Drive letter.
 
     lda cpm_fcb+0
-    .zif ne
+    zif ne
         clc
         adc #'@'
         jsr putchar
 
         lda #':'
         jsr putchar
-    .zendif
+    zendif
 
     \ Main filename.
 
     ldy #FCB_F1
-    .zrepeat
+    zrepeat
         tya
         pha
 
         lda cpm_fcb, y
         and #0x7f
         cmp #' '
-        .zif ne
+        zif ne
             jsr putchar
-        .zendif
+        zendif
 
         pla
         tay
         iny
         cpy #FCB_T1
-    .zuntil eq
+    zuntil eq
 
     lda cpm_fcb+9
     and #0x7f
     cmp #' '
-    .zif ne
+    zif ne
         lda #'.'
         jsr putchar
 
         ldy #FCB_T1
-        .zrepeat
+        zrepeat
             tya
             pha
 
             lda cpm_fcb, y
             and #0x7f
             cmp #' '
-            .zif ne
+            zif ne
                 jsr putchar
-            .zendif
+            zendif
 
             pla
             tay
             iny
             cpy #FCB_T3+1
-        .zuntil eq
-    .zendif
+        zuntil eq
+    zendif
 
     lda #'\r'
     jsr putchar
@@ -316,15 +316,15 @@ print_fcb:
 
 \ Print string wrapper
 
-.zproc print_string
+zproc print_string
     ldy #BDOS_PRINTSTRING
     jmp BDOS
-.zendproc
+zendproc
 
 \ Prints XA in decimal. Y is the padding char or 0 for no padding.
 
 \ Prints an 8-bit hex number in A.
-.zproc print_hex_number
+zproc print_hex_number
     pha
     lsr a
     lsr a
@@ -336,21 +336,21 @@ h4:
     and #0x0f
     ora #'0'
     cmp #'9'+1
-	.zif cs
+	zif cs
 		adc #6
-	.zendif
+	zendif
     pha
     jsr putchar
 	pla
 	rts
-.zendproc
+zendproc
 
-.zproc putchar
+zproc putchar
 
 	ldy #BDOS_CONOUT
     jmp BDOS
 
-.zendproc
+zendproc
 
 
 

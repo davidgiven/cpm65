@@ -25,7 +25,7 @@ zproc main
     lda #<submit_fcb
     ldx #>submit_fcb
     jsr xfcb_open
-    zif_cs
+    zif cs
         lda #$ff
         sta submit_fcb+FCB_DR
     zendif
@@ -37,9 +37,9 @@ MAINLOOP:
         lda #$ff
         jsr bdos_GETSETUSER
         tax
-        zif_ne
+        zif ne
             cmp #10
-            zif_cs
+            zif cs
                 pha
                 jsr printi
                 .byte '1'|0x80
@@ -62,7 +62,7 @@ MAINLOOP:
         ; Read command line.
 
         lda submit_fcb+FCB_DR
-        zif_mi
+        zif mi
             jsr read_command_from_keyboard
         zelse
             jsr read_command_from_submit_file
@@ -80,16 +80,16 @@ MAINLOOP:
         zrepeat
             lda cmdline+2, y
             cmp #'a'
-            zif_cs
+            zif cs
                 cmp #'z'+1
-                zif_cc
+                zif cc
                     and #$5f
                 zendif
             zendif
             sta cmdline+2, y
             iny
             cpy cmdline+1
-        zuntil_eq
+        zuntil eq
 
         ; Empty command line?
 
@@ -97,7 +97,7 @@ MAINLOOP:
         sta cmdoffset
         jsr skip_whitespace         ; leaves cmdoffset in X
         lda cmdline, x
-        zcontinueif_eq
+        zcontinueif eq
 
         #if !defined TINY
             ; Monitor command?
@@ -157,17 +157,17 @@ commands_hi:
             inc cmdoffset
             ldx cmdoffset
             lda cmdline, x
-            zif_eq
+            zif eq
                 jmp MAINLOOP
             zendif
 
             cmp #' '
-        zuntil_ne
+        zuntil ne
 
         cmp #'A'
-        zif_cs
+        zif cs
             cmp #'F'+1
-            zif_cc
+            zif cc
                 clc
                 adc #(10 - 'A') & 0xff
                 jmp monitor_digit
@@ -175,9 +175,9 @@ commands_hi:
         zendif
 
         cmp #'0'
-        zif_cs
+        zif cs
             cmp #'9'+1
-            zif_cc
+            zif cc
                 sec
                 sbc #'0'
                 jmp monitor_digit
@@ -185,7 +185,7 @@ commands_hi:
         zendif
 
         cmp #'R'
-        zif_eq
+        zif eq
             jsr monitor_read
         monitor_exit:
             jsr newline
@@ -193,7 +193,7 @@ commands_hi:
         zendif
 
         cmp #'W'
-        zif_eq
+        zif eq
             jsr monitor_read
             jsr space
             ldy #0
@@ -204,7 +204,7 @@ commands_hi:
         zendif
 
         cmp #'G'
-        zif_eq
+        zif eq
             jmp (temp)
         zendif
         
@@ -231,7 +231,7 @@ commands_hi:
             rol temp+1
             rol temp2
             dex
-        zuntil_mi
+        zuntil mi
         ora temp+0
         sta temp+0
         jmp monitor_nextchar
@@ -253,7 +253,7 @@ zproc read_command_from_submit_file
     ; Read from submit file.
 
     ldx submit_fcb+FCB_RC
-    zif_eq
+    zif eq
         ; File empty --- delete it.
 
         lda #<submit_fcb
@@ -300,7 +300,7 @@ zproc read_command_from_submit_file
     zloop
         ldx temp
         cpx cmdline+1
-        zbreakif_eq
+        zbreakif eq
 
         lda cmdline+2, x
         jsr bdos_CONOUT
@@ -375,7 +375,7 @@ zproc entry_DIR
 
     lda userfcb+FCB_F1
     cmp #' '
-    zif_eq
+    zif eq
         ; If empty FCB, fill with ????...
 
         ldx #10
@@ -383,7 +383,7 @@ zproc entry_DIR
         zrepeat
             sta userfcb+FCB_F1, x
             dex
-        zuntil_mi
+        zuntil mi
     zendif
 
     ; Find number of files to print per line
@@ -402,7 +402,7 @@ zproc entry_DIR
     lda #<userfcb
     ldx #>userfcb
     jsr bdos_FINDFIRST
-    zif_cs
+    zif cs
         jmp newline
     zendif
 
@@ -418,7 +418,7 @@ zproc entry_DIR
         adc #<cmdline
         sta temp+0
         ldx #>cmdline
-        zif_cs
+        zif cs
             inx
         zendif
         stx temp+1
@@ -428,7 +428,7 @@ zproc entry_DIR
         ldy #FCB_T2
         lda (temp), y
         and #$80                ; check attribute bit
-        zif_eq
+        zif eq
             ; Line header.
 
             ldx file_counter
@@ -436,11 +436,11 @@ zproc entry_DIR
             inx
             stx file_counter
             cmp #$00
-            zif_eq
+            zif eq
                 ldy userfcb
                 dey
                 tya
-                zif_mi
+                zif mi
                     jsr bdos_GETDRIVE
                 zendif
                 clc
@@ -464,7 +464,7 @@ zproc entry_DIR
 
             lda file_counter
             cmp dirlen
-            zif_eq
+            zif eq
                 jsr newline
                 lda #0 
                 sta file_counter
@@ -476,7 +476,7 @@ zproc entry_DIR
         lda #<userfcb
         ldx #>userfcb
         jsr bdos_FINDNEXT
-    zuntil_cs
+    zuntil cs
     jmp newline
 
 ; Prints A bytes at 'temp', followed by a space.
@@ -484,7 +484,7 @@ print_filename_bytes:
     sta index
     zrepeat
         inc temp+0
-        zif_eq
+        zif eq
             inc temp+1
         zendif
 
@@ -494,7 +494,7 @@ print_filename_bytes:
         jsr bdos_CONOUT
 
         dec index
-    zuntil_eq
+    zuntil eq
     jmp space
 zendproc
 
@@ -516,7 +516,7 @@ zproc entry_TYPE
     lda #<userfcb
     ldx #>userfcb
     jsr xfcb_open
-    zif_cs
+    zif cs
         jmp cannot_open
     zendif
 
@@ -530,7 +530,7 @@ zproc entry_TYPE
         lda #<userfcb
         ldx #>userfcb
         jsr xfcb_readsequential
-        zbreakif_cs
+        zbreakif cs
 
         ldy #128
         sty temp
@@ -542,7 +542,7 @@ zproc entry_TYPE
             jsr bdos_CONOUT
 
             inc temp
-        zuntil_eq
+        zuntil eq
     zendloop
 type_exit:
     jmp newline
@@ -650,10 +650,10 @@ zproc entry_REN
 
     lda userfcb+FCB_F1
     cmp #' '
-    zif_ne
+    zif ne
         lda userfcb2+FCB_F1
         cmp #' '
-        zif_ne
+        zif ne
             lda #<userfcb
             ldx #>userfcb
             jmp bdos_RENAME
@@ -668,9 +668,9 @@ zendproc
 
 zproc entry_USER
     jsr parse_number
-    zif_cc
+    zif cc
         cmp #16
-        zif_cc
+        zif cc
             jmp bdos_GETSETUSER
         zendif
     zendif
@@ -686,9 +686,9 @@ zproc entry_TRANSIENT
 
     lda cmdfcb + FCB_F1
     cmp #' '
-    zif_eq
+    zif eq
         lda cmdfcb + FCB_DR
-        zif_ne
+        zif ne
             sec
             sbc #1
             sta drive
@@ -701,13 +701,13 @@ zproc entry_TRANSIENT
 
     lda cmdfcb + FCB_T1
     cmp #' '
-    zif_eq
+    zif eq
         ldy #2
         zrepeat
             lda com, y
             sta cmdfcb + FCB_T1, y
             dey
-        zuntil_mi
+        zuntil mi
     zendif
 
     ; Open the command.
@@ -715,15 +715,15 @@ zproc entry_TRANSIENT
     lda #<cmdfcb
     ldx #>cmdfcb
     jsr xfcb_open
-    zif_cs
+    zif cs
         ldy #0
         zrepeat
             lda cmdfcb + FCB_F1, y
             cmp #' '
-            zbreakif_eq
+            zbreakif eq
             iny
             cpy #8
-        zuntil_eq
+        zuntil eq
 
         lda #0
         sta cmdfcb + FCB_F1, y
@@ -745,7 +745,7 @@ zproc entry_TRANSIENT
     ; Read the first sector to get the header.
 
     jsr read_command_sector
-    zif_cs
+    zif cs
         jmp bad_command
     zendif
     lda #0
@@ -759,7 +759,7 @@ zproc entry_TRANSIENT
     clc
     adc (temp), y
     cmp temp2
-    zif_cs
+    zif cs
         jmp no_room
     zendif
 
@@ -769,7 +769,7 @@ zproc entry_TRANSIENT
     clc
     adc (temp), y
     cmp temp2
-    zif_cs
+    zif cs
         jmp no_room
     zendif
 
@@ -779,7 +779,7 @@ zproc entry_TRANSIENT
     sta temp+0
     zrepeat
         jsr read_command_sector
-    zuntil_cs
+    zuntil cs
 
     ; Relocate the file.
 
@@ -828,12 +828,12 @@ zproc entry_TRANSIENT
     lda temp+0
     ldx temp+1
     jsr parse_filename           ; first parameter
-    zif_cc
+    zif cc
         lda temp+0
         clc
         adc #16
         ldx temp+1
-        zif_cs
+        zif cs
             inx
         zendif
         jsr parse_filename       ; second parameter
@@ -848,7 +848,7 @@ zproc entry_TRANSIENT
     zloop
         lda cmdline, x
         sta (temp), y
-        zbreakif_eq
+        zbreakif eq
         inx
         iny
     zendloop
@@ -888,7 +888,7 @@ read_command_sector:
     lda temp+0
     eor #$80
     sta temp+0
-    zif_eq
+    zif eq
         inc temp+1
     zendif
     clc
@@ -911,7 +911,7 @@ zproc decode_command
             inx
             iny
             cpy #4
-        zuntil_eq
+        zuntil eq
         dex                 ; compensate for next_command
         lda cmdfcb+FCB_F5
         cmp #' '
@@ -924,7 +924,7 @@ zproc decode_command
         tax
 
         lda cmdtable, x
-    zuntil_eq
+    zuntil eq
 decode_command_exit:
     txa
     lsr a
@@ -1007,13 +1007,13 @@ zproc parse_filename
     ldx #>cmdline
     clc
     adc cmdoffset
-    zif_cs
+    zif cs
         inx
     zendif
     ldy #BDOS_PARSEFILENAME
     jsr BDOS
 
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -1040,9 +1040,9 @@ zproc skip_whitespace
     zloop
         lda cmdline, x
         cmp #' '
-        zif_ne
+        zif ne
             cmp #'='
-            zbreakif_ne
+            zbreakif ne
         zendif
         inx
     zendloop
@@ -1072,7 +1072,7 @@ print_hex4_number:
     and #$0f
     ora #'0'
     cmp #'9'+1
-    zif_cs
+    zif cs
         adc #6
     zendif
     pha
@@ -1097,12 +1097,12 @@ zproc printi
         jsr bdos_CONOUT
 
         inc temp2+0
-        zif_eq
+        zif eq
             inc temp2+1
         zendif
 
         pla
-    zuntil_mi
+    zuntil mi
 
     lda temp2+1
     pha
@@ -1122,7 +1122,7 @@ zproc set_dirlen
     jsr BIOS    
 
     ; Defailt to 2 files per line if no driver is found
-    zif_cs
+    zif cs
         lda #2
         sta dirlen
         rts

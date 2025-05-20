@@ -46,58 +46,58 @@ mn_flag:        .byte 0             ; Image mounted flag
 ; 
 zproc main
     jsr init
-    zif_cs
+    zif cs
         rts
     zendif
 
     ; Look for switches in command line
 
     lda cpm_cmdline                 ; Get first parameter
-    zif_eq
+    zif eq
         jmp list_mounts             ; Empty, list mounted drives and exit
     zendif
     jsr get_option                  ; Get option switch
-    zif_cs
+    zif cs
         jmp err_usage               ; Syntax error
     zendif
     cpx #'M'
-    zif_eq
+    zif eq
         jmp mount_drive
     zendif
     cpx #'U'
-    zif_eq
+    zif eq
         jmp unmount_drive
     zendif
     cpx #'N'
-    zif_eq
+    zif eq
         jmp create_image
     zendif
     cpx #'D'
-    zif_eq
+    zif eq
         jmp delete_file
     zendif
     cpx #'C'
-    zif_eq
+    zif eq
         lda #0
         sta rn_flag                 ; Unset the "rename" flag
         jmp copy_or_move_file
     zendif
     cpx #'R'
-    zif_eq
+    zif eq
         lda #1
         sta rn_flag                 ; Set the "rename" flag
         jmp copy_or_move_file
     zendif
     cpx #'S'
-    zif_eq
+    zif eq
         jmp save_config
     zendif
     cpx #'L'
-    zif_eq
+    zif eq
         jmp list_images
     zendif
     cpx #'H'
-    zif_eq
+    zif eq
         jmp err_usage
     zendif
     lda #<unknown_msg
@@ -114,7 +114,7 @@ zproc skip_sp
     zloop
         lda cpm_cmdline,y
         cmp #' '
-        zbreakif_ne
+        zbreakif ne
         iny
     zendloop
     sty cmdline_index
@@ -131,10 +131,10 @@ zproc get_option
     ldy cmdline_index
     lda cpm_cmdline,y
     cmp #'/'
-    zif_eq
+    zif eq
         iny
         ldx cpm_cmdline,y
-        zif_ne
+        zif ne
             iny
             sty cmdline_index
             jsr skip_sp
@@ -190,7 +190,7 @@ zproc validate_image_name
 
     ; Check if there is an image name
 
-    zif_eq
+    zif eq
         jsr err_usage               ; If none, bad syntax
         sec
         rts
@@ -236,9 +236,9 @@ zproc set_image_name
         iny
         lda cpm_cmdline,x
         sta (buffer1),y
-        zbreakif_eq                 ; Stop when null or blank
+        zbreakif eq                 ; Stop when null or blank
         cmp #' '
-    zuntil_eq
+    zuntil eq
     lda #0                          ; null-terminate the string
     sta (buffer1),y
     stx cmdline_index
@@ -253,7 +253,7 @@ zendproc
 ;
 zproc set_first_image_name
     jsr validate_image_name
-    zif_cc
+    zif cc
         ldy #0                      ; Offset of first file name in buffer
         sty filename1+0
         lda buffer1+1
@@ -278,7 +278,7 @@ zendproc
 ;
 zproc set_second_image_name
     jsr validate_image_name
-    zif_cc
+    zif cc
         ldy filename2
         jsr set_image_name          ; Copy second image name at (buffer1),y
         jsr skip_sp
@@ -310,7 +310,7 @@ zproc print_mount
     jsr BDOS
     ldy #1
     lda (buffer1),y                 ; Get RO flag
-    zif_ne
+    zif ne
         lda #<ro_msg                ; Print RO indicator
         ldx #>ro_msg
     zelse
@@ -325,19 +325,19 @@ zendproc
 ;
 zproc mount_drive
     jsr get_drive
-    zif_cs
+    zif cs
         jmp err_usage
     zendif
 
     jsr drive_exists
-    zif_cs
+    zif cs
         rts
     zendif
 
     ; Check if there is an image name
 
     jsr validate_image_name
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -351,13 +351,13 @@ zproc mount_drive
     ; Get options, if any
 
     cmp #0                          ; End of command line?
-    zif_ne
+    zif ne
         jsr get_option              ; No, get option
-        zif_cs
+        zif cs
             jmp err_usage           ; Syntax error
         zendif
         cpx #'O'                    ; Read-only switch
-        zif_eq
+        zif eq
             stx ro_flag             ; Any non-zero value is OK
         zelse
             lda #<unknown_msg
@@ -369,7 +369,7 @@ zproc mount_drive
 
     ldy cmdline_index
     lda cpm_cmdline,y
-    zif_ne
+    zif ne
         jmp err_usage               ; Nothing else expected
     zendif
 

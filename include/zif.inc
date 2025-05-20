@@ -16,6 +16,10 @@
     \name:
 .endm
 
+.macro zlproc name, sect=.text, binding=global
+    zproc \name, .text, local
+.endm
+
 .macro zendproc
     .if (zloopsp != 0) || (zifsp != 0)
         .error "Unclosed structure macro"
@@ -89,8 +93,22 @@
     .endm
 .endm
 
+.macro zbreakif cond
+    zbreakif_\cond
+.endm
+
+.macro zcontinueif cond
+    zcontinueif_\cond
+.endm
+
+.macro zuntil cond
+    zuntil_\cond
+.endm
+
 _zmake_loops eq, ne
 _zmake_loops ne, eq
+_zmake_loops lt, ge
+_zmake_loops ge, lt
 _zmake_loops cc, cs
 _zmake_loops cs, cc
 _zmake_loops pl, mi
@@ -106,8 +124,14 @@ _zmake_loops vc, vs
     .endm
 .endm
 
+.macro zif cond, target
+    zif_\cond \target
+.endm
+
 _zmake_if eq, ne
 _zmake_if ne, eq
+_zmake_if lt, ge
+_zmake_if ge, lt
 _zmake_if cc, cs
 _zmake_if cs, cc
 _zmake_if pl, mi

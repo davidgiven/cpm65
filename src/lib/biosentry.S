@@ -83,7 +83,7 @@ zproc bios_FINDDRV
     stx ptr1+1
 
     ora ptr1+1
-    zif_eq
+    zif eq
         ; input ID is 0; return first driver structure
 
         lda drvtop+0
@@ -102,7 +102,7 @@ zproc bios_FINDDRV
 
         lda ptr+0
         ora ptr+1
-        zif_eq
+        zif eq
             sec
             rts
         zendif
@@ -112,11 +112,11 @@ zproc bios_FINDDRV
         ldy #DRVSTRUCT_ID
         lda (ptr), y
         cmp ptr1+0
-        zif_eq
+        zif eq
             iny
             lda (ptr), y
             cmp ptr1+1
-            zif_eq
+            zif eq
                 ; Found a matching driver, so return its strategy routine.
 
                 iny

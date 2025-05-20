@@ -15,9 +15,9 @@ start:
    .byte $eb,$ea \ 6502: sbc #$ea, 65C02: nop:nop, 65816: xba:nop
 \ A: 6502: A=$00, 65C02: A=$ea, 65816: A=$01
    cmp   #$02
-   .zif cs
+   zif cs
       lda   #$02
-   .zendif
+   zendif
    pha
    lda   #<txtbase
    ldx   #>txtbase
@@ -30,9 +30,9 @@ start:
    asl   A
    asl   A
    adc   #<txtcpus
-   .zif cs
+   zif cs
       inx
-   .zendif
+   zendif
    ldy   #BDOS_PRINTSTRING
    jmp   BDOS
 

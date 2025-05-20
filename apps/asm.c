@@ -1440,7 +1440,7 @@ static void consumeInclude()
     token = currentByte = ';';
 }
 
-static void lookupAndCall(const SymbolCallbackEntry* entries)
+static bool lookupAndCall(const SymbolCallbackEntry* entries)
 {
     for (;;)
     {
@@ -1448,13 +1448,19 @@ static void lookupAndCall(const SymbolCallbackEntry* entries)
         {
             consumeToken();
             entries->callback();
-            return;
+            return true;
         }
         entries++;
 
         if (!entries->string)
-            fatal("unknown pseudo-op");
+            return false;
     }
+}
+
+static void lookupAndCallOrFail(const SymbolCallbackEntry* entries)
+{
+    if (!lookupAndCall(entries))
+        fatal("unknown pseudo-op");
 }
 
 static void parse()
@@ -1469,6 +1475,11 @@ static void parse()
         {"fill", consumeDotFill},
         {"expand", consumeDotExpand},
         {"label", consumeDotLabel},
+        {"include", consumeInclude},
+        {}
+    };
+
+    static const SymbolCallbackEntry nondotEntries[] = {
         {"zproc", consumeZproc},
         {"zendproc", consumeZendproc},
         {"zloop", consumeZloop},
@@ -1479,7 +1490,6 @@ static void parse()
         {"zuntil", consumeZuntil},
         {"zif", consumeZif},
         {"zendif", consumeZendif},
-        {"include", consumeInclude},
         {}
     };
 
@@ -1497,10 +1507,15 @@ static void parse()
             case '.':
                 consumeToken();
                 expect(TOKEN_ID);
-                lookupAndCall(dotEntries);
+                lookupAndCallOrFail(dotEntries);
                 break;
 
             case TOKEN_ID:
+                /* Pseudooperations. */
+
+                if (lookupAndCall(nondotEntries))
+                    break;
+
                 /* Process instructions. */
 
                 if (tokenLength == 3)

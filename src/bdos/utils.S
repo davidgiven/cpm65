@@ -62,7 +62,7 @@ zproc setbit, .text.setbit
         ora temp+0, y
         sta (temp+2), y
         dey
-    zuntil_mi
+    zuntil mi
 
     rts
 zendproc
@@ -72,9 +72,9 @@ zproc rotater8, .text.rotater8
     inx
     zloop
         dex
-        zbreakif_eq
+        zbreakif eq
         lsr a
-        zif_cs
+        zif cs
             ora #$80
         zendif
     zendloop
@@ -86,7 +86,7 @@ zproc rotatel8, .text.rotatel8
     inx
     zloop
         dex
-        zbreakif_eq
+        zbreakif eq
         asl a
         adc #0
     zendloop

@@ -21,18 +21,18 @@ zproc bdos_PARSEFCB
     ldy #0
     ldx #0                      ; drive byte
     lda (param), y              ; drive letter
-    zif_ne
+    zif ne
         iny
         lda (param), y
         dey
         cmp #':'                    ; colon?
-        zif_eq
+        zif eq
             lda (param), y
             jsr uppercase
             sec
             sbc #'A'-1              ; to 1-based drive
             cmp #16
-            zif_cs
+            zif cs
                 dec temp+1
             zendif
 
@@ -53,13 +53,13 @@ zproc bdos_PARSEFCB
         jsr uppercase
 
         jsr is_terminator_char
-        zif_cs
+        zif cs
             ; Turn "ABC .X" -> "AB     .X"
             lda #' '
             dey                 ; reread the char again next time
         zendif
         cmp #'*'
-        zif_eq
+        zif eq
             ; Turn "ABC*.X" -> "ABC?????.X"
             lda #'?'
             dey                 ; reread the * again next time
@@ -68,7 +68,7 @@ zproc bdos_PARSEFCB
         iny
 
         dex
-    zuntil_eq
+    zuntil eq
     ; X is cmdoffset
 
     ; Skip non-dot filename characters.
@@ -76,9 +76,9 @@ zproc bdos_PARSEFCB
     lda (param), y
     zloop
         cmp #'.'
-        zbreakif_eq
+        zbreakif eq
         jsr is_terminator_char
-        zif_cs
+        zif cs
             lda #' '            ; filename has no extension
             pha
             pha
@@ -101,13 +101,13 @@ zproc bdos_PARSEFCB
         jsr uppercase
 
         jsr is_terminator_char
-        zif_cs
+        zif cs
             ; Turn "ABC .X" -> "AB     .X"
             lda #' '
             dey                 ; reread the char again next time
         zendif
         cmp #'*'
-        zif_eq
+        zif eq
             ; Turn "ABC.X*" -> "ABC.X*"
             lda #'?'
             dey                 ; reread the * again next time
@@ -116,18 +116,18 @@ zproc bdos_PARSEFCB
         iny
 
         dex
-    zuntil_eq
+    zuntil eq
 
     ; Discard any remaining filename characters.
 
     lda (param), y          ; get a character
     zrepeat
         jsr is_terminator_char
-        zbreakif_cs
+        zbreakif cs
 
         iny
         lda (param), y
-    zuntil_eq
+    zuntil eq
 
 parse_filename_exit:
     ; Push the four zeroes for the metadata.
@@ -150,7 +150,7 @@ parse_filename_exit:
         pla
         sta (user_dma), y
         dey
-    zuntil_mi
+    zuntil mi
     txa                         ; offset into A
 
     ; Compute the updated pointer.
@@ -158,7 +158,7 @@ parse_filename_exit:
     clc
     adc param+0
     ldx param+1
-    zif_cs
+    zif cs
         inx
     zendif
 
@@ -166,7 +166,7 @@ parse_filename_exit:
 
     clc
     ldy temp+1
-    zif_ne
+    zif ne
         sec
     zendif
 
@@ -179,7 +179,7 @@ is_terminator_char:
         cmp terminators, x
         beq 1f                  ; carry set on branch
         dex
-    zuntil_mi
+    zuntil mi
     clc
 1:
     ldx temp+2

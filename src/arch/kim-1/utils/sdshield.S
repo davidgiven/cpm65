@@ -116,7 +116,7 @@ zproc DiskMount, .text.DiskMount
         jsr xParWriteByte
         iny
         pla
-    zuntil_eq
+    zuntil eq
     jmp ComExit
 zendproc
 
@@ -150,7 +150,7 @@ zproc SendString, .text.SendString
         jsr xParWriteByte
         iny
         pla
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -239,9 +239,9 @@ zproc DiskDirNext, .text.DiskDirNext
     zloop
         jsr xParReadByte
         sta (zp_sds_buffer),y
-        zbreakif_eq
+        zbreakif eq
         inc zp_sds_buffer
-        zcontinueif_ne
+        zcontinueif ne
         inc zp_sds_buffer+1
     zendloop
         jmp DiskCsuccess     
@@ -274,11 +274,11 @@ zproc DiskNextMountedDrv, .text.DiskNextMountedDrv
     jsr xParSetRead
     jsr xParReadByte
     cmp #PR_DIR_END         ;end?
-    zif_eq
+    zif eq
         jmp DiskCerror
     zendif
     cmp #PR_NAK             ;NAK?
-    zif_eq
+    zif eq
         jmp DiskRetErrCode
     zendif
 ;
@@ -294,7 +294,7 @@ zproc DiskNextMountedDrv, .text.DiskNextMountedDrv
         iny
         jsr xParReadByte
         sta (zp_sds_buffer),y
-    zuntil_eq
+    zuntil eq
     jmp DiskCsuccess
 zendproc
 
@@ -321,7 +321,7 @@ zproc DiskStatus, .text.DiskStatus
     jsr xParSetRead
     jsr xParReadByte        ;get result code
     cmp #PR_STATUS          ;status
-    zif_ne
+    zif ne
         jmp DiskCerror      ;can't be anything else
     zendif
     jsr xParReadByte
@@ -355,7 +355,7 @@ zproc DiskOpen, .text.DiskOpen
         pha
         jsr xParWriteByte
         pla
-    zuntil_eq
+    zuntil eq
     jmp ComExit
 zendproc
 
@@ -371,7 +371,7 @@ zendproc
 ; Modifies A, X and Y.
 ;
 zproc DiskWrite, .text.DiskWrite
-    zif_eq
+    zif eq
         clc
         rts
     zendif
@@ -389,7 +389,7 @@ zproc DiskWrite, .text.DiskWrite
         jsr xParWriteByte
         iny                 ;next offset
         dex
-    zuntil_eq
+    zuntil eq
     jmp ComExit
 zendproc
 
@@ -434,7 +434,7 @@ zproc DiskFormat, .text.DiskFormat
         pha
         jsr xParWriteByte
         pla
-    zuntil_eq
+    zuntil eq
     jmp ComExit
 zendproc
 
@@ -453,7 +453,7 @@ zproc GetProtoVersion .text.GetProtoVersion
     jsr xParSetRead
     jsr xParReadByte
     cmp #PR_VERSION_INFO
-    zif_eq
+    zif eq
         jsr xParReadByte    ; Get protocol version
         jmp DiskRetSt       ; Return preserving A
     zendif
@@ -476,7 +476,7 @@ zproc GetVersion, .text.GetVersion
     jsr xParSetRead
     jsr xParReadByte
     cmp #PR_VERSION_INFO
-    zif_eq
+    zif eq
         jsr xParReadByte    ; Get major
         tax
         jsr xParReadByte    ; Get minor

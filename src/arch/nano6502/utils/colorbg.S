@@ -39,7 +39,7 @@ read_bg:
     ; Convert
 	jsr hexconv
     ; Exit if not valid hex
-    zif_cs
+    zif cs
 	    rts
     zendif
 
@@ -57,7 +57,7 @@ read_bg:
     ; Convert
     jsr hexconv
     ; Exit if not valid hex
-    zif_cs
+    zif cs
 	    rts
     zendif
     ; Combine with low nibble

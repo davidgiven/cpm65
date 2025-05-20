@@ -77,7 +77,7 @@ state2:         ; read row, --> state 3
 state1:         ; char after ESC, if '=' --> state 2, otherwise --> state 0
     pla
     cmp #'='
-    zif_eq
+    zif eq
         inc state
         rts
     zendif
@@ -88,12 +88,12 @@ state1:         ; char after ESC, if '=' --> state 2, otherwise --> state 0
 state0:
     pla
     cmp #127    ; DEL/RUB (rubout)
-    zif_eq
+    zif eq
         inc rubout
         jmp do_rubout
     zendif
     cmp #32
-    zif_cs      ; normal ASCII
+    zif cs      ; normal ASCII
         ldy #SCREEN_PUTCHAR
         jsr SCREEN
 
@@ -101,13 +101,13 @@ advance_position:
         inc xpos
         lda xpos
         cmp width
-        zif_cs
+        zif cs
             lda #0
             sta xpos
             inc ypos
             lda ypos
             cmp height
-            zif_cs
+            zif cs
                 dec ypos
                 ldy #SCREEN_SCROLLUP
                 jsr SCREEN
@@ -117,17 +117,17 @@ advance_position:
     zendif
 
     cmp #$08
-    zif_eq          ; ^H backspace, move cursor to the left
+    zif eq          ; ^H backspace, move cursor to the left
 do_rubout:
         dec xpos
         lda xpos
-        zif_mi
+        zif mi
             ldx width
             dex
             stx xpos
             dec ypos
             lda ypos
-            zif_mi
+            zif mi
                 inc ypos
                 lda #0
                 sta xpos
@@ -138,7 +138,7 @@ do_rubout:
         ldy #SCREEN_SETCURSOR
         jsr SCREEN
         lda rubout              ; check flag
-        zif_ne
+        zif ne
             lda #' '
             ldy #SCREEN_PUTCHAR
             jsr SCREEN
@@ -149,11 +149,11 @@ do_rubout:
     zendif
 
     cmp #$0a
-    zif_eq          ; ^J line feed, move cursor down one line, optional scroll
+    zif eq          ; ^J line feed, move cursor down one line, optional scroll
         inc ypos
         lda ypos
         cmp height
-        zif_cs
+        zif cs
             dec ypos
             ldy #SCREEN_SCROLLUP
             jsr SCREEN
@@ -162,35 +162,35 @@ do_rubout:
     zendif
 
     cmp #$0b
-    zif_eq          ; ^K upline, move cursor up one line, bump against top
+    zif eq          ; ^K upline, move cursor up one line, bump against top
         dec ypos
-        zif_mi
+        zif mi
             inc ypos
         zendif
         jmp LEAVE
     zendif
 
     cmp #$0c
-    zif_eq          ; ^L forward space, move cursor to the right, opt. scroll
+    zif eq          ; ^L forward space, move cursor to the right, opt. scroll
         jmp advance_position
     zendif
 
     cmp #$0d
-    zif_eq          ; ^M carriage return, move cursor to begin of line
+    zif eq          ; ^M carriage return, move cursor to begin of line
         lda #0
         sta xpos
         jmp LEAVE
     zendif
 
     cmp #$1a
-    zif_eq          ; ^Z clear screen, (home cursor?)
+    zif eq          ; ^Z clear screen, (home cursor?)
         ldy #SCREEN_CLEAR
         jsr SCREEN
         jmp home_cursor
     zendif
 
     cmp #$1e
-    zif_eq          ; ^^ home cursor
+    zif eq          ; ^^ home cursor
 home_cursor:
         lda #0
         sta xpos
@@ -199,7 +199,7 @@ home_cursor:
     zendif
 
     cmp #$1b        ; ESC --> state 1
-    zif_eq
+    zif eq
         inc state
         rts
     zendif
@@ -236,7 +236,7 @@ zproc init
     ldy #BIOS_FINDDRV
     jsr BIOS
 
-    zif_cs
+    zif cs
         lda #<noscreen
         ldx #>noscreen
         ldy #BDOS_WRITE_STRING
@@ -253,7 +253,7 @@ zproc init
     ldy #BIOS_ADDDRV
     jsr BIOS
 
-    zif_cc
+    zif cc
         ; claim memory
 
         ldy #BIOS_GETTPA

@@ -59,7 +59,7 @@ scan_again:
     next:
         iny                     ; Increase row counter
         asl
-    zuntil_eq
+    zuntil eq
 
     sta last_char               ; no key pressed...
     sta cur_char
@@ -69,7 +69,7 @@ scan_again:
 key_pressed:
     lsr                     ; check if row 0 ($01)
 
-    zif_cs                  ; modifier key(s) or ESC pressed
+    zif cs                  ; modifier key(s) or ESC pressed
         rol                 ; correct back to $01
         stx modifiers       ; save modifiers
 
@@ -93,7 +93,7 @@ key_pressed:
     zloop
         dey
         asl
-    zuntil_cs
+    zuntil cs
 
     tya                     ; A=column
     adc tmpval              ; add saved row*7 + 1 (carry always set)
@@ -103,7 +103,7 @@ key_pressed:
 
 lookup_done:
     cmp cur_char
-    zif_ne
+    zif ne
         sta cur_char
         lda #2
         sta wait_cntr
@@ -118,9 +118,9 @@ lookup_done:
         ldx #$40
         zloop
             dex
-        zuntil_eq
+        zuntil eq
         dey
-    zuntil_eq
+    zuntil eq
 
     beq scan_again
 
@@ -128,7 +128,7 @@ debounce_done:
     ldx #$64                ; long delay on first character
     cmp last_char
 
-    zif_eq
+    zif eq
         ldx #$0f            ; shorter repeat rate
     zendif
 
@@ -143,13 +143,13 @@ debounce_done:
 
     and #7                      ; shift or caps
     tax
-    zif_ne                      ; handle shift or caps
+    zif ne                      ; handle shift or caps
         lda tmpval
         cmp #$7f                ; RUB, case modifiers have no effect
         beq getkey_done
 
         cmp #$61                ; >= 0x61 always toupper()
-        zif_cs
+        zif cs
             eor #$20
             bne case_adjust_done
         zendif
@@ -158,14 +158,14 @@ debounce_done:
         beq case_adjust_done    ; for < 0x60, CAPS has no effect
 
         cmp #$30                ; special case, add #$10
-        zif_eq
+        zif eq
             clc
             adc #$10
             bne case_adjust_done
         zendif
 
         cmp #$21                ; don't adjust space (0x20) and below
-        zif_cs
+        zif cs
             eor #$10            ; all other keys with lshift or rshift
         zendif
 
@@ -175,7 +175,7 @@ debounce_done:
 
     tya                     ; restore saved modifiers
     and #$40                ; control key?
-    zif_ne
+    zif ne
         lda tmpval
         and #$1f
         rts

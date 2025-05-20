@@ -41,22 +41,22 @@ _start:
         sta BIOS_EXEC_ADDR
 
         inc load+1
-        zif_eq
+        zif eq
             inc load+2
         zendif
 
         inc store+1
-        zif_eq
+        zif eq
             inc store+2
         zendif
 
         lda store+1
         cmp #<BIOS_END_ADDR
-        zif_eq
+        zif eq
             lda store+2
             cmp #>BIOS_END_ADDR
         zendif
-    zuntil_eq
+    zuntil eq
 
     ; Initialise the BIOS common code.
 
@@ -72,7 +72,7 @@ _start:
         jsr drvstrat_TTY
         ply
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Load the BDOS.
 

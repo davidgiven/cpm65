@@ -91,14 +91,14 @@ _start:
         sta BIOS_EXEC_ADDR
 
         inc load+1
-        zif_eq
+        zif eq
             inc load+2
         zendif
 
         inc store+1
-        zif_eq
+        zif eq
             inc store+2
-            zbreakif_eq
+            zbreakif eq
         zendif
     zendloop
 
@@ -116,7 +116,7 @@ _start:
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
     jmp bdos_core
 
@@ -150,7 +150,7 @@ zproc internal_RESETFILESYSTEM
         tax
 
         cpx #NUM_FILES*FT__SIZE
-    zuntil_eq
+    zuntil eq
 
     ; Initialise the LRU list.
 
@@ -160,7 +160,7 @@ zproc internal_RESETFILESYSTEM
         sta file_table_lru, x
 
         dex
-    zuntil_mi
+    zuntil mi
 
     rts
 zendproc
@@ -183,7 +183,7 @@ zendproc
 zproc bdos_OPENFILE
     jsr get_opened_file_table_entry
     lda CP_ERRNO
-    zif_ne
+    zif ne
         sec
         rts
     zendif
@@ -295,7 +295,7 @@ zproc bdos_WRITESEQUENTIAL
     lda (param), y
     ldy #FCB_RC
     cmp (param), y
-    zif_cs
+    zif cs
         sta (param), y
     zendif
 
@@ -365,7 +365,7 @@ zproc bdos_DELETEFILE
         lda #FUNC_FILE_DELETE
         jsr neo_file_func_blocking
         lda CP_ERRNO
-        zbreakif_ne
+        zbreakif ne
 
         ; Find the next file.
 
@@ -377,7 +377,7 @@ zproc bdos_DELETEFILE
         sta param+1
 
         jsr bdos_FINDNEXT
-    zuntil_cs
+    zuntil cs
     
     ; Something went wrong.
 
@@ -439,13 +439,13 @@ zproc bdos_FINDNEXT
     zrepeat
         lda #' '
         cpx temp_file_entry
-        zif_ne
+        zif ne
             lda temp_file_entry+1, x
             jsr uppercase
             cmp #'.'
-            zif_eq
+            zif eq
                 cpy #FCB_T1
-                zif_eq
+                zif eq
                     inx
                     zcontinue
                 zendif
@@ -459,7 +459,7 @@ zproc bdos_FINDNEXT
 
         iny
         cpy #FCB_T3+1
-    zuntil_eq
+    zuntil eq
 
     ldy #FCB_DR
     lda (param), y
@@ -481,7 +481,7 @@ zproc bdos_FINDNEXT
     tax
     lda CP_PARAM+2
     and #0x7f
-    zif_ne
+    zif ne
         inx
     zendif
     txa
@@ -522,9 +522,9 @@ zproc bdos_FINDNEXT
         lda (param), y
         and #0x7f
         cmp #'?'
-        zif_ne
+        zif ne
             cmp (user_dma), y
-            zif_ne
+            zif ne
                 ; Character is not a wildcard and does not match!
                 ; Try the next file.
 
@@ -533,7 +533,7 @@ zproc bdos_FINDNEXT
         zendif
         iny
         cpy #FCB_T3+1
-    zuntil_eq
+    zuntil eq
 
     ; Success. But, remember to fill out the file attributes.
 
@@ -554,7 +554,7 @@ zproc truncate_filename_to_directory
     ldx #1
     lda temp_file_entry+FT_FILENAME, x
     cmp #'/'
-    zif_ne
+    zif ne
         ; Must have two digits for the user code
         inx
     zendif
@@ -575,21 +575,21 @@ zproc bdos_SETFILEATTRS
 	pha
 	ldy #FCB_T1
 	lda (param), y
-	zif_mi
+	zif mi
 		pla
 		lda #FIOATTR_READONLY
 		pha
 	zendif
 	iny
 	lda (param), y
-	zif_mi
+	zif mi
 		pla
 		ora #FIOATTR_SYSTEM
 		pha
 	zendif
 	iny
 	lda (param), y
-	zif_mi
+	zif mi
 		pla
 		ora #FIOATTR_ARCHIVE
 		pha
@@ -606,7 +606,7 @@ zproc bdos_SETFILEATTRS
 
 	clc
 	lda CP_ERRNO
-	zif_ne
+	zif ne
 		sec
 	zendif
 	rts
@@ -646,7 +646,7 @@ zendproc
 zproc bdos_COMPUTEFILESIZE
     jsr get_opened_file_table_entry
     lda CP_ERRNO
-    zif_ne
+    zif ne
         clc
         rts
     zendif
@@ -681,17 +681,17 @@ zproc bdos_COMPUTEFILESIZE
 
     lda CP_PARAM+1
     and #0x7f
-    zif_ne
+    zif ne
         ldy #FCB_R0
         lda (param), y
         inc a
         sta (param), y
-        zif_eq
+        zif eq
             iny
             lda (param), y
             inc a
             sta (param), y
-            zif_eq
+            zif eq
                 iny
                 lda (param), y
                 inc a
@@ -720,7 +720,7 @@ zproc bdos_RENAMEFILE
     lda param+0
     adc #16
     sta param+0
-    zif_cs
+    zif cs
         inc param+1
     zendif
 
@@ -735,7 +735,7 @@ zproc bdos_RENAMEFILE
     jsr neo_file_func_blocking
     clc
     lda CP_ERRNO
-    zif_ne
+    zif ne
         sec
     zendif
     rts
@@ -808,7 +808,7 @@ zproc update_fcb_to_current_random_record
     ldy #FCB_RC
     lda (param), y
     cmp #0x80
-    zif_ne
+    zif ne
         ; If RC is not 0x80, then this is must be the last extent
         ; in the file; we need to set the file length appropriately
         ; in case we move to a new extent.
@@ -851,11 +851,11 @@ zproc update_fcb_to_current_random_record
     sta (param), y
 
     cmp temp+1              ; is the module different?
-    zif_eq
+    zif eq
         ldy #FCB_EX
         lda (param), y
         cmp temp+0          ; is the extent different?
-        zif_eq
+        zif eq
             rts             ; neither is different
         zendif
     zendif
@@ -906,7 +906,7 @@ zproc update_rc_field
         lsr a
         ror ptr+0
         dex
-    zuntil_eq
+    zuntil eq
 
     ; If we're looking at the last extent, compute the number of records.
     ; Otherwise, it's 128.
@@ -914,10 +914,10 @@ zproc update_rc_field
     tax
     lda #0x80
     cpx temp+1
-    zif_eq
+    zif eq
         ldx ptr+0
         cpx temp+0
-        zif_eq
+        zif eq
             lda CP_PARAM+1
             asl a
             lda CP_PARAM+2
@@ -927,7 +927,7 @@ zproc update_rc_field
             tay
             lda CP_PARAM+1
             and #0x7f
-            zif_ne
+            zif ne
                 iny
             zendif
             tya
@@ -946,7 +946,7 @@ zproc flush_rc_count
     ldy #FCB_RC
     lda (param), y
     cmp #0x80
-    zif_eq
+    zif eq
         rts
     zendif
 
@@ -964,7 +964,7 @@ zproc increment_fcb_location
     inc a
     sta (param), y
     cmp #128
-    zif_eq
+    zif eq
         lda #0
         sta (param), y
         ldy #FCB_EX
@@ -972,7 +972,7 @@ zproc increment_fcb_location
         inc a
         sta (param), y
         cmp #32
-        zif_eq
+        zif eq
             lda #0
             sta (param), y
             ldy #FCB_S2
@@ -1016,7 +1016,7 @@ zproc convert_filename
 
     lda (param)     ; drive
     dec
-    zif_mi          ; no drive specified?
+    zif mi          ; no drive specified?
         lda current_drive
     zendif
     clc
@@ -1025,9 +1025,9 @@ zproc convert_filename
 
     ldx #1
     lda current_user
-    zif_ne
+    zif ne
         cmp #9
-        zif_cs
+        zif cs
             lda #'1'
             sta temp_file_entry+FT_FILENAME, x
             inx
@@ -1053,9 +1053,9 @@ zproc convert_filename
         and #0x7f
 
         cmp #' '
-        zif_ne
+        zif ne
             cpy #FCB_T1
-            zif_eq
+            zif eq
                 pha
                 lda #'.'
                 sta temp_file_entry+FT_FILENAME, x
@@ -1069,7 +1069,7 @@ zproc convert_filename
 
         iny
         cpy #FCB_T3+1
-    zuntil_eq
+    zuntil eq
 
     stx temp_file_entry+FT_FILENAMELEN
     rts
@@ -1091,21 +1091,21 @@ zproc convert_and_find_file_table_entry
     zrepeat
         phx
         lda file_table+FT_ATTRIBS, x
-        zif_ne          ; skip empty slots
+        zif ne          ; skip empty slots
             lda file_table+FT_FILENAMELEN, x
             cmp temp_file_entry+FT_FILENAMELEN
-            zif_eq
+            zif eq
                 ldy #0
                 zrepeat
                     lda file_table+FT_FILENAME, x
                     cmp temp_file_entry+FT_FILENAME, y
-                    zbreakif_ne
+                    zbreakif ne
 
                     inx
                     iny
                     cpy temp_file_entry+FT_FILENAMELEN
-                zuntil_eq
-                zif_eq
+                zuntil eq
+                zif eq
                     plx
                     clc
                     rts
@@ -1119,7 +1119,7 @@ zproc convert_and_find_file_table_entry
 
         inc ptr+0
         cpx #FT__SIZE*NUM_FILES
-    zuntil_eq
+    zuntil eq
     sec
     rts
 zendproc
@@ -1130,7 +1130,7 @@ zendproc
 
 zproc get_file_table_entry
     jsr convert_and_find_file_table_entry
-    zif_cs
+    zif cs
         ; No slots match. Find an empty slot.
 
         ldx #0
@@ -1147,7 +1147,7 @@ zproc get_file_table_entry
             tax
 
             cmp #FT__SIZE * NUM_FILES
-        zuntil_eq
+        zuntil eq
 
         ; A file needs to be evicted.
 
@@ -1158,7 +1158,7 @@ zproc get_file_table_entry
         tax
 
         lda file_table+FT_ATTRIBS, x
-        zif_ne
+        zif ne
             ; Yes; it needs closing.
 
             lda ptr+0
@@ -1167,7 +1167,7 @@ zproc get_file_table_entry
             lda #FUNC_FILE_CLOSE
             jsr neo_file_func_blocking
             lda CP_ERRNO
-            zif_ne
+            zif ne
                 rts
             zendif
         zendif
@@ -1188,7 +1188,7 @@ zproc get_file_table_entry
             inx
             iny
             cpy ptr+1
-        zuntil_eq
+        zuntil eq
         plx
     zendif
 
@@ -1208,7 +1208,7 @@ zproc get_closed_file_table_entry
     jsr get_file_table_entry
 
     lda file_table+FT_ATTRIBS, x
-    zif_ne
+    zif ne
         ; This table entry is open.
 
         lda #FUNC_FILE_CLOSE
@@ -1228,7 +1228,7 @@ zproc open_file_table_entry
 
     stz CP_ERRNO
     lda file_table+FT_ATTRIBS, x
-    zif_eq
+    zif eq
         ; This file has not been opened.
 
         lda #FIOMODE_RDWR
@@ -1242,12 +1242,12 @@ zproc open_file_table_entry
     zrepeat
         lda file_table_lru, x
         cmp ptr+0
-        zif_ne
+        zif ne
             sta file_table_lru, y
             dey
         zendif
         dex
-    zuntil_mi
+    zuntil mi
     lda ptr+0
     sta file_table_lru
 
@@ -1274,7 +1274,7 @@ zproc do_open_file_table_entry
     jsr neo_file_func_blocking
 
     lda CP_ERRNO
-    zif_eq
+    zif eq
         lda CP_PARAM+0
         pha
 
@@ -1436,10 +1436,10 @@ zproc screen_getchar
         lda #FUNC_TTY_READCH
         jsr neo_tty_func_blocking
         lda CP_PARAM + 0
-    zuntil_ne
+    zuntil ne
     
     cmp #8
-    zif_eq
+    zif eq
         lda #127
     zendif
 
@@ -1464,10 +1464,10 @@ zproc screen_putstring
     ldy #0
     zrepeat
         lda (ptr), y
-        zbreakif_eq
+        zbreakif eq
         jsr screen_putchar
         iny
-    zuntil_eq ; never 0
+    zuntil eq ; never 0
     clc
     rts
 zendproc
@@ -1551,9 +1551,9 @@ zendproc
 
 zproc tty_conout
     cmp #'\n'
-    zif_ne
+    zif ne
         cmp #127
-        zif_eq
+        zif eq
             lda #8
         zendif
         sta CP_PARAM + 0
@@ -1640,7 +1640,7 @@ zproc wait_for_command
     pha
     zrepeat
         lda CP_GROUP
-    zuntil_eq
+    zuntil eq
     pla
     rts
 zendproc

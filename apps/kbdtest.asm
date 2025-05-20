@@ -14,7 +14,7 @@
 .label putchar
 .label print_hex_number
 
-.zproc start
+zproc start
 
     \ Find screen driver
 
@@ -29,9 +29,9 @@
     jsr BIOS
     
     \ Exit if no driver is found
-    .zif cs
+    zif cs
         rts
-    .zendif
+    zendif
     sta SCREEN+1
     stx SCREEN+2
 
@@ -41,24 +41,24 @@
     lda #0
     sta esccount
 
-    .zloop
-        .zrepeat
+    zloop
+        zrepeat
             ldy #SCREEN_GETCHAR
             jsr SCREEN
-        .zuntil cc
+        zuntil cc
         
         cmp #27
-        .zif eq
+        zif eq
             inc esccount
             ldx esccount
             cpx #3
-            .zbreak eq
-        .zendif
+            zbreak eq
+        zendif
         cmp #27
-        .zif ne
+        zif ne
             ldx #0
             stx esccount
-        .zendif
+        zendif
         
         pha
         lda #'['
@@ -67,16 +67,16 @@
         jsr print_hex_number
         lda #']'
         jsr putchar
-    .zendloop
+    zendloop
 
     lda #13
     jsr putchar
     lda #10
     jmp putchar
-.zendproc
+zendproc
 
 \ Prints an 8-bit hex number in A.
-.zproc print_hex_number
+zproc print_hex_number
     pha
     lsr a
     lsr a
@@ -88,53 +88,53 @@ print_hex4_number:
     and #$0f
     ora #'0'
     cmp #'9'+1
-    .zif cs
+    zif cs
         adc #6
-    .zendif
+    zendif
     pha
     jsr putchar
     pla
     rts
-.zendproc
+zendproc
 
 \ Prints an inline string. The text string must immediately follow the
 \ subroutine call.
 
-.zproc printi
+zproc printi
     pla
     sta ptr1+0
     pla
     sta ptr1+1
 
-    .zloop
+    zloop
         ldy #1
         lda (ptr1), y
-        .zbreak eq
-        .zbreak mi
+        zbreak eq
+        zbreak mi
         jsr putchar
 
         inc ptr1+0
-        .zif eq
+        zif eq
             inc ptr1+1
-        .zendif
-    .zendloop
+        zendif
+    zendloop
 
     inc ptr1+0
-    .zif eq
+    zif eq
         inc ptr1+1
-    .zendif
+    zendif
     inc ptr1+0
-    .zif eq
+    zif eq
         inc ptr1+1
-    .zendif
+    zendif
 
     jmp (ptr1)
-.zendproc
+zendproc
 
-.zproc putchar
+zproc putchar
     ldy #BDOS_CONIO
     jmp BDOS
-.zendproc
+zendproc
 
 BIOS:
     jmp 0

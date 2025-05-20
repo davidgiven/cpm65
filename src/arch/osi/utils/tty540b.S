@@ -300,7 +300,7 @@ zproc screen540b_cleartoeol
         sta (ptr1),y
         iny
         cpy #SCREEN_WIDTH
-    zuntil_eq
+    zuntil eq
 
     rts
 zendproc
@@ -309,14 +309,14 @@ zendproc
 
 zproc screen540b_setcursor
     cmp #SCREEN_WIDTH
-    zif_cs
+    zif cs
         lda #SCREEN_WIDTH-1
     zendif
     sta curx
 
     txa
     cmp #SCREEN_HEIGHT
-    zif_cs
+    zif cs
         lda #SCREEN_HEIGHT-1
     zendif
     sta cury
@@ -341,7 +341,7 @@ stylebg=.+1
     sta (ptr1),y
 
     cpy #XSCREEN_WIDTH-1
-    zif_ne
+    zif ne
         inc curx
     zendif
     rts
@@ -349,7 +349,7 @@ zendproc
 
 zproc screen540b_setstyle
     cmp #STYLE_REVERSE
-    zif_eq
+    zif eq
         lda #INVERSE
     zelse
         lda #NORMAL
@@ -369,13 +369,13 @@ zproc screen540b_putstring
     zloop
     1:
         lda $1234,x
-        zbreakif_eq
+        zbreakif eq
 
         jsr screen540b_putchar
 
         lda curx
         cmp #SCREEN_WIDTH
-        zbreakif_eq
+        zbreakif eq
         inx
     zendloop
 
@@ -417,7 +417,7 @@ zproc screen540b_scrollup
             lda (ptr3),y
             sta (ptr2),y
             dey
-        zuntil_mi
+        zuntil mi
 
         lda ptr1
         sta ptr
@@ -431,13 +431,13 @@ zproc screen540b_scrollup
         clc
         adc #XSCREEN_WIDTH
         sta ptr1
-        zif_cs
+        zif cs
             inc ptr1+1
             inc ptr3+1
         zendif
 
         dex
-    zuntil_eq
+    zuntil eq
 
 common_clear:
     ldy #SCREEN_WIDTH-1
@@ -447,7 +447,7 @@ common_clear:
         lda #NORMAL
         sta (ptr2),y
         dey
-    zuntil_mi
+    zuntil mi
 
     rts
 zendproc
@@ -477,7 +477,7 @@ zproc screen540b_scrolldown
             lda (ptr3),y
             sta (ptr2),y
             dey
-        zuntil_mi
+        zuntil mi
 
         lda ptr1
         sta ptr
@@ -492,20 +492,20 @@ zproc screen540b_scrolldown
         sbc #XSCREEN_WIDTH
         sta ptr1
         sta ptr3
-        zif_cc
+        zif cc
             dec ptr1+1
             dec ptr3+1
         zendif
 
         dex
-    zuntil_eq
+    zuntil eq
 
     jmp common_clear
 zendproc
 
 zproc screen540b_showcursor
     cmp #0
-    zif_eq
+    zif eq
         lda #0
     zelse
         lda #CURSORXOR
@@ -534,7 +534,7 @@ zproc tty540b_conin
         ldy #BIOS_CONST
         jsr next_tty
         cmp #$ff
-    zuntil_eq
+    zuntil eq
 
     jsr toggle_cursor
     ldy #BIOS_CONIN
@@ -543,32 +543,32 @@ zendproc
 
 zproc tty540b_conout
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta curx
         rts
     zendif
     cmp #10
-    zif_eq
+    zif eq
 do_lf:
         inc cury
         lda cury
         cmp #SCREEN_HEIGHT
-        zif_eq
+        zif eq
             dec cury
             jmp screen540b_scrollup
         zendif
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec curx
-        zif_mi
+        zif mi
             lda #SCREEN_WIDTH-1
             sta curx
 
             dec cury
-            zif_mi
+            zif mi
                 inc cury
                 jsr screen540b_scrolldown
             zendif
@@ -582,7 +582,7 @@ do_lf:
         rts
     zendif
     cmp #$20
-    zif_cc
+    zif cc
         rts
     zendif
 
@@ -594,7 +594,7 @@ do_lf:
 
     lda ptr3                    ; retrieve previous x position
     cmp #SCREEN_WIDTH-1
-    zif_eq
+    zif eq
         lda #0
         sta curx
         beq do_lf
@@ -623,7 +623,7 @@ zproc calculate_cursor_address
     adc #SCREEN_HOMEPOS_OFFSET  ; offset is always < 256
     sta ptr
     sta ptr1
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
 

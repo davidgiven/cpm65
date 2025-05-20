@@ -58,7 +58,7 @@ zproc system_init, loader
         cmp #0xaa
         bne 1f
         iny
-        zif_eq
+        zif eq
             inc ptr+1
             lda ptr+1
             cmp #0xff
@@ -87,7 +87,7 @@ zproc system_init, loader
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
+    zif ne
         sec                 ; invalid drive
         rts
     zendif
@@ -109,7 +109,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
 
     lda sector_num+0
     ror a               ; bottom bit -> C
@@ -140,13 +140,13 @@ zproc change_sector
     lda sector_num+0
     and #$fe
     cmp buffered_sector+0
-    zif_eq
+    zif eq
         lda sector_num+1
         cmp buffered_sector+1
-        zif_eq
+        zif eq
             lda sector_num+2
             cmp buffered_sector+2
-            zif_eq
+            zif eq
                 clc
                 rts
             zendif
@@ -186,7 +186,7 @@ zendproc
 
 zproc flush_buffer
     lda buffer_dirty
-    zif_mi
+    zif mi
         jsr buffered_sector_to_lba
         jsr write_sector
 
@@ -236,7 +236,7 @@ zproc read_sector
         jsr ACPTR
         sta DISK_BUFFER, y
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr UNTLK
     rts
@@ -275,7 +275,7 @@ zproc write_sector
         lda DISK_BUFFER, y
         jsr CIOUT
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr UNLSN
 
@@ -322,7 +322,7 @@ zproc get_status
         jsr ACPTR
         jsr OUTCH
         cmp #13
-    zuntil_eq
+    zuntil eq
 
     jsr UNTLK
     rts
@@ -334,9 +334,9 @@ zproc convert_to_ts
     ldy #0
     zloop
         cpx #0
-        zif_eq
+        zif eq
             cmp track_size_table, y
-            zif_cc
+            zif cc
                 iny     ; tracks are one-based.
                 rts
             zendif
@@ -344,7 +344,7 @@ zproc convert_to_ts
 
         sec
         sbc track_size_table, y
-        zif_cc
+        zif cc
             dex
         zendif
         iny
@@ -370,7 +370,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #100
-    zuntil_cc
+    zuntil cc
     adc #100
     jsr digit
 
@@ -379,7 +379,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #10
-    zuntil_cc
+    zuntil cc
     adc #10
     jsr digit
     tax
@@ -399,7 +399,7 @@ zproc string_out
     ldy #0
     zloop
         lda (ptr), y
-        zif_eq
+        zif eq
             rts
         zendif
         jsr CIOUT

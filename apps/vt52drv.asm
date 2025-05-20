@@ -32,9 +32,9 @@ LF = 0x0a
 .bss cnt, 1
 .bss inp, 1
 
-.zproc start
+zproc start
     jmp entry
-.zendproc
+zendproc
 
 driver:
     .word DRVID_TTY
@@ -42,9 +42,9 @@ driver:
     .word 0
     .byte "VT52TTY", 0
 
-.zproc strategy
+zproc strategy
     cpy #TTY_CONOUT
-    .zif eq
+    zif eq
         sta inp
         ldy #SCREEN_GETCURSOR
         jsr SCREEN
@@ -56,13 +56,13 @@ driver:
         lda inp
 
         cmp #32
-        .zif cs
+        zif cs
             cmp #127
-            .zif cc
+            zif cc
                 lda mEsc
 
                 cmp #0
-                .zif eq
+                zif eq
                     \ Regular ASCII
                     lda inp
                     ldy #SCREEN_PUTCHAR
@@ -70,18 +70,18 @@ driver:
                     inc cur_x
                     lda cur_x
                     cmp width
-                    .zif cs
+                    zif cs
                         lda #0
                         sta cur_x
                         inc cur_y
                         lda cur_y
                         cmp height
-                        .zif cs
+                        zif cs
                             dec cur_y
                             ldy #SCREEN_SCROLLUP
                             jsr SCREEN
-                        .zendif
-                    .zendif
+                        zendif
+                    zendif
                     lda cur_x
                     ldx cur_y
                     ldy #SCREEN_SETCURSOR
@@ -89,23 +89,23 @@ driver:
                     lda #0
                     sta parse
                     jmp mescdone
-                .zendif            
+                zendif            
                 
                 cmp #1
-                .zif eq
+                zif eq
                     \ escape sequence. Do nothing
                     jmp mescdone
-                .zendif
+                zendif
             
                 cmp #2
-                .zif eq
+                zif eq
                     \ First part of cursor adressing
                     lda inp
                     sta mEsc
                     lda #0
                     sta parse
                     jmp mescdone        
-                .zendif
+                zendif
                 
                 \ All other values - second part of cursor adressing
                 sec
@@ -128,55 +128,55 @@ driver:
                 sta mEsc
 
                 mescdone:
-            .zendif
-        .zendif
+            zendif
+        zendif
        
         lda inp
         cmp #127
-        .zif eq
+        zif eq
             lda #BACKSPACE
             sta inp
-        .zendif
+        zendif
          
         lda parse
         cmp #1
-        .zif eq
+        zif eq
             lda inp
             
             cmp #CR
-            .zif eq
+            zif eq
                 lda #0
                 sta cur_x
                 jmp par_done
-            .zendif
+            zendif
             
             cmp #LF
-            .zif eq
+            zif eq
                 inc cur_y
                 lda cur_y
                 cmp height
-                .zif cs
+                zif cs
                     dec cur_y
                     ldy #SCREEN_SCROLLUP
                     jsr SCREEN 
-                .zendif
+                zendif
                 jmp par_done 
-            .zendif
+            zendif
 
             cmp #BACKSPACE
-            .zif eq
+            zif eq
                 dec cur_x
-                .zif mi
+                zif mi
                     lda max_x
                     sta cur_x
                     dec cur_y
-                    .zif mi
+                    zif mi
                         inc cur_y
                         lda #0
                         sta cur_x
                         jmp par_done   \ no rubout, stay at top left corner
-                    .zendif
-                .zendif
+                    zendif
+                zendif
                 lda cur_x
                 ldx cur_y
                 ldy #SCREEN_SETCURSOR
@@ -185,110 +185,110 @@ driver:
                 ldy #SCREEN_PUTCHAR
                 jsr SCREEN
                 jmp par_done
-            .zendif
+            zendif
 
             cmp #TAB
-            .zif eq
+            zif eq
                 lda cur_x
                 clc
                 adc #8
                 and #0xf8   \ mod 8
                 cmp max_x
-                .zif cs
+                zif cs
                     lda max_x
-                .zendif
+                zendif
                 sta cur_x
                 jmp par_done
-            .zendif
+            zendif
 
             cmp #ESC
-            .zif eq
+            zif eq
                 \ Start of escape sequence
                 lda #1
                 sta mEsc
                 jmp par_done
-            .zendif
+            zendif
 
             cmp #'A'
-            .zif eq
+            zif eq
                 \ Cursor up
                 lda #0
                 sta mEsc
                 
                 lda cur_y
-                .zif ne
+                zif ne
                     dec cur_y
-                .zendif
+                zendif
                 jmp par_done
-            .zendif
+            zendif
 
             cmp #'B'
-            .zif eq
+            zif eq
                 \ Cursow down
                 lda #0
                 sta mEsc
                 lda cur_y
                 cmp height
-                .zif cc
+                zif cc
                     inc cur_y
-                .zendif
+                zendif
                 jmp par_done
-            .zendif
+            zendif
             
             cmp #'C'
-            .zif eq
+            zif eq
                 \ Cursor right
                 lda #0
                 sta mEsc
                 lda cur_x
                 cmp width
-                .zif cc
+                zif cc
                     inc cur_x
-                .zendif
+                zendif
                jmp par_done 
-            .zendif
+            zendif
 
             cmp #'D'
-            .zif eq
+            zif eq
                 \ Cursor left
                 lda #0
                 sta mEsc
                 lda cur_x
-                .zif ne
+                zif ne
                     dec cur_x
-                .zendif
+                zendif
                 jmp par_done
-            .zendif
+            zendif
 
             cmp #'H'
-            .zif eq
+            zif eq
                 \ Cursor home
                 lda #0
                 sta mEsc
                 sta cur_x
                 sta cur_y
                 jmp par_done
-            .zendif
+            zendif
             
             cmp #'I'
-            .zif eq
+            zif eq
                 \ Reverse line feed
                 lda #0
                 sta mEsc
                 lda cur_y
-                .zif ne
+                zif ne
                     dec cur_y
                     jmp par_done
-                .zendif
+                zendif
                 lda #0
                 sta cur_y
                 ldy #SCREEN_SCROLLDOWN
                 jsr SCREEN
                 jmp par_done 
-            .zendif            
+            zendif            
             
             cmp #'J'
-            .zif eq
+            zif eq
                 \ Erase to end of screen
                 lda #0
                 sta mEsc
@@ -298,7 +298,7 @@ driver:
                 cpx height
                 bcs par_done
                 inx
-                .zloop
+                zloop
                     stx cnt
                     lda #0
                     ldy #SCREEN_SETCURSOR
@@ -309,28 +309,28 @@ driver:
                     ldx cnt
                     inx
                     cpx height
-                    .zbreak cs
-                .zendloop
+                    zbreak cs
+                zendloop
                 jmp par_done
-            .zendif
+            zendif
 
             cmp #'K'
-            .zif eq
+            zif eq
                 \ Erase to end of line
                 lda #0
                 sta mEsc
                 ldy #SCREEN_CLEARTOEOL
                 jsr SCREEN
                 jmp par_done
-            .zendif
+            zendif
 
             cmp #'Y'
-            .zif eq
+            zif eq
                 \ Cursor addressing
                 lda #2
                 sta mEsc
                 jmp par_done
-            .zendif
+            zendif
 
             \ Not a valid escape sequence
             \ Also covers not implemented sequences for graphics mode,
@@ -344,12 +344,12 @@ driver:
             ldy #SCREEN_SETCURSOR
             jsr SCREEN            
 
-        .zendif
+        zendif
         rts
-    .zendif
+    zendif
     \lda inp
     jmp (next)
-.zendproc
+zendproc
 
 SCREEN:
     jmp 0
@@ -358,7 +358,7 @@ next: .word 0
 
 \ --- Resident part stops here -------------------------------------------
 
-.zproc entry
+zproc entry
     
     ldy #BDOS_GET_BIOS
     jsr BDOS
@@ -372,13 +372,13 @@ next: .word 0
     jsr BIOS
 
     \ Print error message and exit if not found
-    .zif cs
+    zif cs
         lda #<noscreen
         ldx #>noscreen
         ldy #BDOS_PRINTSTRING
         jsr BDOS
         rts
-    .zendif        
+    zendif        
     
     sta SCREEN+1
     stx SCREEN+2    
@@ -408,7 +408,7 @@ next: .word 0
     ldx #>DRVID_TTY
     ldy #BIOS_FINDDRV
     jsr BIOS
-    .zif cc
+    zif cc
         sta next+0
         stx next+1
 
@@ -418,7 +418,7 @@ next: .word 0
         ldx #>driver
         ldy #BIOS_ADDDRV
         jsr BIOS
-        .zif cc
+        zif cc
 
             \ Our driver uses no ZP, so we don't need to adjust that. But it does use
             \ TPA.
@@ -434,8 +434,8 @@ next: .word 0
             \ Finished --- don't even need to warm boot.
 
             rts
-        .zendif
-    .zendif
+        zendif
+    zendif
 
     lda #<failed
     ldx #>failed

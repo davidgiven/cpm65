@@ -39,7 +39,7 @@ zproc format
     ; Put the disk controller in a sane state
 
     lda HSRC                ; Test if an interrupt is pending
-    zif_pl
+    zif pl
         jsr fdc_exec_senseint
     zendif
 
@@ -47,7 +47,7 @@ zproc format
 
     ldy drive
     jsr fdc_exec_recal
-    zif_cs
+    zif cs
         jmp recal_error
     zendif
 
@@ -82,18 +82,18 @@ zproc format
             jsr mod26
             tax
             cpy #26*4       ; Test if 26 sectors gone through
-        zuntil_eq
+        zuntil eq
 
         ldy drive
         jsr fdc_exec_format
-        zif_cs
+        zif cs
             jmp format_error
         zendif
 
         ldy #0              ; Wait at least 500uS after write to allow the write
         zrepeat             ; current to decay before seeking again
             dey
-        zuntil_eq
+        zuntil eq
 
         lda stagger         ; Add in stagger factor for next track
         clc
@@ -104,11 +104,11 @@ zproc format
         inc track           ; Increment track number
         lda track
         cmp #77             ; Test if all tracks formatted
-        zbreakif_eq         ; If so, finished
+        zbreakif eq         ; If so, finished
 
         ldy drive           ; Seek to the new track
         jsr fdc_exec_seek
-        zif_cs
+        zif cs
             jmp seek_error
         zendif
     zendloop
@@ -122,7 +122,7 @@ zendproc
 zproc mod26
     zloop
         cmp     #26         ; Return a mod 26
-        zbreakif_cc
+        zbreakif cc
         sbc     #26         ; If not, substract 26
     zendloop
     rts
@@ -133,7 +133,7 @@ zproc verify
 
     ldy drive
     jsr fdc_exec_recal
-    zif_cs
+    zif cs
         jmp recal_error
     zendif
 
@@ -156,7 +156,7 @@ zproc verify
             ldy drive
 
             jsr fdc_exec_read
-            zif_cs
+            zif cs
                 jmp verify_error
             zendif
 
@@ -164,25 +164,25 @@ zproc verify
             zrepeat
                 lda DMA_BUFFER,Y
                 cmp #FILLER
-                zif_ne
+                zif ne
                     jmp verify_error
                 zendif
                 iny
-            zuntil_eq
+            zuntil eq
 
             inc sector
             lda sector
             cmp #26
-        zuntil_eq
+        zuntil eq
 
         inc track           ; Increment track number
         lda track
         cmp #77             ; Test if all tracks verified
-        zbreakif_eq         ; If so, finished
+        zbreakif eq         ; If so, finished
 
         ldy drive           ; Seek to the new track
         jsr fdc_exec_seek
-        zif_cs
+        zif cs
             jmp seek_error
         zendif
     zendloop
@@ -241,7 +241,7 @@ zproc main
 
     jsr format
 
-    zif_cc
+    zif cc
         lda #<verify_msg
         ldx #>verify_msg
         ldy #BDOS_WRITE_STRING
@@ -249,7 +249,7 @@ zproc main
 
         jsr verify
 
-        zif_cc
+        zif cc
             lda #<done_msg
             ldx #>done_msg
             ldy #BDOS_WRITE_STRING
@@ -356,11 +356,11 @@ zproc print_byte
     zrepeat
         inx                 ; Count number of 10s
         sbc #10
-    zuntil_cc
+    zuntil cc
     adc #10
     pha                     ; Save units
     txa
-    zif_ne
+    zif ne
         jsr print_digit
     zendif
     pla                     ; Restore units
@@ -407,7 +407,7 @@ zproc fdc_exec_recal
 
     pla
     cmp disk_status+1
-    zif_ne
+    zif ne
         sec
         rts
     zendif
@@ -455,17 +455,17 @@ zproc fdc_exec_senseint
 
     zrepeat
         lda HSRC
-    zuntil_pl
+    zuntil pl
 
     ; Execute Sense Interrupt command
 
     ldx #fdc_senseint-fdc_commands
     jsr fdc_exec_command
-    zif_cc
+    zif cc
         ; Read results into memory
 
         jsr fdc_read_result
-        zif_cc
+        zif cc
             ; Look for error in the status registers
 
             lda disk_status     ; Check ST0
@@ -490,7 +490,7 @@ zproc fdc_exec_format
 
     ldx #fdc_format-fdc_commands  ; Command index into X
     jsr fdc_exec_command
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -498,12 +498,12 @@ zproc fdc_exec_format
 
     zrepeat
         lda HSRC            ; Wait until IRQ from FDC
-    zuntil_pl
+    zuntil pl
 
     ; Read results into memory
 
     jsr fdc_read_result
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -528,7 +528,7 @@ zproc fdc_read_result
     zloop
         zrepeat
             lda MSTR        ; Wait until RQM from controller
-        zuntil_mi
+        zuntil mi
         and #0x40           ; Test data direction bit
         beq fdc_fail        ; Error if controller wants to listen
 
@@ -539,7 +539,7 @@ zproc fdc_read_result
         nop                 ; the MSTR with a valid busy status
         lda MSTR            ; Check if still busy and get next
         and #0x10           ; byte while so
-    zuntil_eq
+    zuntil eq
 
     clc
     rts
@@ -566,7 +566,7 @@ zproc fdc_exec_read
 
     ldx #fdc_read-fdc_commands ; Command index into X
     jsr fdc_exec_command
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -574,12 +574,12 @@ zproc fdc_exec_read
 
     zrepeat
         lda HSRC        ; Wait until IRQ from FDC
-    zuntil_pl
+    zuntil pl
 
     ; Read results into memory
 
     jsr fdc_read_result
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -587,7 +587,7 @@ zproc fdc_exec_read
 
     lda disk_status     ; Check ST0
     and #0xd8           ; Delete don't care bits
-    zif_ne
+    zif ne
         ; ST0 is not clear, dig further
         cmp #0x40           ; Test if abnormal termination
         bne fdc_fail        ; Real error if not
@@ -611,13 +611,13 @@ zproc fdc_exec_command
     zloop
         lda #0x10           ; Check if uPD765 is busy processing a command
         and MSTR            ;   (should not occur, but happens)
-        zbreakif_eq         ; Not busy, go execute command
+        zbreakif eq         ; Not busy, go execute command
                             ; Yes, execute recovery procedure
         zrepeat
             bit MSTR        ; wait until ready to read or write
-        zuntil_mi
+        zuntil mi
 
-        zif_vc              ; Data register ready to write
+        zif vc              ; Data register ready to write
             lda #$00        ; Try to complete command sequence
             sta DATR
             beq 1f          ; And try again
@@ -634,7 +634,7 @@ zproc fdc_exec_command
     zloop
         zrepeat
             lda MSTR        ; Wait until RQM from controller
-        zuntil_mi
+        zuntil mi
         and #0x40           ; Test data direction bit
         bne fdc_fail        ; Error if controller wants to talk
 
@@ -642,7 +642,7 @@ zproc fdc_exec_command
         sta DATR            ; Store into FDC data register
         inx                 ; Next command byte
         dey
-    zuntil_eq
+    zuntil eq
 
     clc
     rts

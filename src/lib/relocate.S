@@ -45,7 +45,7 @@ relocate_loop$:
         reloptr$ = . + 1
         lda $ffff           ; get relocation byte
         inc reloptr$+0      ; add one to pointer
-        zif_eq
+        zif eq
             inc reloptr$+1
         zendif
 
@@ -55,14 +55,14 @@ relocate_loop$:
         lsr a
         lsr a
         cmp #$0f
-        zbreakif_eq
+        zbreakif eq
         jsr relocate$
 
         byte$ = . + 1
         lda #$ff
         and #$0f
         cmp #$0f
-        zbreakif_eq
+        zbreakif eq
         jsr relocate$
     zendloop
     rts
@@ -74,13 +74,13 @@ relocate$:
     clc
     adc ptr+0
     sta ptr+0
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
     pla
 
     cmp #$0e
-    zif_ne
+    zif ne
         ; ptr is pointing at the address to fix up.
 
         clc

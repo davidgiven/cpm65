@@ -41,7 +41,7 @@ zproc bdos_EXIT
     lda #>ccp_fcb
     sta param+1
     jsr bdos_OPENFILE
-    zif_cs
+    zif cs
         lda #<1f
         ldx #>1f
         jsr internal_WRITESTRING
@@ -66,7 +66,7 @@ zproc bdos_EXIT
     jsr bios_SETBANK
 
     jsr compute_ccp_start_address
-    zif_cc
+    zif cc
         lda #BANK_MAIN
         jsr bios_SETBANK
         jsr compute_ccp_start_address
@@ -80,7 +80,7 @@ zproc bdos_EXIT
         lda (user_dma), y
         sta (temp), y
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Read the CCP into memory.
 
@@ -92,12 +92,12 @@ zproc bdos_EXIT
     zloop
         ; param remains set from above
         jsr internal_READSEQUENTIAL
-        zbreakif_cs
+        zbreakif cs
 
         lda user_dma+0
         eor #$80
         sta user_dma+0
-        zif_eq
+        zif eq
             inc user_dma+1
         zendif
     zendloop
