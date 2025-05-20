@@ -833,19 +833,18 @@ mem_base: .byte __USERTPA_START__@mos16hi
 
 #ifndef FLOPPY8
 #ifdef TRACKS80
-define_drive dph_a, 1280, 1024, 64, 16
-define_drive dph_b, 1280, 1024, 64, 16
-define_drive dph_c, 1280, 1024, 64, 16
-define_drive dph_d, 1280, 1024, 64, 16
+define_dpb dpb, 1280, 1024, 64, 16
 #else
-define_drive dph_a, 640, 1024, 64, 16
-define_drive dph_b, 640, 1024, 64, 16
-define_drive dph_c, 640, 1024, 64, 16
-define_drive dph_d, 640, 1024, 64, 16
+define_dpb dpb, 640, 1024, 64, 16
 #endif
+define_dph dph_a, dpb
+define_dph dph_b, dpb
+define_dph dph_c, dpb
+define_dph dph_d, dpb
 #else
-define_drive dph_a, 1848, 1024, 64, 24
-define_drive dph_b, 1848, 1024, 64, 24
+define_dpb dpb, 1848, 1024, 64, 24
+define_dph dph_a, dpb
+define_dph dph_b, dpb
 #endif
 
     .section .noinit, "ax", @nobits

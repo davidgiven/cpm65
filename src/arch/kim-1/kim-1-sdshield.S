@@ -247,10 +247,11 @@ dphtab:
     .word dph_floppyD
 dphtab_end:
 
-define_drive dph_floppyA, TRACKS*SECTORS_PER_TRACK*2, 2048, 128, SECTORS_PER_TRACK*2
-define_drive dph_floppyB, TRACKS*SECTORS_PER_TRACK*2, 2048, 128, SECTORS_PER_TRACK*2
-define_drive dph_floppyC, TRACKS*SECTORS_PER_TRACK*2, 2048, 128, SECTORS_PER_TRACK*2
-define_drive dph_floppyD, TRACKS*SECTORS_PER_TRACK*2, 2048, 128, SECTORS_PER_TRACK*2
+define_dpb dpb, TRACKS*SECTORS_PER_TRACK*2, 2048, 128, SECTORS_PER_TRACK*2
+define_dph dph_floppyA, dpb
+define_dph dph_floppyB, dpb
+define_dph dph_floppyC, dpb
+define_dph dph_floppyD, dpb
 
 .bss
 

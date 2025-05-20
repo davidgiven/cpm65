@@ -286,10 +286,11 @@ dphtab:
     .word dph3
 dphtab_end:
 
-define_drive dph0, 77*52, 2048, 128, 52
-define_drive dph1, 77*52, 2048, 128, 52
-define_drive dph2, 77*52, 2048, 128, 52
-define_drive dph3, 77*52, 2048, 128, 52
+define_dpb dpb, 77*52, 2048, 128, 52
+define_dph dph0, dpb
+define_dph dph1, dpb
+define_dph dph2, dpb
+define_dph dph3, dpb
 
 .bss
 

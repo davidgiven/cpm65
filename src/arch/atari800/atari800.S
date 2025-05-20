@@ -1108,13 +1108,15 @@ mem_end:  .byte 0
 ; 18 reserved sectors
 
 #ifdef ATARI_HD
-define_drive dph, 8190, 2048, 128, 18
-define_drive dph_b, 8190, 2048, 128, 18
+define_dpb atari_hd, 8190, 2048, 128, 18
+define_dph dph, atari_hd
+define_dph dph_b, atari_hd
 #else
-define_drive dph, 720, 1024, 64, 18
-define_drive dph_b, 720, 1024, 64, 18
-define_drive dph_c, 720, 1024, 64, 18
-define_drive dph_d, 720, 1024, 64, 18
+define_dpb atari_fd, 720, 1024, 64, 18
+define_dph dph, atari_fd
+define_dph dph_b, atari_fd
+define_dph dph_c, atari_fd
+define_dph dph_d, atari_fd
 #endif
 
     .section .noinit, "ax", @nobits

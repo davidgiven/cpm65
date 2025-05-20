@@ -1110,25 +1110,27 @@ cpm_sector: .fill 3
 ; DPH for drives
 ;
 
-define_drive dph_a, 128*64, 2048, 128, 0
-define_drive dph_b, 128*64, 2048, 128, 0
-define_drive dph_c, 128*64, 2048, 128, 0
-define_drive dph_d, 128*64, 2048, 128, 0
+define_dpb hd, 128*64, 2048, 128, 0
 
-define_drive dph_e, 128*64, 2048, 128, 0
-define_drive dph_f, 128*64, 2048, 128, 0
-define_drive dph_g, 128*64, 2048, 128, 0
-define_drive dph_h, 128*64, 2048, 128, 0
+define_dph dph_a, hd
+define_dph dph_b, hd
+define_dph dph_c, hd
+define_dph dph_d, hd
 
-define_drive dph_i, 128*64, 2048, 128, 0
-define_drive dph_j, 128*64, 2048, 128, 0
-define_drive dph_k, 128*64, 2048, 128, 0
-define_drive dph_l, 128*64, 2048, 128, 0
+define_dph dph_e, hd
+define_dph dph_f, hd
+define_dph dph_g, hd
+define_dph dph_h, hd
 
-define_drive dph_m, 128*64, 2048, 128, 0
-define_drive dph_n, 128*64, 2048, 128, 0
-define_drive dph_o, 128*64, 2048, 128, 0
-define_drive dph_p, 128*64, 2048, 128, 0
+define_dph dph_i, hd
+define_dph dph_j, hd
+define_dph dph_k, hd
+define_dph dph_l, hd
+
+define_dph dph_m, hd
+define_dph dph_n, hd
+define_dph dph_o, hd
+define_dph dph_p, hd
 
 directory_buffer = _start
 NOINIT

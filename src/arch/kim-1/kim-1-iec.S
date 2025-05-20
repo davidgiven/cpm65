@@ -413,7 +413,8 @@ zendproc
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph0, 136*10, 1024, 64, 0
+define_dpb dpb, 136*10, 1024, 64, 0
+define_dph dph0, dpb
 
 .bss
 

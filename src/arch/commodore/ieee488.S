@@ -485,8 +485,9 @@ directory_buffer: .fill 128
 disk_buffer:      .fill 256
 buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
 
-; DPH for drive 0 (our only drive)
+; DPH and DPB for drive 0 (our only drive)
 
-define_drive dph, 136*10, 1024, 64, 0
+define_dpb dpb_1541, 136*10, 1024, 64, 0
+define_dph dph, dpb_1541
 
 
