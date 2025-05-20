@@ -47,6 +47,7 @@ jobs:
           images/kim-1-iec.zip
           images/kim-1-k1013.zip
           images/kim-1-sdcard.zip
+          images/kim-1-sdshield.zip
           images/neo6502.zip
           images/oric.dsk
           images/osi400f.os8

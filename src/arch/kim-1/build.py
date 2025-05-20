@@ -73,6 +73,13 @@ llvmclibrary(
 )
 
 llvmclibrary(
+    name="sdshield",
+    srcs=["./sdshield.S", "./kim-1-sdshield.S"],
+    deps=["include"],
+    hdrs={"sdshield.inc": "./sdshield.inc", "parproto.inc": "./parproto.inc"},
+)
+
+llvmclibrary(
     name="iec-kim",
     srcs=["./kim-1-iec.S"],
     deps=["include"],
@@ -115,6 +122,13 @@ llvmrawprogram(
     linkscript="./kim-1-iec.ld",
 )
 
+llvmrawprogram(
+    name="bios-sdshield",
+    srcs=["./kim-1.S", "./kim-1.inc"],
+    deps=["include", "src/lib+bioslib", ".+pario", ".+sdshield"],
+    linkscript="./kim-1-sdcard.ld",
+)
+
 mkcpmfs(
     name="rawdiskimage-k1013",
     format="k-1013",
@@ -125,7 +139,7 @@ mkcpmfs(
         "0:scrvt100.com": "apps+scrvt100",
         "0:format.com": "src/arch/kim-1/utils+format",
         "0:format.txt": "src/arch/kim-1/cpmfs/format.txt",
-        "0:imu.com": "src/arch/kim-1/utils+imu",
+        "0:imu.com": "src/arch/kim-1/utils+imu_k1013",
         "0:imu.txt": "src/arch/kim-1/cpmfs/imu.txt",
         "0:sys.com": "apps+sys",
         "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
@@ -147,6 +161,28 @@ mkcpmfs(
     items={
         "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
         "0:scrvt100.com": "apps+scrvt100",
+        "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
+    }
+    | MINIMAL_APPS
+    | MINIMAL_APPS_SRCS
+    | BIG_APPS
+    | BIG_APPS_SRCS
+    | SCREEN_APPS
+    | BIG_SCREEN_APPS
+    | PASCAL_APPS,
+)
+
+mkcpmfs(
+    name="rawdiskimage-sdshield",
+    format="k-1013",
+    bootimage=".+bios-sdshield",
+    size=256 * 77 * 26,
+    items={
+        "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:scrvt100.com": "apps+scrvt100",
+        "0:imu.com": "src/arch/kim-1/utils+imu_sdshield",
+        "0:imu.txt": "src/arch/kim-1/cpmfs/imu.txt",
+        "0:sys.com": "apps+sys",
         "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
     }
     | MINIMAL_APPS
@@ -214,5 +250,15 @@ zip(
         "bootiec-kim.pap": "src/arch/kim-1/boot+bootiec-kim.pap",
         "bootiec-pal.bin": "src/arch/kim-1/boot+bootiec-pal.bin",
         "bootiec-pal.pap": "src/arch/kim-1/boot+bootiec-pal.pap",
+    },
+)
+
+zip(
+    name="distro-sdshield",
+    items={
+        "CPM-BOOT.DSK": ".+rawdiskimage-sdshield",
+        "bootsdshield.bin": "src/arch/kim-1/boot+bootsdshield.bin",
+        "bootsdshield.pap": "src/arch/kim-1/boot+bootsdshield.pap",
+        "bootsdshield-kimrom.bin": "src/arch/kim-1/boot+bootsdshield-kimrom.bin",
     },
 )
