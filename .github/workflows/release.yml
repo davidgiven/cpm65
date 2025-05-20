@@ -56,6 +56,7 @@ jobs:
           kim-1-iec.zip
           kim-1-k1013.zip
           kim-1-sdcard.zip
+          kim-1-sdshield.zip
           nano6502.img
           nano6502_sysonly.img
           neo6502.zip
@@ -100,6 +101,7 @@ jobs:
           cpm65/images/kim-1-iec.zip
           cpm65/images/kim-1-k1013.zip
           cpm65/images/kim-1-sdcard.zip
+          cpm65/images/kim-1-sdshield.zip
           cpm65/images/nano6502.img
           cpm65/images/nano6502_sysonly.img
           cpm65/images/neo6502.zip

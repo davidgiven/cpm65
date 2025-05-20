@@ -37,7 +37,7 @@ to the 6502. So far it runs on:
 
   - nano6502 6502-based SoC for the Tang Nano 20K FPGA board; TPA is 55kB.
 
-  - KIM-1 with K-1013 FDC, directly connected SD card module or 1541 drive.
+  - KIM-1 with K-1013 FDC, directly connected SD card module, 1541 drive or Corsham's SD Shield.
 
   - Ohio Scientific series with 16kB RAM or more, and a floppy drive. TPA up to 39kB.
 
@@ -378,11 +378,9 @@ the same time.
 
 ### KIM-1 with K-1013 FDC notes
 
-  - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an
-    SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the
-    0x0400-0x13ff memory hole.
+  - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the 0x0400-0x13ff memory hole.
 
-  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into 0x0200 and execute it.
+  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto a FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into `0x0200` and execute it.
 
   - Up to 4 disks are supported.
 
@@ -407,6 +405,27 @@ the same time.
   - 1 32MB disk supported.
 
   - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with Corsham's SD Shield notes
+
+  - For this port, you'll need an original Corsham's SD Shield, [a clone like this one](https://github.com/eduardocasino/sd-card-shield) or even this [Raspberry Pi Pico based variant](https://retro-spy.com/product/sd-card-system/).
+
+  - Place the `CPM-BOOT.DSK` image at the root of a FAT32 formatted SD card and create an `SD.CFG`file with this content:
+    ```
+    0:CPM-BOOT.DSK
+    ```
+
+  - Start the KIM-1 in TTY mode, load the `bootsdshield.pap` loader program into `0x0200` and execute it.
+
+  - As for the SD variant above, for KIM-1 clones, you can place the `bootsdshield-kimrom.bin` bootloader into the free space of the KIM-1 rom, starting at 0x1AA0.
+
+  - Same memory requirements as for the SD variant.
+
+  - Up to 4 disks are supported.
+
+  - Only TTY interface for now, no SCREEN driver.
+
+  - An Image Manipulation Utility, `IMU.COM`, is included. It allows mounting and unmounting disk images and, [with the latest SD Shield firmware](https://github.com/eduardocasino/SD-drive/tree/version-2), even copy, rename, delete or create new ones.
 
 ### KIM-1 with Commodore 1541 drive
 
