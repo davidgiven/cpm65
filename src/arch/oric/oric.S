@@ -1495,7 +1495,8 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 2844, 2048, 64, 34
+define_dpb dpb, 2844, 2048, 64, 34
+define_dph dph, dpb
 
 .bss
 

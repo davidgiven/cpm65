@@ -450,7 +450,8 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 128*64, 2048, 128, 0
+define_dpb dpb, 128*64, 2048, 128, 0
+define_dph dph, dpb
 
 NOINIT
 

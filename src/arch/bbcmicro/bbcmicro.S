@@ -507,7 +507,8 @@ drvtop: .word drv_TTY
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 0x600, 1024, 64, 0
+define_dpb dpb, 0x600, 1024, 64, 0
+define_dph dph, dpb
 
 directory_buffer = _start
 

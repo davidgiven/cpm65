@@ -202,7 +202,8 @@ zendproc
 
 ; DPH for drives 0
 
-define_drive dph0, 4096*64, 4096, 1024, 64
+define_dpb dpb, 4096*64, 4096, 1024, 64
+define_dph dph0, dpb
 
 .bss
 

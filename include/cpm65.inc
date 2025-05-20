@@ -161,7 +161,7 @@
 #define DPB_CKS      11  /* checksum vector size */
 #define DPB_OFF      13  /* number of reserved sectors */
 
-.macro define_drive name, sectors, blocksize, dirents, reserved
+.macro define_dpb name, sectors, blocksize, dirents, reserved
     .if \blocksize == 1024
         block_shift = 3
     .elseif \blocksize == 2048
@@ -217,13 +217,6 @@
 
 .data
 \name:
-    .word 0, 0, 0, 0    ; CP/M workspace
-    .word directory_buffer
-    .word 1f
-    .word 2f
-    .word 3f
-
-1:
     .word 0             ; unused
     .byte block_shift   ; block shift
     .byte (1<<block_shift)-1 ; block mask
@@ -235,10 +228,23 @@
     .word checksum_buffer_size ; checksum vector size
     .word \reserved     ; number of reserved _sectors_ on disk
 
+    checksum_buffer_size_\name = checksum_buffer_size
+    allocation_vector_size_\name = allocation_vector_size
+.endmacro
+
+.macro define_dph name, dpb
+.data
+\name:
+    .word 0, 0, 0, 0    ; CP/M workspace
+    .word directory_buffer
+    .word \dpb
+    .word 1f
+    .word 2f
+
 NOINIT
 
-2: .fill checksum_buffer_size
-3: .fill allocation_vector_size
+1: .fill checksum_buffer_size_\dpb
+2: .fill allocation_vector_size_\dpb
 
 .endmacro
 

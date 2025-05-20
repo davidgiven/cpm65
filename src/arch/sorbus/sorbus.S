@@ -478,7 +478,8 @@ mem_end:    .byte  $d0
 ; DPH for drive 0 (our only drive)
 
 ; drive parameters: total sectors, bytes per block, dir entries, boot sectors
-define_drive dph, 32768, 2048, 1024, 256
+define_dpb dpb, 32768, 2048, 1024, 256
+define_dph dph, dpb
 
 NOINIT
 

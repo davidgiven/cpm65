@@ -1412,8 +1412,9 @@ mem_base:   .byte __TPA0_START__@mos16hi, __TPA1_START__@mos16hi
 mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 and 1
-define_drive dph, 0x42e, 1024, 64, 32
-define_drive dph_b, 0x42e, 1024, 64, 32
+define_dpb dpb, 0x42e, 1024, 64, 32
+define_dph dph, dpb
+define_dph dph_b, dpb
 
 .section aligneddata, "ax", @nobits
 disk_twos_buffer:   .fill 86 ; must be aligned

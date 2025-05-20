@@ -153,9 +153,13 @@ mem_end:    .byte __TPA_END__@mos16hi
 ; This must point at the _last_ driver.
 drvtop: .word drv_TTY
 
-define_drive dph_romdisk, 160*72, 4096, 256, 0
-define_drive dph_ramdisk, 128*1024/128, 1024, 32, 0
-define_drive dph_fdddisk, 160*72, 4096, 256, 0
+define_dpb dpb_romdisk, 160*72, 4096, 256, 0
+define_dpb dpb_ramdisk, 128*1024/128, 1024, 32, 0
+define_dpb dpb_fdddisk, 160*72, 4096, 256, 0
+
+define_dph dph_romdisk, dpb_romdisk
+define_dph dph_ramdisk, dpb_ramdisk
+define_dph dph_fdddisk, dpb_fdddisk
 
 .data
 dphtab:
