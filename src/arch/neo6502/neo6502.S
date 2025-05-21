@@ -365,7 +365,10 @@ zproc bdos_DELETEFILE
         lda #FUNC_FILE_DELETE
         jsr neo_file_func_blocking
         lda CP_ERRNO
-        zbreakif ne
+        zif ne
+            sec
+            bra delete_exit
+        zendif
 
         ; Find the next file.
 
@@ -379,10 +382,7 @@ zproc bdos_DELETEFILE
         jsr bdos_FINDNEXT
     zuntil cs
     
-    ; Something went wrong.
-
-    sec
-    bra delete_exit
+    ; Successful exit.
 
 delete_success:
     clc
@@ -1204,6 +1204,9 @@ file_table_offsets:
         offset = offset + 1
     .endr
 
+; Note that closed files get be preempted in the file table at any point, so if
+; you call get_file_table_entry after this the filename may become overwritten!
+
 zproc get_closed_file_table_entry
     jsr get_file_table_entry
 
@@ -1226,6 +1229,9 @@ zendproc
 zproc open_file_table_entry
     phx
 
+    lda ptr+0
+    pha
+
     stz CP_ERRNO
     lda file_table+FT_ATTRIBS, x
     zif eq
@@ -1235,8 +1241,17 @@ zproc open_file_table_entry
         jsr do_open_file_table_entry
     zendif
 
-    ; Update the LRU list.
+    pla
+    jsr update_lru_list
 
+    plx
+    rts
+zendproc
+
+; Pushes the file index (i.e. the Morpheus file handle) to the head of the LRU list.
+
+zproc update_lru_list
+    sta ptr+0
     ldx #NUM_FILES-1
     ldy #NUM_FILES-1
     zrepeat
@@ -1250,8 +1265,6 @@ zproc open_file_table_entry
     zuntil mi
     lda ptr+0
     sta file_table_lru
-
-    plx
     rts
 zendproc
 
