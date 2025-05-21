@@ -707,6 +707,26 @@ zproc bdos_RENAMEFILE
     ; Old name: param+0
     ; New name: param+16
 
+    ; Ensure the destination is closed, or else bad things happen.
+
+    clc
+    lda param+0
+    pha
+    adc #16
+    sta param+0
+    lda param+1
+    pha
+    adc #0
+    sta param+1
+    jsr get_closed_file_table_entry
+    pla
+    sta param+1
+    pla
+    sta param+0
+
+    ; Get the file table entry of the source (which might overwrite the entry
+    ; fetched above, but that's fine because it's closed).
+
     jsr get_closed_file_table_entry
     txa
     clc
@@ -716,6 +736,9 @@ zproc bdos_RENAMEFILE
     adc #0
     sta CP_PARAM+1
 
+    ; Now convert the destination filename, but _don't_ create a file table
+    ; entry for it.
+
     clc
     lda param+0
     adc #16
@@ -723,7 +746,6 @@ zproc bdos_RENAMEFILE
     zif cs
         inc param+1
     zendif
-
     jsr convert_filename
 
     lda #<(temp_file_entry+FT_FILENAMELEN)
@@ -1207,6 +1229,7 @@ file_table_offsets:
 ; Note that closed files get be preempted in the file table at any point, so if
 ; you call get_file_table_entry after this the filename may become overwritten!
 
+; Returns the offset into the file table in X.
 zproc get_closed_file_table_entry
     jsr get_file_table_entry
 
@@ -1214,14 +1237,17 @@ zproc get_closed_file_table_entry
     zif ne
         ; This table entry is open.
 
+        phx
         lda #FUNC_FILE_CLOSE
         jsr neo_file_func
+        plx
 
-        stz file_table+FT_ATTRIBS
+        stz file_table+FT_ATTRIBS, x
     zendif
     rts
 zendproc
         
+; Returns the offset into the file table in X.
 zproc get_opened_file_table_entry
     jsr get_file_table_entry
 zendproc
