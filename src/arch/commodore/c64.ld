@@ -25,6 +25,8 @@ SECTIONS {
 	} >ram AT>bootstrap
 	
 	.data : {
+		 . = ALIGN(16);
+		 *(.aligned.16)
 		*(.data .data.* .rodata .rodata.*)
 		bios_end_addr = .;
 	} >ram AT>bootstrap

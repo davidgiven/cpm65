@@ -170,10 +170,7 @@ zendproc
 zproc uload3_recv_file
     zrepeat
         jsr uload3_recv
-        zif eq
-            clc
-            rts
-        zendif
+        zbreakif eq
         cmp #0xff
         zif eq
             ; Error!
@@ -197,5 +194,9 @@ zproc uload3_recv_file
         zif cs
             inc ptr+1
         zendif
-    zendloop
+
+        lda uloadtmp
+        cmp #0xfe
+    zuntil ne
+    rts
 zendproc

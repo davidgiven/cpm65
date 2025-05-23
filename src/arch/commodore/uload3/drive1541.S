@@ -218,9 +218,15 @@ zproc drv_recvstring, .drive
     rts
 zendproc
 
-; Converts an LBA sector number in XA to a track/sector.
+; Reads an LBA sector number and converts it to (track, sector).
 
-zproc convert_to_ts, .drive
+zproc read_lba, .drive
+    jsr drv_recv
+    pha
+    jsr drv_recv
+    tax
+    pla
+
     ldy #0
     zloop
         cpx #0
@@ -255,15 +261,29 @@ zproc drv_start, .drive
     ; fall through
 zlproc drv_main, .drive
     zloop
+    main_done:
         jsr drv_recv            ; get command byte, exit if ATN goes low
 
+        cmp #'R'                ; read a sector
+        beq read_sector
         cmp #'F'                ; load a file
         beq load_file
 
         lda #$ff                ; unknown command
-    main_done:
         jsr drv_send
     zendloop
+
+read_sector:
+    jsr read_lba
+    jsr drv_readsector
+
+    ldx #0
+    zrepeat
+        lda DRIVEBUFFER, x
+        jsr drv_send
+        inx
+    zuntil eq
+    jmp main_done
 
 load_file:
     jsr drv_recvstring
@@ -349,7 +369,6 @@ dirent_found:
         lda DRIVEBUFFER+0
     zuntil eq
     
-    lda #0                      ; end of data
-    jsr drv_send
+    label:
     jmp main_done
 zendproc

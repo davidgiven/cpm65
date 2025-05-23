@@ -581,52 +581,34 @@ zendproc
 ; Reads a 256-byte sector whose LBA index is in XA.
 
 zproc read_sector
-    jsr convert_to_ts
+    tay
+    txa
     pha
     tya
     pha
 
-    lda #8
-    jsr LISTEN
-    lda #$6f
-    jsr SECOND
-
-    lda #'U'
-    jsr CIOUT
-    lda #'1'
-    jsr CIOUT
-    lda #2
-    jsr decimal_out
-    lda #0
-    jsr decimal_out
-    pla                 ; get sector
-    jsr decimal_out
-    pla                 ; get track
-    jsr decimal_out
-
-    jsr UNLSN
-
-    ;jsr get_status
-
-    lda #8
-    jsr TALK
-    lda #$62
-    jsr TALKSA
+    lda #'R'
+    jsr uload3_send
+    pla
+    jsr uload3_send
+    pla
+    jsr uload3_send
 
     ldy #0
     zrepeat
-        jsr ACPTR
+        jsr uload3_recv
         sta disk_buffer, y
         iny
     zuntil eq
 
-    jsr UNTALK
+    clc
     rts
 zendproc
 
 ; Writes a 256-byte sector whose LBA index is in XA.
 
 zproc write_sector
+.if 0
     jsr convert_to_ts
     pha
     tya
@@ -692,6 +674,9 @@ zproc write_sector
 reset_buffer_pointer_command:
     .ascii "B-P 2 0"
     .byte 13, 0
+.endif
+    sec
+    rts
 zendproc
 
 ; Prints an 8-bit hex number in A.
@@ -943,12 +928,6 @@ ddEnd:
 
     rts
 zendproc
-
-
-loading_msg:
-    .byte 147, 14, 5
-    .ascii "cp/m-65 FOR THE cOMMODORE 64"
-    .byte 13, 0
 
 .data
 
