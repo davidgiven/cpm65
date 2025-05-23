@@ -3,7 +3,13 @@
 #include "driver.inc"
 #include "c64.inc"
 
+ZEROPAGE
+
+uloadtmp:   .fill 1
+
 zproc uload3_init
+    sei
+
     lda #0xff                        ; wait for line 255
     zrepeat
         cmp SCREEN_RASTER
@@ -19,6 +25,8 @@ zproc uload3_init
         lda #0xf0                   ; BEQ, 2 cycles
         sta pal_delay_insn
     zendif
+
+    cli
     rts
 zendproc
 
@@ -35,7 +43,7 @@ zproc uload3_send
     lda CIA2_PA
     and #7
     sta CIA2_PA
-    sta ptr+0
+    sta uloadtmp
     eor #0x07
     ora #0x38
     sta CIA2_DA
@@ -54,6 +62,7 @@ zproc uload3_send
 
     ; Wait until a badline won't screw up the timing.
 
+    sei
     zrepeat
         lda SCREEN_CONTROL       ; wait until a badline won't screw up
         clc                     ; the timing
@@ -87,11 +96,12 @@ zproc uload3_send
 
     nop                     ; slight delay, and...
     nop
-    lda ptr+0               ; restore CIA2_PA and CIA_DA
+    lda uloadtmp            ; restore CIA2_PA and CIA_DA
     sta CIA2_PA
     lda #0x3f
     sta CIA2_DA
 
+    cli
     rts
 zendproc
 
@@ -102,7 +112,7 @@ zlproc sendtab, .aligned.16
     .byte 0x50, 0xd0, 0x70, 0xf0
 zendproc
 
-; Receives A from the drive.
+; Receives A from the drive. Preserves X and Y.
 
 zproc uload3_recv
     zrepeat
@@ -119,6 +129,7 @@ zproc uload3_recv
 
     ; Wait until a badline won't screw up the timing.
 
+    sei
     zrepeat
         lda SCREEN_CONTROL
         clc
@@ -126,7 +137,6 @@ zproc uload3_recv
         and #7
     zuntil ne
 
-label:
     lda CIA2_PA
     and #0xef
     sta CIA2_PA             ; set CLK low to signal that we are receiving
@@ -150,5 +160,42 @@ pal_delay_insn:
 1:
     eor #0x00
     eor CIA2_PA
+
+    cli
     rts
+zendproc
+
+; Loads the response from an F command into ptr.
+
+zproc uload3_recv_file
+    zrepeat
+        jsr uload3_recv
+        zif eq
+            clc
+            rts
+        zendif
+        cmp #0xff
+        zif eq
+            ; Error!
+            sec
+            rts
+        zendif
+
+        sta uloadtmp
+        ldy #0
+        zrepeat
+            jsr uload3_recv
+            sta (ptr), y
+            iny
+            cpy uloadtmp
+        zuntil eq
+
+        clc
+        lda ptr+0
+        adc uloadtmp
+        sta ptr+0
+        zif cs
+            inc ptr+1
+        zendif
+    zendloop
 zendproc

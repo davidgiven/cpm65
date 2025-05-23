@@ -16,14 +16,36 @@ ptr:        .word 0
 ptr1:       .word 0
 dma:        .word 0    ; current DMA
 
-    .text
+zproc bootstrap, .bootstrap
+    ; Relocate the BIOS.
 
-    .word $0801
-    .word 1f, 1
-    .byte $9e
-    .asciz "2061"
-1:
-    .word 0
+    zrepeat
+        load1 = .
+        lda bios_load_addr
+        store1 = .
+        sta bios_exec_addr
+
+        inc load1+1
+        zif eq
+            inc load1+2
+        zendif
+
+        inc store1+1
+        zif eq
+            inc store1+2
+            zbreakif eq
+        zendif
+
+        lda store1+1
+        cmp #<bios_end_addr
+        zcontinueif ne
+        lda store1+2
+        cmp #>bios_end_addr
+    zuntil eq
+
+    jmp _start
+zendproc
+
 zproc _start
     jsr init_system
 
@@ -809,22 +831,6 @@ zproc print
 zendproc
 
 zproc init_system
-    lda #$36
-    sta 1                   ; map Basic out
-    lda #0
-    sta 53280               ; black border
-    sta 53281               ; black background
-
-    ; Print the startup banner (directly with CHROUT).
-
-    ldy #0
-    zloop
-        lda loading_msg, y
-        zbreakif eq
-        jsr CHROUT
-        iny
-    zendloop
-
     ; General initialisation.
 
     lda #0
@@ -835,16 +841,8 @@ zproc init_system
     sta buffered_sector+1
     sta buffered_sector+2
 
+    jsr uload3_init
     jsr initdrivers
-
-    lda #8
-    jsr LISTEN
-    lda #$f2
-    jsr SECOND
-    lda #'#'
-    jsr CIOUT
-    jsr UNLSN
-
     rts
 zendproc
 

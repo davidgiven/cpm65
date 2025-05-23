@@ -105,7 +105,7 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="c64_bios",
-    srcs=["./c64.S", "./c64.inc"],
+    srcs=["./c64.S", "./uload3/client.S", "./c64.inc"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     linkscript="./c64.ld",
 )

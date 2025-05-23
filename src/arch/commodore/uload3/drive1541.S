@@ -107,7 +107,7 @@ zlproc drv_send, .drive
     lsr a
     lsr a
     tay
-    lda sendtbl,y       ; get the CLK, DATA pairs for low nybble
+    lda sendtbl, y      ; get the CLK, DATA pairs for low nybble
     pha
     lda zptmp
     and #0x0f
@@ -124,7 +124,7 @@ zlproc drv_send, .drive
     lda #0x04
     zrepeat
         bit SERPORT         ; wait for CLK high
-    zuntil ne
+    zuntil eq
 
     ; 1 MHz code
 
@@ -216,6 +216,37 @@ zproc drv_recvstring, .drive
         iny
     zendloop
     rts
+zendproc
+
+; Converts an LBA sector number in XA to a track/sector.
+
+zproc convert_to_ts, .drive
+    ldy #0
+    zloop
+        cpx #0
+        zif eq
+            cmp track_size_table, y
+            zif cc
+                iny     ; tracks are one-based.
+                sty track
+                sta sector
+                rts
+            zendif
+        zendif
+
+        sec
+        sbc track_size_table, y
+        zif cc
+            dex
+        zendif
+        iny
+    zendloop
+
+track_size_table:
+    .fill 17, 1, 21
+    .fill 7, 1, 19
+    .fill 6, 1, 18
+    .fill 10, 1, 17
 zendproc
 
 zproc drv_start, .drive

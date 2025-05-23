@@ -105,7 +105,6 @@ label:
 
     jsr UNLSN
 
-    sei
     jsr uload3_init
 
     ldx #0
@@ -118,10 +117,13 @@ label:
         cpx #loadbios_command_end - loadbios_command
     zuntil eq
 
-    zloop
-        jsr uload3_recv
-    zendloop
-    jmp .
+    lda #<bootstrap_start
+    sta ptr+0
+    lda #>bootstrap_start
+    sta ptr+1
+    jsr uload3_recv_file
+
+    jmp bootstrap_start
 
 loading_msg:
     .byte 147, 14, 5

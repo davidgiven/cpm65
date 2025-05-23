@@ -3,6 +3,7 @@ MEMORY {
     zp : ORIGIN = 2, LENGTH = 0x8e
 
 	drive (rw) : ORIGIN = 0x300, LENGTH = 0x300
+	bootstrap (rw) : ORIGIN = 0x6000, LENGTH = 0x2000
 }
 
 SECTIONS {
@@ -31,8 +32,11 @@ SECTIONS {
 
 	.noinit (NOLOAD) : {
 		*(.noinit .noinit.*)
-		. = ALIGN(256);
 	} >ram
+
+	.noinit (NOLOAD) : {
+		bootstrap_start = .;
+	} >bootstrap
 }
 
 OUTPUT_FORMAT {
