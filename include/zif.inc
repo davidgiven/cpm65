@@ -16,8 +16,8 @@
     \name:
 .endm
 
-.macro zlproc name, sect=.text, binding=global
-    zproc \name, .text, local
+.macro zlproc name, sect=.text
+    zproc \name, \sect, local
 .endm
 
 .macro zendproc

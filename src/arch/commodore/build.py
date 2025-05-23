@@ -1,4 +1,4 @@
-from build.ab import simplerule, TargetsMap, filenameof, Rule
+from build.ab import simplerule, TargetsMap, filenameof, Rule, Target
 from tools.build import mkcpmfs, mametest
 from build.llvm import llvmrawprogram, llvmclibrary
 from config import (
@@ -33,9 +33,13 @@ def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
     cs += [cmd]
 
     for k, v in items.items():
+        t = "PRG"
+        if k.startswith("&"):
+            t = "USR"
+
         cs += [
-            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s $[outs[0]]"
-            % (k, filenameof(v))
+            "chronic cc1541 -q -t -u 0 -r 18 -f '%s' -T '%s' -w '%s' $[outs[0]]"
+            % (k, t, filenameof(v))
         ]
         ins += [v]
 
@@ -47,6 +51,17 @@ def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
         deps=["tools+mkcombifs"],
         commands=cs,
         label="MKCBMFS",
+    )
+
+
+@Rule
+def mkusr(self, name, src: Target):
+    simplerule(
+        replaces=self,
+        ins=["tools+mkusr", src],
+        outs=[f"={self.localname}.usr"],
+        commands=["$[ins[0]] -r $[ins[1]] -w $[outs[0]] -a 0x300"],
+        label="MKUSR",
     )
 
 
@@ -82,8 +97,15 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
+    name="c64_loader",
+    srcs=["./c64loader.S", "./uload3/drive1541.S", "./uload3/client.S", "./c64.inc"],
+    deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    linkscript="./c64loader.ld",
+)
+
+llvmrawprogram(
     name="c64_bios",
-    srcs=["./c64.S"],
+    srcs=["./c64.S", "./c64.inc"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     linkscript="./c64.ld",
 )
@@ -100,7 +122,16 @@ llvmrawprogram(
     linkscript="./vic20.ld",
 )
 
-for target in ["c64", "pet4032", "pet8032", "pet8096", "vic20"]:
+mkcbmfs(
+    name="c64_cbmfs",
+    title="cp/m-65: c64",
+    items={
+        "cpm": ".+c64_loader",
+        "bios": ".+c64_bios",
+    },
+)
+
+for target in ["pet4032", "pet8032", "pet8096", "vic20"]:
     mkcbmfs(
         name=target + "_cbmfs",
         title="cp/m-65: %s" % target,
