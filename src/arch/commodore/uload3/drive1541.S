@@ -97,6 +97,8 @@ zlproc blink, .drive
     rts
 zendproc
 
+; Sends a byte over the link. Preseves X (but not Y).
+
 zlproc drv_send, .drive
     ldy #0x02           ; set DATA low to signal that we're sending
     sty SERPORT
@@ -266,16 +268,26 @@ zlproc drv_main, .drive
 
         cmp #'R'                ; read a sector
         beq read_sector
+        cmp #'W'                ; write a sector
+        beq write_sector
         cmp #'F'                ; load a file
         beq load_file
 
+    main_error:
         lda #$ff                ; unknown command
+        .byte 0x2c              ; skip next two bytes
+    main_success:
+        lda #0
         jsr drv_send
     zendloop
 
 read_sector:
     jsr read_lba
     jsr drv_readsector
+    bcs main_error
+
+    lda #0                      ; report success
+    jsr drv_send
 
     ldx #0
     zrepeat
@@ -284,6 +296,20 @@ read_sector:
         inx
     zuntil eq
     jmp main_done
+
+write_sector:
+    jsr read_lba
+
+    ldx #0
+    zrepeat
+        jsr drv_recv
+        sta DRIVEBUFFER, x
+        inx
+    zuntil eq
+
+    jsr drv_writesector
+    bcs main_error
+    jmp main_success
 
 load_file:
     jsr drv_recvstring
@@ -369,6 +395,5 @@ dirent_found:
         lda DRIVEBUFFER+0
     zuntil eq
     
-    label:
     jmp main_done
 zendproc

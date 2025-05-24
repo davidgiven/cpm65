@@ -30,7 +30,7 @@ zproc uload3_init
     rts
 zendproc
 
-; Sends A to the drive.
+; Sends A to the drive. Preserves X (but not Y).
 
 zproc uload3_send
     pha

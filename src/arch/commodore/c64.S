@@ -594,6 +594,12 @@ zproc read_sector
     pla
     jsr uload3_send
 
+    jsr uload3_recv
+    zif mi
+        sec
+        rts
+    zendif
+
     ldy #0
     zrepeat
         jsr uload3_recv
@@ -608,74 +614,31 @@ zendproc
 ; Writes a 256-byte sector whose LBA index is in XA.
 
 zproc write_sector
-.if 0
-    jsr convert_to_ts
+    tay
+    txa
     pha
     tya
     pha
 
-    ; Reset buffer pointer.
+    lda #'W'
+    jsr uload3_send
+    pla
+    jsr uload3_send
+    pla
+    jsr uload3_send
 
-    lda #8
-    jsr LISTEN
-    lda #$6f
-    jsr SECOND
-
-    lda #<reset_buffer_pointer_command
-    ldx #>reset_buffer_pointer_command
-    jsr string_out
-
-    jsr UNLSN
-
-    ; Write bytes.
-
-    lda #8
-    jsr LISTEN
-    lda #$62
-    jsr SECOND
-
-    ldy #0
+    ldx #0
     zrepeat
-        lda disk_buffer, y
-        jsr CIOUT
-        iny
+        lda disk_buffer, x
+        jsr uload3_send
+        inx
     zuntil eq
 
-    jsr UNLSN
-
-    ; Write buffer to disk.
-
-    lda #8
-    jsr LISTEN
-    lda #$6f
-    jsr SECOND
-
-    lda #'U'
-    jsr CIOUT
-    lda #'2'
-    jsr CIOUT
-    lda #2
-    jsr decimal_out
-    lda #0
-    jsr decimal_out
-    pla                 ; get sector
-    jsr decimal_out
-    pla                 ; get track
-    jsr decimal_out
-    lda #13
-    jsr CIOUT
-
-    jsr UNLSN
-
-    ; jsr get_status
-
-    rts
-
-reset_buffer_pointer_command:
-    .ascii "B-P 2 0"
-    .byte 13, 0
-.endif
-    sec
+    jsr uload3_recv
+    clc
+    zif mi
+        sec
+    zendif
     rts
 zendproc
 
