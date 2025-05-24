@@ -3,6 +3,7 @@ from build.pkg import package
 
 package(name="libreadline", package="readline")
 package(name="libfmt", package="fmt")
+package(name="libelf", package="libelf")
 
 export(
     name="all",

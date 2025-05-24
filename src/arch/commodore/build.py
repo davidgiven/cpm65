@@ -60,7 +60,7 @@ def mkusr(self, name, src: Target):
         replaces=self,
         ins=["tools+mkusr", src],
         outs=[f"={self.localname}.usr"],
-        commands=["$[ins[0]] -r $[ins[1]] -w $[outs[0]] -a 0x300"],
+        commands=["chronic $[ins[0]] -r $[ins[1]] -w $[outs[0]]"],
         label="MKUSR",
     )
 
@@ -97,8 +97,19 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
+    name="elf_drive1541",
+    srcs=["./uload3/drive1541.S"],
+    deps=["include"],
+    linkscript="./uload3/drive1541.ld",
+)
+
+mkusr(
+    name="usr_drive1541",
+    src=".+elf_drive1541")
+
+llvmrawprogram(
     name="c64_loader",
-    srcs=["./c64loader.S", "./uload3/drive1541.S", "./uload3/client.S", "./c64.inc"],
+    srcs=["./c64loader.S", "./uload3/client.S", "./c64.inc"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     linkscript="./c64loader.ld",
 )
@@ -127,6 +138,7 @@ mkcbmfs(
     title="cp/m-65: c64",
     items={
         "cpm": ".+c64_loader",
+        "&drive1541": ".+usr_drive1541",
         "bios": ".+c64_bios",
     },
 )

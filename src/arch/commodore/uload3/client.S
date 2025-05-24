@@ -168,7 +168,7 @@ zendproc
 ; Loads the response from an F command into ptr.
 
 zproc uload3_recv_file
-    zrepeat
+    zloop
         jsr uload3_recv
         zbreakif eq
         cmp #0xff
@@ -196,7 +196,6 @@ zproc uload3_recv_file
         zendif
 
         lda uloadtmp
-        cmp #0xfe
-    zuntil ne
+    zendloop
     rts
 zendproc

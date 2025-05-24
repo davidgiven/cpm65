@@ -29,7 +29,7 @@ SHOW_CURSOR = $cc
 CURSOR_X = $d3
 CURSOR_Y = $d6
 SA = $b9
-DA = $ba
+FA = $ba
 STATUS = $90
 
 SCREEN_CONTROL = 0xd011

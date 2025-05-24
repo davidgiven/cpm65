@@ -52,77 +52,62 @@ zproc _start
 
     ; Upload the data itself.
 
-label:
-    zrepeat
-        ldx mwcommand_len
-        dex
-        zrepeat
-        source_address = .+1
-            lda drive_load_addr, x
-            sta mwcommand_data, x
-            dex
-        zuntil mi
-
-        jsr sendmwcommand
-        jsr closecommand
-
-        clc
-        lda source_address+0
-        adc mwcommand_len
-        sta source_address+0
-        zif cs
-            inc source_address+1
-        zendif
-
-        clc
-        lda mwcommand_addr+0
-        adc mwcommand_len
-        sta mwcommand_addr+0
-        tax
-        lda mwcommand_addr+1
-        adc #0
-        sta mwcommand_addr+1
-
-        cpx #<drive_end_addr
-        zcontinueif ne
-        cmp #>drive_end_addr
-    zuntil eq
-
-    ; Run it.
-
-    lda DA
-    jsr LISTEN
-    lda #0x6f
-    jsr SECOND
-
-    ldx #0
-    zrepeat
-        lda mecommand, x
-        jsr CIOUT
-        inx
-        cpx #mecommand_end - mecommand
-    zuntil eq
-
-    jsr UNLSN
+    lda #usrcommand_end - usrcommand
+    ldx #<usrcommand
+    ldy #>usrcommand
+    jsr sendcommand
 
     jsr uload3_init
 
-    ldx #0
-    zrepeat
-        lda loadbios_command, x
-        stx ptr+1
-        jsr uload3_send
-        ldx ptr+1
-        inx
-        cpx #loadbios_command_end - loadbios_command
-    zuntil eq
+    ; Read the directory.
 
-    lda #<bootstrap_start
-    sta ptr+0
-    lda #>bootstrap_start
-    sta ptr+1
+    lda #'D'
+    jsr uload3_send
+
+    jsr reset_ptr
     jsr uload3_recv_file
 
+    ; Scan the directory for the BIOS.
+
+    jsr reset_ptr
+    zrepeat
+        ldx #0              ; offset into filename
+        ldy #3              ; offset into dirent
+
+        zloop
+            lda biosfile, x
+            cmp (ptr), y
+            zbreakif ne
+            inx
+            iny
+            cmp #0xa0
+            beq bios_found
+        zendloop
+        
+        clc
+        lda ptr+0
+        adc #32
+        sta ptr+0
+        zif cs
+            inc ptr+1
+        zendif
+    zendloop
+bios_found:
+    
+    ; Fetch the BIOS itself.
+
+    label:
+    lda #'F'
+    jsr uload3_send
+    ldy #1
+    lda (ptr), y
+    jsr uload3_send
+    ldy #2
+    lda (ptr), y
+    jsr uload3_send
+
+    jsr reset_ptr
+    jsr uload3_recv_file
     jmp bootstrap_start
 
 loading_msg:
@@ -133,6 +118,14 @@ loading_msg:
 baddrive_msg:
     .ascii "nOT A SUPPORTED DRIVE!"
     .byte 13, 0
+zendproc
+
+zproc reset_ptr
+    lda #<bootstrap_start
+    sta ptr+0
+    lda #>bootstrap_start
+    sta ptr+1
+    rts
 zendproc
 
 ; Prints the string in XY.
@@ -148,13 +141,6 @@ zproc printstring
         iny
     zendloop
     rts
-zendproc
-
-zproc sendmwcommand
-    lda #mwcommand_end - mwcommand
-    ldx #<mwcommand
-    ldy #>mwcommand
-    jmp sendcommand
 zendproc
 
 zproc sendmrcommand
@@ -181,7 +167,7 @@ zproc getbyte
     lda #0
     sta STATUS
 
-    lda DA
+    lda FA
     jsr TALK
     lda #0x6f
     jsr TALKSA
@@ -196,22 +182,10 @@ mrcommand:
     .byte 1
 mrcommand_end:
 
-mwcommand:
-    .ascii "M-W"
-mwcommand_addr:
-    .word drive_exec_addr
-mwcommand_len:
-    .byte 32
-mwcommand_data:
-    .fill 32
-mwcommand_end:
+usrcommand:
+    .ascii "&DRIVE1541"
+usrcommand_end:
 
-mecommand:
-    .ascii "M-E"
-    .word drv_start
-mecommand_end:
-
-loadbios_command:
-    .ascii "FBIOS"
-    .byte 0
-loadbios_command_end:
+biosfile:
+    .ascii "BIOS"
+    .byte 0xa0

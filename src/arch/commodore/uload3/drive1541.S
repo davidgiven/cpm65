@@ -2,20 +2,9 @@
 #include "cpm65.inc"
 #include "driver.inc"
 
-CMDBUF = 0x200
-CMDBUF_LEN = 0x2a
-
-DRIVEBUFFER = 0x600
-TRACK_LIST = 0x680
-SECTOR_LIST = 0x6c0
-
-RETRIES = 5
-LEDCTL = 0x1c00
-LEDBIT = 0x08
-
 job3      = 0x03
-trk3      = 0x0c
-sct3      = 0x0d
+TRACK3    = 0x0c
+SECTOR3   = 0x0d
 iddrv0    = 0x12
 id        = 0x16
 zptmp     = 0x1b
@@ -30,76 +19,236 @@ R2        = 0x88
 R3        = 0x89
 R4        = 0x8a
 
-SERPORT   = 0x1800
+CMDBUF_LEN = 0x2a
+TRACK     = 0x80
+SECTOR    = 0x81
+DATA      = 0x85
+EOIFLAG   = 0xf8
+JOBNUM    = 0xf9
 
-SECPRETRK = 0xf24b ; get number of sectors in track
+CMDBUF    = 0x200
+LIMIT     = 0x276
+F2CNT     = 0x278
+FILTRK    = 0x280
+FILSEC    = 0x285
+
+BUFFER0   = 0x0300
+BUFFER1   = 0x0400
+BUFFER2   = 0x0500
+BUFFER3   = 0x0600
+SERPORT   = 0x1800
+DISKCNT   = 0x1c00
+DATA2     = 0x1c01
+
+LEDBIT    = 0x08
+
+LOOKUP    = 0xc44f
+GIBYTE    = 0xca35
+OPENTYP   = 0xd477
+DOREAD    = 0xd586
+DOWRIT    = 0xd58a
+DOJOB     = 0xd58c
+
+MAXSEC    = 0xf24b ; get number of sectors in track
 JOBOK     = 0xf505
 WAITSYNC  = 0xf556
 DECODE    = 0xf7e8
 
-; Sets up the location of the directory.
+NUMBER_OF_ZONES           = 0xfed6
+SECTORS_PER_TRACK_TABLE   = 0xfed1
+FIRST_TRACK_OF_ZONE_TABLE = 0xfed7
 
-zlproc drv_get_dir_ts, .drive
-    lda #18
-    sta track
+zproc _start, .code1
+    zloop
+    main_done:
+        jsr recvbyte            ; get command byte, exit if ATN goes low
+
+        cmp #'R'                ; read a sector
+        zif eq
+            jmp read_sector
+        zendif
+        cmp #'W'                ; write a sector
+        zif eq
+            jmp write_sector
+        zendif
+        cmp #'F'                ; read a file by track/sector
+        beq read_file
+        cmp #'D'                ; read the directory
+        beq read_directory
+
+    main_error:
+        lda #$ff                ; unknown command
+        .byte 0x2c              ; skip next two bytes
+    main_success:
+        lda #0
+        jsr sendbyte
+    zendloop
+
+read_file:
+    jsr recv_xa
+    jmp dump_file
+
+read_directory:
+    ldx #18
     lda #1
-    sta sector
-    clc
-    ; fall through
-zlproc drv_flush, .drive
+    jmp dump_file
+zendproc
+
+zproc recv_xa, .code1
+    jsr recvbyte
+    tax
+    jmp recvbyte
+zendproc
+
+zproc recv_lba, .code6
+    jsr recvbyte
+    sta R0                      ; low byte of LBA
+    jsr recvbyte
+    sta R1                      ; high byte of LBA
+
+    ldy NUMBER_OF_ZONES
+    dey                         ; reverse count of zones
+    ldx #1                      ; track number
+    zloop
+        lda R1
+        zif eq                  ; LBA < 0x100
+            lda R0
+            cmp SECTORS_PER_TRACK_TABLE, y
+            zbreakif lt
+        zendif
+
+        ; Subtract the number of sectors for this track and bump track counter.
+
+        sec
+        lda R0
+        sbc SECTORS_PER_TRACK_TABLE, y
+        sta R0
+        zif cc
+            dec R1
+        zendif
+        inx
+
+        txa
+        cmp FIRST_TRACK_OF_ZONE_TABLE, y
+        zif eq
+            ; Reached the end of this zone.
+
+            dey
+            zif mi
+                iny
+            zendif
+        zendif
+    zendloop
+
+    ; Track already in Y.
+    lda R0
     rts
 zendproc
 
-; Sector read/write subroutine (from/to disk into a buffer). Returns !c if
-; successful, c if error.
+zproc read_sector, .code2
+    jsr recv_lba
+    jsr read_sector_xa
 
-zlproc drv_readsector, .drive
-    lda #0x80           ; read sector job code
-    .byte 0x2c          ; skip next two bytes
-zlproc drv_writesector, .drive
-    lda #0x90           ; write sector job code
-    sta zptmp
-    lda track
-    sta trk3
-    lda sector
-    sta sct3
+    lda #0                      ; report success
+    jsr sendbyte
+    jsr sendbuffer
 
-    ldy #RETRIES
-    jsr blink
+    jmp main_done
+zendproc
+
+zproc write_sector, .code6
+    jsr recv_lba
+    pha
+    txa
+    pha
+    jsr recvbuffer
+    pla
+    tax
+    pla
+    jsr write_sector_xa
+    jmp main_success
+zendproc
+
+zproc sendbuffer, .code2
+    ldx #0
     zrepeat
-        lda zptmp
-        sta job3
-
-        cli
-        zrepeat
-            lda job3
-        zuntil pl
-        sei
-
-        cmp #2          ; check status
-        bcc blink       ; success
-
-        lda id+0        ; check for ID change
-        sta iddrv0+0
-        lda id+1
-        sta iddrv0+1
-
-        dey
+        lda BUFFER3, x
+        jsr sendbyte
+        inx
     zuntil eq
-    sec
     rts
 zendproc
 
-zlproc blink, .drive
-    lda LEDCTL
-    eor #LEDBIT
-    sta LEDCTL
+zproc recvbuffer, .code6
+    ldx #0
+    zrepeat
+        jsr recvbyte
+        sta BUFFER3, x
+        inx
+    zuntil eq
     rts
+zendproc
+
+zproc write_sector_xa, .code6
+    ldy #0x90
+    .byte 0x2c          ; skip next two bytes
+zproc read_sector_xa, .code6
+    ldy #0x80
+zproc read_write_sector_xa, .code6
+    stx TRACK3
+    sta SECTOR3
+    lda #3              ; operate on buffer 3
+    sta JOBNUM
+    tya
+    cli
+    jsr blink
+    jsr DOJOB
+    jsr blink
+    sei
+    zif cs
+        jmp main_error
+    zendif
+    rts
+zendproc
+
+zproc dump_file, .code6
+    zrepeat
+        jsr read_sector_xa             ; read sector at T/S in XA
+
+        lda #254                ; default: a full sector
+        ldx BUFFER3+0
+        zif eq
+            lda BUFFER3+1       ; oop, partial sector
+            cmp #254
+            zif ge
+                lda #254
+            zendif
+        zendif
+        sta R0                  ; number of bytes to send
+        jsr sendbyte            ; ...and tell the client
+
+        ; Send the data itself.
+
+        ldx #0
+        zrepeat
+            lda BUFFER3+2, x
+            jsr sendbyte
+            inx
+            cpx R0
+        zuntil eq
+
+        ; Go on to the next sector.
+
+        lda BUFFER3+1           ; next sector
+        ldx BUFFER3+0           ; next track
+    zuntil eq
+    
+    jmp main_success
 zendproc
 
 ; Sends a byte over the link. Preseves X (but not Y).
 
-zlproc drv_send, .drive
+zlproc sendbyte, .code6
     ldy #0x02           ; set DATA low to signal that we're sending
     sty SERPORT
 
@@ -150,23 +299,22 @@ zlproc drv_send, .drive
     sta SERPORT
 
     rts
+zendproc
 
-sendtbl:
+zlproc sendtbl, .code6
     .byte 0x0f, 0x07, 0x0d, 0x05
     .byte 0x0b, 0x03, 0x09, 0x01
     .byte 0x0e, 0x06, 0x0c, 0x04
     .byte 0x0a, 0x02, 0x08, 0x00
 zendproc
 
-zlproc drv_exit, .drive
-    ldx stack
-    txs
-    rts
+zlproc disconnect, .code6
+    jmp (0xfffc)
 zendproc
 
 ; Returns the byte in A. Preserves X and Y.
 
-zlproc drv_recv, .drive
+zlproc recvbyte, .code1
     lda #0x08                ; CLK low to signal that we're receiving
     sta SERPORT
 
@@ -174,7 +322,9 @@ zlproc drv_recv, .drive
     lda #0x01
     zrepeat
         bit SERPORT         ; wait for DATA low
-        bmi drv_exit        ; if ATN released, stop
+        zif mi
+            jmp disconnect  ; if ATN released, stop
+        zendif
     zuntil ne
     sei                     ; interrupts off while thinking
 
@@ -209,191 +359,11 @@ zlproc drv_recv, .drive
     rts
 zendproc
 
-zproc drv_recvstring, .drive
-    ldy #0
-    zloop
-        jsr drv_recv
-        sta CMDBUF, y
-        zbreakif eq
-        iny
-    zendloop
-    rts
-zendproc
-
-; Reads an LBA sector number and converts it to (track, sector).
-
-zproc read_lba, .drive
-    jsr drv_recv
+zlproc blink, .code2
     pha
-    jsr drv_recv
-    tax
+    lda DISKCNT
+    eor #LEDBIT
+    sta DISKCNT
     pla
-
-    ldy #0
-    zloop
-        cpx #0
-        zif eq
-            cmp track_size_table, y
-            zif cc
-                iny     ; tracks are one-based.
-                sty track
-                sta sector
-                rts
-            zendif
-        zendif
-
-        sec
-        sbc track_size_table, y
-        zif cc
-            dex
-        zendif
-        iny
-    zendloop
-
-track_size_table:
-    .fill 17, 1, 21
-    .fill 7, 1, 19
-    .fill 6, 1, 18
-    .fill 10, 1, 17
-zendproc
-
-zproc drv_start, .drive
-    tsx
-    stx stack
-    ; fall through
-zlproc drv_main, .drive
-    zloop
-    main_done:
-        jsr drv_recv            ; get command byte, exit if ATN goes low
-
-        cmp #'R'                ; read a sector
-        beq read_sector
-        cmp #'W'                ; write a sector
-        beq write_sector
-        cmp #'F'                ; load a file
-        beq load_file
-
-    main_error:
-        lda #$ff                ; unknown command
-        .byte 0x2c              ; skip next two bytes
-    main_success:
-        lda #0
-        jsr drv_send
-    zendloop
-
-read_sector:
-    jsr read_lba
-    jsr drv_readsector
-    bcs main_error
-
-    lda #0                      ; report success
-    jsr drv_send
-
-    ldx #0
-    zrepeat
-        lda DRIVEBUFFER, x
-        jsr drv_send
-        inx
-    zuntil eq
-    jmp main_done
-
-write_sector:
-    jsr read_lba
-
-    ldx #0
-    zrepeat
-        jsr drv_recv
-        sta DRIVEBUFFER, x
-        inx
-    zuntil eq
-
-    jsr drv_writesector
-    bcs main_error
-    jmp main_success
-
-load_file:
-    jsr drv_recvstring
-
-    jsr drv_get_dir_ts          ; locate directory
-    zrepeat
-        jsr drv_readsector
-
-        ; R0 is the offset of the current dirent.
-
-        lda #2
-        sta R0
-
-        zrepeat
-            ldx #0
-            ldy R0
-
-            zloop
-                lda CMDBUF, x
-                zif eq
-                    lda #0xa0
-                zendif
-                cmp DRIVEBUFFER+3, y
-                zbreakif ne
-                inx
-                iny
-                cmp #0xa0
-                beq dirent_found
-            zendloop
-
-            clc
-            lda R0
-            adc #32
-            sta R0
-            cmp #226
-        zuntil eq
-
-        lda DRIVEBUFFER+0
-        sta track
-        lda DRIVEBUFFER+1
-        sta sector
-        cmp track
-    zuntil eq
-
-    ; Not found.
-
-    lda #0xff
-    jsr drv_send
-    jmp main_done
-
-dirent_found:
-    ldy R0
-    iny
-    zrepeat
-        lda DRIVEBUFFER+0, y
-        sta track
-        lda DRIVEBUFFER+1, y
-        sta sector
-
-        jsr drv_readsector
-
-        lda #254                ; default: a full sector
-        ldx DRIVEBUFFER+0
-        zif eq
-            lda DRIVEBUFFER+1   ; oop, partial sector
-        zendif
-        sta R0                  ; number of bytes to send
-        jsr drv_send            ; ...and tell the client
-
-        ; Send the data itself.
-
-        ldx #0
-        zrepeat
-            lda DRIVEBUFFER+2, x
-            jsr drv_send
-            inx
-            cpx R0
-        zuntil eq
-
-        ; Go on to the next sector.
-
-        ldy #0
-        lda DRIVEBUFFER+0
-    zuntil eq
-    
-    jmp main_done
+    rts
 zendproc

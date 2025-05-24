@@ -10,6 +10,14 @@
 .set zloopsp, 0
 .set zifsp, 0
 
+.macro blt label
+    bcc \label
+.endm
+
+.macro bge label
+    bcs \label
+.endm
+
 .macro zproc name, sect=.text, binding=global
     .section \sect, "ax"
     .\binding \name
