@@ -44,3 +44,23 @@ SCREEN_WIDTH=40
 SCREEN_HEIGHT=25 
 VIDEO = $0400
 
+.macro set1 port, bit
+    lda \port
+    ora #\bit
+    sta \port
+.endm
+
+.macro set0 port, bit
+    lda \port
+    and #(~(\bit)) & 0xff
+    sta \port
+.endm
+
+.macro set10 port, bitson, bitsoff
+    lda \port
+    ora #\bitson
+    and #(~(\bitsoff)) & 0xff
+    sta \port
+.endm
+
+

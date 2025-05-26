@@ -1,6 +1,7 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "driver.inc"
+#include "wait.inc"
 
 job3      = 0x03
 TRACK3    = 0x0c
@@ -72,9 +73,20 @@ zproc _start, .code1
             jmp write_sector
         zendif
         cmp #'F'                ; read a file by track/sector
-        beq read_file
+        zif eq
+            jsr recv_xa
+            jmp dump_file
+        zendif
         cmp #'D'                ; read the directory
-        beq read_directory
+        zif eq
+            ldx #18
+            lda #1
+            jmp dump_file
+        zendif
+        cmp #'T'                ; tests link integrity
+        zif eq
+            jmp test_link
+        zendif
 
     main_error:
         lda #$ff                ; unknown command
@@ -83,18 +95,9 @@ zproc _start, .code1
         lda #0
         jsr sendbyte
     zendloop
-
-read_file:
-    jsr recv_xa
-    jmp dump_file
-
-read_directory:
-    ldx #18
-    lda #1
-    jmp dump_file
 zendproc
 
-zproc recv_xa, .code1
+zproc recv_xa, .code5
     jsr recvbyte
     tax
     jmp recvbyte
@@ -246,10 +249,16 @@ zproc dump_file, .code6
     jmp main_success
 zendproc
 
+zproc test_link, .code5
+    jsr recvbuffer
+    jsr sendbuffer
+    jmp main_done
+zendproc
+
 ; Sends a byte over the link. Preseves X (but not Y).
 
 zlproc sendbyte, .code6
-    ldy #0x02           ; set DATA low to signal that we're sending
+    ldy #0x02               ; assert DATA to signal that we're sending
     sty SERPORT
 
     sta zptmp
@@ -258,7 +267,7 @@ zlproc sendbyte, .code6
     lsr a
     lsr a
     tay
-    lda sendtbl, y      ; get the CLK, DATA pairs for low nybble
+    lda sendtbl, y          ; get the CLK, DATA pairs for low nybble
     pha
     lda zptmp
     and #0x0f
@@ -266,7 +275,7 @@ zlproc sendbyte, .code6
 
     lda #0x04
     zrepeat
-        bit SERPORT         ; wait for CLK low
+        bit SERPORT         ; wait for CLK asserted
     zuntil ne
 
     lda #0                  ; release DATA
@@ -274,38 +283,51 @@ zlproc sendbyte, .code6
 
     lda #0x04
     zrepeat
-        bit SERPORT         ; wait for CLK high
+        bit SERPORT         ; wait for CLK released
     zuntil eq
 
-    ; 1 MHz code
+    ; The SERPORT layout is %xxxxCxDx.
 
-    lda sendtbl, y          ; get the CLK, DATA pairs for high nybble
-    sta SERPORT
-
-    asl a
-    and #0x0f
-    sta SERPORT
-
-    pla
-    sta SERPORT
-
-    asl a
-    and #0x0f
-    sta SERPORT
-
-    nop
-    nop
-    lda #0x00                ; set CLK and DATA high
-    sta SERPORT
+/* 2 */  lda sendtbl, y          ; get the CLK, DATA pairs for high nybble
+/* 6 */  sta SERPORT
+ 
+/* 10 */ asl a
+/* 12 */ and #0x0f
+/* 14 */ sta SERPORT
+ 
+/* 18 */ pla
+/* 22 */ sta SERPORT
+ 
+/* 26 */ asl a
+/* 28 */ and #0x0f
+/* 30 */ sta SERPORT
+ 
+/* 34 */ WAIT4
+/* 38 */ lda #0x00                ; set CLK and DATA high
+         sta SERPORT
 
     rts
 zendproc
 
 zlproc sendtbl, .code6
-    .byte 0x0f, 0x07, 0x0d, 0x05
-    .byte 0x0b, 0x03, 0x09, 0x01
-    .byte 0x0e, 0x06, 0x0c, 0x04
-    .byte 0x0a, 0x02, 0x08, 0x00
+    ; Bit order:
+    ;      0213
+    .byte %1111 ; 0
+    .byte %0111 ; 1
+    .byte %1101 ; 2
+    .byte %0101 ; 3
+    .byte %1011 ; 4
+    .byte %0011 ; 5
+    .byte %1001 ; 6
+    .byte %0001 ; 7
+    .byte %1110 ; 8
+    .byte %0110 ; 9
+    .byte %1100 ; a
+    .byte %0100 ; b
+    .byte %1010 ; c
+    .byte %0010 ; d
+    .byte %1000 ; e
+    .byte %0000 ; f
 zendproc
 
 zlproc disconnect, .code6
@@ -315,13 +337,13 @@ zendproc
 ; Returns the byte in A. Preserves X and Y.
 
 zlproc recvbyte, .code1
-    lda #0x08                ; CLK low to signal that we're receiving
+    lda #0x08                ; assert CLK to signal that we're receiving
     sta SERPORT
 
     cli                     ; interrupts on while waiting
     lda #0x01
     zrepeat
-        bit SERPORT         ; wait for DATA low
+        bit SERPORT         ; wait for DATA asserted
         zif mi
             jmp disconnect  ; if ATN released, stop
         zendif
@@ -333,28 +355,30 @@ zlproc recvbyte, .code1
 
     lda #0x01
     zrepeat
-        bit SERPORT         ; wait for DATA high
+        bit SERPORT         ; wait for DATA to be released
     zuntil eq
 
-    nop
-    nop
-    lda SERPORT             ; get bits 7 and 5
+    ; Worst-case delay is six cycles between the computer raising DATA and the
+    ; drive noticing.
+    ;
+    ; SERPORT's layout is %xxxxxCxD
 
-    asl a
-    nop
-    nop
-    eor SERPORT             ; get bits 6 and 4
+/* 2 */  WAIT4
+/* 6 */  lda SERPORT             ; %xxxxx7x5
 
-    asl a
-    asl a
-    asl a
-    cmp (0x00,x)            ; delay
-    eor SERPORT             ; get 3 and 1
+/* 10 */ asl a                   ; %xxxx7x5x
+/* 12 */ WAIT4
+/* 16 */ eor SERPORT             ; %xxxx7654
 
-    asl a
-    nop
-    nop
-    eor SERPORT             ; finally get 2 and 0
+/* 20 */ asl a                   ; %xxx7654x
+/* 22 */ asl a                   ; %xx7654xx
+/* 24 */ asl a                   ; %x7654xxx
+/* 26 */ WAIT6          
+/* 32 */ eor SERPORT             ; %x76543x1
+
+/* 36 */ asl a                   ; %76543x1x
+/* 38 */ WAIT4
+/* 42 */ eor SERPORT             ; %76543210
 
     rts
 zendproc

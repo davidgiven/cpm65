@@ -103,33 +103,52 @@ llvmrawprogram(
     linkscript="./uload3/drive1541.ld",
 )
 
-mkusr(
-    name="usr_drive1541",
-    src=".+elf_drive1541")
+mkusr(name="usr_drive1541", src=".+elf_drive1541")
 
 llvmrawprogram(
     name="c64_loader",
-    srcs=["./c64loader.S", "./uload3/client.S", "./c64.inc"],
+    srcs=[
+        "./c64loader.S",
+        "./uload3/client_c64.S",
+        "./uload3/client_common.S",
+        "./c64.inc",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    cflags=["-DC64"],
     linkscript="./c64loader.ld",
 )
 
 llvmrawprogram(
     name="c64_bios",
-    srcs=["./c64.S", "./uload3/client.S", "./c64.inc"],
+    srcs=["./c64.S", "./uload3/client_c64.S", "./c64.inc"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    cflags=["-DC64"],
     linkscript="./c64.ld",
 )
 
 llvmrawprogram(
+    name="vic20_loader",
+    srcs=[
+        "./vic20loader.S",
+        "./uload3/client_vic20.S",
+        "./uload3/client_common.S",
+        "./vic20.inc",
+    ],
+    deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    cflags=["-DVIC20"],
+    linkscript="./vic20loader.ld",
+)
+
+llvmrawprogram(
     name="vic20_bios",
-    srcs=["./vic20.S"],
+    srcs=["./vic20.S", "./uload3/client_vic20.S", "./vic20.inc"],
     deps=[
         ".+commodore_lib",
         "include",
         "src/lib+bioslib",
         "third_party/tomsfonts+4x8",
     ],
+    cflags=["-DVIC20"],
     linkscript="./vic20.ld",
 )
 
@@ -143,7 +162,17 @@ mkcbmfs(
     },
 )
 
-for target in ["pet4032", "pet8032", "pet8096", "vic20"]:
+mkcbmfs(
+    name="vic20_cbmfs",
+    title="cp/m-65: vic20",
+    items={
+        "cpm": ".+vic20_loader",
+        "&drive1541": ".+usr_drive1541",
+        "bios": ".+vic20_bios",
+    },
+)
+
+for target in ["pet4032", "pet8032", "pet8096"]:
     mkcbmfs(
         name=target + "_cbmfs",
         title="cp/m-65: %s" % target,
