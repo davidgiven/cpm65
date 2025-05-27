@@ -163,17 +163,18 @@ the same time.
 
   - Load and run the `CPM` program to start.
 
-  - It's excruciatingly slow as it uses normal 1541 disk accesses at 300 bytes
-	  per second. Everything works, but you won't enjoy it. At some point I want
-	  to add a fastloader.
+  - It has its own built-in fastloader, which has been lightly tested but seems
+    to work on both NTSC and PAL C64s. It needs tuning but currently seems to get
+    about 1100 bytes per second, which is 4x the normal 1541 speed. (It's the same
+    one as for the VIC-20.)
 
   - The disk image produced is a hybrid of a CP/M file system and a CBMDOS file
 	  system, which can be accessed as either. The disk structures used by the
 	  other file system are hidden. You get about 170kB on a normal disk.
 
-  - Disk accesses are done using direct block access, so it _won't_ work on
-	  anything other than a 1541 (but it should be straightforward to add
-	  support for other drives). Sorry.
+  - It'll only work on a 1541, and probably only a 1541-II. Because of the
+    fastloader. Sorry. Porting it to other drives is perfectly possible, I
+    just haven't done it.
 
 ### VIC-20 notes
 
@@ -185,9 +186,6 @@ the same time.
   - You get a 40x24 screen, emulated using a four-pixel-wide soft font. It
     doesn't look great but is surprisingly readable, and is vastly better than
     the VIC-20's default 22x24 screen mode.
-
-  - Disk accesses are slightly faster than the Commodore 64, but only just.
-    It's still a miserable experience.
 
 ### Commodore PET notes
 
