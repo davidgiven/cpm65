@@ -120,7 +120,7 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="c64_bios",
-    srcs=["./c64.S", "./uload3/client_c64.S", "./c64.inc"],
+    srcs=["./c64.S", "./uload3/client_c64.S", "./bios1541.S", "./c64.inc"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DC64"],
     linkscript="./c64.ld",
@@ -141,9 +141,13 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="vic20_bios",
-    srcs=["./vic20.S", "./uload3/client_vic20.S", "./vic20.inc"],
+    srcs=[
+        "./vic20.S",
+        "./uload3/client_vic20.S",
+        "./bios1541.S",
+        "./vic20.inc",
+    ],
     deps=[
-        ".+commodore_lib",
         "include",
         "src/lib+bioslib",
         "third_party/tomsfonts+4x8",

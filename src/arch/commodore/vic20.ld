@@ -21,10 +21,10 @@ SECTIONS {
 	} >zp
 
 	.init : {
+		*(.start)
 		init_exec_addr = .;
 		init_load_addr = LOADADDR(.init);
 		*(.init .init.*)
-		*loader.o(.text .text.*)
 		init_end_addr = .;
 	} >init
 

@@ -8,8 +8,7 @@
 #include "driver.inc"
 #include "vic20.inc"
 
-.global _start
-_start:
+zproc _start, .start
     ; Goodbye interrupts, we'll never use you again...
 
     sei
@@ -40,36 +39,6 @@ _start:
         cmp #>bios_end_addr
     zuntil eq
 
-    ; Relocate the init code --- we can't execute it here because BASIC will
-    ; load it right into the middle of what we're going to use as video memory.
-
-    zrepeat
-        load2 = .
-        lda init_load_addr
-        store2 = .
-        sta init_exec_addr
-
-        inc load2+1
-        zif eq
-            inc load2+2
-        zendif
-
-        inc store2+1
-        zif eq
-            inc store2+2
-            zbreakif eq
-        zendif
-
-        lda store2+1
-        cmp #<init_end_addr
-        zcontinueif ne
-        lda store2+2
-        cmp #>init_end_addr
-    zuntil eq
-
-    jmp _init
-
-zproc _init, .init
     ; Initialise the VIC.
 
     ldx #vic_tab_end - vic_tab
@@ -83,6 +52,7 @@ zproc _init, .init
     sta 0x900f
 
     jsr initdrivers
+    jsr bios1541_init
     jsr clear_screen
 
     ldy #banner_end - banner
@@ -735,6 +705,70 @@ print:
     pha
     jsr bios_CONOUT
     pla
+    rts
+zendproc
+
+; Reads a 256-byte sector whose LBA index is in XA.
+
+zproc read_sector
+    tay
+    txa
+    pha
+    tya
+    pha
+
+    lda #'R'
+    jsr uload3_send
+    pla
+    jsr uload3_send
+    pla
+    jsr uload3_send
+
+    jsr uload3_recv
+    zif mi
+        sec
+        rts
+    zendif
+
+    ldy #0
+    zrepeat
+        jsr uload3_recv
+        sta disk_buffer, y
+        iny
+    zuntil eq
+
+    clc
+    rts
+zendproc
+
+; Writes a 256-byte sector whose LBA index is in XA.
+
+zproc write_sector
+    tay
+    txa
+    pha
+    tya
+    pha
+
+    lda #'W'
+    jsr uload3_send
+    pla
+    jsr uload3_send
+    pla
+    jsr uload3_send
+
+    ldx #0
+    zrepeat
+        lda disk_buffer, x
+        jsr uload3_send
+        inx
+    zuntil eq
+
+    jsr uload3_recv
+    clc
+    zif mi
+        sec
+    zendif
     rts
 zendproc
 

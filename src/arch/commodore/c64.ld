@@ -16,6 +16,7 @@ SECTIONS {
 
 	.bootstrap : {
 		*(.bootstrap)
+		*(.init)
 		bios_load_addr = .;
 	} >bootstrap
 	
@@ -32,6 +33,7 @@ SECTIONS {
 	} >ram AT>bootstrap
 	
 	.noinit (NOLOAD) : {
+		*(.bss .bss.*)
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		__USERTPA_START__ = .;

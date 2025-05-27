@@ -22,12 +22,6 @@ ptr:       .fill 2
 1:
     .word 0
 zproc _start
-    ; Print the startup banner (directly with CHROUT).
-
-    ldx #<loading_msg
-    ldy #>loading_msg
-    jsr printstring
-
     ; Read 0xfea0 from the drive to get the family.
 
     jsr sendmrcommand
@@ -51,6 +45,7 @@ zproc _start
     ldy #>usrcommand
     jsr sendcommand
 
+    sei
     jsr uload3_init
     jsr uload3_test_link
 
@@ -104,11 +99,6 @@ bios_found:
     jsr uload3_recv_file
     jmp bootstrap_start
 
-loading_msg:
-    .byte 147, 14
-    .ascii "lOADING"
-    .byte 13, 0
-
 baddrive_msg:
     .ascii "nOT A SUPPORTED DRIVE!"
     .byte 13, 0
@@ -129,7 +119,7 @@ zproc printstring
 
     ldy #0
     zloop
-        lda loading_msg, y
+        lda (ptr), y
         zbreakif eq
         jsr CHROUT
         iny

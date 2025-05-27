@@ -10,6 +10,18 @@ ZEROPAGE
 uloadtmp:   .fill 1
 
 zproc uload3_init
+    lda VICPALNTSC
+    cmp #0x0c
+    zif eq
+        ; The NTSC VIC20 runs at 1.022727 MHz, the same as the NTSC C64; but the
+        ; PAL VIC20 runs at 1.1108404 MHz, significantly faster than the
+        ; 0.985248 MHz PAL C64.
+        ; 
+        ; That is 1.0861 times the speed of the NTSC VIC20, so that every 10
+        ; NTSC cycles we get 11 PAL cycles.
+
+        ; PAL
+    zendif
     rts
 zendproc
 
@@ -59,25 +71,44 @@ zproc uload3_send
     lda sendtab+1, x
     pha
 
-    ; Begin time-critical part
+    ; Begin time-critical part.
+    ;
 
-    sei
+    lda VICPALNTSC
+    cmp #0x0c
+    zif eq
+        ; PAL
 
-    set0 VIA2_PCR, VIA2_PCR_CB2_DATA_OUT ; release DATA to signal that data is coming
-
-/* 0 */  pla
-/* 4 */  sta VIA2_PCR
-/* 8 */  WAIT2
-/* 10 */ pla
-/* 14 */ sta VIA2_PCR
-/* 18 */ WAIT8
-/* 26 */ pla
-/* 30 */ sta VIA2_PCR
-/* 34 */ WAIT2
-/* 36 */ pla
-/* 40 */ sta VIA2_PCR
-/* 44 */ WAIT4
-/* 48 */
+        set0 VIA2_PCR, VIA2_PCR_CB2_DATA_OUT
+        /* 0 */  pla
+        /* 4 */  sta VIA2_PCR
+        /* 8 */  WAIT4
+        /* 11 */ pla
+        /* 15 */ sta VIA2_PCR
+        /* 19 */ WAIT10
+        /* 29 */ pla
+        /* 33 */ sta VIA2_PCR
+        /* 37 */ WAIT3
+        /* 40 */ pla
+        /* 44 */ sta VIA2_PCR
+        /* 48 */ WAIT4
+        /* 52 */
+    zelse
+        set0 VIA2_PCR, VIA2_PCR_CB2_DATA_OUT
+        /* 0 */  pla
+        /* 4 */  sta VIA2_PCR
+        /* 8 */  WAIT2
+        /* 10 */ pla
+        /* 14 */ sta VIA2_PCR
+        /* 18 */ WAIT8
+        /* 26 */ pla
+        /* 30 */ sta VIA2_PCR
+        /* 34 */ WAIT2
+        /* 36 */ pla
+        /* 40 */ sta VIA2_PCR
+        /* 44 */ WAIT4
+        /* 48 */
+    zendif
 
     ; Release DATA and CLOCK because we're done
 
@@ -85,7 +116,6 @@ zproc uload3_send
 
     pla
     tax
-    cli
     rts
 zendproc
 
@@ -143,25 +173,42 @@ zproc uload3_recv
 
     ; Begin time-critical part
 
-    sei
-
-    set0 VIA2_PCR, VIA2_PCR_CA2_CLOCK_OUT
-
     ; The layout of the VIC20 input bits is %xxxxxxDC, which isn't that
     ; different from the C64's of %DCxxxxxx.
-    ; The critical points here are cycles 15, 23, 31 and 41.
 
-/* 0 */  WAIT9
-/* 9 */  WAIT5
-/* 15 */ ldx VIA1_PA        ; %xxxxxx10
-/* 19 */ WAIT4
-/* 23 */ ldy VIA1_PA        ; %xxxxxx32
-/* 27 */ WAIT4
-/* 31 */ lda VIA1_PA
-/* 35 */ pha                ; %xxxxxx54
-/* 38 */ WAIT3
-/* 41 */ lda VIA1_PA        ; %xxxxxx76
-    cli
+    lda VICPALNTSC
+    cmp #0x0c
+    zif eq
+        ; PAL
+        
+        label:
+        set0 VIA2_PCR, VIA2_PCR_CA2_CLOCK_OUT
+        /* 0 */  WAIT12
+        /* 9 */  WAIT3
+        /* 19 */ ldx VIA1_PA        ; %xxxxxx10
+        /* 14 */ WAIT5
+        /* 28 */ ldy VIA1_PA        ; %xxxxxx32
+        /* 23 */ WAIT5
+        /* 37 */ lda VIA1_PA
+        /* 41 */ pha                ; %xxxxxx54
+        /* 45 */ WAIT4
+        /* 41 */ lda VIA1_PA        ; %xxxxxx76
+    zelse
+        ; NTSC
+        ; The critical points here are cycles 15, 23, 31 and 41.
+
+        set0 VIA2_PCR, VIA2_PCR_CA2_CLOCK_OUT
+        /* 0 */  WAIT12
+        /* 12 */ WAIT3
+        /* 15 */ ldx VIA1_PA        ; %xxxxxx10
+        /* 19 */ WAIT4
+        /* 23 */ ldy VIA1_PA        ; %xxxxxx32
+        /* 27 */ WAIT4
+        /* 31 */ lda VIA1_PA
+        /* 35 */ pha                ; %xxxxxx54
+        /* 38 */ WAIT3
+        /* 41 */ lda VIA1_PA        ; %xxxxxx76
+    zendif
 
     ; Now reassemble the data again.
 
