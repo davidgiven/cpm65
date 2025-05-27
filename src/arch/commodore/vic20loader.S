@@ -46,16 +46,16 @@ zproc _start
     jsr sendcommand
 
     sei
-    jsr uload3_init
-    jsr uload3_test_link
+    jsr yload_init
+    jsr yload_test_link
 
     ; Read the directory.
 
     lda #'D'
-    jsr uload3_send
+    jsr yload_send
 
     jsr reset_ptr
-    jsr uload3_recv_file
+    jsr yload_recv_file
 
     ; Scan the directory for the BIOS.
 
@@ -87,16 +87,16 @@ bios_found:
     ; Fetch the BIOS itself.
 
     lda #'F'
-    jsr uload3_send
+    jsr yload_send
     ldy #1
     lda (ptr), y
-    jsr uload3_send
+    jsr yload_send
     ldy #2
     lda (ptr), y
-    jsr uload3_send
+    jsr yload_send
 
     jsr reset_ptr
-    jsr uload3_recv_file
+    jsr yload_recv_file
     jmp bootstrap_start
 
 baddrive_msg:

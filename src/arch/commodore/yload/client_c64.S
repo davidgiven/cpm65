@@ -9,7 +9,7 @@ ZEROPAGE
 .global uloadtmp
 uloadtmp:   .fill 1
 
-zproc uload3_init
+zproc yload_init
     sei
 
     lda #0xff                        ; wait for line 255
@@ -34,7 +34,7 @@ zendproc
 
 ; Sends A to the drive. Preserves X (but not Y).
 
-zproc uload3_send
+zproc yload_send
     pha
     lsr
     lsr
@@ -134,7 +134,7 @@ zendproc
 
 ; Receives A from the drive. Preserves X and Y.
 
-zproc uload3_recv
+zproc yload_recv
     zrepeat
         bit CIA2_PA           ; wait for drive to signal data ready with
     zuntil pl                 ; DATA asserted

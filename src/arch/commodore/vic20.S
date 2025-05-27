@@ -718,13 +718,13 @@ zproc read_sector
     pha
 
     lda #'R'
-    jsr uload3_send
+    jsr yload_send
     pla
-    jsr uload3_send
+    jsr yload_send
     pla
-    jsr uload3_send
+    jsr yload_send
 
-    jsr uload3_recv
+    jsr yload_recv
     zif mi
         sec
         rts
@@ -732,7 +732,7 @@ zproc read_sector
 
     ldy #0
     zrepeat
-        jsr uload3_recv
+        jsr yload_recv
         sta disk_buffer, y
         iny
     zuntil eq
@@ -751,20 +751,20 @@ zproc write_sector
     pha
 
     lda #'W'
-    jsr uload3_send
+    jsr yload_send
     pla
-    jsr uload3_send
+    jsr yload_send
     pla
-    jsr uload3_send
+    jsr yload_send
 
     ldx #0
     zrepeat
         lda disk_buffer, x
-        jsr uload3_send
+        jsr yload_send
         inx
     zuntil eq
 
-    jsr uload3_recv
+    jsr yload_recv
     clc
     zif mi
         sec

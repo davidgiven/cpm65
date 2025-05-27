@@ -7,20 +7,20 @@
 
 ; Tests the link integrity (crudely).
 
-zproc uload3_test_link, .text.testlink
+zproc yload_test_link, .text.testlink
     lda #'T'
-    jsr uload3_send
+    jsr yload_send
 
     ldx #0
     zrepeat
         txa
-        jsr uload3_send
+        jsr yload_send
         inx
     zuntil eq
 
     ldx #0
     zrepeat
-        jsr uload3_recv
+        jsr yload_recv
         sta uloadtmp
         cpx uloadtmp
         zif ne
@@ -34,9 +34,9 @@ zendproc
 
 ; Loads the response from an F command into ptr.
 
-zproc uload3_recv_file, .text.recvfile
+zproc yload_recv_file, .text.recvfile
     zloop
-        jsr uload3_recv
+        jsr yload_recv
         zbreakif eq
         cmp #0xff
         zif eq
@@ -48,7 +48,7 @@ zproc uload3_recv_file, .text.recvfile
         tax
         ldy #0
         zrepeat
-            jsr uload3_recv
+            jsr yload_recv
             sta (ptr), y
             
             inc ptr+0

@@ -9,7 +9,7 @@ ZEROPAGE
 .global uloadtmp
 uloadtmp:   .fill 1
 
-zproc uload3_init
+zproc yload_init
     lda VICPALNTSC
     cmp #0x0c
     zif eq
@@ -27,7 +27,7 @@ zendproc
 
 ; Sends A to the drive. Preserves X (but not Y).
 
-zproc uload3_send
+zproc yload_send
     tay
     txa
     pha
@@ -153,7 +153,7 @@ zendproc
 
 ; Receives A from the drive. Preserves X and Y.
 
-zproc uload3_recv
+zproc yload_recv
     txa
     pha
     tya
