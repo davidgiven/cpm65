@@ -176,6 +176,8 @@ the same time.
     fastloader. Sorry. Porting it to other drives is perfectly possible, I
     just haven't done it.
 
+  - This won't work on MAME. You'll need VICE to emulate it.
+
 ### VIC-20 notes
 
   - See the Commodore 64 above.
