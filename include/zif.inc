@@ -10,14 +10,22 @@
 .set zloopsp, 0
 .set zifsp, 0
 
+.macro blt label
+    bcc \label
+.endm
+
+.macro bge label
+    bcs \label
+.endm
+
 .macro zproc name, sect=.text, binding=global
     .section \sect, "ax"
     .\binding \name
     \name:
 .endm
 
-.macro zlproc name, sect=.text, binding=global
-    zproc \name, .text, local
+.macro zlproc name, sect=.text
+    zproc \name, \sect, local
 .endm
 
 .macro zendproc

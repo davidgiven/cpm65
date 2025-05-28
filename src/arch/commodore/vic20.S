@@ -6,64 +6,9 @@
 #include "cpm65.inc"
 #include "wait.inc"
 #include "driver.inc"
+#include "vic20.inc"
 
-;https://www.antimon.org/dl/c64/code/stable.txt
-
-TEXT = 0x1000
-FRAMEBUFFER = 0x1100
-COLOURRAM = 0x9400
-
-VIA1     = 0x9110
-VIA1_PB  = VIA1 + 0x0
-VIA1_PA  = VIA1 + 0x1
-VIA1_PCR = VIA1 + 0xc
-VIA1_DRA = VIA1 + 0xf
-
-VIA1_PA_ATN_OUT = 1<<7
-
-VIA2      = 0x9120
-VIA2_PB   = VIA2 + 0x0
-VIA2_PA   = VIA2 + 0x1
-VIA2_T2CL = VIA2 + 0x8
-VIA2_T2CH = VIA2 + 0x9
-VIA2_PCR  = VIA2 + 0xc
-VIA2_IFR  = VIA2 + 0xd
-VIA2_DRA  = VIA2 + 0xf
-
-VIA2_IFR_T2 = 1<<5
-
-VIA2_PCR_CA2_CLOCK_OUT = 1<<1
-VIA2_PCR_CB1_SRQ_IN    = 1<<4
-VIA2_PCR_CB2_DATA_OUT  = 1<<5
-
-.macro set1 port, bit
-    lda \port
-    ora #\bit
-    sta \port
-.endm
-
-.macro set0 port, bit
-    lda \port
-    and #(~(\bit)) & 0xff
-    sta \port
-.endm
-
-.macro set10 port, bitson, bitsoff
-    lda \port
-    ora #\bitson
-    and #(~(\bitsoff)) & 0xff
-    sta \port
-.endm
-
-.section header, "ax"
-    .word $1201
-    .word 1f, 1
-    .byte $9e
-    .asciz "4621"
-1:
-    .word 0
-.global _start
-_start:
+zproc _start, .start
     ; Goodbye interrupts, we'll never use you again...
 
     sei
@@ -94,36 +39,6 @@ _start:
         cmp #>bios_end_addr
     zuntil eq
 
-    ; Relocate the init code --- we can't execute it here because BASIC will
-    ; load it right into the middle of what we're going to use as video memory.
-
-    zrepeat
-        load2 = .
-        lda init_load_addr
-        store2 = .
-        sta init_exec_addr
-
-        inc load2+1
-        zif eq
-            inc load2+2
-        zendif
-
-        inc store2+1
-        zif eq
-            inc store2+2
-            zbreakif eq
-        zendif
-
-        lda store2+1
-        cmp #<init_end_addr
-        zcontinueif ne
-        lda store2+2
-        cmp #>init_end_addr
-    zuntil eq
-
-    jmp _init
-
-zproc _init, .init
     ; Initialise the VIC.
 
     ldx #vic_tab_end - vic_tab
@@ -137,6 +52,7 @@ zproc _init, .init
     sta 0x900f
 
     jsr initdrivers
+    jsr bios1541_init
     jsr clear_screen
 
     ldy #banner_end - banner
@@ -153,9 +69,7 @@ zproc _init, .init
     ; Miscellaneous initialisation.
 
     ; Y is 0
-    sty ieee_eoi
     sty pending_key
-    jsr ieee_init
 
     ldy #7
     lda #0xff
@@ -163,18 +77,6 @@ zproc _init, .init
         sta keyboard_state, y
         dey
     zuntil mi
-
-    ; Set up for sector I/O.
-
-    lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
-    jsr ieee_listen
-    ldx #allocate_cmd_end - allocate_cmd
-    zrepeat
-        lda allocate_cmd-1, x
-        jsr ieee_write
-        dex
-    zuntil eq
-    jsr ieee_unlisten
 
     ; Load the BDOS.
 
@@ -785,304 +687,6 @@ zproc toggle_cursor
     rts
 zendproc
 
-; --- Disk handling ---------------------------------------------------------
-
-; (Most of this is implemented in ieee488.S.)
-
-; Kernel ROM disassembly here:
-; http://www.fox-ts.co.uk/shared/vic20kernelrom.html
-;
-; Description of the terrible IEC protocol here:
-; https://www.pagetable.com/?p=1135
-
-; Switch from either TALK or LISTEN mode to ATN mode.
-
-zproc ieee_mode_atn
-    jsr iec_assert_atn
-    jsr iec_assert_clock
-    jsr iec_release_data
-    jmp wait_1ms
-zendproc
-
-; Switch from ATN mode to TALK mode.
-
-zproc ieee_mode_talk
-    jmp iec_release_atn
-zendproc
-
-; Switch from ATN mode to LISTEN mode.
-
-zproc ieee_mode_listen
-    jsr iec_release_atn
-    jsr iec_assert_data
-    jsr iec_release_clock
-    jmp wait_for_iec_clock_assert
-zendproc
-
-; Returns a byte into A. If EOI was set, sets C.
-
-zproc ieee_getb
-    ; Wait for the talker to indicate it's ready to send.
-
-    jsr wait_for_iec_clock_release
-
-    ; Indicate that we're ready to receive.
-
-    jsr iec_release_data
-
-    ; Wait for the talker to assert clock, indicating that it's starting.
-    ; There's a timeout here used for indicating EOI.
-
-    lda #0
-    sta ieee_eoi
-    lda #1          ; 256us timeout
-    sta VIA2_T2CH
-    zrepeat
-        lda VIA2_IFR
-        and #VIA2_IFR_T2
-        zif ne
-            ; Timeout. Acknowledge EOI by toggling data.
-
-            jsr iec_assert_data
-            jsr wait_1ms
-            jsr iec_release_data
-            inc ieee_eoi
-        zendif
-
-        jsr get_iec_status
-    zuntil pl ; until clock is asserted
-
-    ; The talker will clock in bits on clock release edges.
-
-    txa
-    pha
-    ldx #8
-    zrepeat
-        jsr wait_for_iec_clock_release
-        ror ieee_byte
-        jsr wait_for_iec_clock_assert
-
-        dex
-    zuntil eq
-    pla
-    tax
-
-    ; Acknowledge receipt by asserting data.
-
-    jsr iec_assert_data
-
-    lda ieee_eoi        ; bottom bit set on EOI
-    ror a               ; move into C
-    lda ieee_byte
-    rts
-zendproc
-
-; Sends A, with EOI set.
-
-zproc ieee_puteoib
-    pha
-    lda #1
-    sta ieee_eoi
-    pla
-zendproc
-    ; fall through
-
-; Sends A. Returns C on error.
-
-zproc ieee_putb
-    sta ieee_byte
-
-    ; Ensure there is actually a device on the other end by releasing data and
-    ; seeing if the device has it asserted. If it's not, there's nothing there.
-
-    jsr iec_release_data
-    jsr get_iec_status
-    zif cs
-        ; Device not present.
-
-        sec
-        rts
-    zendif
-
-    ; Tell the device we're ready to send by releasing clock.
-
-    jsr iec_release_clock
-
-    ; Perform EOI sequence if necessary: we wait without sending the clock low.
-    ; Eventually the receiver will aknowledge by briefly asserting data. (Not
-    ; sure how this behaves with multiple receivers?)
-
-    lda ieee_eoi
-    zif ne
-        jsr wait_for_iec_data_release
-        jsr wait_for_iec_data_assert
-    zendif
-
-    ; Now that we're ready, wait for the device to acknowledge by releasing
-    ; data.
-
-    jsr wait_for_iec_data_release
-
-    ; Assert clock and go.
-
-    jsr iec_assert_clock
-
-    ; Now send a byte.
-
-    txa
-    pha
-    ldx #8              ; bit count
-    zrepeat
-        zrepeat
-            lda VIA1_DRA
-            cmp VIA1_DRA
-        zuntil eq
-        ror a
-        ror a           ; put data into carry
-        zif cs
-            ; timeout
-        zendif
-
-        ror ieee_byte
-        jsr set_iec_data_from_carry
-
-        ; Leave the clock released for 26 cycles.
-
-        jsr iec_release_clock               ; uses 6 cycles after changing clock
-        WAIT12                              ; 12
-        lda VIA2_PCR                        ; 4
-        and #~VIA2_PCR_CB2_DATA_OUT & 0xff  ; 2
-        ora #VIA2_PCR_CA2_CLOCK_OUT         ; 2
-        sta VIA2_PCR                        ; 4; total delay, 26 cycles
-
-        dex
-    zuntil eq
-    pla
-    tax
-
-    ; We are now done. Wait for the receivers to acknowledge by asserting data.
-
-    jsr wait_for_iec_data_assert
-    lda #0
-    sta ieee_eoi
-    clc
-    rts
-zendproc
-
-; Sets the data bit to C.
-
-zproc set_iec_data_from_carry
-    bcc iec_assert_data
-zendproc
-    ; fall through
-zproc iec_release_data
-    ; IEC data goes high
-
-    set0 VIA2_PCR, VIA2_PCR_CB2_DATA_OUT
-    rts
-zendproc
-
-zproc wait_for_iec_data_release
-    zrepeat
-        jsr get_iec_status
-    zuntil cs
-    rts
-zendproc
-
-zproc wait_for_iec_data_assert
-    zrepeat
-        jsr get_iec_status
-    zuntil cc
-    rts
-zendproc
-
-zproc iec_assert_data
-    ; IEC data goes low
-
-    set1 VIA2_PCR, VIA2_PCR_CB2_DATA_OUT
-    rts
-zendproc
-
-zproc wait_for_iec_clock_release
-    zrepeat
-        jsr get_iec_status
-    zuntil mi
-    rts
-zendproc
-
-zproc wait_for_iec_clock_assert
-    zrepeat
-        jsr get_iec_status
-    zuntil pl
-    rts
-zendproc
-
-zproc iec_release_clock
-    ; Set low; IEC clock goes high
-
-    set0 VIA2_PCR, VIA2_PCR_CA2_CLOCK_OUT
-    rts
-zendproc
-
-zproc iec_assert_clock
-    ; Set high; IEC clock goes low
-
-    set1 VIA2_PCR, VIA2_PCR_CA2_CLOCK_OUT
-    rts
-zendproc
-
-zproc iec_release_atn
-    ; Set low; IEC ATN goes high
-
-    set0 VIA1_DRA, VIA1_PA_ATN_OUT
-    rts
-zendproc
-
-zproc iec_assert_atn
-    ; Set high; IEC ATN goes low
-
-    set1 VIA1_DRA, VIA1_PA_ATN_OUT
-    rts
-zendproc
-
-; Returns the clock bit in N and the data bit in C.
-
-zproc get_iec_status
-    ; VIA1 PA has format xxxxxxDC.
-
-    zrepeat
-        lda VIA1_DRA
-        cmp VIA1_DRA
-    zuntil eq
-    ror a
-    ror a
-    rts
-zendproc
-
-; Waits for 60us.
-
-zproc wait_60us
-    lda #60
-wait_us:
-    sta VIA2_T2CL
-    lda #0
-    sta VIA2_T2CH
-    jmp timer_wait              ; always taken
-zendproc
-
-; Waits for 1ms.
-
-zproc wait_1ms
-    lda #4
-    sta VIA2_T2CH
-timer_wait:
-    zrepeat
-        lda VIA2_IFR
-        and #VIA2_IFR_T2
-    zuntil ne
-    rts
-zendproc
-
 zproc print_hex_number
     pha
     lsr a
@@ -1104,6 +708,70 @@ print:
     rts
 zendproc
 
+; Reads a 256-byte sector whose LBA index is in XA.
+
+zproc read_sector
+    tay
+    txa
+    pha
+    tya
+    pha
+
+    lda #'R'
+    jsr yload_send
+    pla
+    jsr yload_send
+    pla
+    jsr yload_send
+
+    jsr yload_recv
+    zif mi
+        sec
+        rts
+    zendif
+
+    ldy #0
+    zrepeat
+        jsr yload_recv
+        sta disk_buffer, y
+        iny
+    zuntil eq
+
+    clc
+    rts
+zendproc
+
+; Writes a 256-byte sector whose LBA index is in XA.
+
+zproc write_sector
+    tay
+    txa
+    pha
+    tya
+    pha
+
+    lda #'W'
+    jsr yload_send
+    pla
+    jsr yload_send
+    pla
+    jsr yload_send
+
+    ldx #0
+    zrepeat
+        lda disk_buffer, x
+        jsr yload_send
+        inx
+    zuntil eq
+
+    jsr yload_recv
+    clc
+    zif mi
+        sec
+    zendif
+    rts
+zendproc
+
 ZEROPAGE
 
 .global ptr
@@ -1115,8 +783,6 @@ ptr2:            .fill 2
 cursorx:         .fill 1
 cursory:         .fill 1
 scroll_compensation: .fill 1
-ieee_byte:       .fill 1
-ieee_eoi:        .fill 1
 pending_key:     .fill 1
 
 .data

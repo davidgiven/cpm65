@@ -6,56 +6,46 @@
 #include "cpm65.inc"
 #include "driver.inc"
 #include "jumptables.inc"
-READST = $ffb7
-SETLFS = $ffba
-SETNAM = $ffbd
-OPEN = $ffc0
-CLOSE = $ffc3
-CHKIN = $ffc6
-CHKOUT = $ffc9
-CHRIN = $ffcf
-CHROUT = $ffd2
-LOAD = $ffd5
-SAVE = $ffd8
-CLALL = $ffe7
-SETMSG = $ff90
-ACPTR = $ffa5
-CIOUT = $ffa8
-UNTALK = $ffab
-UNLSN = $ffae
-LISTEN = $ffb1
-TALK = $ffb4
-SECOND = $ff93
-TALKSA = $ff96
-CLRCHN = $ffcc
-GETIN = $ffe4
-CLEAR_SCREEN = $e544
-MOVE_CURSOR = $e56c 
-SHOW_CURSOR = $cc
-CURSOR_X = $d3
-CURSOR_Y = $d6
-STATUS = $90
-
-SCREEN_WIDTH=40
-SCREEN_HEIGHT=25 
-VIDEO = $0400
+#include "c64.inc"
 
 ZEROPAGE
 
 .global ptr
 .global ptr1
+
 ptr:        .word 0
 ptr1:       .word 0
-dma:        .word 0    ; current DMA
 
-    .text
+zproc bootstrap, .bootstrap
+    ; Relocate the BIOS.
 
-    .word $0801
-    .word 1f, 1
-    .byte $9e
-    .asciz "2061"
-1:
-    .word 0
+    zrepeat
+        load1 = .
+        lda bios_load_addr
+        store1 = .
+        sta bios_exec_addr
+
+        inc load1+1
+        zif eq
+            inc load1+2
+        zendif
+
+        inc store1+1
+        zif eq
+            inc store1+2
+            zbreakif eq
+        zendif
+
+        lda store1+1
+        cmp #<bios_end_addr
+        zcontinueif ne
+        lda store1+2
+        cmp #>bios_end_addr
+    zuntil eq
+
+    jmp _start
+zendproc
+
 zproc _start
     jsr init_system
 
@@ -397,49 +387,6 @@ zproc tty_const
     rts
 zendproc
 
-; Sets the current DMA address.
-
-zproc bios_SETDMA
-    sta dma+0
-    stx dma+1
-    clc
-    rts
-zendproc
-
-; Select a disk.
-; A is the disk number.
-; Returns the DPH in XA.
-; Sets carry on error.
-
-zproc bios_SELDSK
-    cmp #0
-    zif ne
-        sec                 ; invalid drive
-        rts
-    zendif
-
-    lda #<dph
-    ldx #>dph
-    clc
-    rts
-zendproc
-
-; Set the current absolute sector number.
-; XA is a pointer to a three-byte number.
-
-zproc bios_SETSEC
-    sta ptr+0
-    stx ptr+1
-    ldy #2
-    zrepeat
-        lda (ptr), y
-        sta sector_num, y
-        dey
-    zuntil mi
-    clc
-    rts
-zendproc
-
 zproc bios_GETTPA
     lda mem_base
     ldx mem_end
@@ -472,236 +419,68 @@ zproc bios_SETBANK
     rts
 zendproc
 
-zproc bios_READ
-    jsr change_sectors
-
-    lda sector_num+0
-    ror a               ; bottom bit -> C
-    lda #0
-    ror a               ; C -> top bit, producing $00 or $80
-    tax
-
-    ldy #0
-    zrepeat
-        lda disk_buffer, x
-        sta (dma), y
-        iny
-        inx
-        cpy #$80
-    zuntil eq
-
-    clc
-    rts
-zendproc
-
-; On entry, A=0 for a normal write; A=1 to always flush to disk.
-
-zproc bios_WRITE
-    pha
-    jsr change_sectors
-
-    lda sector_num+0
-    ror a               ; bottom bit -> C
-    lda #0
-    ror a               ; C -> top bit, producing $00 or $80
-    tax
-
-    ldy #0
-    zrepeat
-        lda (dma), y
-        sta disk_buffer, x
-        iny
-        inx
-        cpy #$80
-    zuntil eq
-
-    lda #$80
-    sta buffer_dirty
-
-    pla
-    zif ne
-        jsr flush_buffered_sector
-    zendif
-
-    clc
-    rts
-zendproc
-
-zproc change_sectors
-    ; If the buffered sector is the one we want, just return.
-
-    lda sector_num+0
-    and #$fe
-    cmp buffered_sector+0
-    zif eq
-        lda sector_num+1
-        cmp buffered_sector+1
-        zif eq
-            lda sector_num+2
-            cmp buffered_sector+2
-            zif eq
-                rts
-            zendif
-        zendif
-    zendif
-
-    ; We need to change sectors. Flush the current one?
-
-    jsr flush_buffered_sector
-
-    ; Now read the new one.
-
-    lda sector_num+0
-    and #$fe
-    sta buffered_sector+0
-    lda sector_num+1
-    sta buffered_sector+1
-    lda sector_num+2
-    sta buffered_sector+2
-
-    jsr buffered_sector_to_lba
-    jmp read_sector
-zendproc
-
-; Compute the current LBA sector number in XA for the buffered sector.
-
-zproc buffered_sector_to_lba
-    lda buffered_sector+1
-    lsr a
-    tax
-    lda buffered_sector+0
-    ror
-    rts
-zendproc
-
-; Flush the current buffer to disk, if necessary.
-
-zproc flush_buffered_sector
-    lda buffer_dirty
-    zif mi
-        jsr buffered_sector_to_lba
-        jsr write_sector
-
-        lda #0
-        sta buffer_dirty
-    zendif
-    rts
-zendproc
-
 ; Reads a 256-byte sector whose LBA index is in XA.
 
 zproc read_sector
-    jsr convert_to_ts
+    tay
+    txa
     pha
     tya
     pha
 
-    lda #8
-    jsr LISTEN
-    lda #$6f
-    jsr SECOND
+    lda #'R'
+    jsr yload_send
+    pla
+    jsr yload_send
+    pla
+    jsr yload_send
 
-    lda #'U'
-    jsr CIOUT
-    lda #'1'
-    jsr CIOUT
-    lda #2
-    jsr decimal_out
-    lda #0
-    jsr decimal_out
-    pla                 ; get sector
-    jsr decimal_out
-    pla                 ; get track
-    jsr decimal_out
-
-    jsr UNLSN
-
-    ;jsr get_status
-
-    lda #8
-    jsr TALK
-    lda #$62
-    jsr TALKSA
+    jsr yload_recv
+    zif mi
+        sec
+        rts
+    zendif
 
     ldy #0
     zrepeat
-        jsr ACPTR
+        jsr yload_recv
         sta disk_buffer, y
         iny
     zuntil eq
 
-    jsr UNTALK
+    clc
     rts
 zendproc
 
 ; Writes a 256-byte sector whose LBA index is in XA.
 
 zproc write_sector
-    jsr convert_to_ts
+    tay
+    txa
     pha
     tya
     pha
 
-    ; Reset buffer pointer.
+    lda #'W'
+    jsr yload_send
+    pla
+    jsr yload_send
+    pla
+    jsr yload_send
 
-    lda #8
-    jsr LISTEN
-    lda #$6f
-    jsr SECOND
-
-    lda #<reset_buffer_pointer_command
-    ldx #>reset_buffer_pointer_command
-    jsr string_out
-
-    jsr UNLSN
-
-    ; Write bytes.
-
-    lda #8
-    jsr LISTEN
-    lda #$62
-    jsr SECOND
-
-    ldy #0
+    ldx #0
     zrepeat
-        lda disk_buffer, y
-        jsr CIOUT
-        iny
+        lda disk_buffer, x
+        jsr yload_send
+        inx
     zuntil eq
 
-    jsr UNLSN
-
-    ; Write buffer to disk.
-
-    lda #8
-    jsr LISTEN
-    lda #$6f
-    jsr SECOND
-
-    lda #'U'
-    jsr CIOUT
-    lda #'2'
-    jsr CIOUT
-    lda #2
-    jsr decimal_out
-    lda #0
-    jsr decimal_out
-    pla                 ; get sector
-    jsr decimal_out
-    pla                 ; get track
-    jsr decimal_out
-    lda #13
-    jsr CIOUT
-
-    jsr UNLSN
-
-    ; jsr get_status
-
+    jsr yload_recv
+    clc
+    zif mi
+        sec
+    zendif
     rts
-
-reset_buffer_pointer_command:
-    .ascii "B-P 2 0"
-    .byte 13, 0
 zendproc
 
 ; Prints an 8-bit hex number in A.
@@ -841,42 +620,14 @@ zproc print
 zendproc
 
 zproc init_system
-    lda #$36
-    sta 1                   ; map Basic out
-    lda #0
-    sta 53280               ; black border
-    sta 53281               ; black background
-
-    ; Print the startup banner (directly with CHROUT).
-
-    ldy #0
-    zloop
-        lda loading_msg, y
-        zbreakif eq
-        jsr CHROUT
-        iny
-    zendloop
-
     ; General initialisation.
 
     lda #0
     sta pending_key
-    sta buffer_dirty
-    lda #$ff
-    sta buffered_sector+0
-    sta buffered_sector+1
-    sta buffered_sector+2
 
+    jsr yload_init
     jsr initdrivers
-
-    lda #8
-    jsr LISTEN
-    lda #$f2
-    jsr SECOND
-    lda #'#'
-    jsr CIOUT
-    jsr UNLSN
-
+    jsr bios1541_init
     rts
 zendproc
 
@@ -978,12 +729,6 @@ ddEnd:
     rts
 zendproc
 
-
-loading_msg:
-    .byte 147, 14, 5
-    .ascii "cp/m-65 FOR THE cOMMODORE 64"
-    .byte 13, 0
-
 .data
 
 zp_base:    .byte __USERZEROPAGE_START__
@@ -991,21 +736,8 @@ zp_end:     .byte __USERZEROPAGE_END__
 mem_base:   .byte __USERTPA_START__@mos16hi
 mem_end:    .byte __USERTPA_END__@mos16hi
 
-; DPH for drive 0 (our only drive)
-
-define_dpb dpb, 136*10, 1024, 64, 0
-define_dph dph, dpb
-
 NOINIT
 
 pending_key:     .byte 0 ; pending keypress from system
-sector_num:      .fill 3 ; current absolute sector number
-buffered_sector: .fill 3 ; sector currently in disk buffer
-buffer_dirty:    .fill 1 ; non-zero if sector needs flushing
-
-.global directory_buffer
-directory_buffer: .fill 128
-disk_buffer: .fill 256
 
 ; vim: sw=4 ts=4 et ft=asm
-
