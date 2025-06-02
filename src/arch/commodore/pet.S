@@ -725,11 +725,15 @@ zendproc
 
 zproc change_key_state
 #if defined PET4032
+    cpy #0x4f               ; control
+    beq ctrl_change
     cpy #0x47               ; left shift
     beq shift_change
     cpy #0x42               ; right shift
     beq shift_change
 #elif defined PET8032 || defined PET8096
+    cpy #0x47
+    beq ctrl_change
     cpy #0x37               ; left shift
     beq shift_change
     cpy #0x31               ; right shift
@@ -742,6 +746,10 @@ zproc change_key_state
         bit shift_pressed
         zif pl
             lda keyboard_decode_tab_shifted, y
+        zendif
+        bit ctrl_pressed
+        zif pl
+            and #0x1f
         zendif
         sta pending_key
     zendif
@@ -769,6 +777,17 @@ shift_change:
     ror a
 #endif
     sta shift_pressed       ; new state in top bit
+    rts
+
+ctrl_change:
+#if defined PET4032
+    lda keyboard_state + 9
+#elif defined PET8032 || defined PET8096
+    lda keyboard_state + 8
+#endif
+    ror a
+    ror a
+    sta ctrl_pressed        ; new state in top bit
     rts
 
 keyboard_decode_tab:
@@ -1094,5 +1113,6 @@ mem_end:    .byte __TPA_END__@mos16hi
 
 keyboard_state:   .fill 10
 shift_pressed:    .fill 1
+ctrl_pressed:     .fill 1
 
 ; vim: sw=4 ts=4 et ft=asm

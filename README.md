@@ -199,10 +199,8 @@ the same time.
   - The 4032 is set up for the Graphics Keyboard. The 8032 and 8096 are set up
     for the Business Keyboard. (It would also be trivial to emulate the
     Business Keyboard on the Graphics Keyboard, but that is likely to be
-    confusing.)
-
-  - It's much faster than the Comodore 64 --- you can run the assembler in real
-    time without having to worry about retirement.
+    confusing.) Both use the RVS/OFF key as the CTRL key; some PET models
+    actually label this as such.
 
   - It supports drive 0: only.
 
