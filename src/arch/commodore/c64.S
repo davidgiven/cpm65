@@ -43,6 +43,18 @@ zproc bootstrap, .bootstrap
         cmp #>bios_end_addr
     zuntil eq
 
+    ; Wipe the colour RAM.
+
+    ldx #0
+    lda #1
+    zrepeat
+        sta COLOUR_RAM+0x0000, x
+        sta COLOUR_RAM+0x0100, x
+        sta COLOUR_RAM+0x0200, x
+        sta COLOUR_RAM+0x0300, x
+        inx
+    zuntil eq
+
     jmp _start
 zendproc
 
@@ -131,14 +143,23 @@ zproc screen_getsize
 zendproc
 
 zproc screen_clear
-   jsr CLEAR_SCREEN
-   rts
+    lda #SCREEN_HEIGHT-1
+    sta CURSOR_Y
+    zrepeat
+        lda CURSOR_Y
+        jsr calculate_line_address
+        jsr erase_screen_line
+        dec CURSOR_Y
+    zuntil mi
+    lda #0
+    sta CURSOR_X
+    sta CURSOR_Y
+    rts
 zendproc
 
 zproc screen_setcursor
     sta CURSOR_X
     stx CURSOR_Y 
-    jsr MOVE_CURSOR
     rts
 zendproc
 
@@ -155,13 +176,13 @@ zproc screen_putchar
     jsr calculate_line_address
     pla
     jsr convert_ascii_to_screencode
+    ora reverse_flag
     sta (ptr),y
     cpy #SCREEN_WIDTH-1
     zif cc
         iny
     zendif
     sty CURSOR_X
-    jsr MOVE_CURSOR   
     clc
     rts
 zendproc
@@ -191,6 +212,7 @@ zproc screen_putstring
         cpx #SCREEN_WIDTH
         ; Do not linewrap
         zif cc
+            ora reverse_flag
             sta (ptr),y
             inc CURSOR_X
         zendif
@@ -203,20 +225,32 @@ zproc screen_putstring
     zif cs
         dec CURSOR_X
     zendif
-    jsr MOVE_CURSOR
 
     clc
     rts
 zendproc
 
 zproc screen_getchar
-    ; Ignore timeout for now, just do a non-blocking read
-    jsr GETIN
-    zif eq
-        sec
-        rts
-    zendif
+    jsr toggle_cursor
+
+    zrepeat
+        jsr GETIN
+    zuntil ne
+
+    pha
+    jsr toggle_cursor
+    pla
     clc
+    rts
+zendproc
+
+zproc toggle_cursor
+    lda CURSOR_Y
+    jsr calculate_line_address
+    ldy CURSOR_X
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
     rts
 zendproc
 
@@ -243,14 +277,7 @@ zproc screen_scrollup
 
         cpx #SCREEN_HEIGHT-1
     zuntil eq
-
-    ldy #SCREEN_WIDTH-1
-    lda #' '
-    zrepeat
-        sta (ptr), y
-        dey
-    zuntil mi
-    rts
+    jmp erase_screen_line
 zendproc
 
 zproc screen_scrolldown
@@ -276,9 +303,12 @@ zproc screen_scrolldown
 
         cpx #0
     zuntil eq
-
+zendproc
+    ; fall through
+zproc erase_screen_line
     ldy #SCREEN_WIDTH-1
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         dey
@@ -292,6 +322,7 @@ zproc screen_cleartoeol
     jsr calculate_line_address
     
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         iny
@@ -302,6 +333,11 @@ zproc screen_cleartoeol
 zendproc
 
 zproc screen_setstyle
+    and #STYLE_REVERSE
+    lsr a
+    lda #0
+    ror a
+    sta reverse_flag
     rts
 zendproc
 
@@ -346,10 +382,7 @@ zendproc
 zproc tty_conin
     lda pending_key
     zif eq
-        zrepeat
-            jsr GETIN
-            tax
-        zuntil ne
+        jsr screen_getchar
     zendif
     ldx #0
     stx pending_key
@@ -364,9 +397,58 @@ zproc tty_conin
 zendproc
 
 zproc tty_conout
-    jsr topetscii
-    jsr CHROUT
-    clc
+    cmp #13
+    zif eq
+        lda #0
+        sta CURSOR_X
+        rts
+    zendif
+    cmp #127
+    zif eq
+        dec CURSOR_X
+        zif mi
+            lda #SCREEN_WIDTH-1
+            sta CURSOR_X
+
+            dec CURSOR_Y
+            zif mi
+                lda #0
+                sta CURSOR_Y
+                jsr screen_scrolldown
+            zendif
+        zendif
+        jsr calculate_line_address
+        ldy CURSOR_X
+        lda #' '
+        sta (ptr), y
+        rts
+    zendif
+    cmp #10
+    beq write_nl
+
+    tax
+    lda CURSOR_X
+    pha
+    txa
+    jsr screen_putchar
+
+    pla
+    cmp #SCREEN_WIDTH-1
+    beq write_nl
+    rts
+zendproc
+
+zproc write_nl
+    lda #0
+    sta CURSOR_X
+
+    inc CURSOR_Y
+    lda CURSOR_Y
+    cmp #SCREEN_HEIGHT
+    zif eq
+        dec CURSOR_Y
+        jmp screen_scrollup
+    zendif
     rts
 zendproc
 
@@ -624,6 +706,7 @@ zproc init_system
 
     lda #0
     sta pending_key
+    sta reverse_flag
 
     jsr yload_init
     jsr initdrivers
@@ -739,5 +822,6 @@ mem_end:    .byte __USERTPA_END__@mos16hi
 NOINIT
 
 pending_key:     .byte 0 ; pending keypress from system
+reverse_flag:    .byte 0 ; 0x00 or 0x80
 
 ; vim: sw=4 ts=4 et ft=asm
