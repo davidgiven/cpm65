@@ -165,6 +165,8 @@ zproc _start, .init
 
     ; Initialise the screen.
 
+    lda #0
+    sta reverse_flag
     jsr screen_clear
 
     IO_ON
@@ -181,13 +183,15 @@ zproc _start, .init
         tay
         dey
     zuntil eq
+    ; Y is zero
 
     ; Miscellaneous initialisation.
 
-    lda #0
+    lda #0x80
     sta shift_pressed
-    sta pending_key
-    sta buffer_dirty
+    sta ctrl_pressed
+    sty pending_key
+    sty buffer_dirty
     jsr initdrivers
 
     jsr ieee_init
@@ -307,7 +311,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
-    jmptablo fail
+    jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -321,7 +325,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-    jmptabhi fail
+    jmptabhi screen_setstyle
 zendproc
 
 zproc fail
@@ -349,6 +353,7 @@ zproc screen_clear
 
         ldy #SCREEN_WIDTH-1
         lda #' '
+        ora reverse_flag
         zrepeat
             sta (ptr), y
             dey
@@ -417,6 +422,7 @@ zproc screen_putchar
     jsr calculate_cursor_address
     pla
     jsr convert_ascii_to_screencode
+    ora reverse_flag
     sta (ptr), y
 
     lda cursorx
@@ -442,6 +448,7 @@ zproc screen_putstring
         zbreakif eq
 
         jsr convert_ascii_to_screencode
+        ora reverse_flag
         sta (ptr), y
         iny
         inx
@@ -476,14 +483,7 @@ zproc screen_scrollup
         cpx #SCREEN_HEIGHT-1
     zuntil eq
 
-    ldy #SCREEN_WIDTH-1
-    lda #' '
-    zrepeat
-        sta (ptr), y
-        dey
-    zuntil mi
-    IO_OFF
-    rts
+    jmp erase_line_at_ptr
 zendproc
 
 zproc screen_scrolldown
@@ -510,9 +510,13 @@ zproc screen_scrolldown
 
         cpx #0
     zuntil eq
-
+zendproc
+    ; fall through
+zproc erase_line_at_ptr
+    IO_ON
     ldy #SCREEN_WIDTH-1
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         dey
@@ -526,12 +530,23 @@ zproc screen_cleartoeol
 
     IO_ON
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
     zuntil eq
     IO_OFF
+    rts
+zendproc
+
+zproc screen_setstyle
+    and #STYLE_REVERSE
+    lsr a
+    lda #0
+    ror a
+    sta reverse_flag
+    clc
     rts
 zendproc
 
@@ -1114,5 +1129,6 @@ mem_end:    .byte __TPA_END__@mos16hi
 keyboard_state:   .fill 10
 shift_pressed:    .fill 1
 ctrl_pressed:     .fill 1
+reverse_flag:     .fill 1
 
 ; vim: sw=4 ts=4 et ft=asm
