@@ -21,9 +21,29 @@ struct watchpoint
 
 static struct watchpoint watchpoints[16];
 bool tracing = false;
-static bool singlestepping = true;
+bool singlestepping = true;
 static bool bdosbreak = false;
 static bool bdoslog = false;
+
+uint16_t get_xa(void)
+{
+    return (cpu->registers->x << 8) | cpu->registers->a;
+}
+
+void set_xa(uint16_t xa)
+{
+    cpu->registers->x = xa >> 8;
+    cpu->registers->a = xa;
+}
+
+void set_result(uint16_t xa, bool succeeded)
+{
+    set_xa(xa);
+    if (succeeded)
+        cpu->registers->p &= ~0x01;
+    else
+        cpu->registers->p |= 0x01;
+}
 
 void showregs(void)
 {
@@ -395,6 +415,13 @@ void emulator_run(void)
                 if (bdosbreak)
                     singlestepping = true;
                 bios_entry(cpu->registers->y);
+                rts();
+                continue;
+
+            case SCREEN_ADDRESS:
+                if (bdosbreak)
+                    singlestepping = true;
+                screen_entry(cpu->registers->y);
                 rts();
                 continue;
 

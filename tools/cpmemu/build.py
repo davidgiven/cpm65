@@ -6,6 +6,7 @@ cprogram(
         "./biosbdos.c",
         "./emulator.c",
         "./fileio.c",
+        "./screen.c",
         "./main.c",
         "./globals.h",
     ],
