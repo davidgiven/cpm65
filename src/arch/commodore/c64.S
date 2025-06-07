@@ -308,8 +308,7 @@ zproc screen_clear
     lda #SCREEN_HEIGHT-1
     sta CURSOR_Y
     zrepeat
-        lda CURSOR_Y
-        jsr calculate_line_address
+        jsr calculate_cursor_address
         jsr erase_screen_line
         dec CURSOR_Y
     zuntil mi
@@ -333,9 +332,7 @@ zendproc
 
 zproc screen_putchar
     pha
-    lda CURSOR_Y
-    ldy CURSOR_X
-    jsr calculate_line_address
+    jsr calculate_cursor_address
     pla
     jsr convert_ascii_to_screencode
     ora reverse_flag
@@ -353,11 +350,10 @@ zproc screen_putstring
     sta ptr1+0
     stx ptr1+1
    
-    lda CURSOR_Y
-    jsr calculate_line_address
+    jsr calculate_cursor_address
     
     ; Add cursor x-position to pointer
-    lda CURSOR_X
+    tya
     clc
     adc ptr+0
     sta ptr+0
@@ -414,9 +410,7 @@ zproc screen_getchar
 zendproc
 
 zproc toggle_cursor
-    lda CURSOR_Y
-    jsr calculate_line_address
-    ldy CURSOR_X
+    jsr calculate_cursor_address
     lda (ptr), y
     eor #0x80
     sta (ptr), y
@@ -581,9 +575,9 @@ zproc tty_conout
                 jsr screen_scrolldown
             zendif
         zendif
-        jsr calculate_line_address
-        ldy CURSOR_X
+        jsr calculate_cursor_address
         lda #' '
+        ora reverse_flag
         sta (ptr), y
         rts
     zendif
@@ -739,6 +733,13 @@ zproc init_system
     jsr yload_init
     jsr initdrivers
     jsr bios1541_init
+    rts
+zendproc
+
+zproc calculate_cursor_address
+    lda CURSOR_Y
+    jsr calculate_line_address
+    ldy CURSOR_X
     rts
 zendproc
 
