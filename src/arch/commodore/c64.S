@@ -16,6 +16,12 @@ ZEROPAGE
 ptr:        .word 0
 ptr1:       .word 0
 
+.macro IO_ON
+.endm
+
+.macro IO_OFF
+.endm
+
 zproc bootstrap, .bootstrap
     ; Relocate the BIOS.
 
@@ -55,6 +61,17 @@ zproc bootstrap, .bootstrap
         inx
     zuntil eq
 
+    ; Reset the keyboard state.
+
+    ldx #7
+    lda #0xff
+    zrepeat
+        sta keyboard_state, x
+        dex
+    zuntil mi
+    sta ctrl_pressed
+    sta shift_pressed
+
     jmp _start
 zendproc
 
@@ -87,6 +104,151 @@ zproc _start
 
 bdos_filename:
     .ascii "BDOS    SYS"
+zendproc
+
+; Does a single keyboard scan, processing any pressed keys. Last pressed key
+; wins.
+;
+; Must be called with IO_ON.
+
+zproc scan_keyboard
+    lda #0xfe
+    sta ptr+0
+    sta CIA1_PA
+    ldy #0
+    zrepeat
+        zrepeat
+            ldx CIA1_PB
+            cpx CIA1_PB
+        zuntil eq
+        txa
+        eor keyboard_state, y
+        zif ne
+            ; Any set bits in A correspond to a key which has changes state.
+            ; The corresponding bit in X tells us whether it went up or down.
+
+            sta ptr1+0
+            stx ptr1+1
+
+            pha
+            txa
+            pha
+            tya
+            pha
+
+            txa
+            sta keyboard_state, y
+
+            tya
+            asl a
+            asl a
+            asl a       ; compute row*8 to get base of scancode number
+            tay
+
+            zrepeat
+                bit ptr1+0
+                zif mi
+                    ; This key has changed.
+
+                    tya
+                    pha
+                    jsr change_key_state
+                    pla
+                    tay
+                zendif
+
+                iny
+                asl ptr1+1
+                asl ptr1+0
+            zuntil eq
+
+            pla
+            tay
+            pla
+            tax
+            pla
+        zendif
+
+        iny
+        cpy #9
+        zif eq
+            .byte 3
+        zendif
+        sec
+        rol ptr+0
+        ldx ptr+0
+        stx CIA1_PA
+        inx
+    zuntil eq
+    rts
+zendproc
+
+; The key with scancode Y has changed state. Whether it's up or down is in
+; the top bit of ptr1+1.
+
+zproc change_key_state
+    cpy #0x3d               ; control
+    beq ctrl_change
+    cpy #0x08               ; left shift
+    beq shift_change
+    cpy #0x33               ; right shift
+    beq shift_change
+
+    bit ptr1+1
+    zif pl
+        lda keyboard_decode_tab, y
+        bit shift_pressed
+        zif pl
+            lda keyboard_decode_tab_shifted, y
+        zendif
+        bit ctrl_pressed
+        zif pl
+            and #0x1f
+        zendif
+        sta pending_key
+    zendif
+    rts
+
+    ; Shift gets special treatment because we care about ups as well as downs.
+
+shift_change:
+    lda keyboard_state + 6
+    rol a
+    rol a
+    rol a                   ; right shift state in bit 0
+    and keyboard_state + 1  ; left shift state in bit 0
+    and #0x80
+    sta shift_pressed       ; new state in top bit
+    rts
+
+ctrl_change:
+    lda keyboard_state + 7
+    ror a
+    ror a
+    ror a
+    ror a
+    and #0x80
+    sta ctrl_pressed        ; new state in top bit
+    rts
+
+keyboard_decode_tab:
+    .byte 0x8a, 0x00, 0x00, 0x00, 0x00, 0x89, 0x0d, 0x7f ; 0x00
+    .byte 0x00, 'e',  's',  'z',  '4',  'a',  'w',  '3'  ; 0x08
+    .byte 'x',  't',  'f',  'c',  '6',  'd',  'r',  '5'  ; 0x10
+    .byte 'v',  'u',  'h',  'b',  '8',  'g',  'y',  '7'  ; 0x18
+    .byte 'n',  'o',  'k',  'm',  '0',  'j',  'i',  '9'  ; 0x20
+    .byte ',',  '@',  ':',  '.',  '-',  'l',  'p',  '+'  ; 0x28
+    .byte '/',  '^',  '=', 0x00, 0x00,  ';',  '*',  '#'  ; 0x30
+    .byte 0x1b, 'q', 0x00,  ' ',  '2', 0x00,  0x00, '1'  ; 0x38
+keyboard_decode_tab_shifted:
+    .byte 0x8b, 0x00, 0x00, 0x00, 0x00, 0x88, 0x0d, 0x7f ; 0x00
+    .byte 0x00, 'E',  'S',  'Z',  '$',  'A',  'W',  '#'  ; 0x08
+    .byte 'X',  'T',  'F',  'C',  '&',  'D',  'R',  '%'  ; 0x10
+    .byte 'V',  'U',  'H',  'B',  '(',  'G',  'Y',  0x60 ; 0x18
+    .byte 'N',  'O',  'K',  'M',  '0',  'J',  'I',  ')'  ; 0x20
+    .byte '<',  '@',  '[',  '>',  '-',  'L',  'P',  '+'  ; 0x28
+    .byte '?',  '^',  '=', 0x00, 0x00,  ']',  '*',  '#'  ; 0x30
+    .byte 0x1b, 'Q', 0x00,  ' ',  '"', 0x00,  0x00, '!'  ; 0x38
 zendproc
 
 .data
@@ -233,9 +395,16 @@ zendproc
 zproc screen_getchar
     jsr toggle_cursor
 
-    zrepeat
-        jsr GETIN
-    zuntil ne
+    lda pending_key
+    zif eq
+        zrepeat
+            jsr scan_keyboard
+            lda pending_key
+        zuntil ne
+    zendif
+
+    ldx #0
+    stx pending_key
 
     pha
     jsr toggle_cursor
@@ -380,12 +549,7 @@ zendproc
 ; Blocks and waits for the next keypress; returns it in A.
 
 zproc tty_conin
-    lda pending_key
-    zif eq
-        jsr screen_getchar
-    zendif
-    ldx #0
-    stx pending_key
+    jsr screen_getchar
 
     cmp #20         ; DEL
     zif eq
@@ -455,8 +619,8 @@ zendproc
 zproc tty_const
     lda pending_key
     zif eq
-        jsr GETIN
-        sta pending_key
+        jsr scan_keyboard
+        lda pending_key
         zif eq
             lda #0
             clc
@@ -585,51 +749,6 @@ h4:
     jsr CHROUT
     pla
     rts
-zendproc
-
-zproc get_status
-    lda #8
-    jsr TALK
-    lda #$6f
-    jsr TALKSA
-
-    zrepeat
-        jsr ACPTR
-        jsr CHROUT
-        cmp #13
-    zuntil eq
-
-    jsr UNTALK
-    rts
-zendproc
-
-; Converts an LBA sector number in XA to track/sector in Y, A.
-
-zproc convert_to_ts
-    ldy #0
-    zloop
-        cpx #0
-        zif eq
-            cmp track_size_table, y
-            zif cc
-                iny     ; tracks are one-based.
-                rts
-            zendif
-        zendif
-
-        sec
-        sbc track_size_table, y
-        zif cc
-            dex
-        zendif
-        iny
-    zendloop
-
-track_size_table:
-    .fill 17, 1, 21
-    .fill 7, 1, 19
-    .fill 6, 1, 18
-    .fill 10, 1, 17
 zendproc
 
 ; Prints a decimal number in A to the IEC output.
@@ -821,7 +940,10 @@ mem_end:    .byte __USERTPA_END__@mos16hi
 
 NOINIT
 
-pending_key:     .byte 0 ; pending keypress from system
-reverse_flag:    .byte 0 ; 0x00 or 0x80
+pending_key:     .fill 1 ; pending keypress from system
+reverse_flag:    .fill 1 ; 0x00 or 0x80
+ctrl_pressed:    .fill 1
+shift_pressed:   .fill 1
+keyboard_state:  .fill 8
 
 ; vim: sw=4 ts=4 et ft=asm

@@ -10,8 +10,6 @@ ZEROPAGE
 uloadtmp:   .fill 1
 
 zproc yload_init
-    sei
-
     lda #0xff                        ; wait for line 255
     zrepeat
         cmp SCREEN_RASTER
@@ -27,8 +25,6 @@ zproc yload_init
         lda #0xf0                   ; BEQ, 2 cycles
         sta pal_delay_insn
     zendif
-
-    cli
     rts
 zendproc
 
@@ -62,7 +58,6 @@ zproc yload_send
 
     ; Wait until a badline won't screw up the timing.
 
-    sei
     zrepeat
         lda SCREEN_CONTROL       ; wait until a badline won't screw up
         clc                     ; the timing
@@ -105,7 +100,6 @@ zproc yload_send
     lda #0x3f
     sta CIA2_DA
 
-    cli
     rts
 zendproc
 
@@ -147,7 +141,6 @@ zproc yload_recv
 
     ; Wait until a badline won't screw up the timing.
 
-    sei
     zrepeat
         lda SCREEN_CONTROL
         clc
@@ -180,6 +173,5 @@ pal_delay_insn:
 /* 41 */ eor CIA2_PA
 /* 45 */
 
-    cli
     rts
 zendproc
