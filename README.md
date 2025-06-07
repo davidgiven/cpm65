@@ -10,12 +10,12 @@ to the 6502. So far it runs on:
   - The BBC Micro family, including Master, Tube, and Electron; TPA ranges from
     14kB on the Electron to 57kB on the Tube.
 
-  - Commodore 64; TPA is 46kB.
+  - Commodore 64; TPA is 55kB.
   
   - Commodore VIC-20; TPA is 24kB.
 
-  - Commodore PET 4032, 8032 and 8096; the TPA ranges from 25kB to 57kB on the
-    8096.
+  - Commodore PET 4032, 8032 and 8096; the TPA ranges from 25kB on the 4032 to
+    57kB on the 8096.
 
   - Commander X16; TPA is 46kB.
 
@@ -172,11 +172,13 @@ the same time.
 	  system, which can be accessed as either. The disk structures used by the
 	  other file system are hidden. You get about 170kB on a normal disk.
 
-  - It'll only work on a 1541, and probably only a 1541-II. Because of the
-    fastloader. Sorry. Porting it to other drives is perfectly possible, I
-    just haven't done it.
+  - It'll only work on a 1541 or a 1571 in compatibility mode. Because of the
+    fastloader. Sorry. Porting it to other drives is perfectly possible, I just
+    haven't done it.
 
   - This won't work on MAME. You'll need VICE to emulate it.
+
+  - There's a SCREEN driver.
 
 ### VIC-20 notes
 
@@ -188,6 +190,8 @@ the same time.
   - You get a 40x24 screen, emulated using a four-pixel-wide soft font. It
     doesn't look great but is surprisingly readable, and is vastly better than
     the VIC-20's default 22x24 screen mode.
+
+  - Unfortunately there's no SCREEN driver.
 
 ### Commodore PET notes
 

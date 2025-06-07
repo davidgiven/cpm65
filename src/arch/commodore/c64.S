@@ -17,9 +17,13 @@ ptr:        .word 0
 ptr1:       .word 0
 
 .macro IO_ON
+    lda #%101
+    sta MMU
 .endm
 
 .macro IO_OFF
+    lda #%000
+    sta MMU
 .endm
 
 zproc bootstrap, .bootstrap
@@ -72,6 +76,7 @@ zproc bootstrap, .bootstrap
     sta ctrl_pressed
     sta shift_pressed
 
+    IO_OFF
     jmp _start
 zendproc
 
@@ -112,6 +117,7 @@ zendproc
 ; Must be called with IO_ON.
 
 zproc scan_keyboard
+    IO_ON
     lda #0xfe
     sta ptr+0
     sta CIA1_PA
@@ -180,6 +186,7 @@ zproc scan_keyboard
         stx CIA1_PA
         inx
     zuntil eq
+    IO_OFF
     rts
 zendproc
 
@@ -668,6 +675,8 @@ zproc read_sector
     tya
     pha
 
+    IO_ON
+
     lda #'R'
     jsr yload_send
     pla
@@ -688,6 +697,7 @@ zproc read_sector
         iny
     zuntil eq
 
+    IO_OFF
     clc
     rts
 zendproc
@@ -700,6 +710,8 @@ zproc write_sector
     pha
     tya
     pha
+
+    IO_ON
 
     lda #'W'
     jsr yload_send
@@ -716,6 +728,9 @@ zproc write_sector
     zuntil eq
 
     jsr yload_recv
+    
+    IO_OFF
+
     clc
     zif mi
         sec
@@ -730,7 +745,10 @@ zproc init_system
     sta pending_key
     sta reverse_flag
 
+    IO_ON
     jsr yload_init
+    IO_OFF
+
     jsr initdrivers
     jsr bios1541_init
     rts
