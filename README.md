@@ -56,7 +56,7 @@ No, it won't let you run 8080 programs on the 6502!
 
 <div style="text-align: left">
 <a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Micro"></a>
-<a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
+<a href="doc/c64.jpg"><img src="doc/c64.jpg" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 <a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
