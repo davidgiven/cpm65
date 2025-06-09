@@ -59,6 +59,9 @@ zproc _start, .start
     jsr bios1541_init
     jsr screen_clear
 
+    ldy #0
+    sty reverse_flag
+
     ldy #banner_end - banner
     zrepeat
         tya
@@ -784,11 +787,12 @@ zproc screen_cleartoeol
 zendproc
 
 zproc screen_setstyle
+    ldx #0
     and #STYLE_REVERSE
-    lsr a
-    lda #0
-    ror a
-    sta reverse_flag
+    zif ne
+        ldx #0xff
+    zendif
+    stx reverse_flag
     rts
 zendproc
 
@@ -919,12 +923,13 @@ zproc draw_glyph
         sta (ptr), y
 
         lda (ptr1), y
+        eor reverse_flag
         and ptr2+1
         ora (ptr), y
         sta (ptr), y
 
         dey
-    zuntil eq
+    zuntil mi
     rts
 
 font_tab:
@@ -1059,7 +1064,7 @@ mem_end:    .byte __TPA_END__@mos16hi, __HIGHTPA_END__@mos16hi
 current_bank:     .fill 1
 keyboard_state:   .fill 8
 show_cursor:      .fill 1
-reverse_flag:     .fill 1
+reverse_flag:     .fill 1 ; 0x00 or 0xff
 
 ; vim: sw=4 ts=4 et ft=asm
 
