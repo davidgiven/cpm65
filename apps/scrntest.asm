@@ -23,6 +23,7 @@
 .label printi
 .label print16
 .label putchar
+.label print_h8
 
 zproc start
 
@@ -249,6 +250,27 @@ case_done:
         jmp mainloop
     zendif
   
+    \ Draw line numbers
+    cmp #'N'
+    zif eq
+        lda max_y
+        sta ptr2
+        zrepeat
+            ldx ptr2
+            lda max_x
+            sec
+            sbc #3
+            ldy #SCREEN_SETCURSOR
+            jsr SCREEN
+
+            lda ptr2
+            jsr print_h8
+
+            dec ptr2
+        zuntil mi
+        jmp mainloop
+    zendif
+
     \ Clear screen and print help 
     cmp #'H'
     beq help
@@ -312,6 +334,29 @@ zproc printi
     zendif
 
     jmp (ptr1)
+zendproc
+
+\ Prints an 8-bit hex number in A with SCREEN_PUTCHAR.
+zproc print_h8
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr print_hex4_number
+    pla
+print_hex4_number:
+    and #$0f
+    ora #'0'
+    cmp #'9'+1
+    zif cs
+        adc #6
+    zendif
+    pha
+    ldy #SCREEN_PUTCHAR
+    jsr SCREEN
+    pla
+    rts
 zendproc
 
 \ Prints XA in decimal. Y is the padding char or 0 for no padding.
@@ -399,6 +444,7 @@ string_init:
     .byte "L - Clear to End of Line\r\n"
     .byte "I - Toggle style\r\n"
     .byte "H - Clear screen and print this help\r\n"
+    .byte "N - Draw line numbers\r\n"
     .byte "Q - Quit\r\n"
     .byte 0
 
