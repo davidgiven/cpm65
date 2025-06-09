@@ -8,7 +8,7 @@ SECTIONS {
 	.zp : {
 		*(.zp .zp.*)
 		__USERZEROPAGE_START__ = .;
-		__USERZEROPAGE_END__ = 0x90;
+		__USERZEROPAGE_END__ = 0xff;
 
 		. = 0x80;
 		*(.loaderzp)
@@ -37,7 +37,7 @@ SECTIONS {
 		*(.noinit .noinit.*)
 		. = ALIGN(256);
 		__USERTPA_START__ = .;
-		__USERTPA_END__ = 0xd000;
+		__USERTPA_END__ = 0xff00;
 	} >ram AT>bootstrap
 }
 

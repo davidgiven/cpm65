@@ -10,12 +10,12 @@ to the 6502. So far it runs on:
   - The BBC Micro family, including Master, Tube, and Electron; TPA ranges from
     14kB on the Electron to 57kB on the Tube.
 
-  - Commodore 64; TPA is 46kB.
+  - Commodore 64; TPA is 55kB.
   
   - Commodore VIC-20; TPA is 24kB.
 
-  - Commodore PET 4032, 8032 and 8096; the TPA ranges from 25kB to 57kB on the
-    8096.
+  - Commodore PET 4032, 8032 and 8096; the TPA ranges from 25kB on the 4032 to
+    57kB on the 8096.
 
   - Commander X16; TPA is 46kB.
 
@@ -56,7 +56,7 @@ No, it won't let you run 8080 programs on the 6502!
 
 <div style="text-align: left">
 <a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Micro"></a>
-<a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
+<a href="doc/c64.jpg"><img src="doc/c64.jpg" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 <a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
@@ -172,11 +172,13 @@ the same time.
 	  system, which can be accessed as either. The disk structures used by the
 	  other file system are hidden. You get about 170kB on a normal disk.
 
-  - It'll only work on a 1541, and probably only a 1541-II. Because of the
-    fastloader. Sorry. Porting it to other drives is perfectly possible, I
-    just haven't done it.
+  - It'll only work on a 1541 or a 1571 in compatibility mode. Because of the
+    fastloader. Sorry. Porting it to other drives is perfectly possible, I just
+    haven't done it.
 
   - This won't work on MAME. You'll need VICE to emulate it.
+
+  - There's a SCREEN driver.
 
 ### VIC-20 notes
 
@@ -185,9 +187,11 @@ the same time.
   - You need a fully expanded VIC-20 with all memory banks populated, for the
     full 35kB.
 
-  - You get a 40x24 screen, emulated using a four-pixel-wide soft font. It
+  - You get a 40x23 screen, emulated using a four-pixel-wide soft font. It
     doesn't look great but is surprisingly readable, and is vastly better than
     the VIC-20's default 22x24 screen mode.
+
+  - There's a SCREEN driver.
 
 ### Commodore PET notes
 
@@ -199,10 +203,8 @@ the same time.
   - The 4032 is set up for the Graphics Keyboard. The 8032 and 8096 are set up
     for the Business Keyboard. (It would also be trivial to emulate the
     Business Keyboard on the Graphics Keyboard, but that is likely to be
-    confusing.)
-
-  - It's much faster than the Comodore 64 --- you can run the assembler in real
-    time without having to worry about retirement.
+    confusing.) Both use the RVS/OFF key as the CTRL key; some PET models
+    actually label this as such.
 
   - It supports drive 0: only.
 

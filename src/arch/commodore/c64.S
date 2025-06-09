@@ -16,6 +16,16 @@ ZEROPAGE
 ptr:        .word 0
 ptr1:       .word 0
 
+.macro IO_ON
+    lda #%101
+    sta MMU
+.endm
+
+.macro IO_OFF
+    lda #%000
+    sta MMU
+.endm
+
 zproc bootstrap, .bootstrap
     ; Relocate the BIOS.
 
@@ -43,6 +53,30 @@ zproc bootstrap, .bootstrap
         cmp #>bios_end_addr
     zuntil eq
 
+    ; Wipe the colour RAM.
+
+    ldx #0
+    lda #1
+    zrepeat
+        sta COLOUR_RAM+0x0000, x
+        sta COLOUR_RAM+0x0100, x
+        sta COLOUR_RAM+0x0200, x
+        sta COLOUR_RAM+0x0300, x
+        inx
+    zuntil eq
+
+    ; Reset the keyboard state.
+
+    ldx #7
+    lda #0xff
+    zrepeat
+        sta keyboard_state, x
+        dex
+    zuntil mi
+    sta ctrl_pressed
+    sta shift_pressed
+
+    IO_OFF
     jmp _start
 zendproc
 
@@ -75,6 +109,153 @@ zproc _start
 
 bdos_filename:
     .ascii "BDOS    SYS"
+zendproc
+
+; Does a single keyboard scan, processing any pressed keys. Last pressed key
+; wins.
+;
+; Must be called with IO_ON.
+
+zproc scan_keyboard
+    IO_ON
+    lda #0xfe
+    sta ptr+0
+    sta CIA1_PA
+    ldy #0
+    zrepeat
+        zrepeat
+            ldx CIA1_PB
+            cpx CIA1_PB
+        zuntil eq
+        txa
+        eor keyboard_state, y
+        zif ne
+            ; Any set bits in A correspond to a key which has changes state.
+            ; The corresponding bit in X tells us whether it went up or down.
+
+            sta ptr1+0
+            stx ptr1+1
+
+            pha
+            txa
+            pha
+            tya
+            pha
+
+            txa
+            sta keyboard_state, y
+
+            tya
+            asl a
+            asl a
+            asl a       ; compute row*8 to get base of scancode number
+            tay
+
+            zrepeat
+                bit ptr1+0
+                zif mi
+                    ; This key has changed.
+
+                    tya
+                    pha
+                    jsr change_key_state
+                    pla
+                    tay
+                zendif
+
+                iny
+                asl ptr1+1
+                asl ptr1+0
+            zuntil eq
+
+            pla
+            tay
+            pla
+            tax
+            pla
+        zendif
+
+        iny
+        cpy #9
+        zif eq
+            .byte 3
+        zendif
+        sec
+        rol ptr+0
+        ldx ptr+0
+        stx CIA1_PA
+        inx
+    zuntil eq
+    IO_OFF
+    rts
+zendproc
+
+; The key with scancode Y has changed state. Whether it's up or down is in
+; the top bit of ptr1+1.
+
+zproc change_key_state
+    cpy #0x3d               ; control
+    beq ctrl_change
+    cpy #0x08               ; left shift
+    beq shift_change
+    cpy #0x33               ; right shift
+    beq shift_change
+
+    bit ptr1+1
+    zif pl
+        lda keyboard_decode_tab, y
+        bit shift_pressed
+        zif pl
+            lda keyboard_decode_tab_shifted, y
+        zendif
+        bit ctrl_pressed
+        zif pl
+            and #0x1f
+        zendif
+        sta pending_key
+    zendif
+    rts
+
+    ; Shift gets special treatment because we care about ups as well as downs.
+
+shift_change:
+    lda keyboard_state + 6
+    rol a
+    rol a
+    rol a                   ; right shift state in bit 0
+    and keyboard_state + 1  ; left shift state in bit 0
+    and #0x80
+    sta shift_pressed       ; new state in top bit
+    rts
+
+ctrl_change:
+    lda keyboard_state + 7
+    ror a
+    ror a
+    ror a
+    ror a
+    and #0x80
+    sta ctrl_pressed        ; new state in top bit
+    rts
+
+keyboard_decode_tab:
+    .byte 0x8a, 0x00, 0x00, 0x00, 0x00, 0x89, 0x0d, 0x7f ; 0x00
+    .byte 0x00, 'e',  's',  'z',  '4',  'a',  'w',  '3'  ; 0x08
+    .byte 'x',  't',  'f',  'c',  '6',  'd',  'r',  '5'  ; 0x10
+    .byte 'v',  'u',  'h',  'b',  '8',  'g',  'y',  '7'  ; 0x18
+    .byte 'n',  'o',  'k',  'm',  '0',  'j',  'i',  '9'  ; 0x20
+    .byte ',',  '@',  ':',  '.',  '-',  'l',  'p',  '+'  ; 0x28
+    .byte '/',  '^',  '=', 0x00, 0x00,  ';',  '*',  '#'  ; 0x30
+    .byte 0x1b, 'q', 0x00,  ' ',  '2', 0x00,  0x00, '1'  ; 0x38
+keyboard_decode_tab_shifted:
+    .byte 0x8b, 0x00, 0x00, 0x00, 0x00, 0x88, 0x0d, 0x7f ; 0x00
+    .byte 0x00, 'E',  'S',  'Z',  '$',  'A',  'W',  '#'  ; 0x08
+    .byte 'X',  'T',  'F',  'C',  '&',  'D',  'R',  '%'  ; 0x10
+    .byte 'V',  'U',  'H',  'B',  '(',  'G',  'Y',  0x60 ; 0x18
+    .byte 'N',  'O',  'K',  'M',  '0',  'J',  'I',  ')'  ; 0x20
+    .byte '<',  '@',  '[',  '>',  '-',  'L',  'P',  '+'  ; 0x28
+    .byte '?',  '^',  '=', 0x00, 0x00,  ']',  '*',  '#'  ; 0x30
+    .byte 0x1b, 'Q', 0x00,  ' ',  '"', 0x00,  0x00, '!'  ; 0x38
 zendproc
 
 .data
@@ -131,14 +312,22 @@ zproc screen_getsize
 zendproc
 
 zproc screen_clear
-   jsr CLEAR_SCREEN
-   rts
+    lda #SCREEN_HEIGHT-1
+    sta CURSOR_Y
+    zrepeat
+        jsr calculate_cursor_address
+        jsr erase_screen_line
+        dec CURSOR_Y
+    zuntil mi
+    lda #0
+    sta CURSOR_X
+    sta CURSOR_Y
+    rts
 zendproc
 
 zproc screen_setcursor
     sta CURSOR_X
     stx CURSOR_Y 
-    jsr MOVE_CURSOR
     rts
 zendproc
 
@@ -150,18 +339,16 @@ zendproc
 
 zproc screen_putchar
     pha
-    lda CURSOR_Y
-    ldy CURSOR_X
-    jsr calculate_line_address
+    jsr calculate_cursor_address
     pla
     jsr convert_ascii_to_screencode
+    ora reverse_flag
     sta (ptr),y
     cpy #SCREEN_WIDTH-1
     zif cc
         iny
     zendif
     sty CURSOR_X
-    jsr MOVE_CURSOR   
     clc
     rts
 zendproc
@@ -170,11 +357,10 @@ zproc screen_putstring
     sta ptr1+0
     stx ptr1+1
    
-    lda CURSOR_Y
-    jsr calculate_line_address
+    jsr calculate_cursor_address
     
     ; Add cursor x-position to pointer
-    lda CURSOR_X
+    tya
     clc
     adc ptr+0
     sta ptr+0
@@ -191,6 +377,7 @@ zproc screen_putstring
         cpx #SCREEN_WIDTH
         ; Do not linewrap
         zif cc
+            ora reverse_flag
             sta (ptr),y
             inc CURSOR_X
         zendif
@@ -203,20 +390,37 @@ zproc screen_putstring
     zif cs
         dec CURSOR_X
     zendif
-    jsr MOVE_CURSOR
 
     clc
     rts
 zendproc
 
 zproc screen_getchar
-    ; Ignore timeout for now, just do a non-blocking read
-    jsr GETIN
+    jsr toggle_cursor
+
+    lda pending_key
     zif eq
-        sec
-        rts
+        zrepeat
+            jsr scan_keyboard
+            lda pending_key
+        zuntil ne
     zendif
+
+    ldx #0
+    stx pending_key
+
+    pha
+    jsr toggle_cursor
+    pla
     clc
+    rts
+zendproc
+
+zproc toggle_cursor
+    jsr calculate_cursor_address
+    lda (ptr), y
+    eor #0x80
+    sta (ptr), y
     rts
 zendproc
 
@@ -243,14 +447,7 @@ zproc screen_scrollup
 
         cpx #SCREEN_HEIGHT-1
     zuntil eq
-
-    ldy #SCREEN_WIDTH-1
-    lda #' '
-    zrepeat
-        sta (ptr), y
-        dey
-    zuntil mi
-    rts
+    jmp erase_screen_line
 zendproc
 
 zproc screen_scrolldown
@@ -276,9 +473,12 @@ zproc screen_scrolldown
 
         cpx #0
     zuntil eq
-
+zendproc
+    ; fall through
+zproc erase_screen_line
     ldy #SCREEN_WIDTH-1
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         dey
@@ -292,6 +492,7 @@ zproc screen_cleartoeol
     jsr calculate_line_address
     
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         iny
@@ -302,6 +503,11 @@ zproc screen_cleartoeol
 zendproc
 
 zproc screen_setstyle
+    and #STYLE_REVERSE
+    lsr a
+    lda #0
+    ror a
+    sta reverse_flag
     rts
 zendproc
 
@@ -344,15 +550,7 @@ zendproc
 ; Blocks and waits for the next keypress; returns it in A.
 
 zproc tty_conin
-    lda pending_key
-    zif eq
-        zrepeat
-            jsr GETIN
-            tax
-        zuntil ne
-    zendif
-    ldx #0
-    stx pending_key
+    jsr screen_getchar
 
     cmp #20         ; DEL
     zif eq
@@ -364,17 +562,66 @@ zproc tty_conin
 zendproc
 
 zproc tty_conout
-    jsr topetscii
-    jsr CHROUT
-    clc
+    cmp #13
+    zif eq
+        lda #0
+        sta CURSOR_X
+        rts
+    zendif
+    cmp #127
+    zif eq
+        dec CURSOR_X
+        zif mi
+            lda #SCREEN_WIDTH-1
+            sta CURSOR_X
+
+            dec CURSOR_Y
+            zif mi
+                lda #0
+                sta CURSOR_Y
+                jsr screen_scrolldown
+            zendif
+        zendif
+        jsr calculate_cursor_address
+        lda #' '
+        ora reverse_flag
+        sta (ptr), y
+        rts
+    zendif
+    cmp #10
+    beq write_nl
+
+    tax
+    lda CURSOR_X
+    pha
+    txa
+    jsr screen_putchar
+
+    pla
+    cmp #SCREEN_WIDTH-1
+    beq write_nl
+    rts
+zendproc
+
+zproc write_nl
+    lda #0
+    sta CURSOR_X
+
+    inc CURSOR_Y
+    lda CURSOR_Y
+    cmp #SCREEN_HEIGHT
+    zif eq
+        dec CURSOR_Y
+        jmp screen_scrollup
+    zendif
     rts
 zendproc
 
 zproc tty_const
     lda pending_key
     zif eq
-        jsr GETIN
-        sta pending_key
+        jsr scan_keyboard
+        lda pending_key
         zif eq
             lda #0
             clc
@@ -428,6 +675,8 @@ zproc read_sector
     tya
     pha
 
+    IO_ON
+
     lda #'R'
     jsr yload_send
     pla
@@ -448,6 +697,7 @@ zproc read_sector
         iny
     zuntil eq
 
+    IO_OFF
     clc
     rts
 zendproc
@@ -460,6 +710,8 @@ zproc write_sector
     pha
     tya
     pha
+
+    IO_ON
 
     lda #'W'
     jsr yload_send
@@ -476,146 +728,13 @@ zproc write_sector
     zuntil eq
 
     jsr yload_recv
+    
+    IO_OFF
+
     clc
     zif mi
         sec
     zendif
-    rts
-zendproc
-
-; Prints an 8-bit hex number in A.
-zproc print_hex_number
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr h4
-    pla
-h4:
-    and #0x0f ; %00001111
-    ora #'0'
-    cmp #'9'+1
-    zif cs
-        adc #6
-    zendif
-    pha
-    jsr CHROUT
-    pla
-    rts
-zendproc
-
-zproc get_status
-    lda #8
-    jsr TALK
-    lda #$6f
-    jsr TALKSA
-
-    zrepeat
-        jsr ACPTR
-        jsr CHROUT
-        cmp #13
-    zuntil eq
-
-    jsr UNTALK
-    rts
-zendproc
-
-; Converts an LBA sector number in XA to track/sector in Y, A.
-
-zproc convert_to_ts
-    ldy #0
-    zloop
-        cpx #0
-        zif eq
-            cmp track_size_table, y
-            zif cc
-                iny     ; tracks are one-based.
-                rts
-            zendif
-        zendif
-
-        sec
-        sbc track_size_table, y
-        zif cc
-            dex
-        zendif
-        iny
-    zendloop
-
-track_size_table:
-    .fill 17, 1, 21
-    .fill 7, 1, 19
-    .fill 6, 1, 18
-    .fill 10, 1, 17
-zendproc
-
-; Prints a decimal number in A to the IEC output.
-
-zproc decimal_out
-    pha
-    lda #' '
-    jsr CIOUT
-    pla
-
-    ldx #$ff
-    sec
-    zrepeat
-        inx
-        sbc #100
-    zuntil cc
-    adc #100
-    jsr digit
-
-    ldx #$ff
-    sec
-    zrepeat
-        inx
-        sbc #10
-    zuntil cc
-    adc #10
-    jsr digit
-    tax
-digit:
-    pha
-    txa
-    ora #'0'
-    jsr CIOUT
-    pla
-    rts
-zendproc
-
-zproc string_out
-    sta ptr+0
-    stx ptr+1
-
-    ldy #0
-    zloop
-        lda (ptr), y
-        zif eq
-            rts
-        zendif
-        jsr CIOUT
-        iny
-    zendloop
-zendproc
-
-; Prints the string at XA with the kernel.
-
-zproc print
-    sta ptr+0
-    stx ptr+1
-
-    ldy #0
-    zloop
-        lda (ptr), y
-        zbreakif eq
-
-        jsr topetscii
-        jsr CHROUT
-
-        iny
-    zendloop
     rts
 zendproc
 
@@ -624,10 +743,21 @@ zproc init_system
 
     lda #0
     sta pending_key
+    sta reverse_flag
 
+    IO_ON
     jsr yload_init
+    IO_OFF
+
     jsr initdrivers
     jsr bios1541_init
+    rts
+zendproc
+
+zproc calculate_cursor_address
+    lda CURSOR_Y
+    jsr calculate_line_address
+    ldy CURSOR_X
     rts
 zendproc
 
@@ -738,6 +868,10 @@ mem_end:    .byte __USERTPA_END__@mos16hi
 
 NOINIT
 
-pending_key:     .byte 0 ; pending keypress from system
+pending_key:     .fill 1 ; pending keypress from system
+reverse_flag:    .fill 1 ; 0x00 or 0x80
+ctrl_pressed:    .fill 1
+shift_pressed:   .fill 1
+keyboard_state:  .fill 8
 
 ; vim: sw=4 ts=4 et ft=asm

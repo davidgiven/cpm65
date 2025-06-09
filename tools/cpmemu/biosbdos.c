@@ -78,26 +78,6 @@ struct fcb
 static void bios_getchar(void);
 static struct fcb* fcb_at(uint16_t address);
 
-static uint16_t get_xa(void)
-{
-    return (cpu->registers->x << 8) | cpu->registers->a;
-}
-
-static void set_xa(uint16_t xa)
-{
-    cpu->registers->x = xa >> 8;
-    cpu->registers->a = xa;
-}
-
-static void set_result(uint16_t xa, bool succeeded)
-{
-    set_xa(xa);
-    if (succeeded)
-        cpu->registers->p &= ~0x01;
-    else
-        cpu->registers->p |= 0x01;
-}
-
 void bios_coldboot(void) {}
 
 static uint16_t do_relocation_item(uint16_t address, uint8_t n, uint8_t addend)
@@ -264,6 +244,19 @@ static void bios_putchar(void)
     (void)write(1, &cpu->registers->a, 1);
 }
 
+static void bios_finddrv(void)
+{
+    switch (get_xa())
+    {
+        case 2: /* DRVID_SCREEN */
+            set_result(SCREEN_ADDRESS, true);
+            break;
+
+        default:
+            set_result(0, false);
+    }
+}
+
 void bios_entry(uint8_t bios_call)
 {
     switch (bios_call)
@@ -274,7 +267,8 @@ void bios_entry(uint8_t bios_call)
         case 2: bios_const(); return; // const
         case 3: bios_getchar(); return; // conin
         case 4: bios_putchar(); return; // conout
-		case 9: set_result((TPA_BASE>>8) | (himem&0xff00), true); return;
+		case 9: set_result((TPA_BASE>>8) | (himem&0xff00), true); return; // gettpa
+        case 15: bios_finddrv(); return;
             // clang-format on
     }
 
@@ -295,15 +289,22 @@ static void bdos_putchar(void)
 
 static void bdos_consoleio(void)
 {
-    uint8_t c = cpu->registers->a;
-    if (c == 0xff)
+    switch (cpu->registers->x)
     {
-        bios_const();
-        if (cpu->registers->a == 0xff)
+        case 0xff:
+            bios_const();
+            if (cpu->registers->a == 0xff)
+                bios_getchar();
+            break;
+
+        case 0xfd:
             bios_getchar();
+            break;
+
+        default:
+            bdos_putchar();
+            break;
     }
-    else
-        bdos_putchar();
 }
 
 static void bdos_printstring(void)

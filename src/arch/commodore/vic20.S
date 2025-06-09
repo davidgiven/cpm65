@@ -7,6 +7,10 @@
 #include "wait.inc"
 #include "driver.inc"
 #include "vic20.inc"
+#include "jumptables.inc"
+
+SCREEN_WIDTH = 40
+SCREEN_HEIGHT = 24
 
 zproc _start, .start
     ; Goodbye interrupts, we'll never use you again...
@@ -53,7 +57,10 @@ zproc _start, .start
 
     jsr initdrivers
     jsr bios1541_init
-    jsr clear_screen
+    jsr screen_clear
+
+    ldy #0
+    sty reverse_flag
 
     ldy #banner_end - banner
     zrepeat
@@ -161,7 +168,7 @@ zendproc
 
 .data
 .global drvtop
-drvtop: .word drv_TTY
+drvtop: .word drv_SCREEN
 
 defdriver TTY, DRVID_TTY, drvstrat_TTY, 0
 
@@ -203,25 +210,7 @@ zendproc
 ; Blocks until a key is pressed; returns it in A.
 
 zproc tty_conin
-    jsr toggle_cursor
-
-    lda pending_key
-    zif eq
-        zrepeat
-            jsr scan_keyboard
-            lda pending_key
-        zuntil ne
-    zendif
-
-    ldx #0
-    stx pending_key
-
-    pha
-    jsr toggle_cursor
-    pla
-
-    clc
-    rts
+    jmp screen_getchar
 zendproc
 
 ; Does a single keyboard scan, processing any pressed keys. Last pressed key
@@ -334,8 +323,8 @@ control_pressed:
 normal_keytab:
     .byte 0x08, '#',  '+',  '9',  '7',  '5',  '3',  '1'  ; 08
     .byte 0x0d, '*',  'p',  'i',  'y',  'r',  'w',  '`'  ; 10
-    .byte 0x00, ';',  'l',  'j',  'g',  'd',  'a',  0x00 ; 18
-    .byte '/',  ',',  0x00, 'n',  'v',  'x',  0x00, 0x1b ; 20
+    .byte 0x89, ';',  'l',  'j',  'g',  'd',  'a',  0x00 ; 18
+    .byte 0x8a, '/',  ',',  'n',  'v',  'x',  0x00, 0x1b ; 20
     .byte 0x00, 0x00, '.',  'm',  'b',  'c',  'z',  ' '  ; 28
     .byte 0x00, '=',  ':',  'k',  'h',  'f',  's',  0x00 ; 30
     .byte 0x00, 0x00, '@',  'o',  'u',  't',  'e',  'q'  ; 38
@@ -344,16 +333,14 @@ normal_keytab:
 shift_keytab:
     .byte 0x08, '#',  '+',  ')',  '\'', '%',  '#',  '!'  ; 08
     .byte 0x0d, '*',  'P',  'I',  'Y',  'R',  'W',  '|'  ; 10
-    .byte 0x00, ']',  'L',  'J',  'G',  'D',  'A',  0x00 ; 18
-    .byte '?',  '<',  0x00, 'N',  'V',  'X',  0x00, 0x1b ; 20
+    .byte 0x88, ']',  'L',  'J',  'G',  'D',  'A',  0x00 ; 18
+    .byte 0x8b, '?',  '<',  'N',  'V',  'X',  0x00, 0x1b ; 20
     .byte 0x00, 0x00, '>',  'M',  'B',  'C',  'Z',  ' '  ; 28
     .byte 0x00, '=',  '[',  'K',  'H',  'F',  'S',  0x00 ; 30
     .byte 0x00, 0x00, '@',  'O',  'U',  'T',  'E',  'Q'  ; 38
     .byte 0x00, 0x00, '_',  '0',  '(',  '&',  '$',  '"'  ; 40
 
 zendproc
-
-; --- Screen handling ----------------------------------------------------
 
 ; Writes the character in A.
 
@@ -368,45 +355,290 @@ zproc tty_conout
     zif eq
         dec cursorx
         zif mi
-            inc cursorx
+            lda #SCREEN_WIDTH-1
+            sta cursorx
+
+            dec cursory
+            zif eq              ; line 0 is omitted
+                lda #1
+                sta cursory
+                jsr screen_scrolldown
+            zendif
         zendif
-        jsr calculate_cursor_address
         lda #' '
-        jsr draw_glyph
+        jsr screen_putchar
+        dec cursorx
         rts
     zendif
     cmp #10
     beq write_nl
 
-    pha
-    jsr calculate_cursor_address
-    pla
-    jsr draw_glyph
-
-    inc cursorx
+    tax
     lda cursorx
-    cmp #40
-    zif eq
-        lda #0
-        sta cursorx
-        jmp write_nl
-    zendif
+    pha
+    txa
+    jsr screen_putchar
+
+    pla
+    cmp #SCREEN_WIDTH-1
+    beq write_nl
     rts
 zendproc
 
 zproc write_nl
     inc cursory
     lda cursory
-    cmp #24
-    zif ne
+    cmp #SCREEN_HEIGHT
+    zif eq
+        jsr screen_scrollup
+        dec cursory
+    zendif
+    lda #0
+    sta cursorx
+    rts
+zendproc
+
+; --- Screen handling ----------------------------------------------------
+
+defdriver SCREEN, DRVID_SCREEN, drvstrat_SCREEN, drv_TTY
+
+; SCREEN driver strategy routine.
+; Y=SCREEN opcode.
+zproc drvstrat_SCREEN
+    jmpdispatch screen_jmptable_lo, screen_jmptable_hi
+
+screen_jmptable_lo:
+    jmptablo screen_version
+    jmptablo screen_getsize
+    jmptablo screen_clear
+    jmptablo screen_setcursor
+    jmptablo screen_getcursor
+    jmptablo screen_putchar
+    jmptablo screen_putstring
+    jmptablo screen_getchar
+    jmptablo screen_showcursor
+    jmptablo screen_scrollup
+    jmptablo screen_scrolldown
+    jmptablo screen_cleartoeol
+    jmptablo screen_setstyle
+screen_jmptable_hi:
+    jmptabhi screen_version
+    jmptabhi screen_getsize
+    jmptabhi screen_clear
+    jmptabhi screen_setcursor
+    jmptabhi screen_getcursor
+    jmptabhi screen_putchar
+    jmptabhi screen_putstring
+    jmptabhi screen_getchar
+    jmptabhi screen_showcursor
+    jmptabhi screen_scrollup
+    jmptabhi screen_scrolldown
+    jmptabhi screen_cleartoeol
+    jmptabhi screen_setstyle
+zendproc
+
+zproc screen_version
+    lda #0
+    rts
+zendproc
+
+zproc screen_getsize
+    ; Hardcode screen size for now
+    lda #SCREEN_WIDTH-1
+    ldx #SCREEN_HEIGHT-1
+    dex                     ; one sacrificial line for scrolling
+    rts
+zendproc
+
+zproc screen_clear
+    ; Reset the character mapping on the screen.
+
+    ldx #16
+    zrepeat
+        txa
+        sta TEXT-0x10, x
+        lda #1
+        sta COLOURRAM-0x10, x
+        inx
+    zuntil eq
+
+    ; Clear the bitmap itself.
+
+    lda #<FRAMEBUFFER
+    sta ptr+0
+    lda #>FRAMEBUFFER
+    sta ptr+1
+    lda #0
+    tay
+    zrepeat
+        sta (ptr), y
+        inc ptr+0
+        zif eq
+            inc ptr+1
+        zendif
+        ldx ptr+1
+        cpx #>(FRAMEBUFFER + 0xf00)
+    zuntil eq
+
+    sty cursorx
+    lda #1
+    sta cursory
+    sty scroll_compensation
+    sty scroll_nudge
+    lda #35
+    sta 0x9001
+
+    rts
+zendproc
+
+zproc screen_setcursor
+    sta cursorx
+    inx                 ; sacrificial line
+    stx cursory 
+    rts
+zendproc
+
+zproc screen_getcursor
+    lda cursorx 
+    ldx cursory
+    dex                 ; sacrificial line
+    rts
+zendproc
+
+zproc screen_putchar
+    pha
+    jsr calculate_cursor_address
+    pla
+    jsr draw_glyph
+
+    ldy cursorx
+    cpy #SCREEN_WIDTH-1
+    zif lt
+        iny
+    zendif
+    sty cursorx
+    clc
+    rts
+zendproc
+
+zproc screen_putstring
+    sta 1f+1
+    stx 1f+2
+   
+    zloop
+    1:
+        lda 0x1234
+        zbreakif eq
+        jsr screen_putchar
+        inc 1b+1
+        zif eq
+            inc 1b+2
+        zendif
+    zendloop
+
+    clc
+    rts
+zendproc
+
+zproc screen_getchar
+    jsr toggle_cursor
+
+    lda pending_key
+    zif eq
+        zrepeat
+            jsr scan_keyboard
+            lda pending_key
+        zuntil ne
+    zendif
+
+    ldx #0
+    stx pending_key
+
+    pha
+    jsr toggle_cursor
+    pla
+
+    clc
+    rts
+zendproc
+
+zproc screen_scrollup
+    bit scroll_nudge
+    zif mi
+        ; We are currently on the first line of the two-line band at the bottom
+        ; of the screen. No physical scroll needed, but we do need to adjust the
+        ; screen position again.
+
+        lda #35
+        sta 0x9001
+        inc scroll_nudge
+        jsr increment_scroll_compensation
+
+        lda #0
+        jsr calculate_line_address
+        jsr wipe_line
+
+        clc
         rts
     zendif
 
+    ; On the bottom line of the two-line band at the bottom of the screen. We
+    ; need to do a physical scroll.
+
     jsr roll_up
 
-    lda #22
-    jsr calculate_line_address
+    ; Adjust the screen position.
 
+    lda #35+4
+    sta 0x9001
+    dec scroll_nudge
+
+    lda #SCREEN_HEIGHT-1
+    jsr calculate_line_address
+    jsr wipe_line_pair
+
+    clc
+    rts
+zendproc
+
+zproc screen_scrolldown
+    bit scroll_nudge
+    zif mi
+        ; On the top line of the two line-band at the top of the screen. A
+        ; physical scroll is needed and a screen adjustment.
+
+        lda #35
+        sta 0x9001
+        inc scroll_nudge
+        jsr roll_down
+
+        lda #0
+        jsr calculate_line_address
+        jsr wipe_line_pair
+
+        clc
+        rts
+    zendif
+
+    ; On the bottom line the two-line band at the top of the screen. No physical
+    ; scroll needed.
+
+    lda #35+4
+    sta 0x9001
+    dec scroll_nudge
+    jsr decrement_scroll_compensation
+
+    lda #0
+    jsr calculate_line_address
+    jsr wipe_line
+
+    clc
+    rts
+zendproc
+
+; Wipes the line pair at ptr.
+
+zproc wipe_line_pair
     ldy #0
     tya
     zrepeat
@@ -420,14 +652,35 @@ zproc write_nl
         sta (ptr), y
         dey
     zuntil mi
-
-    lda #22
-    sta cursory
-
     rts
 zendproc
 
-; Rolls the screen two rows upwards.
+; Wipes a single line at ptr.
+
+zproc wipe_line
+    ldx #20
+    zrepeat
+        lda #0
+        ldy #7
+        zrepeat
+            sta (ptr), y
+            dey
+        zuntil mi
+
+        clc
+        lda ptr+0
+        adc #16
+        sta ptr+0
+        zif cs
+            inc ptr+1
+        zendif
+
+        dex
+    zuntil eq
+    rts
+zendproc
+
+; Rolls the screen video memory two rows upwards.
 
 zproc roll_up
     ; Cache the top row.
@@ -458,56 +711,103 @@ zproc roll_up
         iny
         dex
     zuntil eq
-
-    ; Increment the scroll compensator.
-
-    ldx scroll_compensation
-    inx
-    inx
-    cpx #24
-    zif eq
-        ldx #0
+zendproc
+    ; fall through
+zproc increment_scroll_compensation
+    lda scroll_compensation
+    clc
+    adc #1
+    cmp #SCREEN_HEIGHT
+    zif cs ; ge
+        sbc #SCREEN_HEIGHT
     zendif
-    stx scroll_compensation
-
+    sta scroll_compensation
     rts
 zendproc
 
-zproc clear_screen
-    ; Reset the character mapping on the screen.
+; Rolls the screen video memory two rows downwards.
 
-    ldx #16
+zproc roll_down
+    ; Cache the bottom row.
+
+    ldy #220+19
     zrepeat
-        txa
-        sta TEXT-0x10, x
-        lda #1
-        sta COLOURRAM-0x10, x
-        inx
+        lda TEXT, y
+        pha
+        dey
+        cpy #219
     zuntil eq
 
-    ; Clear the bitmap itself.
+    ; Now scroll the entire screen.
 
-    ldx #>(FRAMEBUFFER + 0xf00)
+    zrepeat
+        lda TEXT, y
+        sta TEXT+20, y
+        dey
+        cpy #0xff
+    zuntil eq
+
+    ; Restore the bottom row.
+
     ldy #0
-    tya
-    sta ptr+0
     zrepeat
-        stx ptr+1
-        zrepeat
-            lda #0
-            sta (ptr), y
-            dec ptr+1
-            lda ptr+1
-            cmp #>(FRAMEBUFFER - 0x100)
-        zuntil eq
+        pla
+        sta TEXT, y
         iny
+        cpy #20
+    zuntil eq
+zendproc
+    ; fall through
+zproc decrement_scroll_compensation
+    lda scroll_compensation
+    sec
+    sbc #1
+    zif cc 
+        adc #SCREEN_HEIGHT
+    zendif
+    sta scroll_compensation
+    rts
+zendproc
+
+zproc screen_cleartoeol
+    lda cursorx
+    pha
+
+    zrepeat
+        jsr calculate_cursor_address
+        lda #' '
+        jsr draw_glyph
+
+        inc cursorx
+        lda cursorx
+        cmp #SCREEN_WIDTH
     zuntil eq
 
-    lda #0
+    pla
     sta cursorx
-    sta cursory
-    sta scroll_compensation
+    rts 
+zendproc
 
+zproc screen_setstyle
+    ldx #0
+    and #STYLE_REVERSE
+    zif ne
+        ldx #0xff
+    zendif
+    stx reverse_flag
+    rts
+zendproc
+
+zproc screen_showcursor
+    zif eq
+        lda #01
+        sta show_cursor
+        clc
+        rts
+    zendif
+    lda #00
+    sta show_cursor
+    clc
     rts
 zendproc
 
@@ -516,60 +816,27 @@ zendproc
 zproc calculate_line_address
     ; The bottom bit of Y turns into a +8 offset at the end.
 
-    pha
-
     clc
     adc scroll_compensation ; compensate for scrolling
     cmp #24
-    zif cs
-        sec
+    zif cs ; ge
         sbc #24
     zendif
-
-    and #0xfe       ; 'x2'
-    asl a           ; x4
+    
+    asl a
+    tay
+    lda line_table+0, y
     sta ptr+0
-    asl a           ; x8
-    asl a           ; x16
-    clc
-    adc ptr+0       ; =x20; may overflow
-    sta ptr+0
-    lda #0
-    zif cs
-        lda #1
-    zendif
-
-    ; Now multiply the whole lot by 16 to get the byte address.
-
-    asl ptr+0
-    rol a
-    asl ptr+0
-    rol a
-    asl ptr+0
-    rol a
-    asl ptr+0
-    rol a
-
-    ; Add on the actual framebuffer address.
-
-    clc
-    adc #>FRAMEBUFFER
+    lda line_table+1, y
     sta ptr+1
-
-    ; Add on the +8 offset for odd lines.
-
-    pla
-    ror a
-    zif cs
-        clc
-        lda #8
-        adc ptr+0
-        sta ptr+0
-        zif cs
-            inc ptr+1
-        zendif
-    zendif
     rts
+
+line_table:
+    i = 0
+    .rept SCREEN_HEIGHT+1
+        .word FRAMEBUFFER + (i & ~1)*20*8 + (i & 1)*8
+        i = i + 1
+    .endr
 zendproc
 
 ; Calculates into ptr the address of the cursor. Leaves the bottom bit of X in
@@ -658,12 +925,13 @@ zproc draw_glyph
         sta (ptr), y
 
         lda (ptr1), y
+        eor reverse_flag
         and ptr2+1
         ora (ptr), y
         sta (ptr), y
 
         dey
-    zuntil eq
+    zuntil mi
     rts
 
 font_tab:
@@ -783,6 +1051,7 @@ ptr2:            .fill 2
 cursorx:         .fill 1
 cursory:         .fill 1
 scroll_compensation: .fill 1
+scroll_nudge:    .fill 1
 pending_key:     .fill 1
 
 .data
@@ -796,6 +1065,8 @@ mem_end:    .byte __TPA_END__@mos16hi, __HIGHTPA_END__@mos16hi
 
 current_bank:     .fill 1
 keyboard_state:   .fill 8
+show_cursor:      .fill 1
+reverse_flag:     .fill 1 ; 0x00 or 0xff
 
 ; vim: sw=4 ts=4 et ft=asm
 

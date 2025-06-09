@@ -58,6 +58,7 @@ zproc _start
     ldy #>usrcommand
     jsr sendcommand
 
+    sei
     jsr yload_init
     jsr yload_test_link
 
