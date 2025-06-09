@@ -183,15 +183,7 @@ for target in ["pet4032", "pet8032", "pet8096"]:
         items={"cpm": ".+%s_bios" % target},
     )
 
-for target in ["pet4032", "pet8032", "pet8096"]:
-    mkcpmfs(
-        name=target + "_diskimage",
-        format="c1541",
-        template=".+%s_cbmfs" % target,
-        items=COMMODORE_ITEMS_WITH_SCREEN,
-    )
-
-for target in ["c64", "vic20"]:
+for target in ["pet4032", "pet8032", "pet8096", "c64", "vic20"]:
     mkcpmfs(
         name=target + "_diskimage",
         format="c1541",
