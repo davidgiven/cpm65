@@ -393,6 +393,8 @@ zproc write_nl
         jsr screen_scrollup
         dec cursory
     zendif
+    lda #0
+    sta cursorx
     rts
 zendproc
 
