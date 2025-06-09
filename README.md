@@ -187,11 +187,11 @@ the same time.
   - You need a fully expanded VIC-20 with all memory banks populated, for the
     full 35kB.
 
-  - You get a 40x24 screen, emulated using a four-pixel-wide soft font. It
+  - You get a 40x23 screen, emulated using a four-pixel-wide soft font. It
     doesn't look great but is surprisingly readable, and is vastly better than
     the VIC-20's default 22x24 screen mode.
 
-  - Unfortunately there's no SCREEN driver.
+  - There's a SCREEN driver.
 
 ### Commodore PET notes
 
