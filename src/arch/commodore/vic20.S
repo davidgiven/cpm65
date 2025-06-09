@@ -597,7 +597,37 @@ zproc screen_scrollup
 zendproc
 
 zproc screen_scrolldown
-    sec
+    bit scroll_nudge
+    zif mi
+        ; On the top line of the two line-band at the top of the screen. A
+        ; physical scroll is needed and a screen adjustment.
+
+        lda #35
+        sta 0x9001
+        inc scroll_nudge
+        jsr roll_down
+
+        lda #0
+        jsr calculate_line_address
+        jsr wipe_line_pair
+
+        clc
+        rts
+    zendif
+
+    ; On the bottom line the two-line band at the top of the screen. No physical
+    ; scroll needed.
+
+    lda #35+4
+    sta 0x9001
+    dec scroll_nudge
+    jsr decrement_scroll_compensation
+
+    lda #0
+    jsr calculate_line_address
+    jsr wipe_line
+
+    clc
     rts
 zendproc
 
@@ -685,6 +715,50 @@ zproc increment_scroll_compensation
     cmp #SCREEN_HEIGHT
     zif cs ; ge
         sbc #SCREEN_HEIGHT
+    zendif
+    sta scroll_compensation
+    rts
+zendproc
+
+; Rolls the screen video memory two rows downwards.
+
+zproc roll_down
+    ; Cache the bottom row.
+
+    ldy #220+19
+    zrepeat
+        lda TEXT, y
+        pha
+        dey
+        cpy #219
+    zuntil eq
+
+    ; Now scroll the entire screen.
+
+    zrepeat
+        lda TEXT, y
+        sta TEXT+20, y
+        dey
+        cpy #0xff
+    zuntil eq
+
+    ; Restore the bottom row.
+
+    ldy #0
+    zrepeat
+        pla
+        sta TEXT, y
+        iny
+        cpy #20
+    zuntil eq
+zendproc
+    ; fall through
+zproc decrement_scroll_compensation
+    lda scroll_compensation
+    sec
+    sbc #1
+    zif cc 
+        adc #SCREEN_HEIGHT
     zendif
     sta scroll_compensation
     rts
