@@ -97,20 +97,20 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
-    name="elf_drive1541",
-    srcs=["./yload/drive1541.S"],
+    name="elf_yload1541",
+    srcs=["./diskaccess/yload1541.S"],
     deps=["include"],
-    linkscript="./yload/drive1541.ld",
+    linkscript="./diskaccess/yload1541.ld",
 )
 
-mkusr(name="usr_drive1541", src=".+elf_drive1541")
+mkusr(name="usr_yload1541", src=".+elf_yload1541")
 
 llvmrawprogram(
     name="c64_loader",
     srcs=[
         "./c64loader.S",
-        "./yload/client_c64.S",
-        "./yload/client_common.S",
+        "./diskaccess/client_yload_c64.S",
+        "./diskaccess/client_yload_common.S",
         "./c64.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -120,7 +120,7 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="c64_bios",
-    srcs=["./c64.S", "./yload/client_c64.S", "./bios1541.S", "./c64.inc"],
+    srcs=["./c64.S", "./diskaccess/client_yload_c64.S", "./bios1541.S", "./c64.inc"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DC64"],
     linkscript="./c64.ld",
@@ -130,8 +130,8 @@ llvmrawprogram(
     name="vic20_loader",
     srcs=[
         "./vic20loader.S",
-        "./yload/client_vic20.S",
-        "./yload/client_common.S",
+        "./diskaccess/client_yload_vic20.S",
+        "./diskaccess/client_yload_common.S",
         "./vic20.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -143,7 +143,7 @@ llvmrawprogram(
     name="vic20_bios",
     srcs=[
         "./vic20.S",
-        "./yload/client_vic20.S",
+        "./diskaccess/client_yload_vic20.S",
         "./bios1541.S",
         "./vic20.inc",
     ],
@@ -161,7 +161,7 @@ mkcbmfs(
     title="cp/m-65: c64",
     items={
         "cpm": ".+c64_loader",
-        "&drive1541": ".+usr_drive1541",
+        "&yload1541": ".+usr_yload1541",
         "bios": ".+c64_bios",
     },
 )
@@ -171,7 +171,7 @@ mkcbmfs(
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_loader",
-        "&drive1541": ".+usr_drive1541",
+        "&yload1541": ".+usr_yload1541",
         "bios": ".+vic20_bios",
     },
 )

@@ -185,7 +185,7 @@ mrcommand:
 mrcommand_end:
 
 usrcommand:
-    .ascii "&DRIVE1541"
+    .ascii "&YLOAD1541"
 usrcommand_end:
 
 biosfile:
