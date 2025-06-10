@@ -73,7 +73,12 @@ llvmclibrary(
 
 llvmrawprogram(
     name="pet4032_bios",
-    srcs=["./pet.S", "./diskaccess/bios_1541.S","./ieee488.S"],
+    srcs=[
+        "./pet.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/rw_ieee488.S",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET4032"],
     ldflags=["--no-check-sections"],
@@ -82,7 +87,12 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="pet8032_bios",
-    srcs=["./pet.S", "./diskaccess/bios_1541.S","./ieee488.S"],
+    srcs=[
+        "./pet.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/rw_ieee488.S",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET8032"],
     ldflags=["--no-check-sections"],
@@ -91,7 +101,12 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="pet8096_bios",
-    srcs=["./pet.S", "./diskaccess/bios_1541.S","./ieee488.S"],
+    srcs=[
+        "./pet.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/rw_ieee488.S",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET8096"],
     ldflags=["--no-check-sections"],

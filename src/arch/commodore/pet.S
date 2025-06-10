@@ -194,7 +194,7 @@ zproc _start, .init
     sty buffer_dirty
     jsr initdrivers
 
-    jsr ieee_init
+    jsr io_init
 
     ldx #10
     lda #0xff
