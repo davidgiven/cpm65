@@ -202,8 +202,8 @@ zendproc
 .bss
 
 .global directory_buffer, disk_buffer
-directory_buffer: .fill 128
 disk_buffer:      .fill 256
+directory_buffer: .fill 128
 buffer_dirty:     .fill 1 ; non-zero if sector needs flushing
 
 ; DPH and DPB for drive 0 (our only drive)

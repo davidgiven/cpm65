@@ -108,30 +108,35 @@ mkusr(name="usr_yload1541", src=".+elf_yload1541")
 llvmrawprogram(
     name="c64_loader",
     srcs=[
-        "./c64loader.S",
-        "./diskaccess/client_yload_c64.S",
-        "./diskaccess/client_yload_common.S",
-        "./c64.inc",
+        "./c64/c64loader.S",
+        "./diskaccess/io_yload_c64.S",
+        "./diskaccess/io_yload_common.S",
+        "./c64/c64.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DC64"],
-    linkscript="./c64loader.ld",
+    linkscript="./c64/c64loader.ld",
 )
 
 llvmrawprogram(
     name="c64_bios",
-    srcs=["./c64.S", "./diskaccess/client_yload_c64.S", "./bios1541.S", "./c64.inc"],
+    srcs=[
+        "./c64/c64.S",
+        "./diskaccess/io_yload_c64.S",
+        "./diskaccess/bios_1541.S",
+        "./c64/c64.inc",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DC64"],
-    linkscript="./c64.ld",
+    linkscript="./c64/c64.ld",
 )
 
 llvmrawprogram(
     name="vic20_loader",
     srcs=[
         "./vic20loader.S",
-        "./diskaccess/client_yload_vic20.S",
-        "./diskaccess/client_yload_common.S",
+        "./diskaccess/io_yload_vic20.S",
+        "./diskaccess/io_yload_common.S",
         "./vic20.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -143,8 +148,8 @@ llvmrawprogram(
     name="vic20_bios",
     srcs=[
         "./vic20.S",
-        "./diskaccess/client_yload_vic20.S",
-        "./bios1541.S",
+        "./diskaccess/io_yload_vic20.S",
+        "./diskaccess/bios_1541.S",
         "./vic20.inc",
     ],
     deps=[

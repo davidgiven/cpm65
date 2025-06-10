@@ -16,16 +16,6 @@ ZEROPAGE
 ptr:        .word 0
 ptr1:       .word 0
 
-.macro IO_ON
-    lda #%101
-    sta MMU
-.endm
-
-.macro IO_OFF
-    lda #%000
-    sta MMU
-.endm
-
 zproc bootstrap, .bootstrap
     ; Relocate the BIOS.
 
