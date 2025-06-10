@@ -728,7 +728,7 @@ zproc write_sector
     rts
 zendproc
 
-zproc init_system
+zproc init_system, .init
     ; General initialisation.
 
     lda #0
@@ -736,11 +736,11 @@ zproc init_system
     sta reverse_flag
 
     IO_ON
-    jsr yload_init
+    jsr io_init
     IO_OFF
 
     jsr initdrivers
-    jsr bios1541_init
+    jsr genericdisk_init
     rts
 zendproc
 

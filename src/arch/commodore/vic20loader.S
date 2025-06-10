@@ -46,7 +46,7 @@ zproc _start
     jsr sendcommand
 
     sei
-    jsr yload_init
+    jsr io_init
     jsr yload_test_link
 
     ; Read the directory.

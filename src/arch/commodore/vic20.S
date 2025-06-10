@@ -56,7 +56,7 @@ zproc _start, .start
     sta 0x900f
 
     jsr initdrivers
-    jsr bios1541_init
+    jsr genericdisk_init
     jsr screen_clear
 
     ldy #0

@@ -9,7 +9,7 @@ ZEROPAGE
 .global uloadtmp
 uloadtmp:   .fill 1
 
-zproc yload_init
+zproc io_init
     lda VICPALNTSC
     cmp #0x0c
     zif eq

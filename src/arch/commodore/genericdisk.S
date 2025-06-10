@@ -17,7 +17,7 @@ buffered_sector: .fill 3 ; sector currently in disk buffer
 
 ; Initialises the disk library.
 
-zproc bios1541_init, ".init"
+zproc genericdisk_init, ".init"
     lda #0
     sta buffer_dirty
 

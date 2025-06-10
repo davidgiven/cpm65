@@ -9,7 +9,7 @@ ZEROPAGE
 .global uloadtmp
 uloadtmp:   .fill 1
 
-zproc yload_init
+zproc io_init
     lda #0xff                        ; wait for line 255
     zrepeat
         cmp SCREEN_RASTER
