@@ -10,6 +10,24 @@ ZEROPAGE
 .zeropage ptr
 .zeropage ptr1
 
+zproc rw_init, .init
+    ; Set up sector IO.
+
+    lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
+    jsr ieee_listen
+    ldx #allocate_cmd_end - allocate_cmd
+    zrepeat
+        lda allocate_cmd-1, x
+        jsr ieee_write
+        dex
+    zuntil eq
+    jmp ieee_unlisten
+
+allocate_cmd: ; reversed!
+    .ascii "2#"
+allocate_cmd_end:
+zendproc
+
 ; Reads a 256-byte sector whose LBA index is in XA.
 
 zproc read_sector

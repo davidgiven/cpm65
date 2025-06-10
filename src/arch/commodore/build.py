@@ -141,6 +141,7 @@ llvmrawprogram(
         "./c64/c64.S",
         "./diskaccess/bios_1541.S",
         "./diskaccess/io_yload_c64.S",
+        "./diskaccess/rw_yload.S",
         "./c64/c64.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -167,6 +168,7 @@ llvmrawprogram(
         "./vic20/vic20.S",
         "./diskaccess/bios_1541.S",
         "./diskaccess/io_yload_vic20.S",
+        "./diskaccess/rw_yload.S",
         "./vic20/vic20.inc",
     ],
     deps=[

@@ -659,72 +659,31 @@ zendproc
 ; Reads a 256-byte sector whose LBA index is in XA.
 
 zproc read_sector
-    tay
-    txa
     pha
-    tya
-    pha
-
     IO_ON
-
-    lda #'R'
-    jsr yload_send
     pla
-    jsr yload_send
-    pla
-    jsr yload_send
 
-    jsr yload_recv
-    zif mi
-        sec
-        rts
-    zendif
-
-    ldy #0
-    zrepeat
-        jsr yload_recv
-        sta disk_buffer, y
-        iny
-    zuntil eq
-
+    jsr rw_yload_read_sector
+    
+    pha
     IO_OFF
-    clc
+    pla
+
     rts
 zendproc
 
 ; Writes a 256-byte sector whose LBA index is in XA.
 
 zproc write_sector
-    tay
-    txa
     pha
-    tya
-    pha
-
     IO_ON
-
-    lda #'W'
-    jsr yload_send
     pla
-    jsr yload_send
-    pla
-    jsr yload_send
 
-    ldx #0
-    zrepeat
-        lda disk_buffer, x
-        jsr yload_send
-        inx
-    zuntil eq
-
-    jsr yload_recv
+    jsr rw_yload_write_sector
     
+    pha
     IO_OFF
-
-    clc
-    zif mi
-        sec
-    zendif
+    pla
     rts
 zendproc
 
@@ -737,6 +696,7 @@ zproc init_system, .init
 
     IO_ON
     jsr io_init
+    jsr rw_init
     IO_OFF
 
     jsr initdrivers
