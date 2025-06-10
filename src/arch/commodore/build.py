@@ -66,12 +66,14 @@ def mkusr(self, name, src: Target):
 
 
 llvmclibrary(
-    name="commodore_lib", srcs=["./ieee488.S", "./petscii.S"], deps=["include"]
+    name="commodore_lib",
+    srcs=["./common/genericdisk.S", "./common/petscii.S"],
+    deps=["include"],
 )
 
 llvmrawprogram(
     name="pet4032_bios",
-    srcs=["./pet.S"],
+    srcs=["./pet.S", "./diskaccess/bios_1541.S","./ieee488.S"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET4032"],
     ldflags=["--no-check-sections"],
@@ -80,7 +82,7 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="pet8032_bios",
-    srcs=["./pet.S"],
+    srcs=["./pet.S", "./diskaccess/bios_1541.S","./ieee488.S"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET8032"],
     ldflags=["--no-check-sections"],
@@ -89,7 +91,7 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="pet8096_bios",
-    srcs=["./pet.S"],
+    srcs=["./pet.S", "./diskaccess/bios_1541.S","./ieee488.S"],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET8096"],
     ldflags=["--no-check-sections"],
@@ -124,7 +126,6 @@ llvmrawprogram(
         "./c64/c64.S",
         "./diskaccess/bios_1541.S",
         "./diskaccess/io_yload_c64.S",
-        "./genericdisk.S",
         "./c64/c64.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -151,13 +152,13 @@ llvmrawprogram(
         "./vic20/vic20.S",
         "./diskaccess/bios_1541.S",
         "./diskaccess/io_yload_vic20.S",
-        "./genericdisk.S",
         "./vic20/vic20.inc",
     ],
     deps=[
         "include",
         "src/lib+bioslib",
         "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
     ],
     cflags=["-DVIC20"],
     linkscript="./vic20/vic20.ld",
