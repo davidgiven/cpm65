@@ -134,23 +134,23 @@ llvmrawprogram(
 llvmrawprogram(
     name="vic20_loader",
     srcs=[
-        "./vic20loader.S",
+        "./vic20/vic20loader.S",
         "./diskaccess/io_yload_vic20.S",
         "./diskaccess/io_yload_common.S",
-        "./vic20.inc",
+        "./vic20/vic20.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DVIC20"],
-    linkscript="./vic20loader.ld",
+    linkscript="./vic20/vic20loader.ld",
 )
 
 llvmrawprogram(
     name="vic20_bios",
     srcs=[
-        "./vic20.S",
+        "./vic20/vic20.S",
         "./diskaccess/io_yload_vic20.S",
         "./genericdisk.S",
-        "./vic20.inc",
+        "./vic20/vic20.inc",
     ],
     deps=[
         "include",
@@ -158,7 +158,7 @@ llvmrawprogram(
         "third_party/tomsfonts+4x8",
     ],
     cflags=["-DVIC20"],
-    linkscript="./vic20.ld",
+    linkscript="./vic20/vic20.ld",
 )
 
 mkcbmfs(
@@ -201,7 +201,7 @@ mametest(
     target="c64",
     diskimage=".+c64_diskimage",
     imagetype=".d64",
-    script="./c64-mame-test.lua",
+    script="./c64/c64-mame-test.lua",
 )
 
 mametest(
