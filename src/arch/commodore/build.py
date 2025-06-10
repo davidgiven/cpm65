@@ -122,6 +122,7 @@ llvmrawprogram(
     name="c64_bios",
     srcs=[
         "./c64/c64.S",
+        "./diskaccess/bios_1541.S",
         "./diskaccess/io_yload_c64.S",
         "./genericdisk.S",
         "./c64/c64.inc",
@@ -148,6 +149,7 @@ llvmrawprogram(
     name="vic20_bios",
     srcs=[
         "./vic20/vic20.S",
+        "./diskaccess/bios_1541.S",
         "./diskaccess/io_yload_vic20.S",
         "./genericdisk.S",
         "./vic20/vic20.inc",
