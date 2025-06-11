@@ -81,7 +81,8 @@ jobs:
           pet8032.d64
           pet8096.d64
           snes.smc
-          vic20.d64
+          vic20_iec.d64
+          vic20_yload.d64
           x16.zip
         fail-if-no-assets: false
 
@@ -125,7 +126,8 @@ jobs:
           cpm65/images/pet8032.d64
           cpm65/images/pet8096.d64
           cpm65/images/snes.smc
-          cpm65/images/vic20.d64
+          cpm65/images/vic20_iec.d64
+          cpm65/images/vic20_yload.d64
           cpm65/images/x16.zip
         tag_name: dev
       env:
