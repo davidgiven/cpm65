@@ -5,8 +5,7 @@
 #include "zif.inc"
 #include "cpm65.inc"
 #include "driver.inc"
-#include "jumptables.inc"
-#include "c64.inc"
+#include "vic20.inc"
 
 ZEROPAGE
 
@@ -19,22 +18,10 @@ ptr:       .fill 2
 2:
     .word 1f, 1
     .byte $9e
-    .asciz "2061"
+    .asciz "4621"
 1:
     .word 0
 zproc _start
-    lda #$36
-    sta 1                   ; map Basic out
-    lda #0
-    sta 53280               ; black border
-    sta 53281               ; black background
-
-    ; Print the startup banner (directly with CHROUT).
-
-    ldx #<loading_msg
-    ldy #>loading_msg
-    jsr printstring
-
     ; Read 0xfea0 from the drive to get the family.
 
     jsr sendmrcommand
@@ -59,7 +46,7 @@ zproc _start
     jsr sendcommand
 
     sei
-    jsr yload_init
+    jsr io_init
     jsr yload_test_link
 
     ; Read the directory.
@@ -112,11 +99,6 @@ bios_found:
     jsr yload_recv_file
     jmp bootstrap_start
 
-loading_msg:
-    .byte 147, 14, 5
-    .ascii "cp/m-65 FOR THE cOMMODORE 64"
-    .byte 13, 0
-
 baddrive_msg:
     .ascii "nOT A SUPPORTED DRIVE!"
     .byte 13, 0
@@ -137,7 +119,7 @@ zproc printstring
 
     ldy #0
     zloop
-        lda loading_msg, y
+        lda (ptr), y
         zbreakif eq
         jsr CHROUT
         iny
@@ -185,7 +167,7 @@ mrcommand:
 mrcommand_end:
 
 usrcommand:
-    .ascii "&DRIVE1541"
+    .ascii "&YLOAD1541"
 usrcommand_end:
 
 biosfile:

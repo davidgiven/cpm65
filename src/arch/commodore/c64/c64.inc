@@ -51,6 +51,16 @@ SCREEN_WIDTH=40
 SCREEN_HEIGHT=25 
 VIDEO = $0400
 
+.macro IO_ON
+    lda #%101
+    sta MMU
+.endm
+
+.macro IO_OFF
+    lda #%000
+    sta MMU
+.endm
+
 .macro set1 port, bit
     lda \port
     ora #\bit

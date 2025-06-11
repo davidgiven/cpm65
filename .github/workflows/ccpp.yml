@@ -70,4 +70,6 @@ jobs:
           images/pet8096.d64
           images/snes.smc
           images/x16.zip
+          images/vic20_iec.d64
+          images/vic20_yload.d64
 

@@ -194,7 +194,8 @@ zproc _start, .init
     sty buffer_dirty
     jsr initdrivers
 
-    jsr ieee_init
+    jsr io_init
+    jsr rw_init
 
     ldx #10
     lda #0xff
@@ -202,18 +203,6 @@ zproc _start, .init
         sta keyboard_state, x
         dex
     zuntil mi
-
-    ; Set up sector IO.
-
-    lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
-    jsr ieee_listen
-    ldx #allocate_cmd_end - allocate_cmd
-    zrepeat
-        lda allocate_cmd-1, x
-        jsr ieee_write
-        dex
-    zuntil eq
-    jsr ieee_unlisten
 
     ; Load the BDOS.
 
@@ -237,10 +226,6 @@ zproc _start, .init
 bdos_filename:
     .ascii "BDOS    SYS"
 bdos_filename_end:
-
-allocate_cmd: ; reversed!
-    .ascii "2#"
-allocate_cmd_end:
 
 banner: ; reversed!
     .byte 13, 10
@@ -985,26 +970,28 @@ zendproc
     sta \port
 .endm
 
-zproc ieee_mode_atn
+zproc ieee_computer_atn
     IO_ON
     set0 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
     rts
 zendproc
 
-zproc ieee_mode_talk
+zproc ieee_computer_talking
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
     rts
 zendproc
 
-; Switch from ATN mode to LISTEN mode.
-
-zproc ieee_mode_listen
+zproc ieee_computer_listening
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
+    rts
+zendproc
+
+zproc ieee_computer_idle
     rts
 zendproc
 

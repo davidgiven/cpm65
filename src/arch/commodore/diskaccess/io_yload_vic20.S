@@ -9,7 +9,7 @@ ZEROPAGE
 .global uloadtmp
 uloadtmp:   .fill 1
 
-zproc yload_init
+zproc io_init
     lda VICPALNTSC
     cmp #0x0c
     zif eq
@@ -181,7 +181,6 @@ zproc yload_recv
     zif eq
         ; PAL
         
-        label:
         set0 VIA2_PCR, VIA2_PCR_CA2_CLOCK_OUT
         /* 0 */  WAIT12
         /* 9 */  WAIT3

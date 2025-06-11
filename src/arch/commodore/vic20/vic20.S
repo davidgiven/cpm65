@@ -56,7 +56,6 @@ zproc _start, .start
     sta 0x900f
 
     jsr initdrivers
-    jsr bios1541_init
     jsr screen_clear
 
     ldy #0
@@ -73,9 +72,15 @@ zproc _start, .start
         dey
     zuntil eq
 
+    ; Disk system.
+
+    jsr io_init
+    jsr rw_init
+    jsr genericdisk_init
+
     ; Miscellaneous initialisation.
 
-    ; Y is 0
+    ldy #0
     sty pending_key
 
     ldy #7
@@ -973,70 +978,6 @@ print:
     pha
     jsr bios_CONOUT
     pla
-    rts
-zendproc
-
-; Reads a 256-byte sector whose LBA index is in XA.
-
-zproc read_sector
-    tay
-    txa
-    pha
-    tya
-    pha
-
-    lda #'R'
-    jsr yload_send
-    pla
-    jsr yload_send
-    pla
-    jsr yload_send
-
-    jsr yload_recv
-    zif mi
-        sec
-        rts
-    zendif
-
-    ldy #0
-    zrepeat
-        jsr yload_recv
-        sta disk_buffer, y
-        iny
-    zuntil eq
-
-    clc
-    rts
-zendproc
-
-; Writes a 256-byte sector whose LBA index is in XA.
-
-zproc write_sector
-    tay
-    txa
-    pha
-    tya
-    pha
-
-    lda #'W'
-    jsr yload_send
-    pla
-    jsr yload_send
-    pla
-    jsr yload_send
-
-    ldx #0
-    zrepeat
-        lda disk_buffer, x
-        jsr yload_send
-        inx
-    zuntil eq
-
-    jsr yload_recv
-    clc
-    zif mi
-        sec
-    zendif
     rts
 zendproc
 

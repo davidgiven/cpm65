@@ -66,12 +66,19 @@ def mkusr(self, name, src: Target):
 
 
 llvmclibrary(
-    name="commodore_lib", srcs=["./ieee488.S", "./petscii.S"], deps=["include"]
+    name="commodore_lib",
+    srcs=["./common/genericdisk.S", "./common/petscii.S"],
+    deps=["include"],
 )
 
 llvmrawprogram(
     name="pet4032_bios",
-    srcs=["./pet.S"],
+    srcs=[
+        "./pet.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/rw_ieee488.S",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET4032"],
     ldflags=["--no-check-sections"],
@@ -80,7 +87,12 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="pet8032_bios",
-    srcs=["./pet.S"],
+    srcs=[
+        "./pet.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/rw_ieee488.S",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET8032"],
     ldflags=["--no-check-sections"],
@@ -89,7 +101,12 @@ llvmrawprogram(
 
 llvmrawprogram(
     name="pet8096_bios",
-    srcs=["./pet.S"],
+    srcs=[
+        "./pet.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/rw_ieee488.S",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DPET8096"],
     ldflags=["--no-check-sections"],
@@ -97,63 +114,102 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
-    name="elf_drive1541",
-    srcs=["./yload/drive1541.S"],
+    name="elf_yload1541",
+    srcs=["./diskaccess/yload1541.S"],
     deps=["include"],
-    linkscript="./yload/drive1541.ld",
+    linkscript="./diskaccess/yload1541.ld",
 )
 
-mkusr(name="usr_drive1541", src=".+elf_drive1541")
+mkusr(name="usr_yload1541", src=".+elf_yload1541")
 
 llvmrawprogram(
     name="c64_loader",
     srcs=[
-        "./c64loader.S",
-        "./yload/client_c64.S",
-        "./yload/client_common.S",
-        "./c64.inc",
+        "./c64/c64loader.S",
+        "./diskaccess/io_yload_c64.S",
+        "./diskaccess/io_yload_common.S",
+        "./c64/c64.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DC64"],
-    linkscript="./c64loader.ld",
+    linkscript="./c64/c64loader.ld",
 )
 
 llvmrawprogram(
     name="c64_bios",
-    srcs=["./c64.S", "./yload/client_c64.S", "./bios1541.S", "./c64.inc"],
+    srcs=[
+        "./c64/c64.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_yload_c64.S",
+        "./diskaccess/rw_yload.S",
+        "./c64/c64.inc",
+    ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DC64"],
-    linkscript="./c64.ld",
+    linkscript="./c64/c64.ld",
 )
 
 llvmrawprogram(
-    name="vic20_loader",
+    name="vic20_yload_loader",
     srcs=[
-        "./vic20loader.S",
-        "./yload/client_vic20.S",
-        "./yload/client_common.S",
-        "./vic20.inc",
+        "./vic20/vic20loader.S",
+        "./diskaccess/io_yload_vic20.S",
+        "./diskaccess/io_yload_common.S",
+        "./vic20/vic20.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
     cflags=["-DVIC20"],
-    linkscript="./vic20loader.ld",
+    linkscript="./vic20/vic20loader.ld",
 )
 
 llvmrawprogram(
-    name="vic20_bios",
+    name="vic20_iec_loader",
     srcs=[
-        "./vic20.S",
-        "./yload/client_vic20.S",
-        "./bios1541.S",
-        "./vic20.inc",
+        "./vic20/vic20loader_iec.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    cflags=["-DVIC20"],
+    linkscript="./vic20/vic20loader.ld",
+)
+
+llvmrawprogram(
+    name="vic20_yload_bios",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_yload_vic20.S",
+        "./diskaccess/rw_yload.S",
+        "./vic20/vic20.inc",
     ],
     deps=[
         "include",
         "src/lib+bioslib",
         "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
     ],
     cflags=["-DVIC20"],
-    linkscript="./vic20.ld",
+    linkscript="./vic20/vic20.ld",
+)
+
+llvmrawprogram(
+    name="vic20_iec_bios",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/rw_ieee488.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
+    ],
+    cflags=["-DVIC20"],
+    linkscript="./vic20/vic20.ld",
 )
 
 mkcbmfs(
@@ -161,18 +217,27 @@ mkcbmfs(
     title="cp/m-65: c64",
     items={
         "cpm": ".+c64_loader",
-        "&drive1541": ".+usr_drive1541",
+        "&yload1541": ".+usr_yload1541",
         "bios": ".+c64_bios",
     },
 )
 
 mkcbmfs(
-    name="vic20_cbmfs",
+    name="vic20_yload_cbmfs",
     title="cp/m-65: vic20",
     items={
-        "cpm": ".+vic20_loader",
-        "&drive1541": ".+usr_drive1541",
-        "bios": ".+vic20_bios",
+        "cpm": ".+vic20_yload_loader",
+        "&yload1541": ".+usr_yload1541",
+        "bios": ".+vic20_yload_bios",
+    },
+)
+
+mkcbmfs(
+    name="vic20_iec_cbmfs",
+    title="cp/m-65: vic20",
+    items={
+        "cpm": ".+vic20_iec_loader",
+        "bios": ".+vic20_iec_bios",
     },
 )
 
@@ -183,7 +248,7 @@ for target in ["pet4032", "pet8032", "pet8096"]:
         items={"cpm": ".+%s_bios" % target},
     )
 
-for target in ["pet4032", "pet8032", "pet8096", "c64", "vic20"]:
+for target in ["pet4032", "pet8032", "pet8096", "c64", "vic20_yload", "vic20_iec"]:
     mkcpmfs(
         name=target + "_diskimage",
         format="c1541",
@@ -196,7 +261,7 @@ mametest(
     target="c64",
     diskimage=".+c64_diskimage",
     imagetype=".d64",
-    script="./c64-mame-test.lua",
+    script="./c64/c64-mame-test.lua",
 )
 
 mametest(
