@@ -8,6 +8,8 @@
 ; DPH and DPB for drive 0 (our only drive)
 
 .global dph
+.global dpb_1541
 
+.data
 define_dpb dpb_1541, 136*10, 1024, 64, 0
 define_dph dph, dpb_1541

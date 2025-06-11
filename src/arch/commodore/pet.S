@@ -970,26 +970,28 @@ zendproc
     sta \port
 .endm
 
-zproc ieee_mode_atn
+zproc ieee_computer_atn
     IO_ON
     set0 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
     rts
 zendproc
 
-zproc ieee_mode_talk
+zproc ieee_computer_talking
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
     rts
 zendproc
 
-; Switch from ATN mode to LISTEN mode.
-
-zproc ieee_mode_listen
+zproc ieee_computer_listening
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
+    rts
+zendproc
+
+zproc ieee_computer_idle
     rts
 zendproc
 

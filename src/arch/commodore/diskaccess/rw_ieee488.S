@@ -15,17 +15,11 @@ zproc rw_init, .init
 
     lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
     jsr ieee_listen
-    ldx #allocate_cmd_end - allocate_cmd
-    zrepeat
-        lda allocate_cmd-1, x
-        jsr ieee_write
-        dex
-    zuntil eq
+    lda #'#'
+    jsr ieee_write
+    lda #'2'
+    jsr ieee_write
     jmp ieee_unlisten
-
-allocate_cmd: ; reversed!
-    .ascii "2#"
-allocate_cmd_end:
 zendproc
 
 ; Reads a 256-byte sector whose LBA index is in XA.
@@ -35,6 +29,8 @@ zproc read_sector
     pha
     tya
     pha
+
+    ; Send the command to read the sector into buffer 2.
 
     lda #0x6f               ; SECOND channel 15
     jsr ieee_listen
@@ -52,6 +48,8 @@ zproc read_sector
     pla
     jsr decimal_out
     jsr ieee_unlisten
+
+    ; Now read the data out of the bufffer.
 
     lda #0x62               ; SECOND channel 2
     jsr ieee_talk

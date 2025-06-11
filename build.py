@@ -48,6 +48,7 @@ export(
         "images/pet8096.d64": "src/arch/commodore+pet8096_diskimage",
         "images/snes.smc": "src/arch/snes+snes_cartridge",
         "images/vic20.d64": "src/arch/commodore+vic20_diskimage",
+        "images/vic20_iec.d64": "src/arch/commodore+vic20_iec_diskimage",
         "images/x16.zip": "src/arch/x16+diskimage",
         "images/sorbus.zip": "src/arch/sorbus+diskimage",
         "images/nano6502.img": "src/arch/nano6502+diskimage",

@@ -56,7 +56,6 @@ zproc _start, .start
     sta 0x900f
 
     jsr initdrivers
-    jsr genericdisk_init
     jsr screen_clear
 
     ldy #0
@@ -73,9 +72,15 @@ zproc _start, .start
         dey
     zuntil eq
 
+    ; Disk system.
+
+    jsr io_init
+    jsr rw_init
+    jsr genericdisk_init
+
     ; Miscellaneous initialisation.
 
-    ; Y is 0
+    ldy #0
     sty pending_key
 
     ldy #7

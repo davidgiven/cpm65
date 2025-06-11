@@ -1,6 +1,7 @@
 MEMORY {
     zp : ORIGIN = 0, LENGTH = 0xff
-    ram (rw) : ORIGIN = 0x200, LENGTH = 0x8000
+	lowram (rw) : ORIGIN = 0x200, LENGTH = 0xe00
+    ram (rw) : ORIGIN = 0x2000, LENGTH = 0x6000
 	init (rw) : ORIGIN = 0x7000, LENGTH = 0x1000
 	block5 (rw) : ORIGIN = 0xa000, LENGTH = 0x2000
 }
@@ -25,6 +26,7 @@ SECTIONS {
 		init_exec_addr = .;
 		init_load_addr = LOADADDR(.init);
 		*(.init .init.*)
+		*loader.o(.text .text.*)
 		init_end_addr = .;
 	} >init
 
@@ -32,19 +34,19 @@ SECTIONS {
 		bios_exec_addr = .;
 		bios_load_addr = LOADADDR(.text);
 		*(.text .text.*)
-	} >ram AT>init
+	} >lowram AT>init
 
 	.data : {
 		. = ALIGN(32);
 		*(.aligned.32)
 		*(.data .data.* .rodata .rodata.*)
 		bios_end_addr = .;
-	} >ram AT>init
+	} >lowram AT>init
 
 	.noinit (NOLOAD) : {
 		*(.bss .bss.*)
 		*(.noinit .noinit.*)
-	} >ram
+	} >lowram
 }
 
 OUTPUT_FORMAT {

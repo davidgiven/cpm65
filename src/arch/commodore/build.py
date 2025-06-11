@@ -163,12 +163,43 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
+    name="vic20_loader_iec",
+    srcs=[
+        "./vic20/vic20loader_iec.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    cflags=["-DVIC20"],
+    linkscript="./vic20/vic20loader.ld",
+)
+
+llvmrawprogram(
     name="vic20_bios",
     srcs=[
         "./vic20/vic20.S",
         "./diskaccess/bios_1541.S",
         "./diskaccess/io_yload_vic20.S",
         "./diskaccess/rw_yload.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
+    ],
+    cflags=["-DVIC20"],
+    linkscript="./vic20/vic20.ld",
+)
+
+llvmrawprogram(
+    name="vic20_bios_iec",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/rw_ieee488.S",
         "./vic20/vic20.inc",
     ],
     deps=[
@@ -201,6 +232,15 @@ mkcbmfs(
     },
 )
 
+mkcbmfs(
+    name="vic20_iec_cbmfs",
+    title="cp/m-65: vic20",
+    items={
+        "cpm": ".+vic20_loader_iec",
+        "bios": ".+vic20_bios_iec",
+    },
+)
+
 for target in ["pet4032", "pet8032", "pet8096"]:
     mkcbmfs(
         name=target + "_cbmfs",
@@ -208,7 +248,7 @@ for target in ["pet4032", "pet8032", "pet8096"]:
         items={"cpm": ".+%s_bios" % target},
     )
 
-for target in ["pet4032", "pet8032", "pet8096", "c64", "vic20"]:
+for target in ["pet4032", "pet8032", "pet8096", "c64", "vic20", "vic20_iec"]:
     mkcpmfs(
         name=target + "_diskimage",
         format="c1541",
