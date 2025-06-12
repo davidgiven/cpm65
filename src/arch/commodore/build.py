@@ -22,33 +22,34 @@ COMMODORE_ITEMS_WITH_SCREEN = COMMODORE_ITEMS | SCREEN_APPS | SCREEN_APPS_SRCS
 
 
 @Rule
-def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
-    cs = ["rm -f $[outs[0]]"]
+def mkcbmfs(self, name, items: TargetsMap = {}, type="d64", title="CBMFS", id=""):
+    cs = []
     ins = []
+    deps = ["tools+mkcombifs"]
 
-    cmd = "chronic cc1541 -q "
-    if id:
-        cmd += "-i %d " % id
-    cmd += '-n "%s" $[outs[0]]' % title
+    if type == "d2m":
+        cs += [f"zcat $[deps[1]] > $[outs[0]]"]
+        deps += ["extras/empty.d2m.gz"]
+    else:
+        cs += [f"chronic c1541 -format '{title}',{id} {type} $[outs[0]]"]
+
+    cmd = f"chronic c1541 $[outs[0]] -name '{title}'"
+    for k, v in items.items():
+        t = "p"
+        if k.startswith("&"):
+            t = "u"
+
+        cmd += f" -write '{filenameof(v)}' '{k},{t}'"
+        ins += [v]
     cs += [cmd]
 
-    for k, v in items.items():
-        t = "PRG"
-        if k.startswith("&"):
-            t = "USR"
-
-        cs += [
-            "chronic cc1541 -q -t -u 0 -r 18 -f '%s' -T '%s' -w '%s' $[outs[0]]"
-            % (k, t, filenameof(v))
-        ]
-        ins += [v]
-
-    cs += ["$[deps[0]] -f $[outs[0]]"]
+    if type != "d2m":
+        cs += ["$[deps[0]] -f $[outs[0]]"]
     simplerule(
         replaces=self,
         ins=ins,
-        outs=[f"={name}.img"],
-        deps=["tools+mkcombifs"],
+        outs=[f"={name}.{type}"],
+        deps=deps,
         commands=cs,
         label="MKCBMFS",
     )
@@ -189,6 +190,7 @@ llvmrawprogram(
         ".+commodore_lib",
     ],
     cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
     linkscript="./vic20/vic20.ld",
 )
 
@@ -209,6 +211,28 @@ llvmrawprogram(
         ".+commodore_lib",
     ],
     cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
+    linkscript="./vic20/vic20.ld",
+)
+
+llvmrawprogram(
+    name="vic20_iec_fd2000_bios",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_fd2000.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/rw_ieee488.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
+    ],
+    cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
     linkscript="./vic20/vic20.ld",
 )
 
@@ -241,6 +265,16 @@ mkcbmfs(
     },
 )
 
+mkcbmfs(
+    name="vic20_iec_fd2000_cbmfs",
+    title="cp/m-65: vic20",
+    type="d2m",
+    items={
+        "cpm": ".+vic20_iec_loader",
+        "bios": ".+vic20_iec_fd2000_bios",
+    },
+)
+
 for target in ["pet4032", "pet8032", "pet8096"]:
     mkcbmfs(
         name=target + "_cbmfs",
@@ -262,6 +296,13 @@ for target in [
         template=".+%s_cbmfs" % target,
         items=COMMODORE_ITEMS_WITH_SCREEN,
     )
+
+mkcpmfs(
+    name="vic20_iec_fd2000_diskimage",
+    format="fd2000",
+    template=".+vic20_iec_fd2000_cbmfs",
+    items=COMMODORE_ITEMS_WITH_SCREEN,
+)
 
 mametest(
     name="c64_mametest",

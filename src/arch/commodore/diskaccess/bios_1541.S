@@ -13,3 +13,32 @@
 .data
 define_dpb dpb_1541, 136*10, 1024, 64, 0
 define_dph dph, dpb_1541
+
+; Converts an LBA sector number in XA to track/sector in Y, A.
+
+zproc convert_to_ts, .text.tsconvert, weak
+    ldy #0
+    zloop
+        cpx #0
+        zif eq
+            cmp track_size_table, y
+            zif cc
+                iny     ; tracks are one-based.
+                rts
+            zendif
+        zendif
+
+        sec
+        sbc track_size_table, y
+        zif cc
+            dex
+        zendif
+        iny
+    zendloop
+
+track_size_table:
+    .fill 17, 1, 21
+    .fill 7, 1, 19
+    .fill 6, 1, 18
+    .fill 10, 1, 17
+zendproc

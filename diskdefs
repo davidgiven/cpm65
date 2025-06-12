@@ -28,6 +28,18 @@ diskdef c1541
 	os 2.2
 end
 
+# The CMD FD-2000 for the Commodore ecosystem.
+
+diskdef fd2000
+	seclen 128
+	tracks 157 # Skips the last two tracks which contain the partition table
+	sectrk 80
+	blocksize 4096
+	maxdir 128
+	boottrk 3
+	os 2.2
+end
+
 # This produces .po files, so there's implicit soft sector skewing intended to
 # be done in the backend. Note that the boot are read in physical sector order
 # and so need to be specially skewed so that one they're ProDOS skewed each
