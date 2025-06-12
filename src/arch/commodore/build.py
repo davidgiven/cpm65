@@ -22,7 +22,9 @@ COMMODORE_ITEMS_WITH_SCREEN = COMMODORE_ITEMS | SCREEN_APPS | SCREEN_APPS_SRCS
 
 
 @Rule
-def mkcbmfs(self, name, items: TargetsMap = {}, type="d64", title="CBMFS", id=""):
+def mkcbmfs(
+    self, name, items: TargetsMap = {}, type="d64", title="CBMFS", id=""
+):
     cs = []
     ins = []
     deps = ["tools+mkcombifs"]
