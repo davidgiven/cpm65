@@ -174,7 +174,7 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
-    name="vic20_yload_bios",
+    name="vic20_yload_1541_bios",
     srcs=[
         "./vic20/vic20.S",
         "./diskaccess/bios_1541.S",
@@ -193,7 +193,7 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
-    name="vic20_iec_bios",
+    name="vic20_iec_1541_bios",
     srcs=[
         "./vic20/vic20.S",
         "./diskaccess/bios_1541.S",
@@ -223,21 +223,21 @@ mkcbmfs(
 )
 
 mkcbmfs(
-    name="vic20_yload_cbmfs",
+    name="vic20_yload_1541_cbmfs",
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_yload_loader",
         "&yload1541": ".+usr_yload1541",
-        "bios": ".+vic20_yload_bios",
+        "bios": ".+vic20_yload_1541_bios",
     },
 )
 
 mkcbmfs(
-    name="vic20_iec_cbmfs",
+    name="vic20_iec_1541_cbmfs",
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_iec_loader",
-        "bios": ".+vic20_iec_bios",
+        "bios": ".+vic20_iec_1541_bios",
     },
 )
 
@@ -248,7 +248,14 @@ for target in ["pet4032", "pet8032", "pet8096"]:
         items={"cpm": ".+%s_bios" % target},
     )
 
-for target in ["pet4032", "pet8032", "pet8096", "c64", "vic20_yload", "vic20_iec"]:
+for target in [
+    "pet4032",
+    "pet8032",
+    "pet8096",
+    "c64",
+    "vic20_yload_1541",
+    "vic20_iec_1541",
+]:
     mkcpmfs(
         name=target + "_diskimage",
         format="c1541",

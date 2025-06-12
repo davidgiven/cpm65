@@ -185,9 +185,10 @@ the same time.
   - See the Commodore 64 above. There are several versions available (built with
     different options):
 
-    - `vic20_yload.d64`: uses the fastloader. Only works on a 1541 (or compatible).
-    - `vic20_iec.d64`: uses old-fashioned IEC code. Should work anywhere which
-       supports `d64` images, although very, very slowly.
+    - `vic20_yload_1541.d64`: 1541 format, with the fastloader. Only works on a
+      1541 (or compatible).
+    - `vic20_iec_1541.d64`: 1541 format, uses old-fashioned IEC code. Should
+      work anywhere which supports `d64` images, although very, very slowly.
 
   - You need a fully expanded VIC-20 with all memory banks populated, for the
     full 35kB.
