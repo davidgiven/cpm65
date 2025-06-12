@@ -977,6 +977,7 @@ zproc ieee_computer_atn
     rts
 zendproc
 
+zproc ieee_computer_idle
 zproc ieee_computer_talking
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
@@ -988,10 +989,6 @@ zproc ieee_computer_listening
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
-    rts
-zendproc
-
-zproc ieee_computer_idle
     rts
 zendproc
 
