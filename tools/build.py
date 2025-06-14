@@ -230,3 +230,39 @@ def mametest(
         ],
         label="MAMETEST",
     )
+
+
+@Rule
+def mkcbmfs(
+    self, name, items: TargetsMap = {}, type="d64", title="CBMFS", id=""
+):
+    cs = []
+    ins = []
+    deps = ["tools+mkcombifs"]
+
+    if type == "d2m":
+        cs += [f"zcat $[deps[1]] > $[outs[0]]"]
+        deps += ["extras/empty.d2m.gz"]
+    else:
+        cs += [f"chronic c1541 -format '{title}',{id} {type} $[outs[0]]"]
+
+    cmd = f"chronic c1541 $[outs[0]] -name '{title}'"
+    for k, v in items.items():
+        t = "p"
+        if k.startswith("&"):
+            t = "u"
+
+        cmd += f" -write '{filenameof(v)}' '{k},{t}'"
+        ins += [v]
+    cs += [cmd]
+
+    if type != "d2m":
+        cs += ["$[deps[0]] -f $[outs[0]]"]
+    simplerule(
+        replaces=self,
+        ins=ins,
+        outs=[f"={name}.{type}"],
+        deps=deps,
+        commands=cs,
+        label="MKCBMFS",
+    )
