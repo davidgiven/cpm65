@@ -1,5 +1,5 @@
 from build.ab import simplerule, TargetsMap, filenameof, Rule, Target
-from tools.build import mkcpmfs, mametest
+from tools.build import mkcpmfs, mametest, mkcbmfs
 from build.llvm import llvmrawprogram, llvmclibrary
 from config import (
     MINIMAL_APPS,
@@ -19,39 +19,6 @@ COMMODORE_ITEMS = (
 )
 
 COMMODORE_ITEMS_WITH_SCREEN = COMMODORE_ITEMS | SCREEN_APPS | SCREEN_APPS_SRCS
-
-
-@Rule
-def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
-    cs = ["rm -f $[outs[0]]"]
-    ins = []
-
-    cmd = "chronic cc1541 -q "
-    if id:
-        cmd += "-i %d " % id
-    cmd += '-n "%s" $[outs[0]]' % title
-    cs += [cmd]
-
-    for k, v in items.items():
-        t = "PRG"
-        if k.startswith("&"):
-            t = "USR"
-
-        cs += [
-            "chronic cc1541 -q -t -u 0 -r 18 -f '%s' -T '%s' -w '%s' $[outs[0]]"
-            % (k, t, filenameof(v))
-        ]
-        ins += [v]
-
-    cs += ["$[deps[0]] -f $[outs[0]]"]
-    simplerule(
-        replaces=self,
-        ins=ins,
-        outs=[f"={name}.img"],
-        deps=["tools+mkcombifs"],
-        commands=cs,
-        label="MKCBMFS",
-    )
 
 
 @Rule
@@ -174,7 +141,7 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
-    name="vic20_yload_bios",
+    name="vic20_yload_1541_bios",
     srcs=[
         "./vic20/vic20.S",
         "./diskaccess/bios_1541.S",
@@ -189,11 +156,12 @@ llvmrawprogram(
         ".+commodore_lib",
     ],
     cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
     linkscript="./vic20/vic20.ld",
 )
 
 llvmrawprogram(
-    name="vic20_iec_bios",
+    name="vic20_iec_1541_bios",
     srcs=[
         "./vic20/vic20.S",
         "./diskaccess/bios_1541.S",
@@ -209,6 +177,28 @@ llvmrawprogram(
         ".+commodore_lib",
     ],
     cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
+    linkscript="./vic20/vic20.ld",
+)
+
+llvmrawprogram(
+    name="vic20_iec_fd2000_bios",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_fd2000.S",
+        "./diskaccess/io_ieee488.S",
+        "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/rw_ieee488.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
+    ],
+    cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
     linkscript="./vic20/vic20.ld",
 )
 
@@ -223,21 +213,31 @@ mkcbmfs(
 )
 
 mkcbmfs(
-    name="vic20_yload_cbmfs",
+    name="vic20_yload_1541_cbmfs",
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_yload_loader",
         "&yload1541": ".+usr_yload1541",
-        "bios": ".+vic20_yload_bios",
+        "bios": ".+vic20_yload_1541_bios",
     },
 )
 
 mkcbmfs(
-    name="vic20_iec_cbmfs",
+    name="vic20_iec_1541_cbmfs",
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_iec_loader",
-        "bios": ".+vic20_iec_bios",
+        "bios": ".+vic20_iec_1541_bios",
+    },
+)
+
+mkcbmfs(
+    name="vic20_iec_fd2000_cbmfs",
+    title="cp/m-65: vic20",
+    type="d2m",
+    items={
+        "cpm": ".+vic20_iec_loader",
+        "bios": ".+vic20_iec_fd2000_bios",
     },
 )
 
@@ -248,13 +248,27 @@ for target in ["pet4032", "pet8032", "pet8096"]:
         items={"cpm": ".+%s_bios" % target},
     )
 
-for target in ["pet4032", "pet8032", "pet8096", "c64", "vic20_yload", "vic20_iec"]:
+for target in [
+    "pet4032",
+    "pet8032",
+    "pet8096",
+    "c64",
+    "vic20_yload_1541",
+    "vic20_iec_1541",
+]:
     mkcpmfs(
         name=target + "_diskimage",
         format="c1541",
         template=".+%s_cbmfs" % target,
         items=COMMODORE_ITEMS_WITH_SCREEN,
     )
+
+mkcpmfs(
+    name="vic20_iec_fd2000_diskimage",
+    format="fd2000",
+    template=".+vic20_iec_fd2000_cbmfs",
+    items=COMMODORE_ITEMS_WITH_SCREEN,
+)
 
 mametest(
     name="c64_mametest",

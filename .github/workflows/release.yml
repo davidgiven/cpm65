@@ -15,7 +15,7 @@ jobs:
         path: 'cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils srecord 64tass libreadline-dev libelf-dev
+      run: sudo apt update && sudo apt install cpmtools libfmt-dev fp-compiler moreutils srecord 64tass libreadline-dev libelf-dev vice
 
     - name: install llvm-mos
       run: |
@@ -81,8 +81,9 @@ jobs:
           pet8032.d64
           pet8096.d64
           snes.smc
-          vic20_iec.d64
-          vic20_yload.d64
+          vic20_iec_1541.d64
+          vic20_iec_fd2000.d64
+          vic20_yload_1541.d64
           x16.zip
         fail-if-no-assets: false
 
@@ -126,8 +127,9 @@ jobs:
           cpm65/images/pet8032.d64
           cpm65/images/pet8096.d64
           cpm65/images/snes.smc
-          cpm65/images/vic20_iec.d64
-          cpm65/images/vic20_yload.d64
+          cpm65/images/vic20_iec_1541.d64
+          cpm65/images/vic20_iec_fd2000.d64
+          cpm65/images/vic20_yload_1541.d64
           cpm65/images/x16.zip
         tag_name: dev
       env:

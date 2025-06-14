@@ -1,5 +1,5 @@
 from build.ab import simplerule, TargetsMap, filenameof, Rule
-from tools.build import mkimd, mkcpmfs
+from tools.build import mkimd, mkcpmfs, mkcbmfs
 from build.llvm import llvmrawprogram, llvmclibrary
 from build.zip import zip
 from config import (
@@ -13,8 +13,11 @@ from config import (
 )
 
 COMMODORE_ITEMS = (
-    {"0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
-     "0:scrvt100.com": "apps+scrvt100"}
+    {
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src/bdos",
+        "0:scrvt100.com": "apps+scrvt100",
+    }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS
@@ -22,34 +25,6 @@ COMMODORE_ITEMS = (
     | SCREEN_APPS
 )
 
-
-@Rule
-def mkcbmfs(self, name, items: TargetsMap = {}, title="CBMFS", id=None):
-    cs = ["rm -f $[outs[0]]"]
-    ins = []
-
-    cmd = "chronic cc1541 -q "
-    if id:
-        cmd += "-i %d " % id
-    cmd += '-n "%s" $[outs[0]]' % title
-    cs += [cmd]
-
-    for k, v in items.items():
-        cs += [
-            "chronic cc1541 -q -t -u 0 -r 18 -f %s -w %s $[outs[0]]"
-            % (k, filenameof(v))
-        ]
-        ins += [v]
-
-    cs += ["$[deps[0]] -f $[outs[0]]"]
-    simplerule(
-        replaces=self,
-        ins=ins,
-        outs=[f"={name}.img"],
-        deps=["tools+mkcombifs"],
-        commands=cs,
-        label="MKCBMFS",
-    )
 
 llvmclibrary(
     name="k-1013",
@@ -135,7 +110,8 @@ mkcpmfs(
     bootimage=".+bios-k1013",
     size=256 * 77 * 26,
     items={
-        "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src/bdos",
         "0:scrvt100.com": "apps+scrvt100",
         "0:format.com": "src/arch/kim-1/utils+format",
         "0:format.txt": "src/arch/kim-1/cpmfs/format.txt",
@@ -159,7 +135,8 @@ mkcpmfs(
     bootimage=".+bios-sdcard",
     size=512 * 4096 * 16,
     items={
-        "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src/bdos",
         "0:scrvt100.com": "apps+scrvt100",
         "0:pasc.pas": "third_party/pascal-m+pasc_pas_cpm",
     }
@@ -178,7 +155,8 @@ mkcpmfs(
     bootimage=".+bios-sdshield",
     size=256 * 77 * 26,
     items={
-        "0:ccp.sys@sr": "src+ccp", "0:bdos.sys@sr": "src/bdos",
+        "0:ccp.sys@sr": "src+ccp",
+        "0:bdos.sys@sr": "src/bdos",
         "0:scrvt100.com": "apps+scrvt100",
         "0:imu.com": "src/arch/kim-1/utils+imu_sdshield",
         "0:imu.txt": "src/arch/kim-1/cpmfs/imu.txt",

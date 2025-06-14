@@ -11,7 +11,7 @@ jobs:
         repository: 'davidgiven/cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils mame srecord 64tass libreadline-dev libelf-dev
+      run: sudo apt update && sudo apt install cpmtools libfmt-dev fp-compiler moreutils mame srecord 64tass libreadline-dev libelf-dev vice
 
     - name: install llvm-mos
       run: |
@@ -70,6 +70,7 @@ jobs:
           images/pet8096.d64
           images/snes.smc
           images/x16.zip
-          images/vic20_iec.d64
-          images/vic20_yload.d64
+          images/vic20_iec_1541.d64
+          images/vic20_iec_fd2000.d64
+          images/vic20_yload_1541.d64
 

@@ -191,32 +191,3 @@ digit:
     pla
     rts
 zendproc
-
-; Converts an LBA sector number in XA to track/sector in Y, A.
-
-zproc convert_to_ts
-    ldy #0
-    zloop
-        cpx #0
-        zif eq
-            cmp track_size_table, y
-            zif cc
-                iny     ; tracks are one-based.
-                rts
-            zendif
-        zendif
-
-        sec
-        sbc track_size_table, y
-        zif cc
-            dex
-        zendif
-        iny
-    zendloop
-
-track_size_table:
-    .fill 17, 1, 21
-    .fill 7, 1, 19
-    .fill 6, 1, 18
-    .fill 10, 1, 17
-zendproc
