@@ -119,7 +119,7 @@ llvmrawprogram(
 llvmrawprogram(
     name="vic20_yload_loader",
     srcs=[
-        "./vic20/vic20loader.S",
+        "./vic20/vic20loader_yload.S",
         "./diskaccess/io_yload_vic20.S",
         "./diskaccess/io_yload_common.S",
         "./vic20/vic20.inc",
@@ -130,9 +130,24 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
+    name="vic20_jiffy_loader",
+    srcs=[
+        "./vic20/vic20loader_ieee488.S",
+        "./diskaccess/io_jiffy_vic20.S",
+        "./diskaccess/io_ieee488.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    cflags=["-DVIC20"],
+    linkscript="./vic20/vic20loader.ld",
+)
+
+llvmrawprogram(
     name="vic20_iec_loader",
     srcs=[
-        "./vic20/vic20loader_iec.S",
+        "./vic20/vic20loader_ieee488.S",
+        "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/io_ieee488.S",
         "./vic20/vic20.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -241,6 +256,16 @@ mkcbmfs(
     },
 )
 
+mkcbmfs(
+    name="vic20_jiffy_fd2000_cbmfs",
+    title="cp/m-65: vic20",
+    type="d2m",
+    items={
+        "cpm": ".+vic20_jiffy_loader",
+        "bios": ".+vic20_iec_fd2000_bios",
+    },
+)
+
 for target in ["pet4032", "pet8032", "pet8096"]:
     mkcbmfs(
         name=target + "_cbmfs",
@@ -263,12 +288,13 @@ for target in [
         items=COMMODORE_ITEMS_WITH_SCREEN,
     )
 
-mkcpmfs(
-    name="vic20_iec_fd2000_diskimage",
-    format="fd2000",
-    template=".+vic20_iec_fd2000_cbmfs",
-    items=COMMODORE_ITEMS_WITH_SCREEN,
-)
+for target in ["vic20_iec_fd2000", "vic20_jiffy_fd2000"]:
+    mkcpmfs(
+        name=f"{target}_diskimage",
+        format="fd2000",
+        template=f".+{target}_cbmfs",
+        items=COMMODORE_ITEMS_WITH_SCREEN,
+    )
 
 mametest(
     name="c64_mametest",

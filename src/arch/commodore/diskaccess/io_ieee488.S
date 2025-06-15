@@ -27,6 +27,8 @@ zendproc
 
 zproc ieee_write
     pha
+    txa
+    pha
     lda ieee_has_buffered_char
     zif ne
         lda ieee_buffered_char
@@ -34,6 +36,8 @@ zproc ieee_write
     zendif
     lda #1
     sta ieee_has_buffered_char
+    pla
+    tax
     pla
     sta ieee_buffered_char
     rts

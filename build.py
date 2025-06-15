@@ -49,6 +49,7 @@ export(
         "images/snes.smc": "src/arch/snes+snes_cartridge",
         "images/vic20_yload_1541.d64": "src/arch/commodore+vic20_yload_1541_diskimage",
         "images/vic20_iec_1541.d64": "src/arch/commodore+vic20_iec_1541_diskimage",
+        "images/vic20_jiffy_fd2000.d2m": "src/arch/commodore+vic20_jiffy_fd2000_diskimage",
         "images/vic20_iec_fd2000.d2m": "src/arch/commodore+vic20_iec_fd2000_diskimage",
         "images/x16.zip": "src/arch/x16+diskimage",
         "images/sorbus.zip": "src/arch/sorbus+diskimage",
