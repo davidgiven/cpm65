@@ -27,7 +27,7 @@ iec_assert_data = 0xe4a9
 iec_release_clock = 0xef84
 iec_assert_clock = 0xef8d
 iec_release_atn = 0xeec5
-iec_make_bus_idle = 0xef09
+ieee_computer_idle = 0xef09
 wait_1ms = 0xef96
 timer_wait = 0xef9b
 
@@ -51,11 +51,43 @@ zproc io_init
     rts
 zendproc
 
+; The computer is asserting ATN and about to send a command.
+
+zproc ieee_computer_atn
+    jsr iec_assert_atn
+    jsr iec_assert_clock
+    jsr iec_release_data
+    jmp wait_for_iec_data_assert
+zendproc
+
+; Switch from ATN to the computer talking.
+
+zproc ieee_computer_talking
+    jmp iec_release_atn
+zendproc
+
+; Switch from ATN to the computer listening.
+
+zproc ieee_computer_listening
+    jsr iec_release_atn
+    jsr iec_assert_data
+    jsr iec_release_clock
+    jmp wait_for_iec_clock_assert
+zendproc
+
+; Switch from any mode to idle.
+
+zproc ieee_computer_idle
+    jsr iec_release_atn
+    jsr iec_release_data
+    jmp iec_release_clock
+zendproc
+
 zproc jiffy_talk
-        ora     #$40
+        lda #0x48
         skip2
 zproc jiffy_listen
-        ora     #$20
+        lda #0x28
         jsr     RSPAUSE         ; SET TIMER
 zproc jiffy_listen2
         pha                     ; save device address
@@ -71,38 +103,28 @@ zproc jiffy_listen2
         sei
         lda     #$00
         sta     jiffy_eoi
-        jsr     iec_release_data         ; set IEC data out high (0)
-        jsr iec_assert_atn
+        jsr ieee_computer_atn
+;        jsr     iec_release_data         ; set IEC data out high (0)
+;        jsr iec_assert_atn
+        lda jiffy_pending_char
+
+; Sends the byte in A via the old-fashioned IEC protocol, with JiffyDOS
+; triggering. EOI is not honoured.
+
 zproc put_command_byte
-        jsr     iec_assert_clock         ; set IEC clock out low
-        jsr     iec_release_data         ; set IEC data out high (0)
-        jsr     wait_1ms           ; 1ms delay
-IEC_send_byte:
-        sei
-        jsr     iec_release_data         ; set serial data out high
-        jsr     get_iec_status
-        bcc     1f              ;
-        jmp     SRBAD           ; Device_Not_Present
-1:       jsr     iec_release_clock         ; set serial clock high
-        bit     jiffy_eoi             ; test EOI flag
-        zif mi ; if not EOI
-                jsr wait_for_iec_data_release
-                jsr wait_for_iec_data_assert
-        zendif
-        jsr wait_for_iec_data_release
+    sta jiffy_pending_char
+    jsr iec_assert_clock         ; set IEC clock out low
+    jsr iec_release_data         ; set IEC data out high (0)
+    jsr wait_1ms           ; 1ms delay
+    jsr iec_release_data         ; set serial data out high
+    jsr get_iec_status
+    bcs device_timeout
+    jsr iec_release_clock         ; set serial clock high
+    jsr wait_for_iec_data_release
 
-; serial data is high now pull the clock low, preferably within 60us
+    jsr iec_assert_clock         ; set IEC clock out low
 
-        jsr     iec_assert_clock         ; set IEC clock out low
-
-; now the Vic has to send the eight bits, LSB first. first it sets the
-; serial data line to reflect the bit in the byte, then it sets the
-; serial clock to high. The serial clock is left high for 26 cycles,
-; 23us on a PAL Vic, before it is again pulled low and the serial data
-; is allowed high again
-
-; The jiffy routine detecs Jiffy devices within the routine
-; jiffy_detect_device and X=2
+    ; Send the actual data.
 
     ldx #8                          ; eight bits to do
     zrepeat
@@ -158,7 +180,7 @@ IEC_send_byte:
 zendproc
 
 zlproc device_timeout
-    jsr iec_make_bus_idle
+    jsr ieee_computer_idle
     sec
     rts
 zendproc
@@ -171,23 +193,7 @@ zproc jiffy_untalk
 zproc jiffy_unlisten
     lda #$3F
     jsr jiffy_listen2
-    jmp iec_make_bus_idle
-zendproc
-
-zproc jiffy_talksa
-    sta jiffy_pending_char
-    jsr put_command_byte
-
-    jsr iec_assert_data
-    jsr iec_release_atn
-    jsr iec_release_clock
-    jmp wait_for_iec_clock_assert
-zendproc
-
-zproc jiffy_listensa
-    sta jiffy_pending_char
-    jsr put_command_byte
-    jmp iec_release_atn
+    jmp ieee_computer_idle
 zendproc
 
 ; Returns a data byte into A using the jiffy protocol. If EOI was set, sets C.
@@ -537,4 +543,50 @@ zproc iec_assert_atn
     rts
 zendproc
 
+; A is the secondary address (0xfX for OPEN).
 
+zproc ieee_talk
+    pha
+    jsr ieee_computer_atn
+    lda #0x48               ; TALK device 8
+1:
+    jsr put_command_byte
+    pla
+    ora #0x60               ; SECOND
+    jsr put_command_byte
+    jmp ieee_computer_listening
+zendproc
+
+; A is the secondary address.
+
+zproc ieee_listen
+    pha
+    jsr ieee_computer_atn
+    lda #0x28               ; LISTEN device 8
+    jsr put_command_byte
+    pla
+    ora #0x60               ; SECOND
+    jsr put_command_byte
+    jmp ieee_computer_talking
+zendproc
+
+zproc ieee_untalk
+    jsr ieee_computer_atn
+    lda #0x5f               ; UNTALK
+    jsr put_command_byte
+    jmp ieee_computer_idle
+zendproc
+
+zproc ieee_unlisten
+    bit jiffy_has_pending_char
+    zif mi
+        lda jiffy_pending_char
+        jsr ieee_putb
+        asl jiffy_has_pending_char      ; reset flag
+    zendif
+
+    jsr ieee_computer_atn
+    lda #0x3f               ; UNLISTEN
+    jsr put_command_byte
+    jmp ieee_computer_idle
+zendproc
