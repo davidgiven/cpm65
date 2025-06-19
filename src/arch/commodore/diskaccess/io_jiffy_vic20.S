@@ -36,10 +36,7 @@ jiffy_pending_char = 0x95
 jiffy_eoi = 0xa3
 
 
-ORIOST = 0xfe6a
 SERGET = 0xe4b2
-RSPAUSE         = $F160        ; SET TIMER
-SRBAD           = $EEB4        ; device not present
 
 ; Kernel ROM disassembly here:
 ; http://www.fox-ts.co.uk/shared/vic20kernelrom.html
@@ -48,6 +45,10 @@ SRBAD           = $EEB4        ; device not present
 ; https://www.pagetable.com/?p=1135
 
 zproc io_init
+    lda #0
+    sta jiffy_has_pending_char
+    sta jiffy_pending_char
+    sta jiffy_eoi
     rts
 zendproc
 
@@ -75,20 +76,11 @@ zproc ieee_computer_listening
     jmp wait_for_iec_clock_assert
 zendproc
 
-; Switch from any mode to idle.
-
-zproc ieee_computer_idle
-    jsr iec_release_atn
-    jsr iec_release_data
-    jmp iec_release_clock
-zendproc
-
 zproc jiffy_talk
         lda #0x48
-        skip2
+        SKIP2
 zproc jiffy_listen
         lda #0x28
-        jsr     RSPAUSE         ; SET TIMER
 zproc jiffy_listen2
         pha                     ; save device address
         bit     jiffy_has_pending_char             ; test deferred character flag
@@ -183,17 +175,6 @@ zlproc device_timeout
     jsr ieee_computer_idle
     sec
     rts
-zendproc
-
-zproc jiffy_untalk
-    jsr iec_release_atn
-    jsr iec_assert_clock
-    lda #$5F
-    skip2
-zproc jiffy_unlisten
-    lda #$3F
-    jsr jiffy_listen2
-    jmp ieee_computer_idle
 zendproc
 
 ; Returns a data byte into A using the jiffy protocol. If EOI was set, sets C.
@@ -326,15 +307,18 @@ zproc ieee_getb
     lda jiffy_pending_char
     rts
 
-lfC4f:  lda     #$40            ; bit 6 = EOI
-        jsr     ORIOST
-l7C54:  lda     ta4
+lfC4f:  
+        lda ta4
         sec
+        rts
+
+l7C54:  lda     ta4
+        clc
         rts
 
 zendproc
 
-zproc send_byte
+zproc ieee_write
         bit     jiffy_has_pending_char             ; test deferred character flag
         bmi     1f              ; branch if defered character
         sec                     ; set deferred character flag
@@ -580,6 +564,8 @@ zendproc
 zproc ieee_unlisten
     bit jiffy_has_pending_char
     zif mi
+        lda #0x80
+        sta jiffy_eoi
         lda jiffy_pending_char
         jsr ieee_putb
         asl jiffy_has_pending_char      ; reset flag

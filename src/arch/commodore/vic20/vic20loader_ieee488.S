@@ -80,6 +80,9 @@ biosfile:
 biosfile_end:
 
 zproc dumperror
+    lda #13
+    jsr CHROUT
+
     lda #0x5f               ; READ channel 15
     jsr ieee_talk
 
