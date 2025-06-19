@@ -13,6 +13,9 @@ t9c:        .fill 1
 tb3:        .fill 1
 ta4:        .fill 1
 tc0:        .fill 1
+jiffy_has_pending_char: .fill 1
+jiffy_pending_char:     .fill 1
+jiffy_eoi:              .fill 1
 
 
 ; Values for VIA2_PCR. Bit values are inverted --- 1 == asserted, 0 == released.
@@ -30,11 +33,6 @@ iec_release_atn = 0xeec5
 ieee_computer_idle = 0xef09
 wait_1ms = 0xef96
 timer_wait = 0xef9b
-
-jiffy_has_pending_char = 0x94
-jiffy_pending_char = 0x95
-jiffy_eoi = 0xa3
-
 
 SERGET = 0xe4b2
 
@@ -76,30 +74,6 @@ zproc ieee_computer_listening
     jmp wait_for_iec_clock_assert
 zendproc
 
-zproc jiffy_talk
-        lda #0x48
-        SKIP2
-zproc jiffy_listen
-        lda #0x28
-zproc jiffy_listen2
-        pha                     ; save device address
-        bit     jiffy_has_pending_char             ; test deferred character flag
-        bpl     1f              ; branch if no defered character
-        sec                     ; flag EOI
-        ror     jiffy_eoi             ; rotate into EOI flag byte
-        jsr     ieee_putb
-        lsr     jiffy_has_pending_char             ; clear deferred character flag
-        lsr     jiffy_eoi             ; clear EOI flag
-1:       pla                     ; device address OR'ed with command
-        sta     jiffy_pending_char             ; save as serial defered character
-        sei
-        lda     #$00
-        sta     jiffy_eoi
-        jsr ieee_computer_atn
-;        jsr     iec_release_data         ; set IEC data out high (0)
-;        jsr iec_assert_atn
-        lda jiffy_pending_char
-
 ; Sends the byte in A via the old-fashioned IEC protocol, with JiffyDOS
 ; triggering. EOI is not honoured.
 
@@ -137,10 +111,10 @@ zproc put_command_byte
         ; However, it's more annoying than it should be because detection only
         ; works on some bytes of the command, and at other times it times out.
 
-        cpx #$02
+        cpx #2
         zif eq
-            lda #$02            ; test bit 1 (DATA) of serial bus
-            ldx #$20            ; 1e??? wait for jiffy protocol
+            lda #2              ; test bit 1 (DATA) of serial bus
+            ldx #0x20           ; 1e??? wait for jiffy protocol
         4:
             bit VIA1_PA        ; test DATA
             beq 2f          ; data high (0) -> Jiffy signal
@@ -151,7 +125,7 @@ zproc put_command_byte
         2:
             jsr wait_for_iec_data_release
         3:
-            ldx #$02
+            ldx #2  
         zendif
 
         dex
@@ -186,81 +160,70 @@ zproc ieee_getb
 ;  PAL: (18+14+14+9+10+25+19) * (1/1.108405) = 98.339505867 microseconds
 ; if the PAL version were to be used on NTSC, it would take 106.577806199 microseconds.
 
-; timing:
-; NTSC: 18*(1/1.022727) microseconds = 17.6000004693 microseconds
-;  PAL: 18*(1/1.108405) microseconds = 16.2395514280 microseconds
+    ; NTSC: 18*(1/1.022727) microseconds = 17.6000004693 microseconds
+    ;  PAL: 18*(1/1.108405) microseconds = 16.2395514280 microseconds
 
-1:       lda     VIA1_PA        ;4 serial bus
-        and     #$03            ;2 mask clock-in and data-in bits
-        beq     1b              ;2 wait for one of them to be high
+/* 0 */  zrepeat
+/* 0 */      lda VIA1_PA
+/* 4 */      and #0x03          ; wait for one of CLOCK or DATA...
+/* 6 */  zuntil ne              ; ...to be released
 
-        lda     #$80            ;2 initialize the byte-received flag
-        sta     t9c             ;3 to $80
-        txa                     ;2 save .X
-        pha                     ;3 i'm serious
+/* 8 */  lda #0x80              ; initialise byte-received flag
+/* 10 */ sta t9c
+/* 13 */ txa
+/* 15 */ pha
+/* 18 */
 
-; timing:
-; NTSC: 11*(1/1.022727) microseconds = 10.755558424 microseconds
-;  PAL: 14*(1/1.108405) microseconds = 12.630762221 microseconds
-
-        pha                     ;3
-        pla                     ;4
+    ; NTSC: 11*(1/1.022727) microseconds = 10.755558424 microseconds
+    ;  PAL: 14*(1/1.108405) microseconds = 12.630762221 microseconds
 
 .ifdef SJ20_NTSC
-        nop                     ;2
-        nop                     ;2
+        WAIT11
+.else
+        WAIT14
 .endif
 
-.ifndef SJ20_NTSC
-        pha                     ;3
-        pla                     ;4
-.endif
+    ; NTSC: 14*(1/1.022727) microseconds = 13.688892539 microseconds
+    ;  PAL: 14*(1/1.108405) microseconds = 12.630762221 microseconds
 
-; timing:
-; NTSC: 14*(1/1.022727) microseconds = 13.688892539 microseconds
-;  PAL: 14*(1/1.108405) microseconds = 12.630762221 microseconds
+/* 0 */  lda VIA2_PCR           ; assert DATA
+/* 4 */  and #0xdd
+/* 6 */  sta VIA2_PCR
+/* 10 */ ora #VIA2_PCR_CB2_DATA_OUT
+/* 12 */ tax
+/* 14 */
 
-        lda     VIA2_PCR        ;4 handshaking (bring serial bus data line high)
-        and     #$DD            ;2 handshaking cont'd
-        sta     VIA2_PCR        ;4 handshaking cont'd
-        ora     #$20            ;2 set bit 5=1
-        tax                     ;2 store
+    ; NTSC: 8*(1/1.022727) microseconds = 7.822224308 microseconds
+    ;  PAL: 9*(1/1.108405) microseconds = 8.302200083 microseconds
 
-; timing:
-; NTSC: 8*(1/1.022727) microseconds = 7.822224308 microseconds
-;  PAL: 9*(1/1.108405) microseconds = 8.302200083 microseconds
-
-        bit     t9c             ;timing
-.ifndef SJ20_NTSC
-        bit     t9c             ;timing
-.endif
-        bit     t9c             ;timing
 .ifdef SJ20_NTSC
-        nop
+        WAIT8
+.else
+        WAIT9
 .endif
 
-; timing:
-; NTSC:  8*(1/1.022727) microseconds = 7.822224308 microseconds
-;  PAL: 10*(1/1.108405) microseconds = 9.021973050 microseconds
+    ; NTSC:  8*(1/1.022727) microseconds = 7.822224308 microseconds
+    ;  PAL: 10*(1/1.108405) microseconds = 9.021973050 microseconds
 
-        lda     VIA1_PA        ; get bit 0 & 1
-        ror                     ; bit 0 (clock) -> bit 7
-        ror                     ; bit 1 (data ) -> carry
-        and     #$80            ; mask received bit 0
+/* 0 */  lda VIA1_PA        ; get bit 0 & 1
+/* 4 */  ror                 ; bit 0 (clock) -> bit 7
+/* 6 */  ror                 ; bit 1 (data ) -> carry
+/* 8 */  and #$80            ; mask received bit 0
+/* 10 */
 
 .ifndef SJ20_NTSC
         nop                     ;2
 .endif
 
-        ora     VIA1_PA        ; get bit 2 & 3
-        rol                     ; A = .....XXX
-        rol                     ; A = ....XXXX
-        sta     tb3             ; store lower nibble
+         ora VIA1_PA        ; get bit 2 & 3
+         rol                 ; A = .....XXX
+         rol                 ; A = ....XXXX
+         sta tb3             ; store lower nibble
 
-        lda     VIA1_PA        ; get bit 4 & 5
-        ror                     ; bit 4 (clock) -> bit 7
-        ror                     ; bit 5 (data ) -> carry
-        and     #$80            ; mask received bit 4
+         lda VIA1_PA        ; get bit 4 & 5
+         ror                 ; bit 4 (clock) -> bit 7
+         ror                 ; bit 5 (data ) -> carry
+         and #$80            ; mask received bit 4
 
 .ifndef SJ20_NTSC
         nop                     ;2
@@ -270,12 +233,14 @@ zproc ieee_getb
 ; NTSC: 19*(1/1.022727) microseconds = 18.577782732 microseconds
 ;  PAL: 19*(1/1.108405) microseconds = 17.141748729 microseconds
 
-        ora     VIA1_PA        ; get bit 6 & 7
-        rol                     ; A = .....XXX
-        rol                     ; A = ....XXXX
-        sta     tc0             ; store upper nibble
-        lda     VIA1_PA        ; get status bits
-        stx     VIA2_PCR        ; data out (5) = 1
+/* 0 */  ora VIA1_PA            ; get bit 6 & 7
+/* 4 */  rol a                  ; A = .....XXX
+/* 6 */  rol a                  ; A = ....XXXX
+/* 8 */  sta tc0                ; store upper nibble
+/* 11 */ lda VIA1_PA            ; get status bits
+/* 15 */ stx VIA2_PCR           ; release DATA
+/* 19 */
+
 ; end of timing sensitive portion
         sta     t9c             ; save status bits
 
@@ -297,39 +262,29 @@ zproc ieee_getb
         lda     t9c             ; restore status bits
         ror                     ; (clock) -> bit 7
         ror                     ; (data ) -> carry
-        bpl     l7C54           ; Jiffy_Set_OK   ; clock = 0 -> OK
-        bcc     lfC4f           ; Jiffy_Set_EOI  ; data  = 0 -> EOI
-        lda     #$42            ; EOI (6) and time out (1) ($42)
-        jmp     $EEB9           ; Set_IEC_Status
-
-    lda jiffy_eoi        ; bottom bit set on EOI
-    ror a               ; move into C
-    lda jiffy_pending_char
-    rts
-
-lfC4f:  
-        lda ta4
         sec
+        zif pl
+            ; Clock asserted, success.
+            clc
+        zendif
+        lda ta4
         rts
-
-l7C54:  lda     ta4
-        clc
-        rts
-
 zendproc
 
 zproc ieee_write
-        bit     jiffy_has_pending_char             ; test deferred character flag
-        bmi     1f              ; branch if defered character
-        sec                     ; set deferred character flag
-        ror     jiffy_has_pending_char
-        bne     2f
-1:  pha
-        jsr     ieee_putb
+    bit jiffy_has_pending_char
+    zif mi
+        pha
+        lda jiffy_pending_char
+        jsr ieee_putb
         pla
-2:   sta     jiffy_pending_char             ; save as serial defered character
-        clc
-        rts
+    zendif
+
+    sta jiffy_pending_char
+    lda #0x80
+    sta jiffy_has_pending_char
+    clc
+    rts
 zendproc
 
 ; Puts a data byte in A using the jiffy protocol.
@@ -463,10 +418,11 @@ zproc ieee_putb
         lda     VIA1_PA        ;4 read serial bus
         and     #$02            ;2 is data line low?
 ; end of timing sensitive portion
-        beq     l7C56           ; yes, we're done
-        jmp     $EEB7           ; no, err TIME OUT
-    l7C56:
-        clc
+        sec
+        zif eq
+            ; Yes, success.
+            clc
+        zendif
         rts
 zendproc
 
