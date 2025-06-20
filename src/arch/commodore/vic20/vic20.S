@@ -960,27 +960,6 @@ zproc toggle_cursor
     rts
 zendproc
 
-zproc print_hex_number
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr print
-    pla
-print:
-    and #0x0f
-    ora #48
-    cmp #58
-    zif cs
-        adc #6
-    zendif
-    pha
-    jsr bios_CONOUT
-    pla
-    rts
-zendproc
-
 ZEROPAGE
 
 .global ptr

@@ -17,7 +17,6 @@ jiffy_has_pending_char: .fill 1
 jiffy_pending_char:     .fill 1
 jiffy_eoi:              .fill 1
 
-
 ; Values for VIA2_PCR. Bit values are inverted --- 1 == asserted, 0 == released.
 ;      %..D...C.
 D0C0 = %11011100 ; 0xdc
@@ -160,123 +159,148 @@ zproc ieee_getb
 ;  PAL: (18+14+14+9+10+25+19) * (1/1.108405) = 98.339505867 microseconds
 ; if the PAL version were to be used on NTSC, it would take 106.577806199 microseconds.
 
+    ; Sets the V flag if we're PAL.
+
+    lda VICPALNTSC
+1:
+    cmp #PAL
+    clv
+    zif eq
+        bit 1b                  ; 'cmp imm' has opcode 0xc9, so bitting it will set V
+    zendif
+
     ; NTSC: 18*(1/1.022727) microseconds = 17.6000004693 microseconds
     ;  PAL: 18*(1/1.108405) microseconds = 16.2395514280 microseconds
 
-/* 0 */  zrepeat
-/* 0 */      lda VIA1_PA
-/* 4 */      and #0x03          ; wait for one of CLOCK or DATA...
-/* 6 */  zuntil ne              ; ...to be released
+    /* 0+0 */  zrepeat
+    /* 0+4 */      lda VIA1_PA
+    /* 4+2 */      and #0x03          ; wait for one of CLOCK or DATA...
+    /* 6+2 */  zuntil ne              ; ...to be released
 
-/* 8 */  lda #0x80              ; initialise byte-received flag
-/* 10 */ sta t9c
-/* 13 */ txa
-/* 15 */ pha
-/* 18 */
+    /* 8+10 */ WAIT10
+    /* 18 */
 
     ; NTSC: 11*(1/1.022727) microseconds = 10.755558424 microseconds
     ;  PAL: 14*(1/1.108405) microseconds = 12.630762221 microseconds
 
-.ifdef SJ20_NTSC
-        WAIT11
-.else
-        WAIT14
-.endif
+    /* PAL NTSC */ 
+    /* 0+2  0+3 */  zif vs
+    /* 2+4      */      WAIT4
+    /* 6+0  3+0 */  zendif
+    /* 6+8  3+8 */  WAIT8
+    /* 14   11  */
 
     ; NTSC: 14*(1/1.022727) microseconds = 13.688892539 microseconds
     ;  PAL: 14*(1/1.108405) microseconds = 12.630762221 microseconds
 
-/* 0 */  lda VIA2_PCR           ; assert DATA
-/* 4 */  and #0xdd
-/* 6 */  sta VIA2_PCR
-/* 10 */ ora #VIA2_PCR_CB2_DATA_OUT
-/* 12 */ tax
-/* 14 */
+    /* 0 */  lda VIA2_PCR
+    /* 4 */  and #0xdd
+    /* 6 */  sta VIA2_PCR           ; release CLOCK, DATA
+    /* 10 */ ora #VIA2_PCR_CB2_DATA_OUT
+    /* 12 */ tax
+    /* 14 */
 
-    ; NTSC: 8*(1/1.022727) microseconds = 7.822224308 microseconds
+
     ;  PAL: 9*(1/1.108405) microseconds = 8.302200083 microseconds
+    ; NTSC: 8*(1/1.022727) microseconds = 7.822224308 microseconds
 
-.ifdef SJ20_NTSC
-        WAIT8
-.else
-        WAIT9
-.endif
+    /* PAL  NTSC */
+    /* 0+3  0+2 */  bvs .+2
+    /* 3+6  2+6 */  WAIT6
 
-    ; NTSC:  8*(1/1.022727) microseconds = 7.822224308 microseconds
-    ;  PAL: 10*(1/1.108405) microseconds = 9.021973050 microseconds
+    ;  PAL: 12*(1/1.108405) microseconds = 10.826367618334 microseconds
+    ; NTSC: 10*(1/1.022727) microseconds = 9.7777803851859 microseconds
 
-/* 0 */  lda VIA1_PA        ; get bit 0 & 1
-/* 4 */  ror                 ; bit 0 (clock) -> bit 7
-/* 6 */  ror                 ; bit 1 (data ) -> carry
-/* 8 */  and #$80            ; mask received bit 0
-/* 10 */
+    /* PAL  NTSC */
+    /* 0+4  0+4 */  lda VIA1_PA     ; bits 0, 1
+    /* 4+3  4+3 */  pha
+    /* 7+2  7+3 */  zif vs
+    /* 9+3      */      WAIT3
+    /* 12   10  */  zendif
 
-.ifndef SJ20_NTSC
-        nop                     ;2
-.endif
+    ;  PAL: 11*(1/1.108405) microseconds = 10.142876243079 microseconds
+    ; NTSC: 11*(1/1.022727) microseconds = 10.755558423704 microseconds
 
-         ora VIA1_PA        ; get bit 2 & 3
-         rol                 ; A = .....XXX
-         rol                 ; A = ....XXXX
-         sta tb3             ; store lower nibble
+    /* 0+4 */  lda VIA1_PA          ; bits 2, 3
+    /* 4+3 */  pha
+    /* 7+4 */  WAIT4
+    /* 11 */
 
-         lda VIA1_PA        ; get bit 4 & 5
-         ror                 ; bit 4 (clock) -> bit 7
-         ror                 ; bit 5 (data ) -> carry
-         and #$80            ; mask received bit 4
+    ;  PAL: 12*(1/1.108405) microseconds = 10.826367618334 microseconds
+    ; NTSC: 10*(1/1.022727) microseconds = 9.7777803851859 microseconds
 
-.ifndef SJ20_NTSC
-        nop                     ;2
-.endif
+    /* PAL  NTSC */
+    /* 0+4  0+4 */  lda VIA1_PA     ; bits 4, 5
+    /* 4+3  4+3 */  pha
+    /* 7+2  7+3 */  zif vs
+    /* 9+3      */      WAIT3
+    /* 12   10  */  zendif
 
-; timing:
-; NTSC: 19*(1/1.022727) microseconds = 18.577782732 microseconds
-;  PAL: 19*(1/1.108405) microseconds = 17.141748729 microseconds
+    ;  PAL: 19*(1/1.108405) microseconds = 17.141748729 microseconds
+    ; NTSC: 19*(1/1.022727) microseconds = 18.577782732 microseconds
 
-/* 0 */  ora VIA1_PA            ; get bit 6 & 7
-/* 4 */  rol a                  ; A = .....XXX
-/* 6 */  rol a                  ; A = ....XXXX
-/* 8 */  sta tc0                ; store upper nibble
-/* 11 */ lda VIA1_PA            ; get status bits
-/* 15 */ stx VIA2_PCR           ; release DATA
-/* 19 */
+    /* 0+4 */  lda VIA1_PA          ; bits 6, 7
+    /* 4+3 */  pha
+    /* 7+4 */  WAIT4
+    /* 11+4 */ lda VIA1_PA          ; status
+    /* 15+4 */ stx VIA2_PCR
+    /* 19 */
 
-; end of timing sensitive portion
-        sta     t9c             ; save status bits
+    sta t9c             ; save status bits
 
-        ; Combine nibbles.
+    ; Now reconstruct the nibble.
 
-        lda     tb3
-        and     #$0F
-        sta     tb3
-        lda     tc0
-        asl
-        asl
-        asl
-        asl
-        ora     tb3
+    pla                 ; ......76
+    and #%00000011
+    asl a               ; .....76.
+    asl a               ; ....76..
+    sta tc0
 
-        sta     ta4             ; received byte
-        pla
-        tax
-        lda     t9c             ; restore status bits
-        ror                     ; (clock) -> bit 7
-        ror                     ; (data ) -> carry
-        sec
-        zif pl
-            ; Clock asserted, success.
-            clc
-        zendif
-        lda ta4
-        rts
+    pla                 ; ......54
+    and #%00000011
+    ora tc0             ; ....7654
+    asl a               ; ...7654.
+    asl a               ; ..7654..
+    sta tc0
+
+    pla
+    and #%00000011
+    ora tc0             ; ..765432
+    asl a               ; .765432.
+    asl a               ; 765432..
+    sta tc0
+
+    pla
+    and #%00000011
+    ora tc0             ; 76543210
+
+    tax
+    lda t9c             ; ......DC
+    and #%00000001
+    sec
+    zif eq
+        ; Clock asserted, success.
+        clc
+    zendif
+    
+    txa
+    rts
 zendproc
 
 zproc ieee_write
     bit jiffy_has_pending_char
     zif mi
         pha
+        tya
+        pha
+        txa
+        pha
         lda jiffy_pending_char
         jsr ieee_putb
+        pla
+        tax
+        pla
+        tay
         pla
     zendif
 
@@ -296,137 +320,133 @@ zproc ieee_putb
     ;
     ; JiffyDOS wants the bits sent in the order 22114334.
 
-        txa             ; store .X on stack
-        pha
-        lda     jiffy_pending_char     ; BSOUR, the byte to send
-        lsr             ; put MSB in LSB
-        lsr
-        lsr
-        lsr
-        tay
-        and #3
-        tax             ; give to .X
-        lda     stab1,x ; get the corresponding data from the send table
-        pha             ; save it
-        tya             ; restore .A to .X
-        lsr             ; next 2 bits
-        lsr
-        and #3
-        tax             ; give to .X
-        lda     stab1,x ; get the corresponding send table data again
-        sta     tb3
-        lda     jiffy_pending_char     ; restore BSOUR
-        and     #$0F    ; get LSB of BSOUR
-        tax             ; give to .X
+    lda jiffy_pending_char
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tay                 ; Y = MSB
+    and #3
+    tax
+    lda stab1, x
+    pha                 ; second value goes on stack
 
-        lda     #$02
+    tya
+    lsr a
+    lsr a
+    and #3
+    tax
+    ldy stab1, x        ; first value goes in Y
+
+    lda jiffy_pending_char
+    and #$0F
+    tax                 ; low nibble goes in X
+
 
 ; start of timing sensitive portion
-; total time:
-; NTSC: (15+14+20+17+18/19+13) * (1/1.022727) = 94.844469736 microseconds
-;  PAL: (15+16+22+19+20/21+13) * (1/1.108405) = 94.730716660 microseconds
 
-; timing:
-; NTSC: 15
-;  PAL: 15
+    ; Timing-sensitive portion starts here (at the bit instruction).
+    ; Total time:
+    ; NTSC: (15+14+20+16+18/19+13) * (1/1.022727) = 93.844469736 microseconds
+    ;  PAL: (15+16+22+18+20/21+13) * (1/1.108405) = 93.828519358 microseconds
 
-1:       bit     VIA1_PA        ;4 wait for bit 1 (data) of $911F to be set
-        beq     1b              ;2 loop until data is 1
+    ; NTSC: 15
+    ;  PAL: 15
 
-        lda     VIA2_PCR        ;4 handshaking - (bring serial bus data line high)
-        and     #$DD            ;2 yep
-        sta     t9c             ;3 save what we want to handshake.
+           lda #0x02
+/* 0 */    zrepeat
+/* 0+4 */      bit VIA1_PA
+/* 4+2 */  zuntil ne           ; wait for DATA release
 
-; timing
-; NTSC: 14
-;  PAL: 20
+/* 6+4 */  lda VIA2_PCR         ; store value of PCR...
+/* 10+2 */ and #$DD             ; ...without DATA and CLOCK...
+/* 12+3 */ sta t9c              ; ...for use later.
+/* 15 */
 
-        pha                     ;3
-        pla                     ;4
-        pha                     ;3
-        pla                     ;4
+    ; NTSC: 14
+    ;  PAL: 20
+
+    WAIT14
 .ifndef SJ20_NTSC
-        nop                     ;2
-        nop                     ;2
-        nop                     ;2
+    WAIT6
 .endif
 
-; timing
-; NTSC: 14
-;  PAL: 16
+    ; NTSC: 14
+    ;  PAL: 16
 
-        sta     VIA2_PCR        ;4 handshaking - bring the data line high
-        pla                     ;3 restore .A (gotten from send table earlier)
-        ora     t9c             ;3 OR with handshake value to get value to send
-
-.ifndef SJ20_NTSC
-        nop                     ;2
-.endif
-
-        sta     VIA2_PCR        ;4 send to drive over serial bus
-
-; timing
-; NTSC: 20
-;  PAL: 22
-
-        lda     tb3             ;3 get 2nd value to send
-        ora     t9c             ;3 OR with old $912C
-        ora     t9c             ;3 timing
-        sta     VIA2_PCR        ;4 send to drive over serial bus
-        lda     stab2,x         ;4 Get third value to send from table
-        ora     t9c             ;3 OR with old $912C
+/* 0+4 */  sta VIA2_PCR         ; release DATA to indicate we're about to send
+/* 4+3 */  pla                  ; first value to send
+/* 7+3 */  ora t9c              ; old VIA2_PDR
 
 .ifndef SJ20_NTSC
-        nop                     ;2
+/* 10+2 */ WAIT2
 .endif
+/* 12+4 */ sta VIA2_PCR
+/* 16 */
 
-; timing
-; NTSC: 17
-;  PAL: 19
+    ; NTSC: 20
+    ;  PAL: 22
 
-        sta     VIA2_PCR        ;4 send to drive over serial bus
-        lda     stab3,x         ;4 Get fourth value to send from table
-        ora     t9c             ;3 OR with old $912C
-        nop                     ;2 timing
-        sta     VIA2_PCR        ;4 send to drive over serial bus
+/* 0+2 */  tya                 ; second value to send
+/* 2+3 */  ora t9c             ; or with old VIA2_PCR
+/* 5+4 */  WAIT4
+/* 9+4 */  sta VIA2_PCR
+/* 13+4 */ lda stab2,x         ; third value to send
+/* 17+3 */ ora t9c             ; or with old VIA2_PCR
+/* 20 */
 
 .ifndef SJ20_NTSC
-        nop                     ;2
+    WAIT2
 .endif
 
-; timing
-; NTSC: 18/19
-;  PAL: 20/21
+    ; NTSC: 16
+    ;  PAL: 18
 
-        and     #$DD            ;2
-        bit     jiffy_eoi        ;3 is bit 7 of LDFLAG set?
-        bmi     1f              ;2/3 yes, don't bring data line low yet
-        ora     #$02            ;2 no, OR to bring serial bus data line low
-1:       sta     VIA2_PCR        ;4 handshaking - bring data line low
+/* 0+4 */  sta VIA2_PCR
+/* 4+4 */  lda stab3,x          ; Get fourth value to send from table
+/* 8+2 */  ora t9c              ; old VIA2_PCR
+/* 10+2 */ WAIT2
+/* 12+4 */ sta VIA2_PCR
+.ifndef SJ20_NTSC
+/* 16+2 */ WAIT2
+.endif
+/* 18 */
 
-        pla                     ;4 restore .X
-        tax                     ;2
+    ; NTSC: 18/19
+    ;  PAL: 20/21
+
+/* 0+2 */  and #$DD
+/* 2+3 */  bit jiffy_eoi
+/* 5+2 */  zif pl
+/* 7+2 */      ora #$02           ; If EOI, don't assert DATA
+/* 9+0 */  zendif
+/* 9+4 */  sta VIA2_PCR
+
+/* 13+6 */ WAIT6
 
 .ifndef SJ20_NTSC
-        nop                     ;2
+/* 19+2 */ WAIT2
 .endif
+/* 21 */
 
-; timing
-; NTSC: 13
-;  PAL: 13
+    ; NTSC: 15
+    ;  PAL: 15
 
-        lda     t9c             ;3 get old $912C
-        ora     #$02            ;2 OR to bring data line low
-        sta     VIA2_PCR        ;4 handshaking - bring data line low
-        lda     VIA1_PA        ;4 read serial bus
-        and     #$02            ;2 is data line low?
-; end of timing sensitive portion
-        sec
-        zif eq
-            ; Yes, success.
-            clc
-        zendif
-        rts
+/* 0+3 */  lda t9c                ; old VIA2_PDR
+/* 3+2 */  ora #$02               ; assert DATA
+/* 5+4 */  sta VIA2_PCR
+/* 9+4 */  lda VIA1_PA
+/* 13+2 */ and #$02               ; check DATA is asserted
+/* 15 */
+
+    ; Timing-sensitive portion ends here.
+
+    sec
+    zif eq
+        ; Yes, success.
+        clc
+    zendif
+    rts
 zendproc
 
 zlproc stab1

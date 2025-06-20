@@ -37,7 +37,10 @@ STATUS  = 0x90
 SA = 0xb9
 FA = 0xba
 
-VICPALNTSC = $ede4 ; PAL=$0c, NTSC=$05
+VICPALNTSC = $ede4
+PAL = 0x0c
+NTSC = 0x05
+
 SENDSECOND = $f495
 CLOSECURR = $f6da
 READST = $ffb7
