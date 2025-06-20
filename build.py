@@ -47,6 +47,7 @@ export(
         "images/pet8032.d64": "src/arch/commodore+pet8032_diskimage",
         "images/pet8096.d64": "src/arch/commodore+pet8096_diskimage",
         "images/snes.smc": "src/arch/snes+snes_cartridge",
+        "images/vic20_jiffy_1541.d64": "src/arch/commodore+vic20_jiffy_1541_diskimage",
         "images/vic20_yload_1541.d64": "src/arch/commodore+vic20_yload_1541_diskimage",
         "images/vic20_iec_1541.d64": "src/arch/commodore+vic20_iec_1541_diskimage",
         "images/vic20_jiffy_fd2000.d2m": "src/arch/commodore+vic20_jiffy_fd2000_diskimage",

@@ -303,12 +303,15 @@ zproc ieee_putb
         lsr
         lsr
         lsr
+        tay
+        and #3
         tax             ; give to .X
         lda     stab1,x ; get the corresponding data from the send table
         pha             ; save it
-        txa             ; restore .A to .X
+        tya             ; restore .A to .X
         lsr             ; next 2 bits
         lsr
+        and #3
         tax             ; give to .X
         lda     stab1,x ; get the corresponding send table data again
         sta     tb3
@@ -426,8 +429,8 @@ zproc ieee_putb
         rts
 zendproc
 
-zlproc stab1, .align.16
-    .byte   $00,$02,$20,$22,$00,$02,$20,$22,$00,$02,$20,$22,$00,$02,$20,$22
+zlproc stab1
+    .byte   $00,$02,$20,$22
 zendproc
 
 zlproc stab2, .align.16
@@ -510,13 +513,6 @@ zproc ieee_listen
     jmp ieee_computer_talking
 zendproc
 
-zproc ieee_untalk
-    jsr ieee_computer_atn
-    lda #0x5f               ; UNTALK
-    jsr put_command_byte
-    jmp ieee_computer_idle
-zendproc
-
 zproc ieee_unlisten
     bit jiffy_has_pending_char
     zif mi
@@ -527,8 +523,14 @@ zproc ieee_unlisten
         asl jiffy_has_pending_char      ; reset flag
     zendif
 
-    jsr ieee_computer_atn
     lda #0x3f               ; UNLISTEN
+    SKIP2
+zproc ieee_untalk
+    lda #0x5f               ; UNTALK
+zproc atn_put_and_idle
+    pha
+    jsr ieee_computer_atn
+    pla
     jsr put_command_byte
     jmp ieee_computer_idle
 zendproc

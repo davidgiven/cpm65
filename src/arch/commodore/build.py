@@ -134,7 +134,6 @@ llvmrawprogram(
     srcs=[
         "./vic20/vic20loader_ieee488.S",
         "./diskaccess/io_jiffy_vic20.S",
-        "./diskaccess/io_ieee488.S",
         "./vic20/vic20.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -197,12 +196,52 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
+    name="vic20_jiffy_1541_bios",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_jiffy_vic20.S",
+        "./diskaccess/rw_ieee488.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
+    ],
+    cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
+    linkscript="./vic20/vic20.ld",
+)
+
+llvmrawprogram(
     name="vic20_iec_fd2000_bios",
     srcs=[
         "./vic20/vic20.S",
         "./diskaccess/bios_fd2000.S",
         "./diskaccess/io_ieee488.S",
         "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/rw_ieee488.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
+    ],
+    cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
+    linkscript="./vic20/vic20.ld",
+)
+
+llvmrawprogram(
+    name="vic20_jiffy_fd2000_bios",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_fd2000.S",
+        "./diskaccess/io_jiffy_vic20.S",
         "./diskaccess/rw_ieee488.S",
         "./vic20/vic20.inc",
     ],
@@ -247,6 +286,15 @@ mkcbmfs(
 )
 
 mkcbmfs(
+    name="vic20_jiffy_1541_cbmfs",
+    title="cp/m-65: vic20",
+    items={
+        "cpm": ".+vic20_jiffy_loader",
+        "bios": ".+vic20_jiffy_1541_bios",
+    },
+)
+
+mkcbmfs(
     name="vic20_iec_fd2000_cbmfs",
     title="cp/m-65: vic20",
     type="d2m",
@@ -262,7 +310,7 @@ mkcbmfs(
     type="d2m",
     items={
         "cpm": ".+vic20_jiffy_loader",
-        "bios": ".+vic20_iec_fd2000_bios",
+        "bios": ".+vic20_jiffy_fd2000_bios",
     },
 )
 
@@ -280,6 +328,7 @@ for target in [
     "c64",
     "vic20_yload_1541",
     "vic20_iec_1541",
+    "vic20_jiffy_1541",
 ]:
     mkcpmfs(
         name=target + "_diskimage",

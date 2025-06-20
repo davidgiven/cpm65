@@ -127,7 +127,7 @@ zlproc sendtab, .aligned.32
     D1C1 = %11111110 ; 0xfe
 
     ; In order to more closely map the C64 tables, the first nibble to be sent
-    ; is the _second_ item in the table.  Bit ordering is %CcDd; this makes it
+    ; is the _second_ item in the table. Bit ordering is %CcDd; this makes it
     ; easier to assemble the values on the 1541.
 
     ;      4 6   5 7 (high nibble)
