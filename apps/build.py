@@ -30,6 +30,7 @@ for prog in [
     "dinfo",
     "dump",
     "ls",
+    "more",
     "scrntest",
     "kbdtest",
     "xrecv",
