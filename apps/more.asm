@@ -92,17 +92,6 @@ zproc start
         jsr SCREEN
     zendif
     
-	\ Try and open the file.
-
-	lda #0
-	sta cpm_fcb+0x20 \ must clear CR before opening. Why?
-	lda #<cpm_fcb
-	ldx #>cpm_fcb
-	ldy #BDOS_OPEN_FILE
-	jsr BDOS
-	bcs cannot_open
-
-
 	\ Print the file
 
 	lda #<cpm_default_dma
