@@ -23,6 +23,8 @@
 .label more_wait
 .label more_wait_print
 .label more_exit
+.label more_newline
+.label more_string
 
 .expand 1
 .label printchar
@@ -34,6 +36,16 @@ zproc start
 	cmp #' '
 	beq syntax_error
 
+	\ Try and open the file.
+
+	lda #0
+	sta cpm_fcb+0x20 \ must clear CR before opening. Why?
+	lda #<cpm_fcb
+	ldx #>cpm_fcb
+	ldy #BDOS_OPEN_FILE
+	jsr BDOS
+	bcs cannot_open
+
     \ Set default values used without screen driver
     lda #0
     sta screen_present
@@ -41,7 +53,7 @@ zproc start
     sta colpos
     lda #39
     sta colmax
-    lda #19
+    lda #23
     sta linemax
 
     \ Check if the screen driver is available
@@ -112,30 +124,39 @@ zproc start
             lda cpm_default_dma-128,y
             cmp #26
             beq more_exit
+            \ Newline?
             cmp #13
             zif eq
                 lda #0
                 sta colpos
                 inc linepos
                 lda #13
+                jsr printchar
+                jmp more_newline
             zendif 
-            ldy #BDOS_CONOUT
-            jsr BDOS
+            jsr printchar
 
-            inc colpos
+            \ End of line?
             lda colpos
             cmp colmax
             zif eq
                 lda #0
                 sta colpos
                 inc linepos
+                jmp more_newline
             zendif
+            
+            inc colpos
+            more_newline:
+            \ End of screen?
             lda linepos
             cmp linemax
             zif eq
                 lda #0
                 sta linepos
+                \ Wait for keypress
                 jsr more_wait
+                \ Exit if Q,q or ctrl+c is pressed
                 cmp #'q'
                 beq more_exit
                 cmp #'Q'
@@ -143,6 +164,7 @@ zproc start
                 cmp #3
                 beq more_exit
 
+                \ Setup for next page of text
                 jsr newline
                 lda screen_present
                 cmp #1
@@ -177,7 +199,7 @@ zproc syntax_error
 	ldy #BDOS_PRINTSTRING
 	jmp BDOS
 msg:
-	.byte "Syntax error", 13, 10, 0
+	.byte "No input file", 13, 10, 0
 zendproc
 
 zproc cannot_open
@@ -200,13 +222,35 @@ zproc more_wait
 zendproc
 
 zproc more_wait_print
-    lda #<msg
-    ldx #>msg
+    \ Print a fancy more prompt if a screen driver is present
+    lda screen_present
+    cmp #1
+    zif eq
+        lda #1
+        ldy #SCREEN_SETSTYLE
+        jsr SCREEN
+        lda #0
+        ldx linemax
+        inx
+        ldy #SCREEN_SETCURSOR
+        jsr SCREEN
+        lda #<more_string
+        ldx #>more_string
+        ldy #SCREEN_PUTSTRING
+        jsr SCREEN
+        lda #0
+        ldy #SCREEN_SETSTYLE
+        jmp SCREEN
+    zendif
+    \ Just print the string if it's not
+    lda #<more_string
+    ldx #>more_string
     ldy #BDOS_PRINTSTRING
     jmp BDOS
-msg:
-    .byte "--More--", 0    
 zendproc
+
+more_string:
+    .byte "--More--", 0
 
 zproc printchar
     ldy #BDOS_CONOUT
