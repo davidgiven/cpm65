@@ -339,7 +339,6 @@ mkcpmfs(
     | MINIMAL_APPS
     | BIG_APPS
     | SCREEN_APPS
-    | BIG_SCREEN_APPS,
 )
 
 mkcpmfs(
@@ -351,7 +350,8 @@ mkcpmfs(
     }
     | MINIMAL_APPS_SRCS
     | BIG_APPS_SRCS
-    | SCREEN_APPS_SRCS,
+    | SCREEN_APPS_SRCS
+    | BIG_SCREEN_APPS
 )
 
 mkcpmfs(
