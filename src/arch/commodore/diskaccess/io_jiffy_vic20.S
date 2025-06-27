@@ -60,9 +60,8 @@ zendproc
 
 ; Switch from ATN to the computer talking.
 
-zproc ieee_computer_talking
-    jmp iec_release_atn
-zendproc
+.global ieee_computer_talking
+ieee_computer_talking = iec_release_atn
 
 ; Switch from ATN to the computer listening.
 
@@ -80,8 +79,7 @@ zproc put_command_byte
     sta jiffy_pending_char
     jsr iec_assert_clock         ; set IEC clock out low
     jsr iec_release_data         ; set IEC data out high (0)
-    jsr wait_1ms           ; 1ms delay
-    jsr iec_release_data         ; set serial data out high
+    jsr wait_1ms                 ; 1ms delay
     jsr get_iec_status
     bcs device_timeout
     jsr iec_release_clock         ; set serial clock high
@@ -150,17 +148,9 @@ zlproc device_timeout
     rts
 zendproc
 
-; Returns a data byte into A using the jiffy protocol. If EOI was set, sets C.
+; Sets the V flag if we're PAL.
 
-zproc ieee_getb
-; Read a byte in using the SJLoad routine.
-; total time for 1 byte received:
-; NTSC: (18+11+14+8+ 8+23+19) * (1/1.022727) = 98.755581890 microseconds
-;  PAL: (18+14+14+9+10+25+19) * (1/1.108405) = 98.339505867 microseconds
-; if the PAL version were to be used on NTSC, it would take 106.577806199 microseconds.
-
-    ; Sets the V flag if we're PAL.
-
+zlproc set_v_if_pal
     lda VICPALNTSC
 1:
     cmp #PAL
@@ -168,6 +158,19 @@ zproc ieee_getb
     zif eq
         bit 1b                  ; 'cmp imm' has opcode 0xc9, so bitting it will set V
     zendif
+    rts
+zendproc
+
+; Returns a data byte into A using the jiffy protocol. If EOI was set, sets C.
+
+zproc ieee_getb
+    ; Read a byte in using the SJLoad routine.
+    ; total time for 1 byte received:
+    ; NTSC: (18+11+14+8+10+11+10+19) * (1/1.022727) = 98.755581890 microseconds
+    ;  PAL: (18+14+14+9+12+11+10+19) * (1/1.108405) = 98.339505867 microseconds
+    ; if the PAL version were to be used on NTSC, it would take 106.577806199 microseconds.
+
+    jsr set_v_if_pal
 
     ; NTSC: 18*(1/1.022727) microseconds = 17.6000004693 microseconds
     ;  PAL: 18*(1/1.108405) microseconds = 16.2395514280 microseconds
@@ -207,6 +210,7 @@ zproc ieee_getb
     /* PAL  NTSC */
     /* 0+3  0+2 */  bvs .+2
     /* 3+6  2+6 */  WAIT6
+    /* 9    8   */
 
     ;  PAL: 12*(1/1.108405) microseconds = 10.826367618334 microseconds
     ; NTSC: 10*(1/1.022727) microseconds = 9.7777803851859 microseconds
@@ -274,6 +278,8 @@ zproc ieee_getb
     and #%00000011
     ora tc0             ; 76543210
 
+    ; Done. Check the status byte to see if the read worked.
+
     tax
     lda t9c             ; ......DC
     and #%00000001
@@ -295,8 +301,7 @@ zproc ieee_write
         pha
         txa
         pha
-        lda jiffy_pending_char
-        jsr ieee_putb
+        jsr ieee_putb_raw
         pla
         tax
         pla
@@ -314,6 +319,154 @@ zendproc
 ; Puts a data byte in A using the jiffy protocol.
 
 zproc ieee_putb
+    sta jiffy_pending_char
+zlproc ieee_putb_raw
+
+.if 1
+    ; The VIC20's data output bits are nothing like as conveniently laid out as
+    ; the C64. For each bit pair, the PCR looks like:
+    ;     %11D111C0
+    ;
+    ; JiffyDOS wants the bits sent in the order 22114334.
+
+    jsr set_v_if_pal
+
+    ; Compute values, in reverse order.
+
+    lda VIA2_PCR        ; store value of PCR...
+    and #0xdd           ; ...without DATA and CLOCK...
+    tax                 ; ...for use throughout.
+
+    ; Least significant bits go first.
+
+    lda jiffy_pending_char
+    and #0x0f
+    tay
+    txa
+    ora stab3, y
+    pha                 ; fourth bit pair
+
+    txa
+    ora stab2, y
+    pha                 ; third bit pair
+
+    ; Compute the MSB.
+
+    lda jiffy_pending_char
+    rol a               ; top two bits into bottom two bits
+    rol a
+    rol a
+    and #3
+    tay
+    txa
+    ora stab1, y
+    pha                 ; second bit pair
+
+    lda jiffy_pending_char
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    and #3
+    tay
+    txa
+    ora stab1, y        ; first bit pair
+    pha
+
+    ; Timing-sensitive portion starts here (at the bit instruction).
+    ; Total time:
+    ; NTSC: (15+14+20+16+18/19+13) * (1/1.022727) = 93.844469736 microseconds
+    ;  PAL: (15+16+22+18+20/21+13) * (1/1.108405) = 93.828519358 microseconds
+
+    lda #0x02
+    zrepeat
+        bit VIA1_PA
+    zuntil ne           ; wait for DATA release
+
+    ; NTSC: 31 * (1/1.022727) = 30.311119 us
+    ;  PAL: 34 * (1/1.108406) = 30.674680 us
+
+    /* PAL  NTSC */
+    /* 0+14  0+14 */ WAIT14
+    /* 14+10 14+10 */ WAIT10
+    /* 24+2  24+3 */ zif vs
+    /* 26+3       */      WAIT3
+    /* 29+0  27+0 */ zendif
+    /* 29+4  27+4 */ stx VIA2_PCR         ; release DATA to indicate we're about to send; real timing starts here
+    /* 34    31   */
+
+    ; NTSC: 12 * (1/1.022727) = 11.733336 us
+    ;  PAL: 13 * (1/1.108406) = 11.728554 us
+
+    /* PAL  NTSC */
+    /* 0+3  0+3  */  pla                  ; first value to send
+    /* 3+2  3+2  */  WAIT2
+    /* 5+2  5+3  */  zif vs
+    /* 7+2       */       WAIT2
+    /* 9+0  8+0 */   zendif
+    /* 9+4  8+4 */   sta VIA2_PCR
+    /* 13   12   */
+
+    ; NTSC: 13 * (1/1.022727) = 12.711114 us
+    ;  PAL: 13 * (1/1.108406) = 11.728554 us
+
+    /* 0+5       */  WAIT5
+    /* 5+4       */  pla                    ; second value to send
+    /* 9+4       */  sta VIA2_PCR
+    /* 13 */                                ; NTSC is one cycle early
+
+    ; NTSC: 11 * (1/1.022727) = 10.755558 us
+    ;  PAL: 13 * (1/1.108406) = 11.728554 us
+
+    /* PAL  NTSC */
+    /* 0+4  0+4 */  pla                   ; third value to send
+    /* 4+2  4+3 */  zif vs
+    /* 6+3      */      WAIT3
+    /* 9+0  7+0 */  zendif
+    /* 9+4  7+4 */  sta VIA2_PCR
+    /* 13   11  */                        ; NTSC is now two cycles early
+
+    ; NTSC: 11 * (1/1.022727) = 10.755558 us
+    ;  PAL: 12 * (1/1.108406) = 10.826358 us (+3 cycles)
+
+    /* PAL  NTSC */
+    /* 0+4  0+4 */  pla                   ; fourth byte to send
+    /* 4+2  4+3 */  zif vs
+    /* 6+2      */      WAIT2
+    /* 8+0  7+0 */  zendif
+    /* 8+4  7+4 */  sta VIA2_PCR
+    /* 12   11  */
+
+    ; NTSC: 15 * (1/1.022727) = 14.666671 us
+    ;  PAL: 15 * (1/1.108406) = 14.435143 us
+
+    /* 0+2  */  WAIT2
+    /* 2+2  */  txa                       ; register value with nothing asserted
+    /* 4+3  */  bit jiffy_eoi
+    /* 7+2  */  zif pl
+    /* 9+2 */      ora #$02               ; if EOI, don't assert CLOCK
+    /* 11+0 */  zendif
+    /* 11+4 */  sta VIA2_PCR
+    /* 15   */
+
+    ; NTSC: 16 * (1/1.022727) = 15.644449 us
+    ;  PAL: 17 * (1/1.108406) = 15.337340 us
+
+    /* PAL  NTSC */
+    /* 0+2  0+3 */  zif vs
+    /* 2+2      */      WAIT2
+    /*      3+0 */  zendif
+    /* 4+5  3+5 */  WAIT5
+    /* 9+2  8+2 */  txa                   ; value with nothing asserted
+    /* 11+2 10+2 */ ora #VIA2_PCR_CA2_CLOCK_OUT ; assert DATA
+    /* 13+4 12+4 */ sta VIA2_PCR
+    /* 17   16 */
+    lda VIA1_PA
+
+    ; Timing-sensitive portion ends here.
+
+    and #0x02               ; check DATA is asserted
+.else
     ; The VIC20's data output bits are nothing like as conveniently laid out as
     ; the C64. For each bit pair, the PCR looks like:
     ;     %11D111C0
@@ -375,6 +528,7 @@ zproc ieee_putb
     ;  PAL: 16
 
 /* 0+4 */  sta VIA2_PCR         ; release DATA to indicate we're about to send
+; dc 30966512 dc dc (dc dc)
 /* 4+3 */  pla                  ; first value to send
 /* 7+3 */  ora t9c              ; old VIA2_PDR
 
@@ -382,6 +536,7 @@ zproc ieee_putb
 /* 10+2 */ WAIT2
 .endif
 /* 12+4 */ sta VIA2_PCR
+; fc 30966525 dc dc (dc dc)
 /* 16 */
 
     ; NTSC: 20
@@ -391,6 +546,7 @@ zproc ieee_putb
 /* 2+3 */  ora t9c             ; or with old VIA2_PCR
 /* 5+4 */  WAIT4
 /* 9+4 */  sta VIA2_PCR
+; dc 30966538 de de (de de)
 /* 13+4 */ lda stab2,x         ; third value to send
 /* 17+3 */ ora t9c             ; or with old VIA2_PCR
 /* 20 */
@@ -403,10 +559,12 @@ zproc ieee_putb
     ;  PAL: 18
 
 /* 0+4 */  sta VIA2_PCR
+; fc 30966551 fc de (fc de)
 /* 4+4 */  lda stab3,x          ; Get fourth value to send from table
 /* 8+2 */  ora t9c              ; old VIA2_PCR
 /* 10+2 */ WAIT2
 /* 12+4 */ sta VIA2_PCR
+; fc 30966564 dc fc (dc fc)
 .ifndef SJ20_NTSC
 /* 16+2 */ WAIT2
 .endif
@@ -418,9 +576,10 @@ zproc ieee_putb
 /* 0+2 */  and #$DD
 /* 2+3 */  bit jiffy_eoi
 /* 5+2 */  zif pl
-/* 7+2 */      ora #$02           ; If EOI, don't assert DATA
+/* 7+2 */      ora #$02           ; If not EOI, assert CLOCK
 /* 9+0 */  zendif
 /* 9+4 */  sta VIA2_PCR
+; de 30966579 de de (de de)
 
 /* 13+6 */ WAIT6
 
@@ -433,14 +592,13 @@ zproc ieee_putb
     ;  PAL: 15
 
 /* 0+3 */  lda t9c                ; old VIA2_PDR
-/* 3+2 */  ora #$02               ; assert DATA
+/* 3+2 */  ora #$02               ; assert CLOCK
 /* 5+4 */  sta VIA2_PCR
+; de 30966596 de de (de de)
 /* 9+4 */  lda VIA1_PA
 /* 13+2 */ and #$02               ; check DATA is asserted
 /* 15 */
-
-    ; Timing-sensitive portion ends here.
-
+.endif
     sec
     zif eq
         ; Yes, success.
@@ -450,15 +608,17 @@ zproc ieee_putb
 zendproc
 
 zlproc stab1
-    .byte   $00,$02,$20,$22
+    .byte 0x00, 0x02, 0x20, 0x22
 zendproc
 
-zlproc stab2, .align.16
-    .byte   $00,$00,$20,$20,$00,$00,$20,$20,$02,$02,$22,$22,$02,$02,$22,$22
+zlproc stab2,  .align.16
+    .byte 0x00, 0x00, 0x20, 0x20, 0x00, 0x00, 0x20, 0x20
+    .byte 0x02, 0x02, 0x22, 0x22, 0x02, 0x02, 0x22, 0x22
 zendproc
 
-zlproc stab3, .align.16
-    .byte   $00,$20,$00,$20,$02,$22,$02,$22,$00,$20,$00,$20,$02,$22,$02,$22
+zlproc stab3,  .align.16
+    .byte 0x00, 0x20, 0x00, 0x20, 0x02, 0x22, 0x02, 0x22
+    .byte 0x00, 0x20, 0x00, 0x20, 0x02, 0x22, 0x02, 0x22
 zendproc
 
 zproc wait_for_iec_data_release
@@ -501,6 +661,7 @@ zendproc
 
 zproc iec_assert_atn
     ; Set high; IEC ATN goes low
+    ; (There isn't a routine to do this in the VIC20 ROM, for some reason.)
 
     set1 VIA1_DRA, VIA1_PA_ATN_OUT
     rts
@@ -512,7 +673,6 @@ zproc ieee_talk
     pha
     jsr ieee_computer_atn
     lda #0x48               ; TALK device 8
-1:
     jsr put_command_byte
     pla
     ora #0x60               ; SECOND
@@ -538,8 +698,7 @@ zproc ieee_unlisten
     zif mi
         lda #0x80
         sta jiffy_eoi
-        lda jiffy_pending_char
-        jsr ieee_putb
+        jsr ieee_putb_raw
         asl jiffy_has_pending_char      ; reset flag
     zendif
 
