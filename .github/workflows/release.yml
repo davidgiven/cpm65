@@ -82,7 +82,8 @@ jobs:
           pet8096.d64
           snes.smc
           vic20_iec_1541.d64
-          vic20_iec_fd2000.d64
+          vic20_jiffy_1541.d64
+          vic20_jiffy_fd2000.d64
           vic20_yload_1541.d64
           x16.zip
         fail-if-no-assets: false
@@ -128,7 +129,8 @@ jobs:
           cpm65/images/pet8096.d64
           cpm65/images/snes.smc
           cpm65/images/vic20_iec_1541.d64
-          cpm65/images/vic20_iec_fd2000.d64
+          cpm65/images/vic20_jiffy_fd2000.d64
+          cpm65/images/vic20_jiffy_1541.d64
           cpm65/images/vic20_yload_1541.d64
           cpm65/images/x16.zip
         tag_name: dev

@@ -14,11 +14,11 @@ SECTIONS {
 	} >zp
 
 	.text : {
-		*(.text .text.*)
+		*(.text .text.* .init .init.*)
 	} >basic
 	.data : {
-		 . = ALIGN(32);
-		 *(.aligned.32)
+		 . = ALIGN(16);
+		 *(.align.16)
 		 *(.data .data.* .rodata .rodata.*)
 	} > basic
 	.noinit (NOLOAD) : {

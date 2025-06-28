@@ -105,7 +105,7 @@ zendproc
 
 zlproc sendtab, .aligned.16
     ; Bit ordering is %CcDd; this makes it easier to assemble the values on the
-    ; 1541.
+    ; 1541. This is the same table JiffyDOS uses!
 
     ;      dcDC
     .byte %00000000 ; 0

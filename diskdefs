@@ -32,7 +32,7 @@ end
 
 diskdef fd2000
 	seclen 128
-	tracks 157 # Skips the last two tracks which contain the partition table
+	tracks 155 # Skips the first three and last two tracks
 	sectrk 80
 	blocksize 4096
 	maxdir 128

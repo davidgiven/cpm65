@@ -10,6 +10,20 @@
 .set zloopsp, 0
 .set zifsp, 0
 
+; Skip the next instruction byte by turning them into the argument of a BIT
+; zp instruction. Trashes flags.
+
+.macro SKIP1
+    .byte 0x24
+.endm
+
+; Skip the next two instruction bytes by turning them into the argument of a BIT
+; abs instruction. Trashes flags.
+
+.macro SKIP2
+    .byte 0x2c
+.endm
+
 .macro blt label
     bcc \label
 .endm

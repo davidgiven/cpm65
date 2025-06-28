@@ -10,7 +10,7 @@
 .global dph
 
 .data
-define_dpb dpb_fd2000, 157*80, 4096, 128, 3*80
+define_dpb dpb_fd2000, 155*80, 4096, 128, 3*80
 define_dph dph, dpb_fd2000
 
 ; Converts an LBA sector number in XA to track/sector in Y, A.

@@ -37,8 +37,8 @@ SECTIONS {
 	} >lowram AT>init
 
 	.data : {
-		. = ALIGN(32);
-		*(.aligned.32)
+		. = ALIGN(16);
+		*(.align.16)
 		*(.data .data.* .rodata .rodata.*)
 		bios_end_addr = .;
 	} >lowram AT>init

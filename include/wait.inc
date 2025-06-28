@@ -30,32 +30,38 @@
 .endm
 
 .macro WAIT8
-    cmp (0, x) ; 6
-    nop        ; 2
+    WAIT6
+    WAIT2
 .endm
 
 .macro WAIT9
-    pha        ; 3
-    pla        ; 4
-    nop        ; 2
+    WAIT6
+    WAIT3
 .endm
 
 .macro WAIT10
-    pha        ; 3
-    pla        ; 4
-    cmp 0      ; 3
+    WAIT7
+    WAIT3
 .endm
     
 .macro WAIT11
-    pha        ; 3
-    pla        ; 4
-    nop        ; 2
-    nop        ; 2
+    WAIT7
+    WAIT4
 .endm
     
 .macro WAIT12
-    cmp (0, x) ; 6
-    cmp (0, x) ; 6
+    WAIT6
+    WAIT6
+.endm
+
+.macro WAIT13
+    WAIT6
+    WAIT7
+.endm
+
+.macro WAIT14
+    WAIT7
+    WAIT7
 .endm
 
 ; vim: filetype=asm sw=4 ts=4 et
