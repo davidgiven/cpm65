@@ -152,7 +152,41 @@ zproc start
                 beq more_exit
                 cmp #3
                 beq more_exit
+                \ Only scroll one line if enter is pressed
+                cmp #13
+                bne more_nextpage
+                ldx linemax
+                dex
+                stx linepos
+                lda #0
+                sta colpos
+                \ Clear last line if screen driver is present
+                lda screen_present
+                cmp #1
+                zif eq
+                    lda #0
+                    ldx linemax
+                    inx
+                    ldy #SCREEN_SETCURSOR
+                    jsr SCREEN
+                    
+                    ldy #SCREEN_CLEARTOEOL
+                    jsr SCREEN
+                    
+                    lda #0
+                    ldx linemax
+                    ldy #SCREEN_SETCURSOR
+                    jsr SCREEN
 
+                zendif
+                \ Otherwise just emit a newline
+                lda screen_present
+                cmp #1
+                zif ne
+                    jsr newline
+                zendif
+                jmp more_done
+                more_nextpage:
                 \ Setup for next page of text
                 jsr newline
                 lda screen_present
@@ -166,6 +200,7 @@ zproc start
                     ldy #SCREEN_SETCURSOR
                     jsr SCREEN
                 zendif
+                more_done:
             zendif
             inc temp
         zuntil eq
