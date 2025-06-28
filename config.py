@@ -14,6 +14,7 @@ MINIMAL_APPS = {
     "0:ls.com": "apps+ls",
     "0:stat.com": "apps+stat",
     "0:submit.com": "apps+submit",
+    "0:more.com": "apps+more",
 }
 
 # Programs which only work on a real CP/M filesystem (not emulation).
