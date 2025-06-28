@@ -119,7 +119,7 @@ llvmrawprogram(
 llvmrawprogram(
     name="vic20_yload_loader",
     srcs=[
-        "./vic20/vic20loader.S",
+        "./vic20/vic20loader_yload.S",
         "./diskaccess/io_yload_vic20.S",
         "./diskaccess/io_yload_common.S",
         "./vic20/vic20.inc",
@@ -130,9 +130,23 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
+    name="vic20_jiffy_loader",
+    srcs=[
+        "./vic20/vic20loader_ieee488.S",
+        "./diskaccess/io_jiffy_vic20.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=["src/lib+bioslib", "include", ".+commodore_lib"],
+    cflags=["-DVIC20"],
+    linkscript="./vic20/vic20loader.ld",
+)
+
+llvmrawprogram(
     name="vic20_iec_loader",
     srcs=[
-        "./vic20/vic20loader_iec.S",
+        "./vic20/vic20loader_ieee488.S",
+        "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/io_ieee488.S",
         "./vic20/vic20.inc",
     ],
     deps=["src/lib+bioslib", "include", ".+commodore_lib"],
@@ -182,12 +196,31 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
-    name="vic20_iec_fd2000_bios",
+    name="vic20_jiffy_1541_bios",
+    srcs=[
+        "./vic20/vic20.S",
+        "./diskaccess/bios_1541.S",
+        "./diskaccess/io_jiffy_vic20.S",
+        "./diskaccess/rw_ieee488.S",
+        "./vic20/vic20.inc",
+    ],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "third_party/tomsfonts+4x8",
+        ".+commodore_lib",
+    ],
+    cflags=["-DVIC20"],
+    ldflags=["--gc-sections"],
+    linkscript="./vic20/vic20.ld",
+)
+
+llvmrawprogram(
+    name="vic20_jiffy_fd2000_bios",
     srcs=[
         "./vic20/vic20.S",
         "./diskaccess/bios_fd2000.S",
-        "./diskaccess/io_ieee488.S",
-        "./diskaccess/io_ieee488_vic20.S",
+        "./diskaccess/io_jiffy_vic20.S",
         "./diskaccess/rw_ieee488.S",
         "./vic20/vic20.inc",
     ],
@@ -207,8 +240,8 @@ mkcbmfs(
     title="cp/m-65: c64",
     items={
         "cpm": ".+c64_loader",
-        "&yload1541": ".+usr_yload1541",
-        "bios": ".+c64_bios",
+        "yload1541,u": ".+usr_yload1541",
+        "bios,s": ".+c64_bios",
     },
 )
 
@@ -217,8 +250,8 @@ mkcbmfs(
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_yload_loader",
-        "&yload1541": ".+usr_yload1541",
-        "bios": ".+vic20_yload_1541_bios",
+        "yload1541,u": ".+usr_yload1541",
+        "bios,s": ".+vic20_yload_1541_bios",
     },
 )
 
@@ -227,17 +260,26 @@ mkcbmfs(
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_iec_loader",
-        "bios": ".+vic20_iec_1541_bios",
+        "bios,s": ".+vic20_iec_1541_bios",
     },
 )
 
 mkcbmfs(
-    name="vic20_iec_fd2000_cbmfs",
+    name="vic20_jiffy_1541_cbmfs",
+    title="cp/m-65: vic20",
+    items={
+        "cpm": ".+vic20_jiffy_loader",
+        "bios,s": ".+vic20_jiffy_1541_bios",
+    },
+)
+
+mkcbmfs(
+    name="vic20_jiffy_fd2000_cbmfs",
     title="cp/m-65: vic20",
     type="d2m",
     items={
-        "cpm": ".+vic20_iec_loader",
-        "bios": ".+vic20_iec_fd2000_bios",
+        "cpm": ".+vic20_jiffy_loader",
+        "bios,s": ".+vic20_jiffy_fd2000_bios",
     },
 )
 
@@ -255,6 +297,7 @@ for target in [
     "c64",
     "vic20_yload_1541",
     "vic20_iec_1541",
+    "vic20_jiffy_1541",
 ]:
     mkcpmfs(
         name=target + "_diskimage",
@@ -263,12 +306,13 @@ for target in [
         items=COMMODORE_ITEMS_WITH_SCREEN,
     )
 
-mkcpmfs(
-    name="vic20_iec_fd2000_diskimage",
-    format="fd2000",
-    template=".+vic20_iec_fd2000_cbmfs",
-    items=COMMODORE_ITEMS_WITH_SCREEN,
-)
+for target in ["vic20_jiffy_fd2000"]:
+    mkcpmfs(
+        name=f"{target}_diskimage",
+        format="fd2000",
+        template=f".+{target}_cbmfs",
+        items=COMMODORE_ITEMS_WITH_SCREEN,
+    )
 
 mametest(
     name="c64_mametest",

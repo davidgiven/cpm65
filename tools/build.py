@@ -248,11 +248,7 @@ def mkcbmfs(
 
     cmd = f"chronic c1541 $[outs[0]] -name '{title}'"
     for k, v in items.items():
-        t = "p"
-        if k.startswith("&"):
-            t = "u"
-
-        cmd += f" -write '{filenameof(v)}' '{k},{t}'"
+        cmd += f" -write '{filenameof(v)}' '{k}'"
         ins += [v]
     cs += [cmd]
 

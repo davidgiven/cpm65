@@ -187,11 +187,14 @@ the same time.
 
     - `vic20_yload_1541.d64`: 1541 format, with the fastloader. Only works on a
       1541 (or compatible).
+    - `vic20_jiffy_1541.d64`: 1541 format with JiffyDOS. Only works on a 1541
+      (or compatible) with the JiffyDOS ROM installed. This _should_ also work on
+      an SD2IEC, although this is untested. You do *not* need the JiffyDOS kernal
+      ROM in the VIC-20 itself.
     - `vic20_iec_1541.d64`: 1541 format, uses old-fashioned IEC code. Should
       work anywhere which supports `d64` images, although very, very slowly.
-    - `vic20_iec_fd2000.d2m`: CMD FD-2000 format, uses old-fashioned IEC code.
-      Faster that the `d64` IEC version, but still pretty slow. But you do
-      get lots of disk space.
+    - `vic20_jiffy_fd2000.d2m`: CMD FD-2000 format, with JiffyDOS. The FD-2000
+      has JiffyDOS support built in. You get over a megabyte of free space.
 
   - You need a fully expanded VIC-20 with all memory banks populated, for the
     full 35kB.

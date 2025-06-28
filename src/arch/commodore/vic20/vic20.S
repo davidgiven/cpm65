@@ -48,12 +48,18 @@ zproc _start, .start
     ldx #vic_tab_end - vic_tab
     zrepeat
         lda vic_tab-1, x
-        sta 0x9000-1, x
+        sta 0x9002-1, x
         dex
     zuntil eq
 
     lda #0x08           ; black border, black background, inverted
     sta 0x900f
+
+    lda 0x9001
+    sta scroll_upval
+    clc
+    adc #4
+    sta scroll_downval
 
     jsr initdrivers
     jsr screen_clear
@@ -76,7 +82,9 @@ zproc _start, .start
 
     jsr io_init
     jsr rw_init
-    jsr genericdisk_init
+    #if defined GENERICDISK
+        jsr genericdisk_init
+    #endif
 
     ; Miscellaneous initialisation.
 
@@ -122,8 +130,6 @@ banner:
 banner_end:
 
 vic_tab:
-    .byte 14            ; 0x9000: abbbbbbb: interlace, screen X
-    .byte 35            ; 0x9001: cccccccc: screen Y
     .byte 0x00 | 20     ; 0x9002: hddddddd: screen address, screen width
     .byte (12<<1) | 1   ; 0x9003: geeeeeef: screen height, char size
     .byte 0             ; 0x9004: gggggggg: variable
@@ -144,7 +150,7 @@ zendproc
 zproc bios_SETTPA
     ldy current_bank
     sta mem_base, y
-    txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
+    txa
     sta mem_end, y
     clc
     rts
@@ -490,7 +496,7 @@ zproc screen_clear
     sta cursory
     sty scroll_compensation
     sty scroll_nudge
-    lda #35
+    lda scroll_upval
     sta 0x9001
 
     rts
@@ -567,6 +573,20 @@ zproc screen_getchar
     rts
 zendproc
 
+zlproc vertadjust_up
+    lda scroll_upval
+    sta 0x9001
+    inc scroll_nudge
+    rts
+zendproc
+
+zlproc vertadjust_down
+    lda scroll_downval
+    sta 0x9001
+    dec scroll_nudge
+    rts
+zendproc
+
 zproc screen_scrollup
     bit scroll_nudge
     zif mi
@@ -574,9 +594,7 @@ zproc screen_scrollup
         ; of the screen. No physical scroll needed, but we do need to adjust the
         ; screen position again.
 
-        lda #35
-        sta 0x9001
-        inc scroll_nudge
+        jsr vertadjust_up
         jsr increment_scroll_compensation
 
         lda #0
@@ -594,9 +612,7 @@ zproc screen_scrollup
 
     ; Adjust the screen position.
 
-    lda #35+4
-    sta 0x9001
-    dec scroll_nudge
+    jsr vertadjust_down
 
     lda #SCREEN_HEIGHT-1
     jsr calculate_line_address
@@ -612,9 +628,7 @@ zproc screen_scrolldown
         ; On the top line of the two line-band at the top of the screen. A
         ; physical scroll is needed and a screen adjustment.
 
-        lda #35
-        sta 0x9001
-        inc scroll_nudge
+        jsr vertadjust_up
         jsr roll_down
 
         lda #0
@@ -628,9 +642,7 @@ zproc screen_scrolldown
     ; On the bottom line the two-line band at the top of the screen. No physical
     ; scroll needed.
 
-    lda #35+4
-    sta 0x9001
-    dec scroll_nudge
+    jsr vertadjust_down
     jsr decrement_scroll_compensation
 
     lda #0
@@ -716,7 +728,6 @@ zproc roll_up
         iny
         dex
     zuntil eq
-zendproc
     ; fall through
 zproc increment_scroll_compensation
     lda scroll_compensation
@@ -805,12 +816,10 @@ zendproc
 
 zproc screen_showcursor
     zif eq
-        lda #01
-        sta show_cursor
-        clc
-        rts
+        lda #1
+        SKIP2
     zendif
-    lda #00
+    lda #0
     sta show_cursor
     clc
     rts
@@ -960,27 +969,6 @@ zproc toggle_cursor
     rts
 zendproc
 
-zproc print_hex_number
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr print
-    pla
-print:
-    and #0x0f
-    ora #48
-    cmp #58
-    zif cs
-        adc #6
-    zendif
-    pha
-    jsr bios_CONOUT
-    pla
-    rts
-zendproc
-
 ZEROPAGE
 
 .global ptr
@@ -994,6 +982,8 @@ cursory:         .fill 1
 scroll_compensation: .fill 1
 scroll_nudge:    .fill 1
 pending_key:     .fill 1
+scroll_upval:    .fill 1
+scroll_downval:  .fill 1
 
 .data
 
