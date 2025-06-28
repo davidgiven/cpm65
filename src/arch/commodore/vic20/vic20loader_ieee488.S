@@ -76,7 +76,7 @@ zendproc
 .data
 
 biosfile:
-    .ascii "BIOS,P,R"
+    .ascii "BIOS,S,R"
 biosfile_end:
 
 zproc dumperror

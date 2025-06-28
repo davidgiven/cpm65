@@ -216,27 +216,6 @@ llvmrawprogram(
 )
 
 llvmrawprogram(
-    name="vic20_iec_fd2000_bios",
-    srcs=[
-        "./vic20/vic20.S",
-        "./diskaccess/bios_fd2000.S",
-        "./diskaccess/io_ieee488.S",
-        "./diskaccess/io_ieee488_vic20.S",
-        "./diskaccess/rw_ieee488.S",
-        "./vic20/vic20.inc",
-    ],
-    deps=[
-        "include",
-        "src/lib+bioslib",
-        "third_party/tomsfonts+4x8",
-        ".+commodore_lib",
-    ],
-    cflags=["-DVIC20"],
-    ldflags=["--gc-sections"],
-    linkscript="./vic20/vic20.ld",
-)
-
-llvmrawprogram(
     name="vic20_jiffy_fd2000_bios",
     srcs=[
         "./vic20/vic20.S",
@@ -261,8 +240,8 @@ mkcbmfs(
     title="cp/m-65: c64",
     items={
         "cpm": ".+c64_loader",
-        "&yload1541": ".+usr_yload1541",
-        "bios": ".+c64_bios",
+        "yload1541,u": ".+usr_yload1541",
+        "bios,s": ".+c64_bios",
     },
 )
 
@@ -271,8 +250,8 @@ mkcbmfs(
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_yload_loader",
-        "&yload1541": ".+usr_yload1541",
-        "bios": ".+vic20_yload_1541_bios",
+        "yload1541,u": ".+usr_yload1541",
+        "bios,s": ".+vic20_yload_1541_bios",
     },
 )
 
@@ -281,7 +260,7 @@ mkcbmfs(
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_iec_loader",
-        "bios": ".+vic20_iec_1541_bios",
+        "bios,s": ".+vic20_iec_1541_bios",
     },
 )
 
@@ -290,17 +269,7 @@ mkcbmfs(
     title="cp/m-65: vic20",
     items={
         "cpm": ".+vic20_jiffy_loader",
-        "bios": ".+vic20_jiffy_1541_bios",
-    },
-)
-
-mkcbmfs(
-    name="vic20_iec_fd2000_cbmfs",
-    title="cp/m-65: vic20",
-    type="d2m",
-    items={
-        "cpm": ".+vic20_iec_loader",
-        "bios": ".+vic20_iec_fd2000_bios",
+        "bios,s": ".+vic20_jiffy_1541_bios",
     },
 )
 
@@ -310,7 +279,7 @@ mkcbmfs(
     type="d2m",
     items={
         "cpm": ".+vic20_jiffy_loader",
-        "bios": ".+vic20_jiffy_fd2000_bios",
+        "bios,s": ".+vic20_jiffy_fd2000_bios",
     },
 )
 
@@ -337,7 +306,7 @@ for target in [
         items=COMMODORE_ITEMS_WITH_SCREEN,
     )
 
-for target in ["vic20_iec_fd2000", "vic20_jiffy_fd2000"]:
+for target in ["vic20_jiffy_fd2000"]:
     mkcpmfs(
         name=f"{target}_diskimage",
         format="fd2000",

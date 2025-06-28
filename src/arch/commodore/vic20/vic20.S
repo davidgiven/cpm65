@@ -76,7 +76,9 @@ zproc _start, .start
 
     jsr io_init
     jsr rw_init
-    jsr genericdisk_init
+    #if defined GENERICDISK
+        jsr genericdisk_init
+    #endif
 
     ; Miscellaneous initialisation.
 
@@ -144,7 +146,7 @@ zendproc
 zproc bios_SETTPA
     ldy current_bank
     sta mem_base, y
-    txa                 ; BUG: stx mem_end, y - invalid 6502 instruction
+    txa
     sta mem_end, y
     clc
     rts
@@ -716,7 +718,6 @@ zproc roll_up
         iny
         dex
     zuntil eq
-zendproc
     ; fall through
 zproc increment_scroll_compensation
     lda scroll_compensation
@@ -805,12 +806,10 @@ zendproc
 
 zproc screen_showcursor
     zif eq
-        lda #01
-        sta show_cursor
-        clc
-        rts
+        lda #1
+        SKIP2
     zendif
-    lda #00
+    lda #0
     sta show_cursor
     clc
     rts
