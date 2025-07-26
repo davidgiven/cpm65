@@ -62,7 +62,7 @@ static void put_bit(bool bit) {
 }
 
 static void put_byte_8E1(uint8_t byte) {
-    bool parity;
+    bool parity = 0;
     put_bit(0);                 // start bit
     for (int i=0; i<8; i++) {
         bool bit = byte & (1<<i);
