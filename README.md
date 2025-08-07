@@ -585,6 +585,14 @@ website](http://pascal.hansotten.com/px-descendants/pascal-m/pascal-m-2k1/).
 However, do not report bugs on the CP/M-65 port to him --- [file bug reports
 here](https://github.com/davidgiven/cpm65/issues/new) instead.
 
+### The Forth
+
+lbForth is a minimal Forth implementation but still contains a fair amount of
+built in words. It is currently not included on the disks for the C64, VIC20 
+or BBC Micro due to lack of disk space.
+
+The original source code is available [here](https://gist.github.com/lbruder/10007431)
+
 ### Utilities
 
 `bin/cpmemu` contains a basic CP/M-65 user mode emulator and debugger. It'll run
@@ -645,3 +653,6 @@ and is available under the terms of the BSD 2-Clause License. See
 `third_party/zmalloc` contains a copy of zmalloc, which is © 2024 by Ivo van
 Poorten and is available under the terms of the 0BSD License. See
 `third_party/zmalloc/LICENSE` for the full text.
+
+`third_party/lbforth` contains a port of lbForth, which is © 2014 by Leif Bruder 
+and is released as Public Domain.
