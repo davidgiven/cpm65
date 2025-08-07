@@ -52,7 +52,6 @@ for prog in [
     "attr",
     "copy",
     "life",
-    "lbforth",
     "mbrot",
     "mkfs",
     "objdump",

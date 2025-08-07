@@ -29,7 +29,7 @@
 #define DOUBLE_CELL_BASE_TYPE long
 
 /* Basic memory configuration */
-#define MEM_SIZE 8192 /* main memory size in bytes */
+#define MEM_SIZE 16384 /* main memory size in bytes */
 #define STACK_SIZE 192 /* cells reserved for the stack */
 #define RSTACK_SIZE 64 /* cells reserved for the return stack */
 #define INPUT_LINE_SIZE 32 /* bytes reserved for the WORD buffer */
@@ -189,7 +189,6 @@ const char *initScript =
 * to e.g. output data on a microcontroller via a serial interface. */
 void putkey(char c)
 {
-    //putchar(c);
     cpm_conout(c);
 }
 
@@ -198,7 +197,6 @@ void putkey(char c)
 int llkey()
 {
     if (*initscript_pos) return *(initscript_pos++);
-    //return getchar();
     return cpm_conin();
 }
 
@@ -1051,6 +1049,8 @@ int main()
     *base = 10;
     *latest = 0;
     *here = HERE_START;
+
+    tell("lbForth for CP/M-65. Use BYE to exit.\r\n\r\n");
 
     ADD_BUILTIN(docol);
     ADD_BUILTIN(doCellSize);
