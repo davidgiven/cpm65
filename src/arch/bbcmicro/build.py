@@ -8,6 +8,7 @@ from config import (
     SCREEN_APPS,
     SCREEN_APPS_SRCS,
     PASCAL_APPS,
+    FORTH_APPS,
 )
 
 llvmrawprogram(
@@ -27,7 +28,7 @@ mkcpmfs(
     | BIG_APPS_SRCS
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
-    | PASCAL_APPS,
+    | FORTH_APPS,
 )
 
 mkdfs(

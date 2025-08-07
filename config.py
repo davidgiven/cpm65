@@ -66,6 +66,8 @@ PASCAL_APPS = {
     "0:hello.pas": "cpmfs+hello_pas_cpm",
 }
 
+FORTH_APPS = {"0:lbforth.com": "apps+lbforth"}
+
 SERIAL_APPS = {
     "0:xrecv.com": "apps+xrecv",
     "0:xsend.com": "apps+xsend",
