@@ -71,7 +71,8 @@ mkcpmfs(
     name="atari800c_rawdiskimage",
     format="atari90",
     size=128 * 720,
-    items={} | MINIMAL_APPS_SRCS | SCREEN_APPS_SRCS | BIG_APPS_SRCS,
+    items={} | MINIMAL_APPS_SRCS | SCREEN_APPS_SRCS | BIG_APPS_SRCS 
+             | FORTH_APPS,
 )
 
 simplerule(
@@ -120,7 +121,8 @@ mkcpmfs(
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
     | BIG_SCREEN_APPS
-    | PASCAL_APPS,
+    | PASCAL_APPS
+    | FORTH_APPS,
 )
 
 simplerule(
