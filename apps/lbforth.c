@@ -221,7 +221,12 @@ int getkey()
     while ((c = llkey()) != EOF)
     {
         if (charsInLineBuffer == sizeof(lineBuffer)) break;
-        lineBuffer[charsInLineBuffer++] = c;
+        // Handle backspace
+        if (c == 0x7f) {
+            lineBuffer[charsInLineBuffer]=0;
+            if(charsInLineBuffer > 0) charsInLineBuffer--;
+        }
+        else lineBuffer[charsInLineBuffer++] = c;
         if (c == '\n' || c == '\r') break;
     }
 
@@ -242,7 +247,7 @@ cell pop()
 {
     if (*sp == 1)
     {
-        tell("? Stack underflow\n");
+        tell("? Stack underflow\r\n");
         errorFlag = 1;
         return 0;
     }
@@ -253,7 +258,7 @@ cell tos()
 {
     if (*sp == 1)
     {
-        tell("? Stack underflow\n");
+        tell("? Stack underflow\r\n");
         errorFlag = 1;
         return 0;
     }
@@ -264,7 +269,7 @@ void push(cell data)
 {
     if (*sp >= STACK_SIZE)
     {
-        tell("? Stack overflow\n");
+        tell("? Stack overflow\r\n");
         errorFlag = 1;
         return;
     }
@@ -293,7 +298,7 @@ cell rpop()
 {
     if (*rsp == 1)
     {
-        tell("? RStack underflow\n");
+        tell("? RStack underflow\r\n");
         errorFlag = 1;
         return 0;
     }
@@ -304,7 +309,7 @@ void rpush(cell data)
 {
     if (*rsp >= RSTACK_SIZE)
     {
-        tell("? RStack overflow\n");
+        tell("? RStack overflow\r\n");
         errorFlag = 1;
         return;
     }
@@ -317,7 +322,7 @@ cell readMem(cell address)
 {
     if (address > MEM_SIZE)
     {
-        tell("Internal error in readMem: Invalid addres\n");
+        tell("Internal error in readMem: Invalid addres\r\n");
         errorFlag = 1;
         return 0;
     }
@@ -328,7 +333,7 @@ void writeMem(cell address, cell value)
 {
     if (address > MEM_SIZE)
     {
-        tell("Internal error in writeMem: Invalid address\n");
+        tell("Internal error in writeMem: Invalid address\r\n");
         errorFlag = 1;
         return;
     }
@@ -346,15 +351,15 @@ byte readWord()
     {
         if (c == ' ') continue;
         if (c == '\n') continue;
-        if (c == 0x0d) continue;
+        if (c == '\r') continue;
         if (c != '\\') break;
 
         while ((c = getkey()) != EOF)
-            if (c == '\n' || c == 0x0d)
+            if (c == '\n' || c == '\r')
                 break;
     }
 
-    while (c != ' ' && c != '\n' && c != 0x0d && c != EOF)
+    while (c != ' ' && c != '\n' && c != '\r' && c != EOF)
     {
         if (len >= (INPUT_LINE_SIZE - 1))
             break;
@@ -679,7 +684,7 @@ BUILTIN(38, "QUIT", quit, 0)
         if (errorFlag)
             *sp = *rsp = 1;
         else if (!keyWaiting() && !(*initscript_pos))
-            tell(" OK\n");
+            tell(" OK\r\n");
     }
 }
 
@@ -999,7 +1004,7 @@ void addBuiltin(cell code, const char* name, const byte flags, builtin f)
     {
         tell("Error adding builtin ");
         tell(name);
-        tell(": Out of builtin IDs\n");
+        tell(": Out of builtin IDs\r\n");
         errorFlag = 1;
         return;
     }
@@ -1008,7 +1013,7 @@ void addBuiltin(cell code, const char* name, const byte flags, builtin f)
     {
         tell("Error adding builtin ");
         tell(name);
-        tell(": ID given twice\n");
+        tell(": ID given twice\r\n");
         errorFlag = 1;
         return;
     }
@@ -1028,7 +1033,7 @@ int main()
 
     if (DCELL_SIZE != 2*CELL_SIZE)
     {
-        tell("Configuration error: DCELL_SIZE != 2*CELL_SIZE\n");
+        tell("Configuration error: DCELL_SIZE != 2*CELL_SIZE\r\n");
         return 1;
     }
 
