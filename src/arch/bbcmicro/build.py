@@ -8,7 +8,6 @@ from config import (
     SCREEN_APPS,
     SCREEN_APPS_SRCS,
     PASCAL_APPS,
-    FORTH_APPS,
 )
 
 llvmrawprogram(
