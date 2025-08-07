@@ -222,7 +222,7 @@ int getkey()
     {
         if (charsInLineBuffer == sizeof(lineBuffer)) break;
         lineBuffer[charsInLineBuffer++] = c;
-        if (c == '\n') break;
+        if (c == '\n' || c == '\r') break;
     }
 
     positionInLineBuffer = 1;
