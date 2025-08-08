@@ -247,16 +247,16 @@ int getkey()
     while ((c = llkey()) != EOF)
     {
         if (charsInLineBuffer == sizeof(lineBuffer)) break;
+        // Handle End of file
+        if (c == 0x1a || c == 0x00) {
+            c = ' ';
+            lineBuffer[charsInLineBuffer++] = c;
+        }
         // Handle backspace
         if (c == 0x7f) {
             lineBuffer[charsInLineBuffer]=0;
             if(charsInLineBuffer > 0) charsInLineBuffer--;
         }
-        if (c == 0x1a || c == 0x00) {
-            c = ' ';
-            lineBuffer[charsInLineBuffer++] = c;
-        }
-
         else lineBuffer[charsInLineBuffer++] = c;
         if (c == '\n' || c == '\r') break;
     }
