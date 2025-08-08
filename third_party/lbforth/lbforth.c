@@ -93,7 +93,7 @@ static FCB startupFile;
 static uint8_t fileBuffer[128];
 static char* cmdptr = cpm_cmdline;
 static bool fileFlag = false;
-static bool fileDoneFlag = false;
+static bool fileDoneFlag = true;
 char* filebuffer_pos;
 
 /* A basic setup for defining builtins. This Forth uses impossibly low
@@ -1109,6 +1109,7 @@ int main()
             tell("Error opening file\r\n");
             return 1;
         }
+        fileDoneFlag = false;
         fillFileBuffer();
     }
 
