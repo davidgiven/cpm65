@@ -200,6 +200,7 @@ void fillFileBuffer(void)
     if(cpm_read_sequential(&startupFile)) {
         cpm_close_file(&startupFile);
         fileDoneFlag = true;
+        cpm_printstring("END OF FILE\r\n OK\r\n");
     }
     filebuffer_pos = (char *)fileBuffer;    
 }
@@ -221,7 +222,7 @@ int llkey()
         return *(filebuffer_pos++);
     if (!(*filebuffer_pos) && fileFlag && !fileDoneFlag) {
         fillFileBuffer();
-        return *(filebuffer_pos++);
+        if(!fileDoneFlag) return *(filebuffer_pos++);
     }
 
     return cpm_conin();
@@ -251,6 +252,11 @@ int getkey()
             lineBuffer[charsInLineBuffer]=0;
             if(charsInLineBuffer > 0) charsInLineBuffer--;
         }
+        if (c == 0x1a || c == 0x00) {
+            c = ' ';
+            lineBuffer[charsInLineBuffer++] = c;
+        }
+
         else lineBuffer[charsInLineBuffer++] = c;
         if (c == '\n' || c == '\r') break;
     }
