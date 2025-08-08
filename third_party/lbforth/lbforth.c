@@ -22,7 +22,7 @@
 * used are getchar, putchar and the EOF value. */
 #include <cpm.h>
 #include <stdio.h>
-
+#include <stdbool.h>
 /* Base cell data types. Use short/long on most systems for 16 bit cells. */
 /* Experiment here if necessary. */
 #define CELL_BASE_TYPE int
@@ -87,6 +87,14 @@ cell maxBuiltinAddress;
 char lineBuffer[128];
 int charsInLineBuffer = 0;
 int positionInLineBuffer = 0;
+
+/* CP/M-65 specific globals for reading a script from a file at startup */
+static FCB startupFile;
+static uint8_t fileBuffer[128];
+static char* cmdptr = cpm_cmdline;
+static bool fileFlag = false;
+static bool fileDoneFlag = false;
+char* filebuffer_pos;
 
 /* A basic setup for defining builtins. This Forth uses impossibly low
 * adresses as IDs for the builtins so we can define builtins as
@@ -185,6 +193,18 @@ const char *initScript =
 
 /******************************************************************************/
 
+/* CP/M-65 addition to read from file */
+void fillFileBuffer(void) 
+{
+    cpm_set_dma(&fileBuffer);
+    if(cpm_read_sequential(&startupFile)) {
+        cpm_close_file(&startupFile);
+        fileDoneFlag = true;
+    }
+    filebuffer_pos = (char *)fileBuffer;    
+}
+
+
 /* The primary data output function. This is the place to change if you want
 * to e.g. output data on a microcontroller via a serial interface. */
 void putkey(char c)
@@ -197,6 +217,13 @@ void putkey(char c)
 int llkey()
 {
     if (*initscript_pos) return *(initscript_pos++);
+    if ((*filebuffer_pos) && fileFlag && !fileDoneFlag) 
+        return *(filebuffer_pos++);
+    if (!(*filebuffer_pos) && fileFlag && !fileDoneFlag) {
+        fillFileBuffer();
+        return *(filebuffer_pos++);
+    }
+
     return cpm_conin();
 }
 
@@ -681,7 +708,7 @@ BUILTIN(38, "QUIT", quit, 0)
 
         if (errorFlag)
             *sp = *rsp = 1;
-        else if (!keyWaiting() && !(*initscript_pos))
+        else if (!keyWaiting() && !(*initscript_pos) && !(*filebuffer_pos))
             tell(" OK\r\n");
     }
 }
@@ -1024,10 +1051,60 @@ void addBuiltin(cell code, const char* name, const byte flags, builtin f)
     comma();
 }
 
+/* CP/M-65 addition to get word from command line */
+static const char* getword(void)
+{
+    const char *word = cmdptr;
+    if(*cmdptr) {
+        while(*cmdptr == ' ')
+            cmdptr++;
+        for(;;)
+        {
+            char c = *cmdptr;
+            if(!c)
+                break;
+            if(c == ' ')
+            {
+                *cmdptr++ = '\0';
+                break;
+            }
+
+            cmdptr++;
+        }
+    }
+    return word;
+}
+
+/* CP/M-65 addition to parse command line arguments */
+void parseCmdline(void) 
+{
+    const char *arg;
+    cpm_fcb.f[0] = ' ';
+    while(*(arg = getword()))
+    {
+        if(cpm_fcb.f[0] == ' ') {
+            cpm_set_dma(&startupFile);
+            cpm_parse_filename(arg);
+            fileFlag = true;
+        }
+    }
+
+}
+
 /* Program setup and jump to outer interpreter */
 int main()
 {
     errorFlag = 0;
+
+    /* Open file if given as command line argument */
+    parseCmdline();
+    if(fileFlag) {
+        if(cpm_open_file(&startupFile)) {
+            tell("Error opening file\r\n");
+            return 1;
+        }
+        fillFileBuffer();
+    }
 
     if (DCELL_SIZE != 2*CELL_SIZE)
     {
