@@ -591,7 +591,36 @@ lbForth is a minimal Forth implementation but still contains a fair amount of
 built in words. It is currently not included on the disks for the C64, VIC20 
 or BBC Micro due to lack of disk space.
 
-The original source code is available [here](https://gist.github.com/lbruder/10007431)
+The original source code is available [here](https://gist.github.com/lbruder/10007431). 
+
+It has been extended with the possibility to load a script from file at 
+startup if the filename is given as a command line argument, and a small
+example file (`TRIANGLE.FRT`) is included:
+```
+: STAR 42 EMIT ;
+: STARS 0 DO STAR LOOP ;
+: TRIANGLE 1 + 1 DO I STARS CR LOOP ;
+CR 10 TRIANGLE CR
+```
+When run from the command line it produces the following output:
+```
+A> LBFORTH TRIANGLE.FRT
+lbForth for CP/M-65. Use BYE to exit.
+
+*
+**
+***
+****
+*****
+******
+*******
+********
+*********
+**********
+
+END OF FILE
+ OK
+```
 
 ### Utilities
 
