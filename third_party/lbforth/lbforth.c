@@ -708,7 +708,7 @@ BUILTIN(38, "QUIT", quit, 0)
 
         if (errorFlag)
             *sp = *rsp = 1;
-        else if (!keyWaiting() && !(*initscript_pos) && !(*filebuffer_pos))
+        else if (!keyWaiting() && !(*initscript_pos) && fileDoneFlag)
             tell(" OK\r\n");
     }
 }
