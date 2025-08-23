@@ -112,18 +112,18 @@ timeout:
     iny
     tya
     cmp #4
-    .zif eq
+    zif eq
         ldy #0
-    .zendif
+    zendif
     sty spinner_pos
     \ldx kbd_blocking
-    \.zif ne
+    \zif ne
     \    lda #'*'
-    \.zendif
+    \zendif
     ldx kbd_blocking
-    \.zif eq
+    \zif eq
         lda chars_spinner, y
-    \.zendif
+    \zendif
     ldy #SCREEN_PUTCHAR
     jsr SCREEN 
 
@@ -143,15 +143,15 @@ timeout:
     \ Get and parse command
     
     ldy kbd_blocking
-    .zif ne
+    zif ne
         lda #0xff
         ldx #0x7f
-    .zendif
+    zendif
     ldy kbd_blocking
-    .zif eq
+    zif eq
         lda #10          \ 0.1 second timeout
         ldx #0x0
-    .zendif
+    zendif
     ldy #SCREEN_GETCHAR
     jsr SCREEN
     bcs timeout \ make sure we don't have consecutive key presses because of short timeouts
@@ -305,22 +305,22 @@ case_done:
         ldy #SCREEN_SETSTYLE
         jsr SCREEN
         jmp mainloop
-    .zendif
+    zendif
     
     \ Toggle keyboard read mode
     cmp #'B'
-    .zif eq
+    zif eq
         lda kbd_blocking
-        .zif eq
+        zif eq
             lda #1
             sta kbd_blocking
             jmp mainloop
-        .zendif
+        zendif
         lda #0
         sta kbd_blocking
         jmp mainloop
         
-    .zendif
+    zendif
   
     \ Draw line numbers
     cmp #'N'
