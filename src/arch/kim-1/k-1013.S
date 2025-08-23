@@ -6,13 +6,15 @@
 
 #include "zif.inc"
 #include "kim-1.inc"
+#include "k-1013.inc"
 
-; K-1013 FDC registers
+zproc fdc_exec_specify, .text.fdc_exec_specify
+    ; Save cylinder for later check
 
-HSRC = 0xffe8           ; R/W   - K-1003 Hardware Status Register
-ADMA = 0xffea           ; Write - K-1013 Set DMA Address Register
-MSTR = 0xffee           ; Read  - NEC-765 Main Status Register
-DATR = 0xffef           ; R/W   - NEC-765 Data Register
+    ldx #fdc_specify-fdc_commands ; Command index into X
+    jsr fdc_exec_command
+    rts
+zendproc
 
 ; Drive in Y
 
@@ -28,12 +30,26 @@ zproc fdc_exec_recal, .text.fdc_exec_recal
 
     ldx #fdc_recal-fdc_commands ; Command index into X
     jsr fdc_exec_command
-    zif_cs
-        pla
+    bcs fdc_pla_ret
+
+    jsr fdc_exec_senseint
+    bcs fdc_pla_ret
+
+    ; Compare cylinder number with desired one in ST1
+
+    pla
+    cmp disk_status+1
+    zif ne
+        sec
         rts
     zendif
+    clc
+    rts
+zendproc
 
-    bcc fdc_exec_senseint
+zproc fdc_pla_ret, .text.fdc_pla_ret, local
+    pla
+    rts
 zendproc
 
 ; Seek track in A, drive in Y
@@ -51,31 +67,10 @@ zproc fdc_exec_seek, .text.fdc_exec_seek
 
     ldx #fdc_seek-fdc_commands  ; Command index into X
     jsr fdc_exec_command
-    zif_cs
-        pla
-        rts
-    zendif
-    ; Fallthrough
-zendproc
-zproc fdc_exec_senseint, .text.fdc_exec_senseint, local
-    ; Wait until FDC interrupt
+    bcs fdc_pla_ret
 
-1:  lda HSRC
-    bmi 1b
-
-    ; Execute Sense Interrupt command
-
-    ldx #fdc_senseint-fdc_commands
-    jsr fdc_exec_command
-    bcs 2f
-
-    ; Read results into memory
-
-    jsr fdc_read_result
-    zif_cs
-  2:    pla
-        rts
-    zendif
+    jsr fdc_exec_senseint
+    bcs fdc_pla_ret
 
     ; Compare cylinder number with desired one in ST1
 
@@ -83,17 +78,115 @@ zproc fdc_exec_senseint, .text.fdc_exec_senseint, local
     cmp disk_status+1
     bne fdc_fail
 
+    clc
+    rts
+zendproc
+
+; Sector num in A, cylinder in X, drive in Y
+
+zproc fdc_exec_write, .text.fdc_exec_write
+    pha
+
+    ; Put READ DATA command code into command byte
+
+    lda #$45            ; Write, no multitrack, MFM, don't skip deleted
+    sta fdc_rw+1
+
+    ; Set FDC DMA read mode
+
+    lda #0
+    sta HSRC
+
+    pla
+zendproc
+;
+; Fall through
+;
+zproc fdc_exec_rw, .text.fdc_exec_rw, local
+
+    stx fdc_rw+3        ; Put cylinder in third byte of command
+    sta fdc_rw+5        ; Put sector in fifth byte of command
+    sta fdc_rw+7        ; Put last sector in seventh byte of command
+    sty fdc_rw+2        ; Put drive in second byte of command
+
+    ; Encode read/write buffer address into the DMA address register
+    ; DISK_BUFFER is in the higher half of the FDC system RAM, at page 0xfe
+    ; Bit 7 and 6: 11  ->  Upper half of system RAM, sys. RAM starts in even boundary
+    ; Bits 5-0: Bits 11-6 of the buffer address
+
+    lda #BUFFER_DMA
+    sta ADMA
+
+    ; Read/Write data into/from disk buffer
+
+    ldx #fdc_rw-fdc_commands ; Command index into X
+    jsr fdc_exec_command
+    zif cs
+        rts
+    zendif
+
+    ; Wait until IRQ from FDC
+
+    zrepeat
+        lda HSRC        ; Wait until IRQ from FDC
+    zuntil pl
+
+    ; Read results into memory
+
+    jsr fdc_read_result
+    zif cs
+        rts
+    zendif
+
     ; Look for error in the status registers
 
     lda disk_status     ; Check ST0
-    and #0xf8           ; Delete don't care bits
-    cmp #0x20           ; Result must be "Seek Completed"
-    bne fdc_fail
+    and #0xd8           ; Delete don't care bits
+    zif ne
+        ; ST0 is not clear, dig further
+        cmp #0x40           ; Test if abnormal termination
+        bne fdc_fail        ; Real error if not
+        lda disk_status+1   ; If abnormal termination, check ST1 for end of cylinder
+        bpl fdc_fail        ; Nope, then it is an error
+    zendif
+    lda disk_status+1   ; Check ST1
+    and #0x37           ; Mask out non-error bits
+    bne fdc_fail        ; Error if any remainder set
+    lda disk_status+2   ; Check ST2
+    and #0x33           ; Mask out non-error bits
+    bne fdc_fail        ; Error if any remainder set
 
     clc
     rts
 zendproc
 
+zproc fdc_exec_senseint, .text.fdc_exec_senseint
+    ; Wait until FDC interrupt
+
+    zrepeat
+        lda HSRC
+    zuntil pl
+
+    ; Execute Sense Interrupt command
+
+    ldx #fdc_senseint-fdc_commands
+    jsr fdc_exec_command
+    zif cc
+        ; Read results into memory
+
+        jsr fdc_read_result
+        zif cc
+            ; Look for error in the status registers
+
+            lda disk_status     ; Check ST0
+            and #0xf8           ; Delete don't care bits
+            cmp #0x20           ; Result must be "Seek Completed"
+            bne fdc_fail
+            clc
+        zendif
+    zendif
+    rts
+zendproc
 
 ; Sector num in A, cylinder in X, drive in Y
 
@@ -115,98 +208,62 @@ zproc fdc_exec_read, .text.fdc_exec_read
     jmp fdc_exec_rw
 zendproc
 
-; Sector num in A, cylinder in X, drive in Y
-
-zproc fdc_exec_write, .text.fdc_exec_write
-    pha
-
-    ; Put READ DATA command code into command byte
-
-    lda #$45            ; Write, no multitrack, MFM, don't skip deleted
-    sta fdc_rw+1
-
-    ; Set FDC DMA read mode
-
-    lda #0
-    sta HSRC
-
-    pla
-
-    ; Fallthrough
-zendproc
-zproc fdc_exec_rw, .text.fdc_exec_rw, local
-
-    stx fdc_rw+3        ; Put cylinder in third byte of command
-    sta fdc_rw+5        ; Put sector in fifth byte of command
-    sta fdc_rw+7        ; Put last sector in seventh byte of command
-    sty fdc_rw+2        ; Put drive in second byte of command
-
-    ; Encode read/write buffer address into the DMA address register
-    ; DISK_BUFFER is in the higher half of the FDC system RAM, at page 0xfe
-    ; Bit 7 and 6: 11  ->  Upper half of system RAM, sys. RAM starts in even boundary
-    ; Bits 5-0: Bits 11-6 of the buffer address
-
-    lda #$f8
-    sta ADMA
-
-    ; Read/Write data into/from disk buffer
-
-    ldx #fdc_rw-fdc_commands ; Command index into X
-    jsr fdc_exec_command
-    zif_cs
-        rts
-    zendif
-
-    ; Wait until IRQ from FDC
-
-1:  lda HSRC            ; Wait until IRQ from FDC
-    bmi 1b
-
-    ; Read results into memory
-
-    jsr fdc_read_result
-    zif_cs
-        rts
-    zendif
-
-    ; Look for error in the status registers
-
-    lda disk_status     ; Check ST0
-    and #0xd8           ; Delete don't care bits
-    beq 2f              ; Jump ahead if ST0 clear
-    cmp #0x40           ; Test if abnormal termination
-    bne fdc_fail        ; Real error if not
-    lda disk_status+1   ; If abnormal termination, check ST1 for end of cylinder
-    bpl fdc_fail        ; Nope, then it is an error
-2:  lda disk_status+1   ; Check ST1
-    and #0x37           ; Mask out non-error bits
-    bne fdc_fail        ; Error if any remainder set
-    lda disk_status+2   ; Check ST2
-    and #0x33           ; Mask out non-error bits
-    bne fdc_fail        ; Error if any remainder set
-
-    clc
+zproc fdc_fail, .text.fdc_fail, local
+    sec
     rts
 zendproc
 
-zproc fdc_fail, .text.fdc_fail, local
-    sec
+zproc fdc_exec_sensestatus, .text.fdc_exec_sensestatus
+
+    sty fdc_status+2    ; Put drive in second byte of command
+
+    ; Execute command
+
+    ldx #fdc_status-fdc_commands
+    jsr fdc_exec_command
+    zif cc
+        ; Read results into memory
+
+        jsr fdc_read_result
+        zif cc
+            ; And return status in A
+
+            lda disk_status     ; Load ST3
+        zendif
+    zendif
     rts
 zendproc
 
 ; Command index in X
 
 zproc fdc_exec_command, .text.fdc_exec_command, local
-    lda MSTR            ; Load Main Status Register
-    and #0x10           ; Check if busy
-    bne fdc_fail
+    zloop
+        lda #0x10           ; Check if uPD765 is busy processing a command
+        and MSTR            ;   (should not occur, but happens)
+        zbreakif eq         ; Not busy, go execute command
+                            ; Yes, execute recovery procedure
+        zrepeat
+            bit MSTR        ; wait until ready to read or write
+        zuntil mi
 
-    ldy fdc_commands, x ; Load command length
+        zif vc              ; Data register ready to write
+            lda #$00        ; Try to complete command sequence
+            sta DATR
+            beq 1f          ; And try again
+        zendif
+                            ; Else, data register needs to be read
+        lda DATR            ; Read status register
+1:      nop                 ; Wait a few cycles
+        nop
+    zendloop
+
+    ldy fdc_commands, x     ; Load command length
     inx
 
-    zloop
-1:      lda MSTR            ; Load Main Status Register again
-        bpl 1b              ; Wait until RQM from controller
+    zrepeat
+        zrepeat
+            lda MSTR        ; Wait until RQM from controller
+        zuntil mi
         and #0x40           ; Test data direction bit
         bne fdc_fail        ; Error if controller wants to talk
 
@@ -214,7 +271,7 @@ zproc fdc_exec_command, .text.fdc_exec_command, local
         sta DATR            ; Store into FDC data register
         inx                 ; Next command byte
         dey
-    zuntil_eq
+    zuntil eq
 
     clc
     rts
@@ -223,8 +280,9 @@ zendproc
 zproc fdc_read_result, .text.fdc_read_result, local
     ldx #0
     zloop
-1:      lda MSTR            ; Load Main Status Register again
-        bpl 1b              ; Wait until RQM from controller
+        zrepeat
+            lda MSTR        ; Wait until RQM from controller
+        zuntil mi
         and #0x40           ; Test data direction bit
         beq fdc_fail        ; Error if controller wants to listen
 
@@ -233,9 +291,9 @@ zproc fdc_read_result, .text.fdc_read_result, local
         inx                 ; Next byte
         nop                 ; Give the controller time to update
         nop                 ; the MSTR with a valid busy status
-        lda #0x10           ; Check if busy and go get another
-        and MSTR            ; byte while so
-    zuntil_eq
+        lda MSTR            ; Check if still busy and get next
+        and #0x10           ; byte while so
+    zuntil eq
 
     clc
     rts
@@ -246,6 +304,12 @@ zendproc
 ; NEC-765 pre-formatted command strings
 
 fdc_commands:
+fdc_specify:
+    .byte 3             ; Command length
+    .byte 3             ; Specify
+    .byte 0x6f          ; Step Rate Time   = 10ms, Head Unload Time = 240ms
+    .byte 0x20          ; Head Load Time   = 32ms
+
 fdc_recal:
     .byte 2             ; Command length
     .byte 7             ; Recalibrate
@@ -273,6 +337,13 @@ fdc_rw:
     .byte 0xe           ; GPL: Gap length for 26 sectors, 256 bytes/sect
     .byte 0xff          ; DTL: Data length = 0xff since N is non-zero
 
+fdc_status:
+    .byte 2             ; Command length
+    .byte 4             ; Sense Drive Status command
+    .byte 0             ; Drive number in bits 0-1, head number in bit 2
+
 .bss
+
+.global disk_status
 
 disk_status:            .fill 8     ; Result phase readouts from NEC-765

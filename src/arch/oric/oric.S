@@ -149,24 +149,24 @@ jasmin_start:
             nop
             nop
             dey
-        zuntil_eq
+        zuntil eq
 
         ldy #0
         zrepeat
             zrepeat
                 lda JFDC_drq
-            zuntil_pl
+            zuntil pl
             lda JFDC_data
             sta (ptr), y
             iny
-        zuntil_eq
+        zuntil eq
 
         /* Advance to next sector. */
 
         inx
         inc ptr+1
         cpx #4 + BIOS_SECTOR_COUNT
-    zuntil_eq
+    zuntil eq
 
     /* Patch the BIOS floppy routines to use the Jasmin registers. */
 
@@ -236,7 +236,7 @@ return:
         lda (ptr), y
         sta sector2, y
         iny
-    zuntil_eq
+    zuntil eq
     jmp sector2_start
 
 sector2_start:
@@ -266,24 +266,24 @@ sector2_start:
             nop
             nop
             dey
-        zuntil_eq
+        zuntil eq
 
         ldy #0
         zrepeat
             zrepeat
                 lda MFDC_drq
-            zuntil_pl
+            zuntil pl
             lda MFDC_data
             sta (ptr), y
             iny
-        zuntil_eq
+        zuntil eq
 
         /* Advance to next sector. */
 
         inx
         inc ptr+1
         cpx #4 + BIOS_SECTOR_COUNT
-    zuntil_eq
+    zuntil eq
 
     lda #MFDC_ID
     jmp _start
@@ -328,10 +328,10 @@ zproc _start
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
     pla                     ; get xFDC_ID back
-    zif_ne
+    zif ne
       ldy #msg_jasmin_end - msg_jasmin
       zrepeat
           tya
@@ -341,7 +341,7 @@ zproc _start
           pla
           tay
           dey
-      zuntil_eq
+      zuntil eq
       beq msg_crlf
     zendif
 
@@ -354,7 +354,7 @@ zproc _start
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
 msg_crlf:
     lda #10
@@ -369,7 +369,7 @@ msg_crlf:
     zrepeat
         sta bss_bottom-1, x
         dex
-    zuntil_eq
+    zuntil eq
 
     ldx #0xff
     stx buffered_host_sector
@@ -469,7 +469,7 @@ zproc psg_x2a
     tay
     txa
     cpy   #0x07
-    zif_eq
+    zif eq
       ora   #0x40
     zendif
     pha
@@ -585,12 +585,12 @@ zproc bios_SETSEC
         rol ptr1+1
         rol a
         cmp #34
-        zif_cs
+        zif cs
             sbc #34
             inc ptr1+0
         zendif
         dex
-    zuntil_eq
+    zuntil eq
     sta requested_cpm_sector
     lda ptr1+0
     sta requested_track
@@ -600,7 +600,7 @@ zendproc
 
 zproc bios_READ
     jsr change_sector
-    zif_cc
+    zif cc
         lda requested_cpm_sector
         ror a
         lda #0
@@ -614,7 +614,7 @@ zproc bios_READ
             inx
             iny
             cpy #0x80
-        zuntil_eq
+        zuntil eq
         clc
     zendif
     rts
@@ -624,7 +624,7 @@ zproc bios_WRITE
     pha
     jsr change_sector
     pla
-    zif_cc
+    zif cc
         pha
 
         lda requested_cpm_sector
@@ -640,14 +640,14 @@ zproc bios_WRITE
             inx
             iny
             cpy #0x80
-        zuntil_eq
+        zuntil eq
 
         lda #0x80
         sta buffer_dirty
 
         clc
         pla
-        zif_ne
+        zif ne
             jsr flush_buffer
         zendif
     zendif
@@ -682,7 +682,7 @@ zendproc
 
 zproc tty_const
     dec const_counter
-    zif_mi
+    zif mi
         lda #16
         sta const_counter
         jsr scan_keyboard
@@ -690,7 +690,7 @@ zproc tty_const
 
     lda pending_key
    
-    zif_ne
+    zif ne
         lda #0xff
     zendif
 
@@ -707,10 +707,10 @@ zproc tty_conin
         jsr screen_getchar
         ; Filter out arrow keys
         cmp #$80
-        zif_cs
+        zif cs
             lda #0
         zendif
-    zuntil_cc
+    zuntil cc
 
     rts
 zendproc
@@ -719,20 +719,20 @@ zendproc
 
 zproc tty_conout
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec cursorx
-        zif_mi
+        zif mi
             lda #SCREEN_WIDTH-1
             sta cursorx
 
             dec cursory
-            zif_mi
+            zif mi
                 lda #0
                 sta cursory
                 jsr screen_scrolldown
@@ -765,7 +765,7 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #SCREEN_HEIGHT
-    zif_eq
+    zif eq
         dec cursory
         jmp screen_scrollup
     zendif
@@ -833,13 +833,13 @@ zproc screen_clear
         zrepeat
             sta (ptr), y
             dey
-        zuntil_mi
+        zuntil mi
 
         pla
         clc
         adc #1
         cmp #SCREEN_HEIGHT
-    zuntil_eq
+    zuntil eq
 
     ; SCREEN doesn't specify where the cursor ends up, but this code is used by
     ; TTY and homing the cursor here simplifies things.
@@ -864,7 +864,7 @@ zendproc
 
 zproc screen_putchar
     cmp #32
-    zif_cs
+    zif cs
         pha
         jsr calculate_cursor_address
         pla
@@ -874,7 +874,7 @@ zproc screen_putchar
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
-    zif_ne
+    zif ne
         inc cursorx
     zendif
 
@@ -890,7 +890,7 @@ zproc screen_putstring
     zloop
     1:
         lda 0xffff, x
-        zbreakif_eq
+        zbreakif eq
 
         sta (ptr), y
         iny
@@ -933,7 +933,7 @@ zproc calculate_line_address
     clc
     adc ptr+0
     sta ptr+0
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
 
@@ -978,10 +978,10 @@ zproc screen_scrollup
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #SCREEN_HEIGHT-1
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #' '
@@ -989,7 +989,7 @@ zproc screen_scrollup
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -1012,10 +1012,10 @@ zproc screen_scrolldown
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #0
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #' '
@@ -1023,7 +1023,7 @@ zproc screen_scrolldown
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -1036,14 +1036,14 @@ zproc screen_cleartoeol
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
 zproc screen_setstyle
     ldx #0
     and #STYLE_REVERSE
-    zif_ne
+    zif ne
         ldx #0x80
     zendif
     stx screen_style
@@ -1057,7 +1057,7 @@ zproc screen_getchar
     zrepeat
         jsr scan_keyboard
         lda pending_key
-    zuntil_ne
+    zuntil ne
     pha
     jsr toggle_cursor
     pla
@@ -1101,12 +1101,12 @@ zproc scan_keyboard
             lsr a
             lsr a
             lsr a                   ; C is set if key is pressed
-            zif_cs
+            zif cs
                 lda column_store_values, x
             zendif
             eor keypress_bitfield, y
             and column_store_values, x ; has key changed state?
-            zif_ne
+            zif ne
                 ; Key has changed state.
 
                 eor keypress_bitfield, y
@@ -1126,10 +1126,10 @@ zproc scan_keyboard
             zendif
 
             dex
-        zuntil_mi
+        zuntil mi
 
         dey
-    zuntil_mi
+    zuntil mi
     rts
 
 column_pa_values:
@@ -1158,14 +1158,14 @@ zproc key_state_changed
 
     lda VIA_PB
     and #0x08
-    zif_ne
+    zif ne
         lda keyboard_decode_tab, x
         bit shift_pressed
-        zif_mi
+        zif mi
             lda keyboard_shift_decode_tab, x
         zendif
         bit ctrl_pressed
-        zif_mi
+        zif mi
             and #0x1f
         zendif
         sta pending_key
@@ -1219,10 +1219,10 @@ zproc change_sector
     lda requested_cpm_sector
     lsr a
     cmp buffered_host_sector
-    zif_eq
+    zif eq
         lda requested_track
         cmp buffered_track
-        zif_eq
+        zif eq
             ; Buffered track/sector not changing, so do no work.
 
             clc
@@ -1231,9 +1231,9 @@ zproc change_sector
     zendif
 
     bit buffer_dirty
-    zif_mi
+    zif mi
         jsr flush_buffer
-        zif_cs
+        zif cs
             rts
         zendif
     zendif
@@ -1252,17 +1252,17 @@ zproc change_sector
         zrepeat
 __fdc_drq_reg_0 = . + 1
             lda MFDC_drq
-        zuntil_pl
+        zuntil pl
 __fdc_data_reg_0 = . + 1
         lda MFDC_data
         sta DISK_BUFFER, y
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr wait_for_fdc_completion
     clc
     and #0x1c
-    zif_ne
+    zif ne
         ; Some kind of read error. The data in the buffer is corrupt.
 
         lda #0xff
@@ -1281,17 +1281,17 @@ zproc flush_buffer
         zrepeat
 __fdc_drq_reg_1 = . + 1
             lda MFDC_drq
-        zuntil_pl
+        zuntil pl
         lda DISK_BUFFER, y
 __fdc_data_reg_1 = . + 1
         sta MFDC_data
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr wait_for_fdc_completion
     sec
     and #0x1c
-    zif_eq
+    zif eq
         ; A successful write, so mark the buffer as clean.
 
         lda #0
@@ -1310,7 +1310,7 @@ zproc prepare_fdc
     lsr a                           ; bottom bit is the side
 __fdc_track_reg = . + 1
     cmp MFDC_track_register
-    zif_ne
+    zif ne
 __fdc_data_reg_2 = . + 1
         sta MFDC_data               ; computed track
 __fdc_seek_cmd = . + 1
@@ -1333,7 +1333,7 @@ __fdc_side0_flag = . + 1
     ldx #MFDC_Flag_Side0
     lda buffered_track
     ror a
-    zif_cs
+    zif cs
 __fdc_side1_flag = . + 1
         ldx #MFDC_Flag_Side1
     zendif
@@ -1349,13 +1349,13 @@ zproc wait_for_fdc_completion
     ldy #4
     zrepeat
         dey
-    zuntil_eq
+    zuntil eq
 
     zloop
 __fdc_status_reg = . + 1
         lda MFDC_status_register
         lsr a
-    zuntil_cc
+    zuntil cc
     asl a
     rts
 zendproc
@@ -1375,7 +1375,7 @@ __fdc_command_reg = . + 1
         nop
         nop
         dey
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -1400,7 +1400,7 @@ zproc brk_handler
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
     pla
     tay             ; low byte of fault address
@@ -1434,7 +1434,7 @@ zproc nmi_handler
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
 
     lda #<biosentry
     ldx #>biosentry
@@ -1469,7 +1469,7 @@ print_hex4_number:
     and #$0f
     ora #'0'
     cmp #'9'+1
-    zif_cs
+    zif cs
         adc #6
     zendif
     pha
@@ -1495,7 +1495,8 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 2844, 2048, 64, 34
+define_dpb dpb, 2844, 2048, 64, 34
+define_dph dph, dpb
 
 .bss
 

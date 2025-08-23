@@ -78,7 +78,7 @@ zproc loadfile
     zloop
         zloop
             jsr readsector
-        zuntil_cc
+        zuntil cc
 
         lda #0x01
         zrepeat
@@ -90,7 +90,7 @@ zproc loadfile
             clc
             adc #0x20
             cmp #0x81
-        zuntil_eq
+        zuntil eq
 
         jsr gotonextsector
     zendloop
@@ -115,7 +115,7 @@ found:
 
         sty current_sector+1
         lda large_disk
-        zif_ne
+        zif ne
             ; This is a large disk; it's using two-byte block numbers.
 
             lda directory_buffer, x
@@ -130,7 +130,7 @@ found:
 
         lda current_sector+0
         ora current_sector+1
-        zbreakif_eq
+        zbreakif eq
 
         ; Convert block number to sector number.
 
@@ -140,7 +140,7 @@ found:
             rol current_sector+1
             rol current_sector+2
             dey
-        zuntil_eq
+        zuntil eq
 
         ; Remember to add on the number of reserved sectors.
 
@@ -151,7 +151,7 @@ found:
         lda current_sector+1
         adc reserved_sectors+1
         sta current_sector+1
-        zif_cs
+        zif cs
             inc current_sector+2
         zendif
 
@@ -162,7 +162,7 @@ found:
         zrepeat
             asl a
             dey
-        zuntil_eq
+        zuntil eq
         sta sector_count
 
         ; Read the block.
@@ -175,24 +175,24 @@ found:
             jsr bios_SETDMA
             zrepeat
                 jsr readsector
-            zuntil_cc
+            zuntil cc
 
             ; Advance to the next sector.
 
             lda destination_addr+0
             eor #0x80
             sta destination_addr+0
-            zif_eq
+            zif eq
                 inc destination_addr+1
             zendif
 
             jsr gotonextsector
             dec sector_count
-        zuntil_eq
+        zuntil eq
 
         ldx directory_offset
         cpx #16
-    zuntil_eq
+    zuntil eq
 
     ; We're finished!
 
@@ -208,7 +208,7 @@ zproc checkfilename,,local
         lda directory_buffer, x
         and #0x7f
         cmp (filename), y
-        zif_ne
+        zif ne
             sec
             rts
         zendif
@@ -216,16 +216,16 @@ zproc checkfilename,,local
         iny
         inx
         cpy #11
-    zuntil_eq
+    zuntil eq
     clc
     rts
 zendproc
 
 zproc gotonextsector,,local
     inc current_sector+0
-    zif_eq
+    zif eq
         inc current_sector+1
-        zif_eq
+        zif eq
             inc current_sector+2
         zendif
     zendif

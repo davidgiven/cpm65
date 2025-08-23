@@ -6,7 +6,7 @@ simplerule(
     name="mads",
     ins=["./mads.pas"],
     outs=["=mads"],
-    commands=["chronic $(FPC) -Mdelphi -Os {ins[0]} -o{outs[0]}"],
+    commands=["chronic $(FPC) -Mdelphi -Os $[ins[0]] -o$[outs[0]]"],
     label="FREEPASCAL",
 )
 
@@ -20,6 +20,8 @@ def mads(self, name, src: Target, deps: Targets = [], defines={}):
         ins=[src],
         outs=[f"={name}.bin"],
         deps=["third_party/mads"] + deps,
-        commands=["chronic {deps[0]} {ins[0]} -c -o:{outs[0]} " + " ".join(ds)],
+        commands=[
+            "chronic $[deps[0]] $[ins[0]] -c -o:$[outs[0]] " + " ".join(ds)
+        ],
         label="MADS",
     )

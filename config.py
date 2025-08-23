@@ -14,6 +14,7 @@ MINIMAL_APPS = {
     "0:ls.com": "apps+ls",
     "0:stat.com": "apps+stat",
     "0:submit.com": "apps+submit",
+    "0:more.com": "apps+more",
 }
 
 # Programs which only work on a real CP/M filesystem (not emulation).
@@ -66,6 +67,11 @@ PASCAL_APPS = {
     "0:pasc.obb": "third_party/pascal-m+pasc-obb",
     "0:pload.com": "third_party/pascal-m+loader",
     "0:hello.pas": "cpmfs+hello_pas_cpm",
+}
+
+FORTH_APPS = {
+    "0:lbforth.com": "third_party/lbforth",
+    "0:triangle.frt": "cpmfs+triangle_frt_cpm",
 }
 
 SERIAL_APPS = {

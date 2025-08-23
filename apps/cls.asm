@@ -8,7 +8,7 @@
 
 \ --- Resident part starts at the top of the file ---------------------------
 
-.zproc start
+zproc start
     ldy #BDOS_GET_BIOS
     jsr BDOS
     sta BIOS+1
@@ -18,9 +18,9 @@
     ldx #>DRVID_SCREEN
     ldy #BIOS_FINDDRV
     jsr BIOS
-    .zif cs
+    zif cs
         rts
-    .zendif
+    zendif
     sta SCREEN+1
     stx SCREEN+2
 

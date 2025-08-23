@@ -15,7 +15,7 @@ jobs:
         path: 'cpm65'
 
     - name: apt
-      run: sudo apt update && sudo apt install cc1541 cpmtools libfmt-dev fp-compiler moreutils srecord 64tass libreadline-dev
+      run: sudo apt update && sudo apt install cpmtools libfmt-dev fp-compiler moreutils srecord 64tass libreadline-dev libelf-dev vice
 
     - name: install llvm-mos
       run: |
@@ -56,6 +56,7 @@ jobs:
           kim-1-iec.zip
           kim-1-k1013.zip
           kim-1-sdcard.zip
+          kim-1-sdshield.zip
           nano6502.img
           nano6502_sysonly.img
           neo6502.zip
@@ -80,7 +81,10 @@ jobs:
           pet8032.d64
           pet8096.d64
           snes.smc
-          vic20.d64
+          vic20_iec_1541.d64
+          vic20_jiffy_1541.d64
+          vic20_jiffy_fd2000.d2m
+          vic20_yload_1541.d64
           x16.zip
         fail-if-no-assets: false
 
@@ -101,6 +105,7 @@ jobs:
           cpm65/images/kim-1-iec.zip
           cpm65/images/kim-1-k1013.zip
           cpm65/images/kim-1-sdcard.zip
+          cpm65/images/kim-1-sdshield.zip
           cpm65/images/nano6502.img
           cpm65/images/nano6502_sysonly.img
           cpm65/images/neo6502.zip
@@ -124,7 +129,10 @@ jobs:
           cpm65/images/pet8032.d64
           cpm65/images/pet8096.d64
           cpm65/images/snes.smc
-          cpm65/images/vic20.d64
+          cpm65/images/vic20_iec_1541.d64
+          cpm65/images/vic20_jiffy_fd2000.d2m
+          cpm65/images/vic20_jiffy_1541.d64
+          cpm65/images/vic20_yload_1541.d64
           cpm65/images/x16.zip
         tag_name: dev
       env:

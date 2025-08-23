@@ -18,8 +18,8 @@ UART_WBUFSIZ = $DF0F; can be $00-$7f in normal operation
 
 ; IO Register for Disk-Access.
 ; Write Sector LBA ( 128 Byte sectors ), Address of the DMA-buffer
-; then trigger the read  ( write 0x55 to SECTOR_CMD_READ )
-; or the           write ( write 0x44 to SECTOR_CMD_WRITE )
+; then trigger the read  ( strobe write to SECTOR_CMD_READ )
+; or the           write ( strobe write to SECTOR_CMD_WRITE )
 ; DMA-adress and LBA will be auto-incremented, be aware to set them properly before trigger !
 
 SECTOR_LBA_L = $DF70
@@ -135,17 +135,17 @@ zendproc
 
 zproc tty_conin
     lda pending_key
-    zif_eq
+    zif eq
         zrepeat
             jsr GETIN
             tax
-        zuntil_ne
+        zuntil ne
     zendif
     ldx #0
     stx pending_key
 
     cmp #$7f         ; Backspace
-    zif_eq
+    zif eq
         lda #8
     zendif
 
@@ -155,7 +155,7 @@ zendproc
 
 zproc tty_conout
     cmp #$7f         ; Backspace
-    zif_eq
+    zif eq
         lda #8
         jsr CHROUT
         lda #32
@@ -169,10 +169,10 @@ zendproc
 
 zproc tty_const
     lda pending_key
-    zif_eq
+    zif eq
         jsr GETIN
         sta pending_key
-        zif_eq
+        zif eq
             lda #0
             clc
             rts
@@ -230,7 +230,7 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
+    zif ne
         sec                 ; invalid drive
         rts
     zendif
@@ -252,7 +252,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
     clc
     rts
 zendproc
@@ -317,9 +317,14 @@ zproc bios_READ
     lda dma+1
     sta SECTOR_DMA_H
 
-    lda #$88        // iniate read with DMA
     sta SECTOR_CMD_READ
+    zrepeat
+        lda SECTOR_CMD_READ
+    zuntil mi
     clc
+    zif vs
+        sec
+    zendif
     rts
 zendproc
 
@@ -340,12 +345,15 @@ zproc bios_WRITE
    ; jsr print_hex_number
    ; pla
    ; jsr print_hex_number
-    lda #$44        // iniate write with DMA
     sta SECTOR_CMD_WRITE
-
+    zrepeat
+        lda SECTOR_CMD_WRITE
+    zuntil mi
     clc
+    zif vs
+        sec
+    zendif
     rts
-
 zendproc
 
 ; Prints an 8-bit hex number in A.
@@ -361,7 +369,7 @@ h4:
     and #0x0f ; %00001111
     ora #'0'
     cmp #'9'+1
-    zif_cs
+    zif cs
         adc #6
     zendif
     pha
@@ -381,7 +389,7 @@ zproc print
     ldy #0
     zloop
         lda (ptr), y
-        zbreakif_eq
+        zbreakif eq
         jsr CHROUT
         iny
     zendloop
@@ -397,7 +405,7 @@ zproc init_system
     ldy #0
     zloop
         lda loading_msg, y
-        zbreakif_eq
+        zbreakif eq
         jsr CHROUT
         iny
     zendloop
@@ -470,7 +478,8 @@ mem_end:    .byte  $d0
 ; DPH for drive 0 (our only drive)
 
 ; drive parameters: total sectors, bytes per block, dir entries, boot sectors
-define_drive dph, 32768, 2048, 1024, 256
+define_dpb dpb, 32768, 2048, 1024, 256
+define_dph dph, dpb
 
 NOINIT
 

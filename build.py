@@ -3,6 +3,7 @@ from build.pkg import package
 
 package(name="libreadline", package="readline")
 package(name="libfmt", package="fmt")
+package(name="libelf", package="libelf")
 
 export(
     name="all",
@@ -47,7 +48,10 @@ export(
         "images/pet8032.d64": "src/arch/commodore+pet8032_diskimage",
         "images/pet8096.d64": "src/arch/commodore+pet8096_diskimage",
         "images/snes.smc": "src/arch/snes+snes_cartridge",
-        "images/vic20.d64": "src/arch/commodore+vic20_diskimage",
+        "images/vic20_jiffy_1541.d64": "src/arch/commodore+vic20_jiffy_1541_diskimage",
+        "images/vic20_yload_1541.d64": "src/arch/commodore+vic20_yload_1541_diskimage",
+        "images/vic20_iec_1541.d64": "src/arch/commodore+vic20_iec_1541_diskimage",
+        "images/vic20_jiffy_fd2000.d2m": "src/arch/commodore+vic20_jiffy_fd2000_diskimage",
         "images/x16.zip": "src/arch/x16+diskimage",
         "images/sorbus.zip": "src/arch/sorbus+diskimage",
         "images/nano6502.img": "src/arch/nano6502+diskimage",
@@ -55,32 +59,36 @@ export(
         "images/kim-1-k1013.zip": "src/arch/kim-1+distro-k1013",
         "images/kim-1-sdcard.zip": "src/arch/kim-1+distro-sdcard",
         "images/kim-1-iec.zip": "src/arch/kim-1+distro-iec",
+        "images/kim-1-sdshield.zip": "src/arch/kim-1+distro-sdshield",
     },
-    deps=[
-        "tests"
-    ],
+    deps=["tests"],
 )
 
 export(
     name="mametest",
     deps=[
         "src/arch/bbcmicro+mametest",
-        "src/arch/commodore+c64_mametest",
         
+        # Isn't accurate enough to support the fastloader.
+        #"src/arch/commodore+c64_mametest",
+        
+        # As above, and also doesn't support enough memory expansions.
+        #"src/arch/commodore+vic20_mametest",
+
         # MAME's ROM configuration is for the graphics keyboard, but MAME's
         # hardware emulates the business keyboard, so we can't interact with the
         # system.
-        #"src/arch/commodore+pet4032_mametest",
+        # "src/arch/commodore+pet4032_mametest",
 
         # MAME's ROM configuration is for the business keyboard, but MAME's
         # hardware emulates the graphics keyboard...
-        #"src/arch/commodore+pet8032_mametest",
+        # "src/arch/commodore+pet8032_mametest",
 
         # Works locally, but not on github CI.
-        #"src/arch/apple2e+mametest",
+        # "src/arch/apple2e+mametest",
 
         # Fails everywhere.
-        #"src/arch/atari800+mametest",
+        # "src/arch/atari800+mametest",
 
         "src/arch/oric+mametest",
     ],

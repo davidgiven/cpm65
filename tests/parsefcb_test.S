@@ -25,18 +25,18 @@ zproc main
 		ldy #0
 		zrepeat
 			inc param+0
-			zif_eq
+			zif eq
 				inc param+1
 			zendif
 
 			lda (param), y
-		zuntil_eq
+		zuntil eq
 		inc param+0
-		zif_eq
+		zif eq
 			inc param+1
 		zendif
 		lda (param), y
-	zuntil_eq
+	zuntil eq
 		
 	rts
 zendproc
@@ -93,7 +93,7 @@ zproc print_fcb
 		pla
 		inx
 		cpx #FCB_T3+1
-	zuntil_eq
+	zuntil eq
 		
 	jmp nl
 zendproc
@@ -127,7 +127,7 @@ print:
 	and #0x0f
 	ora #48
 	cmp #58
-    zif_cs
+    zif cs
         adc #6
     zendif
 	pha

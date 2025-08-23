@@ -211,7 +211,7 @@ init:
         sta (ptr),y
         iny
         cpy #5
-    zuntil_eq
+    zuntil eq
 
     ldx #23
     zrepeat
@@ -222,7 +222,7 @@ init:
         sta (ptr),y
         iny
         dex
-    zuntil_eq
+    zuntil eq
 
     lda #$41
     sta (ptr),y
@@ -246,7 +246,7 @@ init:
         jsr tty_conout
         ldy save_y
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Open IOCB1 for K device (no direct OS call hack)
 
@@ -321,24 +321,24 @@ memcpy:
         sta bios_exec_addr
 
         inc memload
-        zif_eq
+        zif eq
             inc memload+1
         zendif
 
         inc memstore
-        zif_eq
+        zif eq
             inc memstore+1
-            zbreakif_eq
+            zbreakif eq
         zendif
 
         lda memstore
         memcmplsb = .+1
         cmp #<bios_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda memstore+1
         memcmpmsb = .+1
         cmp #>bios_end_addr
-    zuntil_eq
+    zuntil eq
     rts
 
 dl_prologue:
@@ -449,18 +449,18 @@ zproc screen_clear
         zrepeat
             sta (ptr), y
             dey
-        zuntil_mi
+        zuntil mi
 
         lda ptr
         clc
         adc #SCREEN_WIDTH
         sta ptr
-        zif_cs
+        zif cs
             inc ptr+1
         zendif
 
         dex
-    zuntil_eq
+    zuntil eq
 
     ; SCREEN doesn't specify where the cursor ends up, but this code is used by
     ; TTY and homing the cursor here simplifies things.
@@ -475,14 +475,14 @@ zendproc
 
 zproc screen_setcursor
     cmp #SCREEN_WIDTH
-    zif_cs
+    zif cs
         lda #SCREEN_WIDTH-1
     zendif
     sta cursorx
 
     txa
     cmp #SCREEN_HEIGHT
-    zif_cs
+    zif cs
         lda #SCREEN_HEIGHT-1
     zendif
     sta cursory
@@ -514,16 +514,16 @@ zproc screen_getchar
     zloop
         ldx CH
         inx
-        zbreakif_ne                 ; break if key is pending
+        zbreakif ne                 ; break if key is pending
         cpy RTCLOK
-        zif_eq
+        zif eq
             iny
             lda ptr
-            zif_eq
+            zif eq
                 dec ptr+1
                 ldx ptr+1
                 cpx #$ff
-                zif_eq
+                zif eq
                     jsr toggle_cursor
                     sec             ; timer expired
                     rts
@@ -538,22 +538,22 @@ zproc screen_getchar
     
     ; Translate arrow keys
     cmp #$1c ; Up
-    zif_eq
+    zif eq
         lda #$8b
     zendif
 
     cmp #$1d ; Down
-    zif_eq
+    zif eq
         lda #$8a
     zendif
     
     cmp #$1e ; Left
-    zif_eq
+    zif eq
         lda #$88
     zendif
     
     cmp #$1f ; Right
-    zif_eq
+    zif eq
         lda #$89
     zendif
 
@@ -573,7 +573,7 @@ style=.+1
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
-    zif_ne
+    zif ne
         inc cursorx
     zendif
 
@@ -589,13 +589,13 @@ zproc screen_putstring
     zloop
     1:
         lda 0xffff, x
-        zbreakif_eq
+        zbreakif eq
 
         jsr convert_ascii_to_screencode
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
-        zbreakif_eq
+        zbreakif eq
         inx
     zendloop
     dey
@@ -617,7 +617,7 @@ zproc screen_scrollup
         clc
         adc #SCREEN_WIDTH
         sta ptr
-        zif_cs
+        zif cs
             inc ptr+1
         zendif
 
@@ -626,7 +626,7 @@ zproc screen_scrollup
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         lda ptr
         sta ptr1
@@ -634,14 +634,14 @@ zproc screen_scrollup
         sta ptr1+1
 
         dex
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #0                  ; screen memory space
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -661,7 +661,7 @@ zproc screen_scrolldown
         sec
         sbc #SCREEN_WIDTH
         sta ptr
-        zif_cc
+        zif cc
             dec ptr+1
         zendif
 
@@ -670,7 +670,7 @@ zproc screen_scrolldown
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         lda ptr
         sta ptr1
@@ -678,14 +678,14 @@ zproc screen_scrolldown
         sta ptr1+1
 
         dex
-    zuntil_eq
+    zuntil eq
 
     ldy #SCREEN_WIDTH-1
     lda #0                          ; screen memory space
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -697,7 +697,7 @@ zproc screen_cleartoeol
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
-    zuntil_eq
+    zuntil eq
 
     rts
 zendproc
@@ -730,19 +730,19 @@ zproc tty_conin
     lda charin
 
     cmp #ATARI_EOL
-    zif_eq
+    zif eq
         lda #13
         bne 1f
     zendif
 
     cmp #ATARI_BS
-    zif_eq
+    zif eq
         lda #127            ; DEL not BS
         bne 1f
     zendif
 
     cmp #ATARI_TAB
-    zif_eq
+    zif eq
         lda #9
     zendif                  ; fallthrough
 
@@ -758,7 +758,7 @@ zendproc
 zproc tty_const
     ldx CH
     inx
-    zif_eq
+    zif eq
         lda #0
         rts
     zendif
@@ -770,20 +770,20 @@ zendproc
 
 zproc tty_conout
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec cursorx
-        zif_mi
+        zif mi
             lda #SCREEN_WIDTH-1
             sta cursorx
 
             dec cursory
-            zif_mi
+            zif mi
                 lda #0
                 sta cursory
                 jsr screen_scrolldown
@@ -817,7 +817,7 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #SCREEN_HEIGHT
-    zif_eq
+    zif eq
         dec cursory
         jmp screen_scrollup
     zendif
@@ -827,13 +827,13 @@ zendproc
 ; Preserves X and Y.
 zproc convert_ascii_to_screencode
     cmp #32
-    zif_cc
+    zif cc
         clc
         adc #64
         rts
     zendif
     cmp #96
-    zif_cc
+    zif cc
         sec
         sbc #32
         rts
@@ -869,7 +869,7 @@ zproc calculate_cursor_address
     clc
     adc ptr+0
     sta ptr+0
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
 
@@ -893,7 +893,7 @@ zendproc
 
 zproc screen_showcursor
     cmp #0
-    zif_eq
+    zif eq
         lda #$60            ; rts instruction
     zelse
         lda #$20            ; jsr instruction
@@ -904,7 +904,7 @@ zendproc
 
 zproc screen_setstyle
     cmp #STYLE_REVERSE
-    zif_eq
+    zif eq
         lda #$80
     zelse
         lda #0
@@ -930,7 +930,7 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph
         ldx #>dph
@@ -938,7 +938,7 @@ zproc bios_SELDSK
         rts
     zendif
     cmp #1
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph_b
         ldx #>dph_b
@@ -947,7 +947,7 @@ zproc bios_SELDSK
     zendif
 #ifndef ATARI_HD
     cmp #2
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph_c
         ldx #>dph_c
@@ -955,7 +955,7 @@ zproc bios_SELDSK
         rts
     zendif
     cmp #3
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph_d
         ldx #>dph_d
@@ -980,7 +980,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -1108,13 +1108,15 @@ mem_end:  .byte 0
 ; 18 reserved sectors
 
 #ifdef ATARI_HD
-define_drive dph, 8190, 2048, 128, 18
-define_drive dph_b, 8190, 2048, 128, 18
+define_dpb atari_hd, 8190, 2048, 128, 18
+define_dph dph, atari_hd
+define_dph dph_b, atari_hd
 #else
-define_drive dph, 720, 1024, 64, 18
-define_drive dph_b, 720, 1024, 64, 18
-define_drive dph_c, 720, 1024, 64, 18
-define_drive dph_d, 720, 1024, 64, 18
+define_dpb atari_fd, 720, 1024, 64, 18
+define_dph dph, atari_fd
+define_dph dph_b, atari_fd
+define_dph dph_c, atari_fd
+define_dph dph_d, atari_fd
 #endif
 
     .section .noinit, "ax", @nobits
@@ -1203,7 +1205,7 @@ clok_done:
         lda PCOLOR0,x
         sta COLPM0,x
         dex
-    zuntil_mi
+    zuntil mi
 
     lda CHBAS
     sta CHBASE
@@ -1281,7 +1283,7 @@ SIOV_wrapper:
         lda (ptr),y
         sta sector_buffer,y
         iny
-    zuntil_mi
+    zuntil mi
 
 no_write:
     jsr actual_sio
@@ -1295,7 +1297,7 @@ no_write:
         lda sector_buffer,y
         sta (ptr),y
         iny
-    zuntil_mi
+    zuntil mi
 
 siov_done:
     rts

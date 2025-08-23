@@ -10,6 +10,7 @@
 #define BDOS_ADDRESS 0xff00
 #define BIOS_ADDRESS 0xff01
 #define EXIT_ADDRESS 0xff02
+#define SCREEN_ADDRESS 0xff03
 
 extern M6502* cpu;
 extern uint8_t ram[0x10000];
@@ -19,6 +20,10 @@ extern bool tracing;
 extern void emulator_init(void);
 extern void emulator_run(void);
 extern void showregs(void);
+extern uint16_t get_xa();
+extern void set_xa(uint16_t xa);
+extern void set_result(uint16_t xa, bool success);
+extern bool singlestepping;
 
 extern const uint8_t ccp_data[];
 extern const int ccp_len;
@@ -31,6 +36,7 @@ extern void bios_warmboot(void);
 
 extern void bdos_entry(uint8_t bdos_call, bool log);
 extern void bios_entry(uint8_t bios_call);
+extern void screen_entry(uint8_t screen_call);
 
 typedef struct
 {

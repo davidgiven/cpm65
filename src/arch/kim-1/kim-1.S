@@ -4,6 +4,8 @@
 
 ; KIM-1 port Copyright © 2024 Eduardo Casino
 
+#include "zif.inc"
+#include "cpm65.inc"
 #include "driver.inc"
 #include "kim-1.inc"
 
@@ -11,6 +13,7 @@ ZEROPAGE
 
 .global ptr
 .global ptr1
+.global tmp1
 ptr: .fill 2
 ptr1: .fill 2
 dma: .fill 2            ; current DMA address
@@ -32,7 +35,7 @@ _start:
     ldy #0
     zloop
         lda loading_msg, y
-        zbreakif_eq
+        zbreakif eq
         sty tmp1
         jsr OUTCH
         ldy tmp1
@@ -48,12 +51,12 @@ _start:
     sta __bios_start
 
     inc srcp+0
-    zif_eq
+    zif eq
         inc srcp+1
     zendif
 
     inc destp+0
-    zif_eq
+    zif eq
         inc destp+1
     zendif
 
@@ -64,6 +67,11 @@ _start:
     lda destp+1
     cmp #>__bios_end
     bne 1b
+
+    ; System initialisation
+    lda #0
+    sta pending_key
+    sta buffer_dirty
 
     jsr system_init
 
@@ -99,6 +107,7 @@ loading_msg:
 
 bdos_filename:
     .ascii "BDOS    SYS"
+zendproc
 
 ; Actual BIOS code.
 
@@ -137,58 +146,47 @@ zendproc
 
 zproc tty_conin
     lda pending_key
-    zif_eq
-        sty tmp1        ; Save Y
-        lda SBD         ; Supress echo
-        and #0xfe
-        sta SBD
-        jsr GETCH
-        pha
-        lda SBD         ; Restore echo
-        ora #1
-        sta SBD
-        pla
-        cmp #0x20       ; Echo control characters
-        zif_cc
-            pha
-            jsr OUTCH
-            pla
-        zendif
-        ldy tmp1        ; Restore Y
-    zendif
-    ldx #0
-    stx pending_key
+    bne 1f
 
-    cmp #20             ; DEL
-    zif_eq
-        lda #8
-    zendif
+    lda SBD             ; Supress echo
+    and #0xfe
+    sta SBD
+
+    jsr _tty_bgetch
+
+    pha                 ; Restore echo
+    lda SBD
+    ora #1
+    sta SBD
+    pla
+
+1:  ldy #0
+    sty pending_key
 
     clc
     rts
 zendproc
 
 zproc tty_conout
-    sty tmp1            ; Save Y
-    cmp #'\n'
-    zif_eq
-        pha
-        lda #'\r'
+    cmp #127
+    zif eq
+        lda #8
         jsr OUTCH
-        pla
+        lda #' '
+        jsr OUTCH
+        lda #8
     zendif
     jsr OUTCH
-    ldy tmp1            ; Restore Y
     clc
     rts
 zendproc
 
 zproc tty_const
     lda pending_key
-    zif_eq
-        jsr tty_nbgetch
+    zif eq
+        jsr _tty_nbgetch
         sta pending_key
-        zif_eq
+        zif eq
             clc
             rts
         zendif
@@ -199,18 +197,36 @@ zproc tty_const
     rts
 zendproc
 
+; Blocking tty read. Wait until char ready, then
+; put it into A
+
+zproc _tty_bgetch
+    lda #1
+    zrepeat
+        bit SAD         ; Check start bit
+        bne 1f
+    zuntil pl
+    bpl _tty_getch      ; Always jump
+1:  lda #0
+    rts
+zendproc
+
 ; Non-blocking tty read. If there is a char ready,
 ; put it into A. Otherwise, return 0x00. Adapted
 ; from the KIM-1 ROM
 
-zproc tty_nbgetch
-    sty tmp1            ; Save XY
-    stx tmp2
-    ldx #8              ; Set up 8 bit count
+zproc _tty_nbgetch
     lda #1
     bit SAD             ; Check start bit
-    bne 1f
-    bmi 1f              ; No start bit
+    bne 1b
+    bmi 1b              ; No start bit
+zendproc
+;
+; Fall through
+;
+zproc _tty_getch
+    ldx #8              ; Set up 8 bit count
+    lda #1
     jsr DELAY           ; Delay 1 bit
     jsr DEHALF          ; Delay 1/2 bit time
     zrepeat             ; Get 8 bits loop
@@ -221,39 +237,15 @@ zproc tty_nbgetch
         sta CHAR
         jsr DELAY
         dex
-    zuntil_eq
+    zuntil eq
     jsr DEHALF
     lda CHAR
     rol a               ; Shift off parity
     lsr a
-    bne 2f
-1:  lda #0
-2:  ldx tmp2            ; Restore XY
-    ldy tmp1
     rts
 zendproc
 
 ; --- BIOS entrypoints ------------------------------------------------------
-
-; Select a disk.
-; A is the disk number.
-; Returns the DPH in XA.
-; Sets carry on error.
-
-zproc bios_SELDSK
-    cmp #0
-    zif_ne
-        sec                 ; invalid drive
-        rts
-    zendif
-
-    sta current_drive
-
-    lda #<dph0
-    ldx #>dph0
-    clc
-    rts
-zendproc
 
 zproc bios_GETTPA
     lda mem_base
@@ -299,7 +291,7 @@ zendproc
 
 zproc bios_READ
     jsr change_sector
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -312,7 +304,7 @@ zproc bios_READ
         lda (ptr), y
         sta (dma), y
         dey
-    zuntil_mi
+    zuntil mi
     clc
     rts
 zendproc
@@ -322,7 +314,7 @@ zproc bios_WRITE
     jsr change_sector
     pla
 
-    zif_cc
+    zif cc
         pha
 
         ; Calculate offset in DISK_BUFFER
@@ -334,14 +326,14 @@ zproc bios_WRITE
             lda (dma), y
             sta (ptr), y
             dey
-        zuntil_mi
+        zuntil mi
 
         lda #0x80
         sta buffer_dirty
 
         clc
         pla
-        zif_ne
+        zif ne
             jsr flush_buffer
         zendif
     zendif
@@ -357,13 +349,15 @@ zp_end:     .byte __ZEROPAGE_END__
 mem_base:   .byte __TPA_START__@mos16hi
 mem_end:    .byte __TPA_END__@mos16hi
 
+.global mem_end
+
 .bss
 
 directory_buffer:       .fill 128   ; used by the BDOS
 
 .global directory_buffer
 
-pending_key:            .byte 0
-current_drive:          .fill 1     ; Current selected disk drive number
+pending_key:            .fill 1
 buffer_dirty:           .fill 1     ; top bit set if the buffer was modified
-buffer_offset:          .fill 1     ; Offset of CP/M sector into host sector buffer
+
+.global buffer_dirty

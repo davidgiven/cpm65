@@ -20,7 +20,7 @@ scan_keyboard:
     zloop
         lda KEYBD
 
-        zif_mi
+        zif mi
             sta last_char
             sta cur_char
             ldx #2
@@ -29,7 +29,7 @@ scan_keyboard:
         zendif
 
         cmp cur_char
-        zif_ne
+        zif ne
             sta cur_char
             lda #2
             sta wait_cntr
@@ -37,21 +37,21 @@ scan_keyboard:
         zendif
 
         dec wait_cntr
-        zbreakif_eq
+        zbreakif eq
 
         ldy #$10
         zloop
             ldx #$40
             zloop
                 dex
-            zuntil_eq
+            zuntil eq
             dey
-        zuntil_eq
+        zuntil eq
     zendloop
 
     ldx #$64                ; long delay on first character
     cmp last_char
-    zif_eq
+    zif eq
         ldx #$0f                ; shorter repeat rate
     zendif
 

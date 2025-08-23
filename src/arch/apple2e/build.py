@@ -9,6 +9,7 @@ from config import (
     SCREEN_APPS_SRCS,
     BIG_SCREEN_APPS,
     PASCAL_APPS,
+    FORTH_APPS,
 )
 
 llvmcfile(
@@ -39,7 +40,7 @@ llvmrawprogram(
     ],
     linkscript="./apple2e.ld",
     ldflags=[
-        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers {deps[0]} "
+        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers $[deps[0]] "
         + "| gawk --non-decimal-data -f scripts/size.awk)"
     ],
 )
@@ -97,6 +98,7 @@ mkcpmfs(
     | MINIMAL_APPS
     | BIG_SCREEN_APPS
     | PASCAL_APPS
+    | FORTH_APPS
 )
 
 mametest(

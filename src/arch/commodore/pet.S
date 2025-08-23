@@ -115,21 +115,21 @@ cursory:          .fill 1
         sta (ptr1), y
 
         inc ptr+0
-        zif_eq
+        zif eq
             inc ptr+1
         zendif
 
         inc ptr1+0
-        zif_eq
+        zif eq
             inc ptr1+1
         zendif
 
         lda ptr1+0
         cmp #<init_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda ptr1+1
         cmp #>init_end_addr
-    zuntil_eq
+    zuntil eq
 
     jmp _start
 
@@ -147,24 +147,26 @@ zproc _start, .init
         sta bios_exec_addr
 
         inc load+1
-        zif_eq
+        zif eq
             inc load+2
         zendif
 
         inc store+1
-        zif_eq
+        zif eq
             inc store+2
         zendif
 
         lda store+1
         cmp #<bios_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda store+2
         cmp #>bios_end_addr
-    zuntil_eq
+    zuntil eq
 
     ; Initialise the screen.
 
+    lda #0
+    sta reverse_flag
     jsr screen_clear
 
     IO_ON
@@ -180,36 +182,27 @@ zproc _start, .init
         pla
         tay
         dey
-    zuntil_eq
+    zuntil eq
+    ; Y is zero
 
     ; Miscellaneous initialisation.
 
-    lda #0
+    lda #0x80
     sta shift_pressed
-    sta pending_key
-    sta buffer_dirty
+    sta ctrl_pressed
+    sty pending_key
+    sty buffer_dirty
     jsr initdrivers
 
-    jsr ieee_init
+    jsr io_init
+    jsr rw_init
 
     ldx #10
     lda #0xff
     zrepeat
         sta keyboard_state, x
         dex
-    zuntil_mi
-
-    ; Set up sector IO.
-
-    lda #0xf2               ; OPEN channel 2 (for use with sector I/O)
-    jsr ieee_listen
-    ldx #allocate_cmd_end - allocate_cmd
-    zrepeat
-        lda allocate_cmd-1, x
-        jsr ieee_write
-        dex
-    zuntil_eq
-    jsr ieee_unlisten
+    zuntil mi
 
     ; Load the BDOS.
 
@@ -233,10 +226,6 @@ zproc _start, .init
 bdos_filename:
     .ascii "BDOS    SYS"
 bdos_filename_end:
-
-allocate_cmd: ; reversed!
-    .ascii "2#"
-allocate_cmd_end:
 
 banner: ; reversed!
     .byte 13, 10
@@ -307,7 +296,7 @@ screen_jmptable_lo:
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
-    jmptablo fail
+    jmptablo screen_setstyle
 screen_jmptable_hi:
     jmptabhi screen_version
     jmptabhi screen_getsize
@@ -321,7 +310,7 @@ screen_jmptable_hi:
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
-    jmptabhi fail
+    jmptabhi screen_setstyle
 zendproc
 
 zproc fail
@@ -349,16 +338,17 @@ zproc screen_clear
 
         ldy #SCREEN_WIDTH-1
         lda #' '
+        ora reverse_flag
         zrepeat
             sta (ptr), y
             dey
-        zuntil_mi
+        zuntil mi
 
         pla
         clc
         adc #1
         cmp #SCREEN_HEIGHT
-    zuntil_eq
+    zuntil eq
     IO_OFF
 
     ; SCREEN doesn't specify where the cursor ends up, but this code is used by
@@ -393,7 +383,7 @@ zproc screen_getchar
     zrepeat
         jsr scan_keyboard
         lda pending_key
-    zuntil_ne
+    zuntil ne
 
     ldx #0
     stx pending_key
@@ -417,11 +407,12 @@ zproc screen_putchar
     jsr calculate_cursor_address
     pla
     jsr convert_ascii_to_screencode
+    ora reverse_flag
     sta (ptr), y
 
     lda cursorx
     cmp #SCREEN_WIDTH-1
-    zif_ne
+    zif ne
         inc cursorx
     zendif
 
@@ -439,9 +430,10 @@ zproc screen_putstring
     zloop
     1:
         lda 0xffff, x
-        zbreakif_eq
+        zbreakif eq
 
         jsr convert_ascii_to_screencode
+        ora reverse_flag
         sta (ptr), y
         iny
         inx
@@ -471,19 +463,12 @@ zproc screen_scrollup
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #SCREEN_HEIGHT-1
-    zuntil_eq
+    zuntil eq
 
-    ldy #SCREEN_WIDTH-1
-    lda #' '
-    zrepeat
-        sta (ptr), y
-        dey
-    zuntil_mi
-    IO_OFF
-    rts
+    jmp erase_line_at_ptr
 zendproc
 
 zproc screen_scrolldown
@@ -506,17 +491,21 @@ zproc screen_scrolldown
             lda (ptr), y
             sta (ptr1), y
             dey
-        zuntil_mi
+        zuntil mi
 
         cpx #0
-    zuntil_eq
-
+    zuntil eq
+zendproc
+    ; fall through
+zproc erase_line_at_ptr
+    IO_ON
     ldy #SCREEN_WIDTH-1
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         dey
-    zuntil_mi
+    zuntil mi
     IO_OFF
     rts
 zendproc
@@ -526,12 +515,23 @@ zproc screen_cleartoeol
 
     IO_ON
     lda #' '
+    ora reverse_flag
     zrepeat
         sta (ptr), y
         iny
         cpy #SCREEN_WIDTH
-    zuntil_eq
+    zuntil eq
     IO_OFF
+    rts
+zendproc
+
+zproc screen_setstyle
+    and #STYLE_REVERSE
+    lsr a
+    lda #0
+    ror a
+    sta reverse_flag
+    clc
     rts
 zendproc
 
@@ -567,7 +567,7 @@ zproc tty_const
     IO_OFF
 
     lda pending_key
-    zif_ne
+    zif ne
         lda #0xff
     zendif
 
@@ -584,10 +584,10 @@ zproc tty_conin
         jsr screen_getchar
         ; Filter out arrow keys
         cmp #$80
-        zif_cs
+        zif cs
             lda #0
         zendif
-    zuntil_cc
+    zuntil cc
 
     rts
 zendproc
@@ -596,20 +596,20 @@ zendproc
 
 zproc tty_conout
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta cursorx
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec cursorx
-        zif_mi
+        zif mi
             lda #SCREEN_WIDTH-1
             sta cursorx
 
             dec cursory
-            zif_mi
+            zif mi
                 lda #0
                 sta cursory
                 jsr screen_scrolldown
@@ -644,7 +644,7 @@ zproc write_nl
     inc cursory
     lda cursory
     cmp #SCREEN_HEIGHT
-    zif_eq
+    zif eq
         dec cursory
         jmp screen_scrollup
     zendif
@@ -668,7 +668,7 @@ zproc scan_keyboard
         ldx PIA1_PB
         txa
         eor keyboard_state, y
-        zif_ne
+        zif ne
             ; Any set bits in A correspond to a key which has changes state.
             ; The corresponding bit in X tells us whether it went up or down.
 
@@ -692,7 +692,7 @@ zproc scan_keyboard
 
             zrepeat
                 bit ptr1+0
-                zif_mi
+                zif mi
                     ; This key has changed.
 
                     tya
@@ -705,7 +705,7 @@ zproc scan_keyboard
                 iny
                 asl ptr1+1
                 asl ptr1+0
-            zuntil_eq
+            zuntil eq
 
             pla
             tay
@@ -716,7 +716,7 @@ zproc scan_keyboard
 
         iny
         cpy #0x0a
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -725,11 +725,15 @@ zendproc
 
 zproc change_key_state
 #if defined PET4032
+    cpy #0x4f               ; control
+    beq ctrl_change
     cpy #0x47               ; left shift
     beq shift_change
     cpy #0x42               ; right shift
     beq shift_change
 #elif defined PET8032 || defined PET8096
+    cpy #0x47
+    beq ctrl_change
     cpy #0x37               ; left shift
     beq shift_change
     cpy #0x31               ; right shift
@@ -737,11 +741,15 @@ zproc change_key_state
 #endif
 
     bit ptr1+1
-    zif_pl
+    zif pl
         lda keyboard_decode_tab, y
         bit shift_pressed
-        zif_pl
+        zif pl
             lda keyboard_decode_tab_shifted, y
+        zendif
+        bit ctrl_pressed
+        zif pl
+            and #0x1f
         zendif
         sta pending_key
     zendif
@@ -769,6 +777,17 @@ shift_change:
     ror a
 #endif
     sta shift_pressed       ; new state in top bit
+    rts
+
+ctrl_change:
+#if defined PET4032
+    lda keyboard_state + 9
+#elif defined PET8032 || defined PET8096
+    lda keyboard_state + 8
+#endif
+    ror a
+    ror a
+    sta ctrl_pressed        ; new state in top bit
     rts
 
 keyboard_decode_tab:
@@ -827,15 +846,15 @@ zproc convert_ascii_to_screencode
     ; Flip case.
 
     cmp #'A'
-    zif_cs
+    zif cs
         cmp #'Z'+1
         bcc swapcase
     zendif
 
     cmp #'a'
-    zif_cs
+    zif cs
         cmp #'z'+1
-        zif_cc
+        zif cc
         swapcase:
             eor #0x20
         zendif
@@ -913,7 +932,7 @@ zproc calculate_line_address
     clc
     adc ptr+0
     sta ptr+0
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
 
@@ -951,23 +970,22 @@ zendproc
     sta \port
 .endm
 
-zproc ieee_mode_atn
+zproc ieee_computer_atn
     IO_ON
     set0 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
     rts
 zendproc
 
-zproc ieee_mode_talk
+zproc ieee_computer_idle
+zproc ieee_computer_talking
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
     rts
 zendproc
 
-; Switch from ATN mode to LISTEN mode.
-
-zproc ieee_mode_listen
+zproc ieee_computer_listening
     IO_ON
     set1 VIA_PB, VIA_PB_ATN_OUT
     IO_OFF
@@ -995,7 +1013,7 @@ zproc ieee_putb
     zrepeat
         lda VIA_PB
         and #VIA_PB_NRFD_IN
-    zuntil_ne
+    zuntil ne
     pla
 
     ; Send data, inverted.
@@ -1012,7 +1030,7 @@ zproc ieee_putb
     zrepeat
         lda VIA_PB
         and #VIA_PB_NDAC_IN
-    zuntil_ne
+    zuntil ne
 
     ; Release DAV, EOI, and the data bus.
 
@@ -1042,7 +1060,7 @@ zproc ieee_getb
     zrepeat
         lda VIA_PB
         and #VIA_PB_DAV_IN
-    zuntil_eq
+    zuntil eq
 
     ; Not ready for data.
 
@@ -1059,7 +1077,7 @@ zproc ieee_getb
     lda PIA1_PA
     and #PIA1_PA_EOI_IN
     clc
-    zif_eq
+    zif eq
         sec
     zendif
 
@@ -1072,7 +1090,7 @@ zproc ieee_getb
     zrepeat
         lda VIA_PB
         and #VIA_PB_DAV_IN
-    zuntil_ne
+    zuntil ne
 
     ; Release NDAC and the data bus.
 
@@ -1094,5 +1112,7 @@ mem_end:    .byte __TPA_END__@mos16hi
 
 keyboard_state:   .fill 10
 shift_pressed:    .fill 1
+ctrl_pressed:     .fill 1
+reverse_flag:     .fill 1
 
 ; vim: sw=4 ts=4 et ft=asm

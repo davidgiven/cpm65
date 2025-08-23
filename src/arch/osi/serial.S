@@ -21,7 +21,7 @@ zendproc
 zproc tty_const
     lda SERIAL_ACIA_STATUS
     lsr
-    zif_cc
+    zif cc
         lda #0                      ; no key
     zelse
         lda #$ff                    ; key is pending
@@ -31,7 +31,7 @@ zendproc
 
 zproc tty_conout
     cmp #127                        ; workaround for now, see issue #148
-    zif_eq                          ; and PR #138
+    zif eq                          ; and PR #138
         lda #8
         jsr serial_out
         lda #' '
@@ -74,7 +74,7 @@ zendproc
 zproc serial_inp
     lda SERIAL_ACIA_STATUS
     lsr
-    zif_cc                          ; no char is pending
+    zif cc                          ; no char is pending
         sec
         rts
     zendif
@@ -90,7 +90,7 @@ zproc serial_outp
     lda SERIAL_ACIA_STATUS
     lsr
     lsr
-    zif_cc                          ; TDR is not empty
+    zif cc                          ; TDR is not empty
         pla
         sec
         rts
@@ -109,7 +109,7 @@ zproc serial_in
     zrepeat
         lda SERIAL_ACIA_STATUS       ; wait for bit 0 set, RDR full
         lsr
-    zuntil_cs
+    zuntil cs
 
     lda SERIAL_ACIA_RDR
     rts
@@ -121,7 +121,7 @@ zproc serial_out
         lda SERIAL_ACIA_STATUS       ; wait for bit 1 set, TDR empty
         lsr
         lsr
-    zuntil_cs
+    zuntil cs
     pla
     sta SERIAL_ACIA_TDR
     rts

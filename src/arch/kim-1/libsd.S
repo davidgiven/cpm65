@@ -48,14 +48,14 @@ zproc sd_readbyte, .text.sd_readbyte, local
         and #SD_MISO
 
         clc                     ; default to clearing the bottom bit
-        zif_ne
+        zif ne
             sec                 ; unless MISO was set, in which case get ready to set the bottom bit
         zendif
 
         txa                     ; transfer partial result from X
         rol                     ; rotate carry bit into read result, and loop bit into carry
         tax                     ; save partial result back to X
-    zuntil_cc
+    zuntil cc
 
     rts
 zendproc
@@ -82,7 +82,7 @@ zproc sd_writebyte, .text.sd_writebyte, local
         tya                     ; restore remaining bits to send
 
         dex
-    zuntil_eq
+    zuntil eq
 
     rts
 zendproc
@@ -93,7 +93,7 @@ zproc sd_waitresult, .text.sd_waitresult, local
     zrepeat
         jsr sd_readbyte
         cmp #$ff
-    zuntil_ne
+    zuntil ne
     rts
 
 zproc sd_sendcommand, .text.sd_sendcommand, local
@@ -199,7 +199,7 @@ zproc _readpage, .text._readpage, local
         jsr sd_readbyte
         sta (zp_sd_address),y
         iny
-    zuntil_eq
+    zuntil eq
     rts
 zendproc
 
@@ -261,7 +261,7 @@ zproc sd_writesector, .text.sd_writesector
     zrepeat
         jsr sd_readbyte
         cmp #$ff
-    zuntil_eq
+    zuntil eq
 
     ; End command
 
@@ -284,6 +284,6 @@ zproc _writepage, .text._writepage, local
         pla                     ; pull counter from stack
         tay                     ; transfer back
         iny
-    zuntil_eq
+    zuntil eq
     rts
 zendproc

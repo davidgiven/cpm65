@@ -3322,27 +3322,37 @@ read -->----------------( ( )----( file-ident )------          !
                        !      --------------------     !
                        !                               !
                         --------------<----------------          *)
+        var
+          lsp : structptr ;
+
           procedure ProcessTerms;
           var
             test: boolean;
+            len : addrrange ;
+
 
           begin
             repeat
+              lsp := gattr.typtr ;
               begin
                 if (gattr.kind <> varbl) then
                   Error(154);
                       (* place address of variable
-                          on stack for rdc or rdi *)
+                          on stack for rdc, rdi or rds *)
                 LoadAddress ;
-                if (gattr.typtr <> nil)
+                if (lsp <> nil)
                 then
                 begin
-                  if CompTypes(intptr, gattr.typtr) then
+                  if CompTypes(intptr, lsp) then
                     CSPgen(3) (* rdi *)
-                  else if CompTypes(charptr, gattr.typtr) then
+                  else if CompTypes(charptr, lsp) then
                     CSPgen(5) (* rdc *)
-                  else if IsString(gattr.typtr) then
-                    CSPgen(4) (* rdn *)
+                  else if IsString(lsp) then
+                  begin
+                    len := lsp^.size;
+                    LDCIGen(len);
+                    CSPgen(19) (* rds *)
+                  end
                   else
                     Error(177);
                 end

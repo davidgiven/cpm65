@@ -6,6 +6,7 @@
 
 #include "zif.inc"
 #include "cpm65.inc"
+#include "kim-1.inc"
 
 DEFDRIVE = $08          ; Default drive number
 
@@ -31,18 +32,8 @@ ACPTR   = $f407
 
 .section loader, "ax"
 
-    .word _start
-
-#include "kim-1.S"
-
-    ; System init
-
+.global system_init
 zproc system_init, loader
-    lda #0
-    sta current_drive
-    sta pending_key
-    sta buffer_dirty
-
     lda #0xff
     sta buffered_sector+0
     sta buffered_sector+1
@@ -67,7 +58,7 @@ zproc system_init, loader
         cmp #0xaa
         bne 1f
         iny
-        zif_eq
+        zif eq
             inc ptr+1
             lda ptr+1
             cmp #0xff
@@ -86,9 +77,26 @@ zproc system_init, loader
     jsr UNLSN
 
     rts
-zendproc
 
 .text
+
+; Select a disk.
+; A is the disk number.
+; Returns the DPH in XA.
+; Sets carry on error.
+
+zproc bios_SELDSK
+    cmp #0
+    zif ne
+        sec                 ; invalid drive
+        rts
+    zendif
+
+    lda #<dph0
+    ldx #>dph0
+    clc
+    rts
+zendproc
 
 ; Set the current absolute sector number.
 ; XA is a pointer to a three-byte number.
@@ -101,7 +109,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
 
     lda sector_num+0
     ror a               ; bottom bit -> C
@@ -132,13 +140,13 @@ zproc change_sector
     lda sector_num+0
     and #$fe
     cmp buffered_sector+0
-    zif_eq
+    zif eq
         lda sector_num+1
         cmp buffered_sector+1
-        zif_eq
+        zif eq
             lda sector_num+2
             cmp buffered_sector+2
-            zif_eq
+            zif eq
                 clc
                 rts
             zendif
@@ -178,7 +186,7 @@ zendproc
 
 zproc flush_buffer
     lda buffer_dirty
-    zif_mi
+    zif mi
         jsr buffered_sector_to_lba
         jsr write_sector
 
@@ -228,7 +236,7 @@ zproc read_sector
         jsr ACPTR
         sta DISK_BUFFER, y
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr UNTLK
     rts
@@ -267,7 +275,7 @@ zproc write_sector
         lda DISK_BUFFER, y
         jsr CIOUT
         iny
-    zuntil_eq
+    zuntil eq
 
     jsr UNLSN
 
@@ -314,7 +322,7 @@ zproc get_status
         jsr ACPTR
         jsr OUTCH
         cmp #13
-    zuntil_eq
+    zuntil eq
 
     jsr UNTLK
     rts
@@ -326,9 +334,9 @@ zproc convert_to_ts
     ldy #0
     zloop
         cpx #0
-        zif_eq
+        zif eq
             cmp track_size_table, y
-            zif_cc
+            zif cc
                 iny     ; tracks are one-based.
                 rts
             zendif
@@ -336,7 +344,7 @@ zproc convert_to_ts
 
         sec
         sbc track_size_table, y
-        zif_cc
+        zif cc
             dex
         zendif
         iny
@@ -362,7 +370,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #100
-    zuntil_cc
+    zuntil cc
     adc #100
     jsr digit
 
@@ -371,7 +379,7 @@ zproc decimal_out
     zrepeat
         inx
         sbc #10
-    zuntil_cc
+    zuntil cc
     adc #10
     jsr digit
     tax
@@ -391,7 +399,7 @@ zproc string_out
     ldy #0
     zloop
         lda (ptr), y
-        zif_eq
+        zif eq
             rts
         zendif
         jsr CIOUT
@@ -405,9 +413,11 @@ zendproc
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph0, 136*10, 1024, 64, 0
+define_dpb dpb, 136*10, 1024, 64, 0
+define_dph dph0, dpb
 
 .bss
 
+buffer_offset:   .fill 1 ; Offset of CP/M sector into host sector buffer
 sector_num:      .fill 3 ; current absolute sector number
 buffered_sector: .fill 3 ; sector currently in disk buffer

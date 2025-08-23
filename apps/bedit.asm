@@ -39,7 +39,7 @@ command_buffer = cpm_default_dma + 2
 .bss line_buffer, 128
 .bss text_start, 0
 
-.zproc start
+zproc start
     jsr printi
     .byte "Basic Text Editor", 13, 10, 0
 
@@ -58,24 +58,24 @@ command_buffer = cpm_default_dma + 2
 
     lda cpm_fcb+1
     cmp #' '
-    .zif eq
+    zif eq
         \ No parameter given.
 
         jsr new_file
         jsr print_free
         jmp mainloop
-    .zendif
+    zendif
     jsr load_file_from_fcb
     jmp mainloop
-.zendproc
+zendproc
 
-.zproc jsr_indirect
+zproc jsr_indirect
     jmp (ptr1)
-.zendproc
+zendproc
 
 \ Multiplies ptr1 by 10.
 
-.zproc mul10
+zproc mul10
     asl ptr1+0
     rol ptr1+1      \ x2
 
@@ -98,94 +98,94 @@ command_buffer = cpm_default_dma + 2
     adc ptr1+1
     sta ptr1+1
     rts         
-.zendproc
+zendproc
 
-.zproc skip_command_spaces
+zproc skip_command_spaces
     ldx command_ptr
-    .zloop
+    zloop
         lda command_buffer, x
-        .zbreak eq
+        zbreak eq
         cmp #' '
-        .zbreak ne
+        zbreak ne
         inx
-    .zendloop
+    zendloop
     stx command_ptr
     rts
-.zendproc
+zendproc
 
 \ Returns Z if there are no more words in the command line.
 
-.zproc has_command_word
+zproc has_command_word
     jsr skip_command_spaces
     ldx command_ptr
     lda command_buffer, x
     rts
-.zendproc
+zendproc
 
 \ Parses a command separator; returns Z if there are no more words.
 
-.zproc read_command_separator
+zproc read_command_separator
     jsr has_command_word
-    .zif ne
+    zif ne
         ldx command_ptr
         lda command_buffer, x
         cmp #','
-        .zif ne
+        zif ne
             jsr error
             .byte "Syntax error; bad separator", 0
-        .zendif
+        zendif
         inx
         stx command_ptr ; \ leaves !Z
-    .zendif
+    zendif
     rts
-.zendproc
+zendproc
 
 \ Converts an ASCII character to uppercase.
 
-.zproc toupper
+zproc toupper
     cmp #'a'
-    .zif cs
+    zif cs
         cmp #'z'+1
-        .zif cc
+        zif cc
             and #0xdf
-        .zendif
-    .zendif
+        zendif
+    zendif
     rts
-.zendproc
+zendproc
 
 \ Parses a command word and copies it to the line buffer.
 
-.zproc read_command_word
+zproc read_command_word
     jsr skip_command_spaces
     
     ldy #0
     ldx command_ptr
-    .zloop
+    zloop
         lda command_buffer, x
         jsr toupper
 
         \ Stop on non-command characters.
 
         cmp #'.'
-        .zif ne
+        zif ne
             cmp #'A'
-            .zbreak cc
+            zbreak cc
             cmp #'Z'+1
-            .zbreak cs
-        .zendif
+            zbreak cs
+        zendif
 
         sta line_buffer, y
         inx
         iny
-    .zendloop
+    zendloop
     stx command_ptr
     sty line_length
     rts
-.zendproc
+zendproc
 
 \ Parses a number from the command buffer. Returns it in XA and ptr1.
 
-.zproc read_command_number
+zproc read_command_number
     jsr skip_command_spaces
 
     lda #0
@@ -196,13 +196,13 @@ command_buffer = cpm_default_dma + 2
     lda command_buffer, x
     beq syntax_error
 
-    .zloop
+    zloop
         lda command_buffer, x
 
         cmp #'0'
-        .zbreak cc
+        zbreak cc
         cmp #'9'+1
-        .zbreak cs
+        zbreak cs
 
         pha
         txa
@@ -217,12 +217,12 @@ command_buffer = cpm_default_dma + 2
         clc
         adc ptr1+0
         sta ptr1+0
-        .zif cs
+        zif cs
             inc ptr1+1
-        .zendif
+        zendif
 
         inx
-    .zendloop
+    zendloop
 
     \ If we read no bytes, it's a syntax error.
 
@@ -237,12 +237,12 @@ command_buffer = cpm_default_dma + 2
 syntax_error:
     jsr error
     .byte "Syntax error; expected number", 0
-.zendproc
+zendproc
 
 \ Parses a string from the command buffer. This can be double-quote or
 \ space/comma delimited. The result is placed in the line buffer.
 
-.zproc read_command_string
+zproc read_command_string
     jsr skip_command_spaces
 
     ldx command_ptr
@@ -255,18 +255,18 @@ syntax_error:
     \ Parsing a space/comma delimited string.
 
     ldy #0
-    .zloop
+    zloop
         lda command_buffer, x
-        .zbreak eq
+        zbreak eq
         cmp #' '
-        .zbreak eq
+        zbreak eq
         cmp #','
-        .zbreak eq
+        zbreak eq
 
         sta line_buffer, y
         inx
         iny
-    .zendloop
+    zendloop
     stx command_ptr
     sty line_length
     rts
@@ -278,48 +278,48 @@ parse_quoted_string:
 
     inx             \ skip double quote
     ldy #0
-    .zloop
+    zloop
         lda command_buffer, x
-        .zbreak eq
+        zbreak eq
         cmp #'"'
-        .zbreak eq
+        zbreak eq
         cmp #'\\'
-        .zif eq
+        zif eq
             \ Backslash-escaped character.
 
             sty line_length
 
             inx
             lda command_buffer, x
-            .zbreak eq
+            zbreak eq
 
             ldy #0
-            .zloop
+            zloop
                 lda escaped_character_table, y
-                .zbreak mi
+                zbreak mi
                 cmp command_buffer, x
-                .zbreak eq
+                zbreak eq
                 iny
                 iny
-            .zendloop
-            .zif pl
+            zendloop
+            zif pl
                 iny
                 lda escaped_character_table, y
-            .zendif
+            zendif
 
             ldy line_length
-        .zendif
+        zendif
 
         sta line_buffer, y
         inx
         iny
-    .zendloop
+    zendloop
     lda command_buffer, x
-    .zif ne
+    zif ne
         \ If we terminated due to a closing ", skip it.
 
         inx
-    .zendif
+    zendif
     stx command_ptr
     sty line_length
     rts
@@ -335,27 +335,27 @@ escaped_character_table:
 syntax_error:
     jsr error
     .byte "Syntax error; expected string", 0
-.zendproc
+zendproc
 
-.zproc mainloop
+zproc mainloop
     ldx #0xff
     txs
 
     .label command_tab
 
-    .zloop
+    zloop
         lda needs_renumber
-        .zif ne
+        zif ne
             lda #0
             sta needs_renumber
             jsr renumber_file
-        .zendif
+        zendif
 
         lda dirty
-        .zif ne
+        zif ne
             lda #'*'
             jsr putchar
-        .zendif
+        zendif
         lda #'>'
         jsr putchar
 
@@ -382,72 +382,72 @@ syntax_error:
         ldx command_ptr
         lda command_buffer, x
         cmp #'0'
-        .zif cs
+        zif cs
             cmp #'9'+1
-            .zif cc
+            zif cc
                 jsr line_entry
-                .zcontinue
-            .zendif
-        .zendif
+                zcontinue
+            zendif
+        zendif
 
         \ If not, it must be a normal command.
 
         jsr read_command_word
         lda line_length
-        .zif ne
+        zif ne
             ldx #0          \ offset into command table
             ldy #0          \ offset into line buffer
-            .zrepeat
+            zrepeat
                 lda line_buffer, y
                 cmp #'.'    \ abbreviation?
-                .zbreak eq  \ if yes, then we've found the command
+                zbreak eq  \ if yes, then we've found the command
 
                 lda command_tab, x
-                .zif eq
+                zif eq
                     \ No more commands.
                     jsr error
                     .byte "Bad command", 0
-                .zendif
+                zendif
                 and #0x7f
                 cmp line_buffer, y
-                .zif eq
+                zif eq
                     lda command_tab, x
-                    .zbreak mi \ last matching character of word
+                    zbreak mi \ last matching character of word
 
                     \ If we got here, the character matched, but it's not
                     \ the last one, so go again.
 
                     inx
                     iny
-                    .zcontinue
-                .zendif
+                    zcontinue
+                zendif
                 
                 \ If we get here, the character didn't match, so skip to
                 \ the end of the command and go again.
 
-                .zrepeat
+                zrepeat
                     inx
                     lda command_tab-1, x
-                .zuntil mi
+                zuntil mi
                 inx
                 inx
                 ldy #0          \ reset line buffer offset
-            .zendloop
+            zendloop
 
             \ Found. Skip to the end of the word.
 
-            .zrepeat
+            zrepeat
                 inx
                 lda command_tab-1, x
-            .zuntil mi
+            zuntil mi
 
             lda command_tab+0, x
             sta ptr1+0
             lda command_tab+1, x
             sta ptr1+1
             jsr jsr_indirect
-        .zendif
-    .zendloop
+        zendif
+    zendloop
 
 command_tab:
     .byte "LIS", 'T'+0x80
@@ -467,34 +467,34 @@ command_tab:
     .byte "QUI", 'T'+0x80
     .word exit_program
     .byte 0
-.zendproc
+zendproc
 
-.zproc putchar
+zproc putchar
     ldx #0
     ldy #BDOS_CONIO
     jmp BDOS
-.zendproc
+zendproc
 
-.zproc crlf
+zproc crlf
     lda #0x0d
     jsr putchar
 
     lda #0x0a
     jmp putchar
-.zendproc
+zendproc
 
 \ Processes a simple error. The text string must immediately follow the
 \ subroutine call.
 
-.zproc error
+zproc error
     pla
     tay
     pla
     tax
     iny
-    .zif eq
+    zif eq
         inx
-    .zendif
+    zendif
     tya
 
     ldy #BDOS_PRINTSTRING
@@ -502,19 +502,19 @@ command_tab:
     jsr crlf
 
     jmp mainloop
-.zendproc
+zendproc
 
 \ Does a simple syntax error.
 
-.zproc syntax_error
+zproc syntax_error
     jsr error
     .byte "Syntax error", 0
-.zendproc
+zendproc
 
 \ Parses a filename from the line buffer into cpm_fcb.
 \ Returns with C set if the filename is invalid.
 
-.zproc parse_filename
+zproc parse_filename
     lda #<cpm_fcb
     ldx #>cpm_fcb
     ldy #BDOS_SET_DMA
@@ -525,112 +525,112 @@ command_tab:
     ldy #BDOS_PARSE_FILENAME
     jsr BDOS
     rts
-.zendproc
+zendproc
 
 \ Prints the name of the file in cpm_fcb.
 
-.zproc print_fcb
+zproc print_fcb
     \ Drive letter.
 
     lda cpm_fcb+0
-    .zif ne
+    zif ne
         clc
         adc #'@'
         jsr putchar
 
         lda #':'
         jsr putchar
-    .zendif
+    zendif
 
     \ Main filename.
 
     ldy #FCB_F1
-    .zrepeat
+    zrepeat
         tya
         pha
 
         lda cpm_fcb, y
         and #0x7f
         cmp #' '
-        .zif ne
+        zif ne
             jsr putchar
-        .zendif
+        zendif
 
         pla
         tay
         iny
         cpy #FCB_T1
-    .zuntil eq
+    zuntil eq
 
     lda cpm_fcb+9
     and #0x7f
     cmp #' '
-    .zif ne
+    zif ne
         lda #'.'
         jsr putchar
 
         ldy #FCB_T1
-        .zrepeat
+        zrepeat
             tya
             pha
 
             lda cpm_fcb, y
             and #0x7f
             cmp #' '
-            .zif ne
+            zif ne
                 jsr putchar
-            .zendif
+            zendif
 
             pla
             tay
             iny
             cpy #FCB_T3+1
-        .zuntil eq
-    .zendif
+        zuntil eq
+    zendif
 
     rts
-.zendproc
+zendproc
         
 \ Prints an inline string. The text string must immediately follow the
 \ subroutine call.
 
-.zproc printi
+zproc printi
     pla
     sta ptr1+0
     pla
     sta ptr1+1
 
-    .zloop
+    zloop
         ldy #1
         lda (ptr1), y
-        .zbreak eq
+        zbreak eq
         jsr putchar
 
         inc ptr1+0
-        .zif eq
+        zif eq
             inc ptr1+1
-        .zendif
-    .zendloop
+        zendif
+    zendloop
 
     inc ptr1+0
-    .zif eq
+    zif eq
         inc ptr1+1
-    .zendif
+    zendif
     inc ptr1+0
-    .zif eq
+    zif eq
         inc ptr1+1
-    .zendif
+    zendif
 
     jmp (ptr1)
-.zendproc
+zendproc
 
 \ Prints XA in decimal. Y is the padding char or 0 for no padding.
 
-.zproc print16
+zproc print16
     ldy #0
-.zendproc
+zendproc
 \ falls through
-.zproc print16padded
+zproc print16padded
     sta ptr1+0
     stx ptr1+1
     sty ptr2+0
@@ -640,10 +640,10 @@ command_tab:
     .label justprint
 
     ldy #8
-    .zrepeat
+    zrepeat
         ldx #0xff
         sec
-        .zrepeat
+        zrepeat
             lda ptr1+0
             sbc dec_table+0, y
             sta ptr1+0
@@ -653,7 +653,7 @@ command_tab:
             sta ptr1+1
 
             inx
-        .zuntil cc
+        zuntil cc
 
         lda ptr1+0
         adc dec_table+0, y
@@ -668,11 +668,11 @@ command_tab:
         txa
         pha
 
-        .zif eq                     \ if digit is zero, check padding
+        zif eq                     \ if digit is zero, check padding
             lda ptr2+0              \ get the padding character
             beq skip                \ if zero, no padding
             bne justprint           \ otherwise, use it
-        .zendif
+        zendif
 
         ldx #'0'                    \ printing a digit, so reset padding
         stx ptr2+0
@@ -687,12 +687,12 @@ command_tab:
 
         dey
         dey
-    .zuntil mi
+    zuntil mi
     rts
 
 dec_table:
    .word 1, 10, 100, 1000, 10000
-.zendproc
+zendproc
 
 \ Compares the current line number to line_number.
 \ Returns:
@@ -701,19 +701,19 @@ dec_table:
 \    Z if current_line == line_number line
 \   !Z if current_line != line_number
 
-.zproc test_line_number
+zproc test_line_number
     ldy #1
     lda (current_line), y
     cmp line_number+0
-    .zif eq
+    zif eq
         iny
         lda (current_line), y
         cmp line_number+1
-        .zif eq
+        zif eq
             clc \ return !C
             rts 
-        .zendif
-    .zendif
+        zendif
+    zendif
 
     \ Not equal, so do magnitude comparison.
 
@@ -725,81 +725,81 @@ dec_table:
     sbc (current_line), y
     tya \ force !Z
     rts
-.zendproc
+zendproc
 
 \ Advances current_line to point at the next line. Sets Z
 \ if there isn't one.
 
-.zproc goto_next_line
+zproc goto_next_line
     ldy #0
     lda (current_line), y
-    .zif ne
+    zif ne
         clc
         adc current_line+0
         sta current_line+0
-        .zif cs
+        zif cs
             inc current_line+1
-        .zendif
+        zendif
         \ !Z must be set at this point.
-    .zendif
+    zendif
     rts
-.zendproc
+zendproc
 
 \ Sets current_ptr to the first line with an equal or great number than
 \ line_number.
 
-.zproc find_line
+zproc find_line
     lda #<text_start
     sta current_line+0
     lda #>text_start
     sta current_line+1
 
-    .zloop
+    zloop
         ldy #0
         lda (current_line), y
-        .zbreak eq
+        zbreak eq
 
         jsr test_line_number
-        .zbreak cc
+        zbreak cc
         jsr goto_next_line
-    .zendloop
+    zendloop
     rts
-.zendproc
+zendproc
 
 \ Sets ptr1 to point at the terminating 0 at the end of the document.
 
-.zproc find_end_of_document
+zproc find_end_of_document
     lda current_line+0
     sta ptr1+0
     lda current_line+1
     sta ptr1+1
 
     ldy #0
-    .zloop
+    zloop
         lda (ptr1), y
-        .zif eq
+        zif eq
             rts
-        .zendif
+        zendif
 
         clc
         adc ptr1+0
         sta ptr1+0
-        .zif cs
+        zif cs
             inc ptr1+1
-        .zendif
-    .zendloop
-.zendproc
+        zendif
+    zendloop
+zendproc
 
 \ Exits.
 
-.zproc exit_program
+zproc exit_program
     ldy #BDOS_WARMBOOT
     jmp BDOS
-.zendproc
+zendproc
 
 \ Computes and prints the amount of free space.
 
-.zproc print_free
+zproc print_free
     jsr find_end_of_document \ sets ptr1
 
     \ Subtract this from himem.
@@ -818,11 +818,11 @@ dec_table:
     .byte " bytes free", 13, 10, 0
 
     rts
-.zendproc
+zendproc
 
 \ Sets up a new, empty document.
 
-.zproc new_file
+zproc new_file
     lda #<text_start
     sta current_line+0
     lda #>text_start
@@ -832,11 +832,11 @@ dec_table:
     sta text_start
     sta dirty
     rts
-.zendproc
+zendproc
 
 \ Prints the current line.
 
-.zproc print_current_line
+zproc print_current_line
     ldy #1
     lda (current_line), y
     pha
@@ -855,9 +855,9 @@ dec_table:
     tax
 
     cmp #3
-    .zif ne
+    zif ne
         ldy #3
-        .zrepeat
+        zrepeat
             pha
             txa
             pha
@@ -876,15 +876,15 @@ dec_table:
             iny
             dex
             cpx #3
-        .zuntil eq
-    .zendif
+        zuntil eq
+    zendif
     jmp crlf
-.zendproc
+zendproc
 
 \ Parses a line range. Sets current_line to the first line of the range, and
 \ line_number to the line number of the last line of the range.
 
-.zproc parse_line_range
+zproc parse_line_range
     \ Default start: beginning of the file.
 
     lda #<text_start
@@ -901,7 +901,7 @@ dec_table:
     \ Parameter parsing.
 
     jsr has_command_word
-    .zif ne
+    zif ne
         jsr read_command_number
         sta line_number+0
         stx line_number+1
@@ -920,7 +920,7 @@ dec_table:
         \ current_line, which is the start line, is set. 
 
         jsr read_command_separator
-        .zif ne
+        zif ne
             \ Default to listing to the end of the file again.
 
             lda #0xff
@@ -928,22 +928,22 @@ dec_table:
             sta line_number+1
 
             jsr has_command_word
-            .zif ne
+            zif ne
                 jsr read_command_number
                 sta line_number+0
                 stx line_number+1
 
                 jsr has_command_word
                 bne syntax_error
-            .zendif
-        .zendif
-    .zendif
+            zendif
+        zendif
+    zendif
     rts
-.zendproc
+zendproc
 
 \ Lists part of the file.
 
-.zproc list_file
+zproc list_file
     lda current_line+0
     pha
     lda current_line+1
@@ -951,15 +951,15 @@ dec_table:
 
     jsr parse_line_range
 
-    .zloop
+    zloop
         ldy #0
         lda (current_line), y
-        .zbreak eq
+        zbreak eq
 
         jsr test_line_number
-        .zif ne
-            .zbreak cc
-        .zendif
+        zif ne
+            zbreak cc
+        zendif
 
         jsr print_current_line
 
@@ -967,22 +967,22 @@ dec_table:
         ldy #BDOS_CONIO
         jsr BDOS
         tax
-        .zbreak ne
+        zbreak ne
 
         jsr goto_next_line
-    .zendloop
+    zendloop
 
     pla
     sta current_line+1
     pla
     sta current_line+0
     rts
-.zendproc
+zendproc
 
 \ Inserts the contents of line_buffer into the current document before the
 \ current line. The line number is unset.
 
-.zproc insert_line
+zproc insert_line
     jsr find_end_of_document \ sets ptr1
 
     \ Calculate the new end-of-document based on the changed line length.
@@ -999,10 +999,10 @@ dec_table:
     \ Is there actually room?
 
     cmp himem
-    .zif cs
+    zif cs
         jsr error
         .byte "No room", 0
-    .zendif
+    zendif
 
     \ This dirties the file.
 
@@ -1012,30 +1012,30 @@ dec_table:
     \ Open up space.
 
     ldy #0
-    .zloop
+    zloop
         lda (ptr1), y
         sta (ptr2), y
 
         lda ptr1+0
         cmp current_line+0
-        .zif eq
+        zif eq
             lda ptr1+1
             cmp current_line+1
-            .zbreak eq
-        .zendif
+            zbreak eq
+        zendif
 
         lda ptr1+0
-        .zif eq
+        zif eq
             dec ptr1+1
-        .zendif
+        zendif
         dec ptr1+0
 
         lda ptr2+0
-        .zif eq
+        zif eq
             dec ptr2+1
-        .zendif
+        zendif
         dec ptr2+0
-    .zendloop
+    zendloop
 
     \ We now have space for the new line, plus the header. Populate said header.
 
@@ -1048,15 +1048,15 @@ dec_table:
 
     ldx #0
     ldy #3
-    .zloop
+    zloop
         cpx line_length
-        .zbreak eq
+        zbreak eq
 
         lda line_buffer, x
         sta (current_line), y
         iny
         inx
-    .zendloop
+    zendloop
 
     \ Advance the current line.
 
@@ -1068,11 +1068,11 @@ dec_table:
     sty line_length
 
     rts
-.zendproc
+zendproc
 
 \ Deletes the current line from the document (unless it's the end of the file).
 
-.zproc delete_current_line
+zproc delete_current_line
     lda current_line+0
     pha
     lda current_line+1
@@ -1083,16 +1083,16 @@ dec_table:
 
     ldy #0
     lda (current_line), y
-    .zif ne
+    zif ne
         \ Calculate address of next line into ptr2.
 
         clc
         adc current_line+0
         sta ptr2+0
         ldx current_line+1
-        .zif cs
+        zif cs
             inx
-        .zendif
+        zendif
         stx ptr2+1
 
         jsr find_end_of_document \ into ptr1
@@ -1100,28 +1100,28 @@ dec_table:
         \ Close up space.
 
         ldy #0
-        .zrepeat
+        zrepeat
             lda (ptr2), y
             sta (current_line), y
 
             inc current_line+0
-            .zif eq
+            zif eq
                 inc current_line+1
-            .zendif
+            zendif
 
             inc ptr2+0
-            .zif eq
+            zif eq
                 inc ptr2+1
-            .zendif
+            zendif
 
             lda ptr1+0
             cmp current_line+0
-            .zif eq
+            zif eq
                 lda ptr1+1
                 cmp current_line+1
-            .zendif
-        .zuntil eq
-    .zendif
+            zendif
+        zuntil eq
+    zendif
 
     pla
     sta current_line+1
@@ -1129,32 +1129,32 @@ dec_table:
     sta current_line+0
 
     rts
-.zendproc
+zendproc
 
 \ Deletes a line range.
 
-.zproc delete_lines
+zproc delete_lines
     jsr parse_line_range
 
-    .zloop
+    zloop
         ldy #0
         lda (current_line), y
-        .zbreak eq
+        zbreak eq
 
         jsr test_line_number
-        .zif ne
-            .zbreak cc
-        .zendif
+        zif ne
+            zbreak cc
+        zendif
 
         jsr delete_current_line
-    .zendloop
+    zendloop
 
     rts
-.zendproc
+zendproc
 
 \ Renumbers the document.
 
-.zproc renumber_file
+zproc renumber_file
     lda #<text_start
     sta ptr1+0
     lda #>text_start
@@ -1165,10 +1165,10 @@ dec_table:
     lda #0
     sta line_number+1
 
-    .zloop
+    zloop
         ldy #0
         lda (ptr1), y       \ length of this line
-        .zbreak eq          \ zero? end of file
+        zbreak eq          \ zero? end of file
         tax
 
         \ Update the line number in the text field.
@@ -1186,9 +1186,9 @@ dec_table:
         lda line_number+0
         adc #10
         sta line_number+0
-        .zif cs
+        zif cs
             inc line_number+1
-        .zendif
+        zendif
 
         \ Advance to the next line.
 
@@ -1196,17 +1196,17 @@ dec_table:
         txa
         adc ptr1+0
         sta ptr1+0
-        .zif cs
+        zif cs
             inc ptr1+1
-        .zendif
-    .zendloop
+        zendif
+    zendloop
 
     rts
-.zendproc
+zendproc
 
 \ Does line entry.
 
-.zproc line_entry
+zproc line_entry
     jsr read_command_number
     sta line_number+0
     stx line_number+1
@@ -1216,39 +1216,39 @@ dec_table:
 
     ldy #0
     lda (current_line), y
-    .zif ne
+    zif ne
         iny
         lda (current_line), y
         cmp line_number+0
-        .zif eq
+        zif eq
             iny
             lda (current_line), y
             cmp line_number+1
-            .zif eq
+            zif eq
                 jsr delete_current_line
-            .zendif
-        .zendif
-    .zendif
+            zendif
+        zendif
+    zendif
 
     \ If the next character is a space, skip it.
 
     ldx command_ptr
     lda command_buffer, x
     cmp #' '
-    .zif eq
+    zif eq
         inx
-    .zendif
+    zendif
 
     \ Copy the entire remainder of the command into the line buffer.
 
     ldy #0
-    .zloop
+    zloop
         lda command_buffer, x
-        .zbreak eq
+        zbreak eq
         sta line_buffer, y
         inx
         iny
-    .zendloop
+    zendloop
     sty line_length
 
     \ Insert it into the document and patch up the line number.
@@ -1271,23 +1271,23 @@ dec_table:
     sta (current_line), y
 
     rts
-.zendproc
+zendproc
 
 \ Reads a file.
 
-.zproc load_file
+zproc load_file
     jsr read_command_string
 
     jsr has_command_word
     bne syntax_error
 
     jsr parse_filename
-.zendproc
+zendproc
     \ falls through
 
 \ Reads the file pointed at by the FCB into memory.
 
-.zproc load_file_from_fcb
+zproc load_file_from_fcb
     jsr printi
     .byte "Loading ", 0
     jsr print_fcb
@@ -1300,10 +1300,10 @@ dec_table:
     ldx #>cpm_fcb
     ldy #BDOS_OPEN_FILE
     jsr BDOS
-    .zif cs
+    zif cs
         jsr error
         .byte "Failed to load file", 0
-    .zendif
+    zendif
 
     jsr new_file
     lda #1
@@ -1318,41 +1318,41 @@ dec_table:
     ldy #BDOS_SET_DMA
     jsr BDOS
 
-    .zloop
+    zloop
         ldx io_ptr
-        .zif eq
+        zif eq
             lda #<cpm_fcb
             ldx #>cpm_fcb
             ldy #BDOS_READ_SEQUENTIAL
             jsr BDOS
-            .zbreak cs
+            zbreak cs
             ldx io_ptr
-        .zendif
+        zendif
 
         lda cpm_default_dma, x
 
         cmp #0x1a
-        .zbreak eq
+        zbreak eq
 
         cmp #0x0d
         beq skip
 
         cmp #0x0a
-        .zif eq
+        zif eq
             \ insert line
             jsr insert_line
             jmp skip
-        .zendif
+        zendif
 
         \ Insert character into line buffer.
 
         ldy line_length
         cpy #252
-        .zif eq
+        zif eq
             \ This line is already at the maximum length.
             jsr insert_line
             ldy #0
-        .zendif
+        zendif
 
         sta line_buffer, y
         iny
@@ -1362,52 +1362,52 @@ dec_table:
         ldx io_ptr
         inx
         cpx #128
-        .zif eq
+        zif eq
             ldx #0
-        .zendif
+        zendif
         stx io_ptr
-    .zendloop
+    zendloop
 
     lda #0
     sta dirty
 
     jsr print_free
     rts
-.zendproc
+zendproc
     
 \ Writes a byte to the already opened cpm_fcb. Returns C
 \ on an I/O error.
 
-.zproc write_byte_to_file
+zproc write_byte_to_file
     ldx io_ptr
     sta cpm_default_dma, x
 
     inc io_ptr
     clc
-    .zif eq
+    zif eq
         lda #<cpm_fcb
         ldx #>cpm_fcb
         ldy #BDOS_WRITE_SEQUENTIAL
         jsr BDOS
-    .zendif 
+    zendif 
     rts
-.zendproc 
+zendproc 
 
 \ Writes a file.
 
-.zproc save_file
+zproc save_file
     jsr read_command_string
 
     jsr has_command_word
     bne syntax_error
 
     jsr parse_filename
-.zendproc
+zendproc
     \ falls through
 
 \ Saves memory into the file pointed at by the FCB.
 
-.zproc save_file_to_fcb
+zproc save_file_to_fcb
     jsr printi
     .byte "Saving ", 0
     jsr print_fcb
@@ -1425,10 +1425,10 @@ dec_table:
     ldx #>cpm_fcb
     ldy #BDOS_MAKE_FILE
     jsr BDOS
-    .zif cs
+    zif cs
         jsr error
         .byte "Failed to create file", 0
-    .zendif
+    zendif
 
     lda #0
     sta io_ptr
@@ -1448,13 +1448,13 @@ dec_table:
     ldy #BDOS_SET_DMA
     jsr BDOS
 
-    .zloop
+    zloop
         ldy #0
         lda (current_line), y
-        .zbreak eq
+        zbreak eq
 
         cmp line_length
-        .zif eq
+        zif eq
             jsr goto_next_line
             lda #3
             sta line_length
@@ -1463,7 +1463,7 @@ dec_table:
             jsr write_byte_to_file
             lda #'\n'
             jmp write_char
-        .zendif
+        zendif
 
         ldy line_length
         lda (current_line), y
@@ -1472,34 +1472,34 @@ dec_table:
     write_char:
         jsr write_byte_to_file
         bcs io_error
-    .zendloop
+    zendloop
 
     lda #0x1a
     jsr write_byte_to_file
 
     lda io_ptr
-    .zif ne
+    zif ne
         lda #<cpm_fcb
         ldx #>cpm_fcb
         ldy #BDOS_WRITE_SEQUENTIAL
         jsr BDOS
         bcs io_error
-    .zendif
+    zendif
 
     lda #<cpm_fcb
     ldx #>cpm_fcb
     ldy #BDOS_CLOSE_FILE
     jsr BDOS
-    .zif cs
+    zif cs
 io_error:
         jsr error
         .byte "I/O error on write; save failed", 0
-    .zendif
+    zendif
 
     lda #0
     sta dirty
     rts
-.zendproc
+zendproc
     
 BIOS:
     jmp 0

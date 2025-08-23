@@ -10,12 +10,12 @@ to the 6502. So far it runs on:
   - The BBC Micro family, including Master, Tube, and Electron; TPA ranges from
     14kB on the Electron to 57kB on the Tube.
 
-  - Commodore 64; TPA is 46kB.
+  - Commodore 64; TPA is 55kB.
   
   - Commodore VIC-20; TPA is 24kB.
 
-  - Commodore PET 4032, 8032 and 8096; the TPA ranges from 25kB to 57kB on the
-    8096.
+  - Commodore PET 4032, 8032 and 8096; the TPA ranges from 25kB on the 4032 to
+    57kB on the 8096.
 
   - Commander X16; TPA is 46kB.
 
@@ -37,7 +37,7 @@ to the 6502. So far it runs on:
 
   - nano6502 6502-based SoC for the Tang Nano 20K FPGA board; TPA is 55kB.
 
-  - KIM-1 with K-1013 FDC, directly connected SD card module or 1541 drive.
+  - KIM-1 with K-1013 FDC, directly connected SD card module, 1541 drive or Corsham's SD Shield.
 
   - Ohio Scientific series with 16kB RAM or more, and a floppy drive. TPA up to 39kB.
 
@@ -56,7 +56,7 @@ No, it won't let you run 8080 programs on the 6502!
 
 <div style="text-align: left">
 <a href="doc/bbcmicro.png"><img src="doc/bbcmicro.png" style="width:40%" alt="CP/M-65 running on a BBC Micro"></a>
-<a href="doc/c64.png"><img src="doc/c64.png" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
+<a href="doc/c64.jpg"><img src="doc/c64.jpg" style="width:40%" alt="CP/M-65 running on a Commodore 64"></a>
 <a href="doc/x16.png"><img src="doc/x16.png" style="width:40%" alt="CP/M-65 running on a Commander X16"></a>
 <a href="doc/apple2e.png"><img src="doc/apple2e.png" style="width:40%" alt="CP/M-65 running on an Apple IIe"></a>
 <a href="doc/pet4032.png"><img src="doc/pet4032.png" style="width:40%" alt="CP/M-65 running on a Commodore PET 4032"></a>
@@ -163,31 +163,47 @@ the same time.
 
   - Load and run the `CPM` program to start.
 
-  - It's excruciatingly slow as it uses normal 1541 disk accesses at 300 bytes
-	  per second. Everything works, but you won't enjoy it. At some point I want
-	  to add a fastloader.
+  - It has its own built-in fastloader, which has been lightly tested but seems
+    to work on both NTSC and PAL C64s. It needs tuning but currently seems to get
+    about 1100 bytes per second, which is 4x the normal 1541 speed. (It's the same
+    one as for the VIC-20.)
 
   - The disk image produced is a hybrid of a CP/M file system and a CBMDOS file
 	  system, which can be accessed as either. The disk structures used by the
 	  other file system are hidden. You get about 170kB on a normal disk.
 
-  - Disk accesses are done using direct block access, so it _won't_ work on
-	  anything other than a 1541 (but it should be straightforward to add
-	  support for other drives). Sorry.
+  - It'll only work on a 1541 or a 1571 in compatibility mode. Because of the
+    fastloader. Sorry. Porting it to other drives is perfectly possible, I just
+    haven't done it.
+
+  - This won't work on MAME. You'll need VICE to emulate it.
+
+  - There's a SCREEN driver.
 
 ### VIC-20 notes
 
-  - See the Commodore 64 above.
+  - See the Commodore 64 above. There are several versions available (built with
+    different options):
+
+    - `vic20_yload_1541.d64`: 1541 format, with the fastloader. Only works on a
+      1541 (or compatible).
+    - `vic20_jiffy_1541.d64`: 1541 format with JiffyDOS. Only works on a 1541
+      (or compatible) with the JiffyDOS ROM installed. This _should_ also work on
+      an SD2IEC, although this is untested. You do *not* need the JiffyDOS kernal
+      ROM in the VIC-20 itself.
+    - `vic20_iec_1541.d64`: 1541 format, uses old-fashioned IEC code. Should
+      work anywhere which supports `d64` images, although very, very slowly.
+    - `vic20_jiffy_fd2000.d2m`: CMD FD-2000 format, with JiffyDOS. The FD-2000
+      has JiffyDOS support built in. You get over a megabyte of free space.
 
   - You need a fully expanded VIC-20 with all memory banks populated, for the
     full 35kB.
 
-  - You get a 40x24 screen, emulated using a four-pixel-wide soft font. It
+  - You get a 40x23 screen, emulated using a four-pixel-wide soft font. It
     doesn't look great but is surprisingly readable, and is vastly better than
     the VIC-20's default 22x24 screen mode.
 
-  - Disk accesses are slightly faster than the Commodore 64, but only just.
-    It's still a miserable experience.
+  - There's a SCREEN driver.
 
 ### Commodore PET notes
 
@@ -199,10 +215,8 @@ the same time.
   - The 4032 is set up for the Graphics Keyboard. The 8032 and 8096 are set up
     for the Business Keyboard. (It would also be trivial to emulate the
     Business Keyboard on the Graphics Keyboard, but that is likely to be
-    confusing.)
-
-  - It's much faster than the Comodore 64 --- you can run the assembler in real
-    time without having to worry about retirement.
+    confusing.) Both use the RVS/OFF key as the CTRL key; some PET models
+    actually label this as such.
 
   - It supports drive 0: only.
 
@@ -378,13 +392,11 @@ the same time.
 
 ### KIM-1 with K-1013 FDC notes
 
-  - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an
-    SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the
-    0x0400-0x13ff memory hole.
+  - To run this on an KIM-1, you need an MTU K-1013 Floppy Disk Controller with an SSDD 8'' disk (or this [Pico based RAM/ROM/Video/FDC card](https://github.com/eduardocasino/kim-1-programmable-memory-card)) and full RAM upgrade, including the 0x0400-0x13ff memory hole.
 
-  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto an FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into 0x0200 and execute it.
+  - To use it, transfer the `diskimage.imd` image to an SSDD 8'' disk (or place it directly onto a FAT or exFAT formatted SD card and assign it to disk0 in the Pico card). Start the KIM-1 in TTY mode, load the `boot.pap` loader program into `0x0200` and execute it.
 
-  - Only 1 disk is supported. Multi-disk is not stable in CP/M-65 yet.
+  - Up to 4 disks are supported.
 
   - Only TTY interface for now, no SCREEN driver.
 
@@ -407,6 +419,27 @@ the same time.
   - 1 32MB disk supported.
 
   - Only TTY interface for now, no SCREEN driver.
+
+### KIM-1 with Corsham's SD Shield notes
+
+  - For this port, you'll need an original Corsham's SD Shield, [a clone like this one](https://github.com/eduardocasino/sd-card-shield) or even this [Raspberry Pi Pico based variant](https://retro-spy.com/product/sd-card-system/).
+
+  - Place the `CPM-BOOT.DSK` image at the root of a FAT32 formatted SD card and create an `SD.CFG`file with this content:
+    ```
+    0:CPM-BOOT.DSK
+    ```
+
+  - Start the KIM-1 in TTY mode, load the `bootsdshield.pap` loader program into `0x0200` and execute it.
+
+  - As for the SD variant above, for KIM-1 clones, you can place the `bootsdshield-kimrom.bin` bootloader into the free space of the KIM-1 rom, starting at 0x1AA0.
+
+  - Same memory requirements as for the SD variant.
+
+  - Up to 4 disks are supported.
+
+  - Only TTY interface for now, no SCREEN driver.
+
+  - An Image Manipulation Utility, `IMU.COM`, is included. It allows mounting and unmounting disk images and, [with the latest SD Shield firmware](https://github.com/eduardocasino/SD-drive/tree/version-2), even copy, rename, delete or create new ones.
 
 ### KIM-1 with Commodore 1541 drive
 
@@ -552,6 +585,43 @@ website](http://pascal.hansotten.com/px-descendants/pascal-m/pascal-m-2k1/).
 However, do not report bugs on the CP/M-65 port to him --- [file bug reports
 here](https://github.com/davidgiven/cpm65/issues/new) instead.
 
+### The Forth
+
+lbForth is a minimal Forth implementation but still contains a fair amount of
+built in words. It is currently not included on the disks for the C64, VIC20 
+or BBC Micro due to lack of disk space.
+
+The original source code is available [here](https://gist.github.com/lbruder/10007431). 
+
+It has been extended with the possibility to load a script from file at 
+startup if the filename is given as a command line argument, and a small
+example file (`TRIANGLE.FRT`) is included:
+```
+: STAR 42 EMIT ;
+: STARS 0 DO STAR LOOP ;
+: TRIANGLE 1 + 1 DO I STARS CR LOOP ;
+CR 10 TRIANGLE CR
+```
+When run from the command line it produces the following output:
+```
+A> LBFORTH TRIANGLE.FRT
+lbForth for CP/M-65. Use BYE to exit.
+
+*
+**
+***
+****
+*****
+******
+*******
+********
+*********
+**********
+
+END OF FILE
+ OK
+```
+
 ### Utilities
 
 `bin/cpmemu` contains a basic CP/M-65 user mode emulator and debugger. It'll run
@@ -612,3 +682,6 @@ and is available under the terms of the BSD 2-Clause License. See
 `third_party/zmalloc` contains a copy of zmalloc, which is © 2024 by Ivo van
 Poorten and is available under the terms of the 0BSD License. See
 `third_party/zmalloc/LICENSE` for the full text.
+
+`third_party/lbforth` contains a port of lbForth, which is © 2014 by Leif Bruder 
+and is released as Public Domain.

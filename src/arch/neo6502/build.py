@@ -11,6 +11,7 @@ from config import (
     SCREEN_APPS_SRCS,
     BIG_SCREEN_APPS,
     PASCAL_APPS,
+    FORTH_APPS,
 )
 import re
 
@@ -47,7 +48,7 @@ llvmrawprogram(
     ],
     linkscript="./neo6502.ld",
     ldflags=[
-        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers {deps[0]} "
+        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers $[deps[0]] "
         + "| gawk --non-decimal-data -f scripts/size.awk)"
     ],
 )
@@ -78,6 +79,7 @@ zip(
             | SCREEN_APPS_SRCS
             | BIG_SCREEN_APPS
             | PASCAL_APPS
+            | FORTH_APPS
         ).items()
     },
 )

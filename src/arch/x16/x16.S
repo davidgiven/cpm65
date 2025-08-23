@@ -62,7 +62,7 @@ _start:
     ldy #0
     zloop
         lda loading_msg, y
-        zbreakif_eq
+        zbreakif eq
         jsr CHROUT
         iny
     zendloop
@@ -76,12 +76,12 @@ _start:
         sta __bios_start
 
         inc srcp+0
-        zif_eq
+        zif eq
             inc srcp+1
         zendif
 
         inc destp+0
-        zif_eq
+        zif eq
             inc destp+1
         zendif
 
@@ -110,7 +110,7 @@ _start:
         jsr CIOUT
 
         inx
-    zuntil_eq
+    zuntil eq
 
     jsr UNLSN
 
@@ -133,12 +133,12 @@ _start:
         sta (ptr), y
 
         inc ptr+0
-        zif_eq
+        zif eq
             inc ptr+1
         zendif
 
         lda STATUS      ; check for EOF
-    zuntil_ne
+    zuntil ne
     ; The drive will UNTALK automatically on EOF.
 
     lda #8
@@ -160,7 +160,7 @@ _start:
         jsr CIOUT
 
         inx
-    zuntil_eq
+    zuntil eq
 
     jsr UNLSN
 
@@ -231,17 +231,17 @@ zendproc
 
 zproc tty_conin
     lda pending_key
-    zif_eq
+    zif eq
         zrepeat
             jsr GETIN
             tax
-        zuntil_ne
+        zuntil ne
     zendif
     ldx #0
     stx pending_key
 
     cmp #20         ; DEL
-    zif_eq
+    zif eq
         lda #8
     zendif
 
@@ -258,10 +258,10 @@ zendproc
 
 zproc tty_const
     lda pending_key
-    zif_eq
+    zif eq
         jsr GETIN
         sta pending_key
-        zif_eq
+        zif eq
             lda #0
             clc
             rts
@@ -289,7 +289,7 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_ne
+    zif ne
         sec                 ; invalid drive
         rts
     zendif
@@ -383,7 +383,7 @@ zproc bios_READ
         sta (dma), y
         iny
         cpy #$80
-    zuntil_eq
+    zuntil eq
 
     jsr UNTALK
     clc
@@ -406,7 +406,7 @@ zproc bios_WRITE
         jsr CIOUT
         iny
         cpy #$80
-    zuntil_eq
+    zuntil eq
 
     jsr UNLSN
     clc
@@ -433,7 +433,7 @@ zproc seek_to_sector
         jsr CIOUT
         iny
         cpy #4
-    zuntil_eq
+    zuntil eq
 
     jmp UNLSN
 zendproc
@@ -450,7 +450,8 @@ mem_end:    .byte __TPA0_END__@mos16hi,   __TPA1_END__@mos16hi
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 128*64, 2048, 128, 0
+define_dpb dpb, 128*64, 2048, 128, 0
+define_dph dph, dpb
 
 NOINIT
 

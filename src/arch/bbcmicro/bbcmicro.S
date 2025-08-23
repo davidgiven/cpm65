@@ -28,7 +28,7 @@ zproc _start
         lda banner - 1, y
         jsr OSWRCH
         dey
-    zuntil_eq
+    zuntil eq
 
     ; Figure out the start and end of the TPA.
 
@@ -40,7 +40,7 @@ zproc _start
     ldy #0
     jsr OSBYTE
     cpy #$4
-    zif_eq              ; Tube present?
+    zif eq              ; Tube present?
         ldy #$f8        ; override mem_end
         lda #$ee
         sta zp_end      ; override zp_end
@@ -230,7 +230,7 @@ zendproc
 
 zproc screen_putchar
     cmp #32
-    zif_cs
+    zif cs
         cmp #127
         bcc oswrch
     zendif
@@ -243,10 +243,10 @@ zproc screen_putstring
     ldy #0
     zrepeat
         lda (ptr), y
-        zbreakif_eq
+        zbreakif eq
         jsr OSWRCH
         iny
-    zuntil_eq ; never 0
+    zuntil eq ; never 0
     clc
     rts
 zendproc
@@ -302,7 +302,7 @@ zendproc
 zproc screen_setstyle
     and #STYLE_REVERSE
 
-    zif_eq
+    zif eq
         lda #7              ; white foreground
         jsr setcolour
         lda #128            ; black background
@@ -337,14 +337,14 @@ zendproc
 
 zproc tty_conin
     lda pending_key
-    zif_eq
+    zif eq
         ldx #0              ; cursor keys edit
         jsr set_cursor_keys
         zrepeat
             ldx #$7f
             lda #$ff
             jsr screen_getchar
-        zuntil_cc
+        zuntil cc
         pha
         ldx #1              ; cursor keys return values
         jsr set_cursor_keys
@@ -359,11 +359,11 @@ zendproc
 
 zproc tty_const
     lda pending_key
-    zif_eq
+    zif eq
         ldx #0
         lda #0
         jsr screen_getchar
-        zif_cs
+        zif cs
             lda #0
             rts
         zendif
@@ -414,7 +414,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -442,7 +442,7 @@ zproc init_control_block
     zrepeat
         sta osgbpb_block, y
         dey
-    zuntil_mi
+    zuntil mi
 
     lda filehandle
     sta osgbpb_block+0
@@ -458,14 +458,14 @@ zproc init_control_block
         lda sector_num+0, y
         sta osgbpb_block+10, y
         dey
-    zuntil_mi
+    zuntil mi
 
     clc
     ldx #3
     zrepeat
         ror osgbpb_block+9, x
         dex
-    zuntil_mi
+    zuntil mi
 
     rts
 zendproc
@@ -507,7 +507,8 @@ drvtop: .word drv_TTY
 
 ; DPH for drive 0 (our only drive)
 
-define_drive dph, 0x600, 1024, 64, 0
+define_dpb dpb, 0x600, 1024, 64, 0
+define_dph dph, dpb
 
 directory_buffer = _start
 

@@ -14,7 +14,7 @@
 .zp ptr, 2
 .zp index, 1
 
-.zproc start
+zproc start
     ldy #BDOS_GET_BIOS
     jsr BDOS
     sta BIOS+1
@@ -29,12 +29,12 @@
 	sta ptr+0
 	stx ptr+1
 
-	.zloop
+	zloop
 		lda ptr+0
 		ora ptr+1
-		.zif eq
+		zif eq
 			rts
-		.zendif
+		zendif
 
 		\ Print driver address.
 
@@ -48,14 +48,14 @@
 
 		ldy #DRVSTRUCT_NAME
 		sty index
-		.zloop
+		zloop
 			ldy index
 			lda (ptr), y
-			.zbreak eq
+			zbreak eq
 
 			jsr printchar
 			inc index
-		.zendloop
+		zendloop
 		jsr space
 
 		\ Print driver ID.
@@ -85,13 +85,13 @@
 		sta ptr+1
 		pla
 		sta ptr+0
-	.zendloop
+	zendloop
 
 BIOS:
     jmp 0
 
 \ Prints an 8-bit hex number in A.
-.zproc print_hex_number
+zproc print_hex_number
 	pha
 	lsr a
 	lsr a
@@ -103,30 +103,30 @@ print:
 	and #0x0f
 	ora #48
 	cmp #58
-    .zif cs
+    zif cs
         adc #6
-    .zendif
+    zendif
 	pha
 	jsr printchar
 	pla
 	rts
-.zendproc
+zendproc
 
-.zproc space
+zproc space
 	lda #' '
-.zendproc
+zendproc
     \ fall through
-.zproc printchar
+zproc printchar
     ldy #BDOS_CONOUT
     jmp BDOS
-.zendproc
+zendproc
 
-.zproc newline
+zproc newline
 	lda #13
 	jsr printchar
 	lda #10
 	jmp printchar
-.zendproc
+zendproc
 
 \ vim: sw=4 ts=4 et
 

@@ -74,7 +74,7 @@ no_fill_wildcards:
 
     .label too_many_files
 
-    .zrepeat
+    zrepeat
         asl A
         asl A
         asl A
@@ -100,16 +100,16 @@ no_fill_wildcards:
         .label found_name
         .label inc_pfile
     
-        .zrepeat
+        zrepeat
     
             ldy #11
     
-            .zrepeat
+            zrepeat
                 lda (pfile),y
                 cmp (pentry),y
                 bne inc_pfile       \ decide it is not equal
                 dey
-            .zuntil eq
+            zuntil eq
             beq found_name          \ bra
     
         inc_pfile:
@@ -117,25 +117,25 @@ no_fill_wildcards:
             clc
             adc #14
             sta pfile
-            .zif cs
+            zif cs
                 inc pfile+1
-            .zendif
+            zendif
     
             dex
     
     test_nfiles:
     
-        .zuntil eq
+        zuntil eq
     
     \ not found, add to end of list.
     \ note that pfile still points to list entry - 1
     
         ldy #11
-        .zrepeat
+        zrepeat
             lda (pentry),y
             sta (pfile),y
             dey
-        .zuntil eq
+        zuntil eq
     
         ldy #12
         lda #0          \ init to zero
@@ -181,7 +181,7 @@ no_fill_wildcards:
     
     test_ff:
         cmp #$ff
-    .zuntil eq
+    zuntil eq
 
 \ sorting with simple bubble sort which fast enough
 
@@ -201,9 +201,9 @@ print_next:
     clc
     adc #2
     sta pidx
-    .zif cs
+    zif cs
         inc pidx+1
-    .zendif
+    zendif
 
     ldy #0
     lda (pidx),y
@@ -310,12 +310,12 @@ mul128:             \ 24-bit mul, files can be larger than 65535
     clc
     adc tmp
     sta tmp
-    .zif cs
+    zif cs
         inc tmp+1
-        .zif eq
+        zif eq
             inc tmp+2
-        .zendif
-    .zendif
+        zendif
+    zendif
 
 no_adjust:
     lda tmp+2               \ we cannot print a value larger than 65535
@@ -340,7 +340,7 @@ no_adjust2:
 
     ldy #0
 
-    .zrepeat
+    zrepeat
         lda (pfile),y
         and #$7f            \ 7-bit ASCII
         sty tmp
@@ -351,7 +351,7 @@ no_adjust2:
         ldy tmp
         iny
         cpy #11
-    .zuntil eq
+    zuntil eq
 
     ldy #BDOS_CONOUT
     lda #13
@@ -371,7 +371,7 @@ done:
 
 \ ----------------------------------------------
 
-.zproc sort
+zproc sort
 
 \ init index
 
@@ -387,7 +387,7 @@ done:
 
     ldy #0
     ldx nfiles
-    .zrepeat
+    zrepeat
         lda pfile
         sta (pidx),y
         iny
@@ -398,18 +398,18 @@ done:
         clc
         adc #2
         sta pidx
-        .zif cs
+        zif cs
             inc pidx+1
-        .zendif
+        zendif
         lda pfile
         clc
         adc #14
         sta pfile
-        .zif cs
+        zif cs
             inc pfile+1
-        .zendif
+        zendif
         dex
-    .zuntil eq
+    zuntil eq
 
 \ sort index
 
@@ -420,7 +420,7 @@ done:
     stx endcondx
 
     ldx #0
-    .zrepeat
+    zrepeat
         stx count
 
         lda endcondx
@@ -456,7 +456,7 @@ done:
 
         php             \ instead of unrolling 11 compares
         .label further_checks
-        .zrepeat
+        zrepeat
             plp
             lda (pfile),y
             cmp (pfile2),y
@@ -464,7 +464,7 @@ done:
             php
             iny
             cpy #11
-        .zuntil eq
+        zuntil eq
 
         plp
 
@@ -497,16 +497,16 @@ done:
         clc
         adc #2
         sta pidx
-        .zif cs
+        zif cs
             inc pidx+1
-        .zendif
+        zendif
         lda pidx2
         clc
         adc #2
         sta pidx2
-        .zif cs
+        zif cs
             inc pidx2+1
-        .zendif
+        zendif
 
         lda count
         beq ready
@@ -516,23 +516,23 @@ done:
     ready:
         inx
         cpx endcondx
-    .zuntil eq
+    zuntil eq
 
 no_files:
 just_one_file:
     rts
-.zendproc
+zendproc
 
 \ Print string wrapper
 
-.zproc print_string
+zproc print_string
     ldy #BDOS_PRINTSTRING
     jmp BDOS
-.zendproc
+zendproc
 
 \ Prints XA in decimal. Y is the padding char or 0 for no padding.
 
-.zproc print16padded
+zproc print16padded
     ldy #' '            \ always pad with ' '
     sta ptr1+0
     stx ptr1+1
@@ -543,10 +543,10 @@ just_one_file:
     .label justprint
 
     ldy #8
-    .zrepeat
+    zrepeat
         ldx #0xff
         sec
-        .zrepeat
+        zrepeat
             lda ptr1+0
             sbc dec_table+0, y
             sta ptr1+0
@@ -556,7 +556,7 @@ just_one_file:
             sta ptr1+1
 
             inx
-        .zuntil cc
+        zuntil cc
 
         lda ptr1+0
         adc dec_table+0, y
@@ -571,11 +571,11 @@ just_one_file:
         txa
         pha
 
-        .zif eq                     \ if digit is zero, check padding
+        zif eq                     \ if digit is zero, check padding
             lda ptr2+0              \ get the padding character
             beq skip                \ if zero, no padding
             bne justprint           \ otherwise, use it
-        .zendif
+        zendif
 
         ldx #'0'                    \ printing a digit, so reset padding
         stx ptr2+0
@@ -591,12 +591,12 @@ just_one_file:
 
         dey
         dey
-    .zuntil mi
+    zuntil mi
     rts
 
 dec_table:
    .word 1, 10, 100, 1000, 10000
-.zendproc
+zendproc
 
 error:
     .byte "drive error\r\n$"

@@ -26,7 +26,7 @@ zproc internal_RESETFILESYSTEM
     zrepeat
         sta filesystem_state_start, y
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Log in drive A.
 
@@ -59,7 +59,7 @@ zproc internal_ENDSYS
     pha
 
     lda old_fcb_drive
-    zif_pl
+    zif pl
         ldy #FCB_DR
         sta (param), y      ; restore user FCB
     zendif
@@ -102,7 +102,7 @@ zendproc
 zproc internal_OPENFILE
     lda #FCB_S2+1              ; match 15 bytes of FCB
     jsr find_first
-    zif_cc
+    zif cc
         ; We have a matching dirent!
 
         ldy #FCB_EX
@@ -116,7 +116,7 @@ zproc internal_OPENFILE
             lda (current_dirent), y
             sta (param), y
             dey
-        zuntil_mi
+        zuntil mi
 
         ; Set bit 7 of S2 to indicate that this file hasn't been modified.
 
@@ -128,9 +128,9 @@ zproc internal_OPENFILE
         ldy #FCB_EX
         lda (param), y
         cmp tempb                   ; C if ex >= tempb
-        zif_ne
+        zif ne
             lda #$00                ; after the end of the file, record count empty
-            zif_cs
+            zif cs
                 ; user extent is smaller
                 lda #$80            ; middle of the file, record count full
             zendif
@@ -174,7 +174,7 @@ zproc internal_CREATEFILE
         sta (param), y
         iny
         cpy #FCB_AL+16
-    zuntil_eq
+    zuntil eq
 
     ; Search for an empty dirent.
 
@@ -193,7 +193,7 @@ zproc internal_CREATEFILE
         sta (current_dirent), y
         iny
         cpy #FCB_AL+16
-    zuntil_eq
+    zuntil eq
 
     ; Set the user code correctly.
 
@@ -244,7 +244,7 @@ zproc convert_user_fcb
     and #$0f                    ; extract drive
     tax
     dex                         ; convert to internal drive numbering
-    zif_mi
+    zif mi
         ldx current_drive       ; override with current drive
     zendif
 
@@ -269,7 +269,7 @@ zproc internal_CLOSEFILE
 
     ldy #FCB_S2
     lda (param), y
-    zif_mi
+    zif mi
         clc                     ; just return if not
         rts
     zendif
@@ -278,7 +278,7 @@ zproc internal_CLOSEFILE
 
     lda #FCB_S2+1
     jsr find_first
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -295,7 +295,7 @@ zproc internal_CLOSEFILE
     ; Merge the allocation maps.
 
     jsr merge_fcb_into_dirent
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -321,7 +321,7 @@ zproc bdos_DELETEFILE
 
     lda #FCB_T3+1
     jsr find_first
-    zif_cc
+    zif cc
         jsr check_dirent_writable
         zrepeat
             ; Free all the blocks in the matching dirent.
@@ -341,7 +341,7 @@ zproc bdos_DELETEFILE
 
             lda #FCB_T3+1
             jsr find_next
-        zuntil_cs
+        zuntil cs
         clc
     zendif
 
@@ -356,7 +356,7 @@ zproc bdos_RENAMEFILE
 
     lda #FCB_T3+1
     jsr find_first
-    zif_cc
+    zif cc
         jsr check_dirent_writable
         zrepeat
             ; Replace the filename in the dirent with the new one.
@@ -376,7 +376,7 @@ zproc bdos_RENAMEFILE
                 inc temp+1
                 lda temp+0
                 cmp #FCB_T3+1
-            zuntil_eq
+            zuntil eq
 
             ; Write back to disk.
 
@@ -387,7 +387,7 @@ zproc bdos_RENAMEFILE
 
             lda #FCB_T3+1
             jsr find_next
-        zuntil_cs
+        zuntil cs
         clc
     zendif
 
@@ -402,7 +402,7 @@ zproc bdos_SETFILEATTRS
 
     lda #FCB_T3+1
     jsr find_first
-    zif_cc
+    zif cc
         zrepeat
             ; Replace the filename in the dirent with the new one.
 
@@ -412,7 +412,7 @@ zproc bdos_SETFILEATTRS
                 sta (current_dirent), y
                 iny
                 cpy #FCB_T3+1
-            zuntil_eq
+            zuntil eq
 
             ; Write back to disk.
 
@@ -423,7 +423,7 @@ zproc bdos_SETFILEATTRS
 
             lda #FCB_T3+1
             jsr find_next
-        zuntil_cs
+        zuntil cs
         clc
     zendif
 
@@ -440,7 +440,7 @@ zproc internal_READSEQUENTIAL
     lda (param), y
     ldy #FCB_RC
     cmp (param), y
-    zif_eq
+    zif eq
         cmp #$80                ; is this extent full?
         bne eof$                ; no, we've reached the end of the file
 
@@ -491,7 +491,7 @@ zproc close_extent_and_move_to_next_one
     adc #1
     and #$1f
     sta (param), y
-    zif_eq
+    zif eq
         ldy #FCB_S2
         lda (param), y
         and #$7f            ; remove not-modified flag
@@ -525,11 +525,11 @@ zendproc
 zproc get_fcb_block
     jsr get_fcb_block_index     ; gets index in Y
     ldx blocks_on_disk+1        ; are we a big disk?
-    zif_ne                      ; yes
+    zif ne                      ; yes
         lda (param), y
         iny
         ora (param), y          ; check for zero
-        zif_ne
+        zif ne
             lda (param), y          ; high byte!
             tax
             dey
@@ -553,7 +553,7 @@ zproc set_fcb_block
     lda temp+0                  ; fetch low byte
     sta (param), y
     ldx blocks_on_disk+1        ; are we a big disk?
-    zif_ne                      ; yes
+    zif ne                      ; yes
         iny
         lda temp+1              ; fetch high byte
         sta (param), y
@@ -578,7 +578,7 @@ zproc get_fcb_block_index
     zrepeat                     ; shift extent to get allocation map start
         asl a
         dex
-    zuntil_eq
+    zuntil eq
     sta temp+2
 
     ldy #FCB_CR                ; get current record
@@ -589,13 +589,13 @@ zproc get_fcb_block_index
     zrepeat
         lsr a
         dex
-    zuntil_eq                   ; A = block index
+    zuntil eq                   ; A = block index
 
     clc
     adc temp+2                  ; add extent start index
 
     ldx blocks_on_disk+1        ; are we a big disk?
-    zif_ne                      ; yes
+    zif ne                      ; yes
         asl a                   ; blocks occupy two bytes
     zendif
 
@@ -610,12 +610,12 @@ zendproc
 zproc merge_fcb_into_dirent
     ldy #FCB_AL                ; index into FCB/dirent
     lda blocks_on_disk+1        ; are we a big disk?
-    zif_ne                      ; yes
+    zif ne                      ; yes
         zrepeat
             lda (param), y
             iny
             ora (param), y
-            zif_eq              ; FCB <- dirent
+            zif eq              ; FCB <- dirent
                 lda (current_dirent), y
                 sta (param), y
                 dey
@@ -627,7 +627,7 @@ zproc merge_fcb_into_dirent
             lda (current_dirent), y
             dey
             ora (current_dirent), y
-            zif_eq              ; FCB -> dirent
+            zif eq              ; FCB -> dirent
                 lda (param), y
                 sta (current_dirent), y
                 iny
@@ -645,20 +645,20 @@ zproc merge_fcb_into_dirent
 
             iny
             cpy #FCB_AL+16
-        zuntil_eq
+        zuntil eq
         clc
         rts
     zendif
 
     zrepeat
         lda (param), y          ; get FCB block number
-        zif_eq                  ; FCB <- dirent
+        zif eq                  ; FCB <- dirent
             lda (current_dirent), y
             sta (param), y
         zendif
 
         lda (current_dirent), y
-        zif_eq                  ; FCB -> dirent
+        zif eq                  ; FCB -> dirent
             lda (param), y
             sta (current_dirent), y
         zendif
@@ -669,7 +669,7 @@ zproc merge_fcb_into_dirent
 
         iny
         cpy #FCB_AL+16
-    zuntil_eq
+    zuntil eq
     clc
     rts
 
@@ -694,7 +694,7 @@ zproc get_sequential_sector_number
         rol current_sector+1
         rol current_sector+2
         dex
-    zuntil_eq
+    zuntil eq
 
     ; Add on record number.
 
@@ -705,9 +705,9 @@ zproc get_sequential_sector_number
     clc
     adc current_sector+0
     sta current_sector+0
-    zif_cs
+    zif cs
         inc current_sector+1
-        zif_eq
+        zif eq
             inc current_sector+2
         zendif
     zendif
@@ -721,7 +721,7 @@ zproc get_sequential_sector_number
     lda current_sector+1
     adc reserved_sectors+1
     sta current_sector+1
-    zif_cs
+    zif cs
         inc current_sector+2
     zendif
     rts
@@ -737,12 +737,12 @@ zproc bdos_WRITESEQUENTIAL
     ldy #FCB_CR
     lda (param), y
     cmp #$80
-    zif_eq                      ; is this extent full?
+    zif eq                      ; is this extent full?
         ; Move to the next extent.
 
         jsr close_extent_and_move_to_next_one
         lda #2                  ; disk full
-        zif_cs
+        zif cs
             rts
         zendif
 
@@ -753,12 +753,12 @@ zproc bdos_WRITESEQUENTIAL
         sta (param), y
 
         jsr internal_OPENFILE
-        zif_cs
+        zif cs
             ; Could not open new extent --- it must not exist.
 
             jsr internal_CREATEFILE
             lda #1              ; directory full
-            zif_cs
+            zif cs
                 rts
             zendif
         zendif
@@ -778,7 +778,7 @@ zproc bdos_WRITESEQUENTIAL
 
     ldy #FCB_RC
     cmp (param), y
-    zif_cs
+    zif cs
         sta (param), y
         jsr fcb_is_modified
     zendif
@@ -797,14 +797,14 @@ zendproc
 
 zproc seek_to_block_and_create
     jsr get_fcb_block           ; get disk block value in XA
-    zif_eq
+    zif eq
         jsr fcb_is_modified
         jsr allocate_unused_block
         jsr set_fcb_block
         jsr get_sequential_sector_number
 
         lda block_needs_clearing
-        zif_ne
+        zif ne
             ; Wipe the new block.
 
             ldy #0
@@ -813,7 +813,7 @@ zproc seek_to_block_and_create
                 sta (directory_buffer), y
                 iny
                 cpy #128
-            zuntil_eq
+            zuntil eq
 
             ; Now write zeroes until the block is full.
 
@@ -826,16 +826,16 @@ zproc seek_to_block_and_create
                 jsr write_sector
 
                 inc current_sector+0
-                zif_eq
+                zif eq
                     inc current_sector+1
-                    zif_eq
+                    zif eq
                         inc current_sector+2
                     zendif
                 zendif
 
                 lda current_sector+0
                 and block_mask
-            zuntil_eq
+            zuntil eq
         zendif
 
         ; Get the block number again for get_sequential_sector_number.
@@ -869,11 +869,11 @@ zproc bdos_WRITERANDOM
     jsr check_disk_writable
 
     jsr seek_to_random_location
-    zif_cs
+    zif cs
         ; Do we need a new extent?
 
         cmp #CPME_NOEXTENT
-        zif_eq
+        zif eq
             sec
             rts
         zendif
@@ -884,7 +884,7 @@ zproc bdos_WRITERANDOM
         lda #CPME_DIRFULL
         sec
     zendif
-    zif_cc
+    zif cc
         ; If (CR+1) > RC, update RC.
 
         ldy #FCB_CR
@@ -893,7 +893,7 @@ zproc bdos_WRITERANDOM
         adc #1
         ldy #FCB_RC
         cmp (param), y
-        zif_cs
+        zif cs
             sta (param), y
             jsr fcb_is_modified
         zendif
@@ -919,7 +919,7 @@ zendproc
 zproc bdos_READRANDOM
     jsr convert_user_fcb
     jsr seek_to_random_location
-    zif_cc
+    zif cc
         ; If CR > RC, fail.
 
         ldy #FCB_CR
@@ -983,12 +983,12 @@ zproc seek_to_random_location
     lda (param), y          ; compare S2
     and #$7f                ; ...ignoring not-modified bit
     cmp temp+2
-    zif_eq
+    zif eq
         ldy #FCB_EX
         lda (param), y
         cmp temp+1
     zendif
-    zif_ne
+    zif ne
         lda temp+1
         pha                     ; push EX
         lda temp+2
@@ -1028,7 +1028,7 @@ zproc bdos_COMPUTEFILESIZE
 
     lda #FCB_T3+1              ; match just the filename
     jsr find_first
-    zif_cc
+    zif cc
         zrepeat
             ; Check for a maximum-possible-length file,
             ; resulting in file size overflow.
@@ -1036,15 +1036,15 @@ zproc bdos_COMPUTEFILESIZE
             ldy #FCB_RC
             lda (current_dirent), y
             cmp #$80            ; maximum possible RC
-            zif_eq
+            zif eq
                 ldy #FCB_EX
                 lda (current_dirent), y
                 cmp #$1f        ; maximum possible EX
-                zif_eq
+                zif eq
                     ldy #FCB_S2
                     lda (current_dirent), y
                     cmp #$0f    ; maximum possible S2
-                    zif_eq
+                    zif eq
                         ; This file is the maximum possible length!
                         ; We can just stop here.
 
@@ -1088,7 +1088,7 @@ zproc bdos_COMPUTEFILESIZE
             ldy #FCB_RC
             clc
             adc (current_dirent), y     ; add in record count
-            zif_cs
+            zif cs
                 inx
             zendif
 
@@ -1096,12 +1096,12 @@ zproc bdos_COMPUTEFILESIZE
             ; low byte of file size -> a
 
             cpx temp+3
-            zif_cs
-                zif_eq
+            zif cs
+                zif eq
                     cmp temp+2
                 zendif
             zendif
-            zif_ne
+            zif ne
                 ; Update the file size accumulator.
 
                 sta temp+2
@@ -1110,7 +1110,7 @@ zproc bdos_COMPUTEFILESIZE
 
             lda #FCB_T3+1
             jsr find_next
-        zuntil_cs
+        zuntil cs
     zendif
 
     ; temp+2/3 now contains the record count of the file.
@@ -1151,7 +1151,7 @@ zproc bdos_FINDNEXT
     jsr find_next
     ; fall through
 copy_result_of_find:
-    zif_cc
+    zif cc
         ; Copy the directory buffer into the DMA buffer.
 
         ldy #127
@@ -1159,7 +1159,7 @@ copy_result_of_find:
             lda (directory_buffer), y
             sta (user_dma), y
             dey
-        zuntil_mi
+        zuntil mi
 
         ; Calculate the offset into the DMA buffer.
 
@@ -1182,7 +1182,7 @@ zproc setup_fcb_for_find
     ldy #FCB_DR
     lda (param), y
     cmp #'?'
-    zif_eq
+    zif eq
         lda #FCB_DR+1          ; number of bytes to search
     zelse
         jsr convert_user_fcb
@@ -1191,7 +1191,7 @@ zproc setup_fcb_for_find
         ldy #FCB_EX
         lda (param), y
         cmp #'?'
-        zif_eq                  ; get all extents?
+        zif eq                  ; get all extents?
             ldy #FCB_S2
             sta (param), y      ; module number should be a wildcard
         zendif
@@ -1218,7 +1218,7 @@ zproc find_next
     lda #$e5
     ldy #0
     cmp (param), y
-    zif_ne
+    zif ne
         ; If current_dirent is higher than cdrmax, we know that
         ; the rest of the directory is empty, so give up now.
         ldy #DPH_CDRMAX
@@ -1263,7 +1263,7 @@ zproc find_next
     same_characters:
         iny
         cpy find_first_count    ; reached the end of the string?
-    zuntil_eq
+    zuntil eq
 
     ; We found a file!
 
@@ -1315,7 +1315,7 @@ zproc internal_LOGINDRIVE
 
     sta active_drive
     jsr select_active_drive
-    zif_cs                  ; selecting drive failed, no need to go on
+    zif cs                  ; selecting drive failed, no need to go on
         rts
     zendif
 
@@ -1327,7 +1327,7 @@ zproc internal_LOGINDRIVE
     jsr shiftr              ; flag at bottom of temp+0
 
     ror temp+0
-    zif_cs                  ; already logged in
+    zif cs                  ; already logged in
         clc                 ; drive exists and is successfully selected
         rts
     zendif
@@ -1345,7 +1345,7 @@ zproc internal_LOGINDRIVE
     ldx blocks_on_disk+1
     clc                     ; add 7 to round up
     adc #7
-    zif_cs
+    zif cs
         inx
     zendif
     ldy #3
@@ -1362,7 +1362,7 @@ zproc internal_LOGINDRIVE
         sta (temp+2), y     ; zero a byte
 
         inc temp+2          ; advance pointer
-        zif_eq
+        zif eq
             inc temp+3
         zendif
 
@@ -1370,13 +1370,13 @@ zproc internal_LOGINDRIVE
         sec
         sbc #1
         sta temp+0
-        zif_cc
+        zif cc
             dec temp+1
         zendif
 
         lda temp+0
         ora temp+1
-    zuntil_eq
+    zuntil eq
 
     ; Initialise the bitmap with the directory.
 
@@ -1390,7 +1390,7 @@ zproc internal_LOGINDRIVE
         lda bitmap_init+0, y
         sta (temp+2), y
         dey
-    zuntil_mi
+    zuntil mi
 
     ; Zero cdrmax.
 
@@ -1407,12 +1407,12 @@ zproc internal_LOGINDRIVE
     zloop
         jsr read_dir_entry
         jsr check_dir_pos
-        zbreakif_eq
+        zbreakif eq
 
         ldy #0
         lda (current_dirent), y
         cmp #$e5                    ; is this directory entry in use?
-        zif_ne
+        zif ne
             ldx #1
             jsr update_bitmap_for_dirent
             jsr update_cdrmax
@@ -1430,10 +1430,10 @@ zproc read_dir_entry
 
     lda directory_pos+0         ; is this the last?
     cmp directory_entries+0
-    zif_eq
+    zif eq
         lda directory_pos+1
         cmp directory_entries+1
-        zif_eq
+        zif eq
             jmp reset_dir_pos
         zendif
     zendif
@@ -1441,7 +1441,7 @@ zproc read_dir_entry
     ; Move to the next dirent
 
     inc directory_pos+0
-    zif_eq
+    zif eq
         inc directory_pos+1
     zendif
 
@@ -1458,7 +1458,7 @@ zproc read_dir_entry
 
     ; If at the beginning of a new record, reload it from disk.
 
-    zif_eq
+    zif eq
         jsr calculate_dirent_sector
 
         lda directory_buffer+0
@@ -1487,7 +1487,7 @@ zproc update_cdrmax
     iny
     lda directory_pos+1
     sbc (dph), y
-    zif_cs
+    zif cs
         ; Update cdrmax.
         sta (dph), y
         dey
@@ -1504,7 +1504,7 @@ zproc update_bitmap_for_dirent
     ldy #16                 ; offset into dirent
     zloop
         cpy #32
-        zif_eq
+        zif eq
             rts
         zendif
 
@@ -1524,7 +1524,7 @@ zproc update_bitmap_for_dirent
         iny
         sta temp+1              ; store high byte
         ora temp+0              ; check for zero
-        zcontinueif_eq
+        zcontinueif eq
 
         sty temp+3
 
@@ -1619,10 +1619,10 @@ zproc allocate_unused_block
 
         jsr get_bitmap_status
         and #$01
-        zbreakif_eq
+        zbreakif eq
 
         inc temp+2
-        zif_eq
+        zif eq
             inc temp+3
         zendif
     zendloop
@@ -1765,7 +1765,7 @@ reset_dir_pos:
 check_dir_pos:
     ldx directory_pos+0
     cpx directory_pos+1
-    zif_ne                      ; if not the same, cannot be 0xffff
+    zif ne                      ; if not the same, cannot be 0xffff
         ldx #1
         rts
     zendif
@@ -1778,14 +1778,14 @@ zproc home_drive
     zrepeat
         sta current_sector, y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
 zproc select_active_drive
     lda active_drive
     jsr bios_SELDSK
-    zif_cc
+    zif cc
         ; Copy DPH into local storage.
 
         sta dph+0
@@ -1799,7 +1799,7 @@ zproc select_active_drive
             iny
             inx
             cpy #DPH_ALV+2
-        zuntil_eq
+        zuntil eq
 
         ; Copy DPB into local storage.
 
@@ -1808,7 +1808,7 @@ zproc select_active_drive
             lda (current_dpb), y
             sta dpb_copy, y
             dey
-        zuntil_mi
+        zuntil mi
 
         clc
     zelse
@@ -1831,7 +1831,7 @@ zproc check_disk_writable
     jsr shiftr              ; flag at bottom of temp+0
 
     ror temp+0
-    zif_cs
+    zif cs
         lda #<1f
         ldx #>1f
         jmp harderror

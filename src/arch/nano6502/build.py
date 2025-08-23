@@ -11,6 +11,7 @@ from config import (
     PASCAL_APPS,
     SERIAL_APPS,
     SERIAL_SCREEN_APPS,
+    FORTH_APPS,
 )
 
 llvmrawprogram(
@@ -28,7 +29,7 @@ mkcpmfs(
         "1:colorfg.com": "src/arch/nano6502/utils+colorfg",
         "1:colorbg.com": "src/arch/nano6502/utils+colorbg",
         "1:ledtest.com": "src/arch/nano6502/utils+ledtest",
-	"1:baudrate.com": "src/arch/nano6502/utils+baudrate",
+        "1:baudrate.com": "src/arch/nano6502/utils+baudrate",
     }
     | MINIMAL_APPS
     | MINIMAL_APPS_SRCS
@@ -39,6 +40,7 @@ mkcpmfs(
     | PASCAL_APPS
     | SERIAL_APPS
     | SERIAL_SCREEN_APPS
+    | FORTH_APPS,
 )
 
 mkcpmfs(
@@ -58,8 +60,8 @@ simplerule(
     ],
     outs=["=nano6502.img"],
     commands=[
-        "rm -f {outs[0]}",
-        "{ins[4]} {ins[2]} {ins[3]} {ins[0]} {ins[1]} {outs[0]}",
+        "rm -f $[outs[0]]",
+        "$[ins[4]] $[ins[2]] $[ins[3]] $[ins[0]] $[ins[1]] $[outs[0]]",
     ],
     label="IMG",
 )
@@ -75,8 +77,8 @@ simplerule(
     ],
     outs=["=nano6502_sysonly.img"],
     commands=[
-        "rm -f {outs[0]}",
-        "{ins[4]} {ins[2]} {ins[3]} {ins[0]} {ins[1]} {outs[0]}",
+        "rm -f $[outs[0]]",
+        "$[ins[4]] $[ins[2]] $[ins[3]] $[ins[0]] $[ins[1]] $[outs[0]]",
     ],
     label="IMG",
 )

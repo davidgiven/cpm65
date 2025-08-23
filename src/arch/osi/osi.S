@@ -58,21 +58,41 @@ drive_number:   .fill 1
 sector_num:     .fill 3
 dma:            .fill 2
 
+; Invisible overscan areas:
+;
+; 32x32 --> 24x26 worst case, hidden: 6L, 2R, 3T, 3B
+; 64x32 --> 48x26 worst case, hidden: 13L, 3R, 3T, 3B
+; 64x16 --> 48x12 worst case, hidden: 13L, 3R, 2T, 2B
+
 #if OSI400
-    SCREEN_WIDTH  = 32
-    SCREEN_HEIGHT = 32
-    SCREEN_PAGES  = 4
+    XSCREEN_WIDTH  = 32
+    XSCREEN_HEIGHT = 32
+    XSCREEN_PAGES  = 4
+    SCREEN_WIDTH   = 24
+    SCREEN_HEIGHT  = 26
+    SCREEN_LMARGIN = 6
+    SCREEN_TMARGIN = 3
 #elif OSI500
-    SCREEN_WIDTH  = 64
-    SCREEN_HEIGHT = 32
-    SCREEN_PAGES  = 8
+    XSCREEN_WIDTH  = 64
+    XSCREEN_HEIGHT = 32
+    XSCREEN_PAGES  = 8
+    SCREEN_WIDTH   = 48
+    SCREEN_HEIGHT  = 26
+    SCREEN_LMARGIN = 13
+    SCREEN_TMARGIN = 3
     CONTROL = $de00
 #elif OSI600
-    SCREEN_WIDTH  = 64
-    SCREEN_HEIGHT = 16
-    SCREEN_PAGES  = 4
+    XSCREEN_WIDTH  = 64
+    XSCREEN_HEIGHT = 16
+    XSCREEN_PAGES  = 4
+    SCREEN_WIDTH   = 48
+    SCREEN_HEIGHT  = 12
+    SCREEN_LMARGIN = 13
+    SCREEN_TMARGIN = 2
     CONTROL = $d800
 #endif
+
+#define SCREEN_HOMEPOS_OFFSET SCREEN_LMARGIN+(SCREEN_TMARGIN * XSCREEN_WIDTH)
 
 #ifdef FLOPPY8
 PAGES_PER_TRACK = 12
@@ -105,17 +125,17 @@ init:
 
     lda #>SCREENMEM
     sta ptr+1
-    ldx #SCREEN_PAGES
+    ldx #XSCREEN_PAGES
     lda #' '
 
     zloop                   ; clear screen
         zloop
             sta (ptr),y
             dey
-        zuntil_eq
+        zuntil eq
         inc ptr+1
         dex
-    zuntil_eq
+    zuntil eq
 #endif
 
 #if OSI500 | OSI600
@@ -132,22 +152,22 @@ init:
         sta bios_exec_addr
 
         inc memload
-        zif_eq
+        zif eq
             inc memload+1
         zendif
 
         inc memstore
-        zif_eq
+        zif eq
             inc memstore+1
         zendif
 
         lda memstore
         cmp #<bios_end_addr
-        zcontinueif_ne
+        zcontinueif ne
         lda memstore+1
         memcmpmsb = .+1
         cmp #>bios_end_addr
-    zuntil_eq
+    zuntil eq
 
     ; Determine memory size. $0000-$3fff is assumed RAM (the 16kB minimum).
     ; Systems without BASIC can have RAM at $a000-$bfff. Floppy controller
@@ -162,11 +182,11 @@ init:
         inc ptr+1
         lda ptr+1
         cmp #$c0
-        zbreakif_eq
+        zbreakif eq
         lda #$3f
         sta (ptr),y
         cmp (ptr),y
-    zuntil_ne
+    zuntil ne
 
     lda ptr+1
     sec
@@ -188,7 +208,7 @@ init:
         jsr tty_conout
         ldy save_y
         dey
-    zuntil_eq
+    zuntil eq
 
     ldx #$ff
     stx curtrk
@@ -272,7 +292,7 @@ zproc tty_conin
     stx key_pending
 
     cmp #$80
-    zif_cc
+    zif cc
         rts
     zendif
 
@@ -281,7 +301,7 @@ zproc tty_conin
     zloop
         jsr scan_keyboard
         cmp #$80                ; works for both polled and ASCII keyboards
-    zuntil_cc                   ; < $80, valid key
+    zuntil cc                   ; < $80, valid key
 
     pha
     jsr hide_cursor
@@ -295,7 +315,7 @@ zproc tty_const
     jsr scan_keyboard
     sta key_pending
     cmp #$80
-    zif_cc
+    zif cc
         lda #$ff                ; < $80, valid key
     zelse
         lda #0
@@ -332,32 +352,32 @@ zendproc
 
 zproc tty_conout
     cmp #13
-    zif_eq
+    zif eq
         lda #0
         sta curx
         rts
     zendif
     cmp #10
-    zif_eq
+    zif eq
 increase_cury:
         inc cury
         lda cury
         cmp #SCREEN_HEIGHT
-        zif_eq
+        zif eq
             dec cury
             jsr scroll_up
         zendif
         rts
     zendif
     cmp #127
-    zif_eq
+    zif eq
         dec curx
-        zif_mi
+        zif mi
             lda #SCREEN_WIDTH-1
             sta curx
 
             dec cury
-            zif_mi
+            zif mi
                 lda #0
                 sta cury
             zendif
@@ -378,7 +398,7 @@ increase_cury:
     inc curx
     lda curx
     cmp #SCREEN_WIDTH
-    zif_eq
+    zif eq
         sty curx            ; Y = 0
         beq increase_cury
     zendif
@@ -409,20 +429,29 @@ zproc calculate_cursor_address
 ;    clc                    ; C = 0 because of ror and previous adc
     adc curx
     sta ptr
-    zif_cs
+    zif cs
         inc ptr+1
     zendif
 
+    lda ptr
+    clc
+    adc #SCREEN_HOMEPOS_OFFSET  ; offset is always < 256
+    sta ptr
+    zif cs
+        inc ptr+1
+    zendif
     rts
 zendproc
 
 zproc scroll_up
-    lda #<(SCREENMEM)
+    lda #<(SCREENMEM+SCREEN_TMARGIN*XSCREEN_WIDTH)
     sta ptr
-    lda #<(SCREENMEM+SCREEN_WIDTH)
-    sta ptr1
-    lda #>SCREENMEM
+    lda #>(SCREENMEM+SCREEN_TMARGIN*XSCREEN_WIDTH)
     sta ptr+1
+
+    lda #<(SCREENMEM+(SCREEN_TMARGIN+1)*XSCREEN_WIDTH)
+    sta ptr1
+    lda #>(SCREENMEM+(SCREEN_TMARGIN+1)*XSCREEN_WIDTH)
     sta ptr1+1
 
     ldy #0
@@ -430,23 +459,23 @@ zproc scroll_up
         lda (ptr1),y
         sta (ptr),y
         inc ptr
-        zif_eq
+        zif eq
             inc ptr+1
         zendif
         inc ptr1
-        zif_eq
+        zif eq
             inc ptr1+1
         zendif
         lda ptr1+1
-        cmp #>(SCREENMEM+SCREEN_PAGES*256)
-    zuntil_eq
+        cmp #>(SCREENMEM+XSCREEN_PAGES*256)
+    zuntil eq
 
     lda #' '
     zloop                       ; Clear last line
         sta (ptr),y
         iny
-        cpy #SCREEN_WIDTH
-    zuntil_eq
+        cpy #XSCREEN_WIDTH
+    zuntil eq
 
     rts
 zendproc
@@ -470,7 +499,7 @@ zendproc
 
 zproc bios_SELDSK
     cmp #0
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph_a
         ldx #>dph_a
@@ -478,7 +507,7 @@ zproc bios_SELDSK
         rts
     zendif
     cmp #1
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph_b
         ldx #>dph_b
@@ -487,7 +516,7 @@ zproc bios_SELDSK
     zendif
 #ifndef FLOPPY8
     cmp #2
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph_c
         ldx #>dph_c
@@ -495,7 +524,7 @@ zproc bios_SELDSK
         rts
     zendif
     cmp #3
-    zif_eq
+    zif eq
         sta drive_number
         lda #<dph_d
         ldx #>dph_d
@@ -520,7 +549,7 @@ zproc bios_SETSEC
         lda (ptr), y
         sta sector_num, y
         dey
-    zuntil_mi
+    zuntil mi
     rts
 zendproc
 
@@ -576,7 +605,7 @@ zproc calculate_reqtrk_and_reqsec
         lsr
         ror reqtrk
         dex
-    zuntil_mi
+    zuntil mi
 
     rts
 zendproc
@@ -644,7 +673,7 @@ zproc fill_trkbuf
 
     lda drive_number
     cmp curdrv
-    zif_ne
+    zif ne
         sta curdrv
         lda #$ff
         sta curtrk
@@ -660,15 +689,15 @@ zproc fill_trkbuf
 do_retry:
     lda curtrk
     cmp reqtrk
-    zif_ne
+    zif ne
         cmp #$ff
-        zif_eq
+        zif eq
             jsr seek_to_track0
         zendif
         ; seek track, step in/out
         lda curtrk
         cmp reqtrk
-        zif_cc          ; we need to step in
+        zif cc          ; we need to step in
             lda reqtrk
             sec
             sbc curtrk
@@ -678,7 +707,7 @@ do_retry:
                 jsr step_in
                 ldy save_y
                 dey
-            zuntil_eq
+            zuntil eq
         zelse           ; we need to step out
             lda curtrk
             sec
@@ -689,13 +718,13 @@ do_retry:
                 jsr step_out
                 ldy save_y
                 dey
-            zuntil_eq
+            zuntil eq
         zendif
         lda reqtrk
         sta curtrk
 
         jsr read_track
-        zif_cs
+        zif cs
             lda #$ff            ; force resync on retry
             sta curtrk
             dec retry
@@ -711,7 +740,7 @@ zendproc
 zproc bios_READ
     jsr fill_trkbuf
 
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -721,7 +750,7 @@ zproc bios_READ
         lda (ptr),y
         sta (dma),y
         iny
-    zuntil_mi
+    zuntil mi
 
     clc
     rts
@@ -730,7 +759,7 @@ zendproc
 zproc bios_WRITE
     jsr fill_trkbuf             ; no-op if current track
 
-    zif_cs
+    zif cs
         rts
     zendif
 
@@ -740,7 +769,7 @@ zproc bios_WRITE
         lda (dma),y
         sta (ptr),y
         iny
-    zuntil_mi
+    zuntil mi
 
     jsr write_track             ; returns status in C
 
@@ -804,19 +833,18 @@ mem_base: .byte __USERTPA_START__@mos16hi
 
 #ifndef FLOPPY8
 #ifdef TRACKS80
-define_drive dph_a, 1280, 1024, 64, 16
-define_drive dph_b, 1280, 1024, 64, 16
-define_drive dph_c, 1280, 1024, 64, 16
-define_drive dph_d, 1280, 1024, 64, 16
+define_dpb dpb, 1280, 1024, 64, 16
 #else
-define_drive dph_a, 640, 1024, 64, 16
-define_drive dph_b, 640, 1024, 64, 16
-define_drive dph_c, 640, 1024, 64, 16
-define_drive dph_d, 640, 1024, 64, 16
+define_dpb dpb, 640, 1024, 64, 16
 #endif
+define_dph dph_a, dpb
+define_dph dph_b, dpb
+define_dph dph_c, dpb
+define_dph dph_d, dpb
 #else
-define_drive dph_a, 1848, 1024, 64, 24
-define_drive dph_b, 1848, 1024, 64, 24
+define_dpb dpb, 1848, 1024, 64, 24
+define_dph dph_a, dpb
+define_dph dph_b, dpb
 #endif
 
     .section .noinit, "ax", @nobits

@@ -68,7 +68,7 @@ zendproc
 zproc bdos_GETSETUSER
     clc
     lda param+0
-    zif_mi
+    zif mi
         lda current_user
         rts
     zendif

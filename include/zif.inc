@@ -10,10 +10,36 @@
 .set zloopsp, 0
 .set zifsp, 0
 
+; Skip the next instruction byte by turning them into the argument of a BIT
+; zp instruction. Trashes flags.
+
+.macro SKIP1
+    .byte 0x24
+.endm
+
+; Skip the next two instruction bytes by turning them into the argument of a BIT
+; abs instruction. Trashes flags.
+
+.macro SKIP2
+    .byte 0x2c
+.endm
+
+.macro blt label
+    bcc \label
+.endm
+
+.macro bge label
+    bcs \label
+.endm
+
 .macro zproc name, sect=.text, binding=global
     .section \sect, "ax"
     .\binding \name
     \name:
+.endm
+
+.macro zlproc name, sect=.text
+    zproc \name, \sect, local
 .endm
 
 .macro zendproc
@@ -89,8 +115,22 @@
     .endm
 .endm
 
+.macro zbreakif cond
+    zbreakif_\cond
+.endm
+
+.macro zcontinueif cond
+    zcontinueif_\cond
+.endm
+
+.macro zuntil cond
+    zuntil_\cond
+.endm
+
 _zmake_loops eq, ne
 _zmake_loops ne, eq
+_zmake_loops lt, ge
+_zmake_loops ge, lt
 _zmake_loops cc, cs
 _zmake_loops cs, cc
 _zmake_loops pl, mi
@@ -106,8 +146,14 @@ _zmake_loops vc, vs
     .endm
 .endm
 
+.macro zif cond, target
+    zif_\cond \target
+.endm
+
 _zmake_if eq, ne
 _zmake_if ne, eq
+_zmake_if lt, ge
+_zmake_if ge, lt
 _zmake_if cc, cs
 _zmake_if cs, cc
 _zmake_if pl, mi

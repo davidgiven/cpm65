@@ -9,6 +9,7 @@ from config import (
     SCREEN_APPS_SRCS,
     BIG_SCREEN_APPS,
     PASCAL_APPS,
+    FORTH_APPS,
 )
 
 llvmcfile(
@@ -36,7 +37,7 @@ llvmrawprogram(
     ],
     linkscript="./oric.ld",
     ldflags=[
-        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers {deps[0]} "
+        "--defsym=BIOS_SIZE=$$($(LLVM)/llvm-objdump --section-headers $[deps[0]] "
         + "| gawk --non-decimal-data -f scripts/size.awk)"
     ],
 )
@@ -53,7 +54,8 @@ mkcpmfs(
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
     | BIG_SCREEN_APPS
-    | PASCAL_APPS,
+    | PASCAL_APPS
+    | FORTH_APPS,
 )
 
 mkoricdsk(name="diskimage", src=".+cpmfs")

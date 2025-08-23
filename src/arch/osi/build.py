@@ -9,6 +9,7 @@ from config import (
     SCREEN_APPS_SRCS,
     BIG_SCREEN_APPS,
     PASCAL_APPS,
+    FORTH_APPS,
 )
 
 # ----------------------------------------------------------------------------
@@ -17,10 +18,13 @@ from config import (
 llvmrawprogram(
     name="osi400mf_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/ascii.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/keyboard.S",
+        "src/arch/osi/ascii.S",
+    ],
     cflags=["-DOSI400"],
     linkscript="./osi.ld",
 )
@@ -28,10 +32,12 @@ llvmrawprogram(
 llvmrawprogram(
     name="osi500mf_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/keyboard.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/keyboard.S",
+    ],
     cflags=["-DOSI500"],
     linkscript="./osi.ld",
 )
@@ -39,10 +45,12 @@ llvmrawprogram(
 llvmrawprogram(
     name="osi600mf_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/keyboard.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/keyboard.S",
+    ],
     cflags=["-DOSI600"],
     linkscript="./osi.ld",
 )
@@ -56,7 +64,7 @@ mkcpmfs(
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
     }
-    | MINIMAL_APPS
+    | MINIMAL_APPS,
 )
 
 mkcpmfs(
@@ -68,7 +76,7 @@ mkcpmfs(
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
     }
-    | MINIMAL_APPS
+    | MINIMAL_APPS,
 )
 
 mkcpmfs(
@@ -80,27 +88,21 @@ mkcpmfs(
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
     }
-    | MINIMAL_APPS
+    | MINIMAL_APPS,
 )
 
 mkcpmfs(
     name="osimf-b_rawdiskimage",
     format="osi5",
     size=128 * 640,
-    items={
-    }
-    | BIG_APPS
-    | PASCAL_APPS
+    items={} | BIG_APPS | PASCAL_APPS,
 )
 
 mkcpmfs(
     name="osimf-c_rawdiskimage",
     format="osi5",
     size=128 * 640,
-    items={
-    }
-    | MINIMAL_APPS_SRCS
-    | BIG_APPS_SRCS
+    items={} | MINIMAL_APPS_SRCS | BIG_APPS_SRCS,
 )
 
 mkcpmfs(
@@ -114,6 +116,7 @@ mkcpmfs(
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
     | BIG_SCREEN_APPS
+    | FORTH_APPS,
 )
 
 img2osi(
@@ -152,10 +155,12 @@ img2osi(
 llvmrawprogram(
     name="osi400f_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/ascii.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/ascii.S",
+    ],
     cflags=["-DOSI400", "-DFLOPPY8"],
     linkscript="./osi.ld",
 )
@@ -163,10 +168,13 @@ llvmrawprogram(
 llvmrawprogram(
     name="osi500f_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/ascii.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/keyboard.S",
+        "src/arch/osi/ascii.S",
+    ],
     cflags=["-DOSI500", "-DFLOPPY8"],
     linkscript="./osi.ld",
 )
@@ -174,10 +182,13 @@ llvmrawprogram(
 llvmrawprogram(
     name="osi600f_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/ascii.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/keyboard.S",
+        "src/arch/osi/ascii.S",
+    ],
     cflags=["-DOSI600", "-DFLOPPY8"],
     linkscript="./osi.ld",
 )
@@ -196,6 +207,7 @@ mkcpmfs(
     | PASCAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS_SRCS
+    | FORTH_APPS,
 )
 
 mkcpmfs(
@@ -216,6 +228,7 @@ mkcpmfs(
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
     | BIG_SCREEN_APPS
+    | FORTH_APPS,
 )
 
 mkcpmfs(
@@ -233,18 +246,10 @@ mkcpmfs(
     | PASCAL_APPS
     | MINIMAL_APPS_SRCS
     | BIG_APPS_SRCS
-    | SCREEN_APPS
-    | SCREEN_APPS_SRCS
-    | BIG_SCREEN_APPS
+    | FORTH_APPS,
 )
 
-mkcpmfs(
-    name="osif-b_rawdiskimage",
-    format="osi8",
-    size=128 * 1848,
-    items={
-    }
-)
+mkcpmfs(name="osif-b_rawdiskimage", format="osi8", size=128 * 1848, items={})
 
 img2osi(
     name="osi400f_diskimage",
@@ -272,10 +277,12 @@ img2osi(
 llvmrawprogram(
     name="osiserf_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/serial.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/serial.S",
+    ],
     cflags=["-DOSISERIAL", "-DFLOPPY8"],
     linkscript="./osi.ld",
 )
@@ -288,7 +295,7 @@ mkcpmfs(
     items={
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
-        "0:scrvt100.com": "src/arch/osi/utils+scrvt100",
+        "0:scrvt100.com": "apps+scrvt100",
     }
     | MINIMAL_APPS
     | BIG_APPS
@@ -298,6 +305,7 @@ mkcpmfs(
     | SCREEN_APPS
     | SCREEN_APPS_SRCS
     | BIG_SCREEN_APPS
+    | FORTH_APPS,
 )
 
 img2osi(
@@ -311,10 +319,12 @@ img2osi(
 llvmrawprogram(
     name="osi600mf80_bios",
     srcs=["./osi.S"],
-    deps=["include",
-          "src/lib+bioslib",
-          "src/arch/osi/floppy.S",
-          "src/arch/osi/keyboard.S"],
+    deps=[
+        "include",
+        "src/lib+bioslib",
+        "src/arch/osi/floppy.S",
+        "src/arch/osi/keyboard.S",
+    ],
     cflags=["-DOSI600 -DTRACKS80"],
     linkscript="./osi.ld",
 )
@@ -328,12 +338,13 @@ mkcpmfs(
         "0:ccp.sys@sr": "src+ccp",
         "0:bdos.sys@sr": "src/bdos",
         "0:tty630.com": "src/arch/osi/utils+tty630",
+        "0:pint.com": "third_party/pascal-m+pint",
+        "0:pasc.obb": "third_party/pascal-m+pasc-obb",
+        "0:pload.com": "third_party/pascal-m+loader",
     }
     | MINIMAL_APPS
     | BIG_APPS
-    | PASCAL_APPS
-    | SCREEN_APPS
-    | BIG_SCREEN_APPS
+    | SCREEN_APPS,
 )
 
 mkcpmfs(
@@ -341,26 +352,21 @@ mkcpmfs(
     format="osi5_80",
     size=128 * 1280,
     items={
+        "0:hello.pas": "cpmfs+hello_pas_cpm",
     }
     | MINIMAL_APPS_SRCS
     | BIG_APPS_SRCS
     | SCREEN_APPS_SRCS
+    | BIG_SCREEN_APPS
+    | FORTH_APPS,
 )
 
 mkcpmfs(
-    name="osimf80-c_rawdiskimage",
-    format="osi5_80",
-    size=128 * 1280,
-    items={
-    }
+    name="osimf80-c_rawdiskimage", format="osi5_80", size=128 * 1280, items={}
 )
 
 mkcpmfs(
-    name="osimf80-d_rawdiskimage",
-    format="osi5_80",
-    size=128 * 1280,
-    items={
-    }
+    name="osimf80-d_rawdiskimage", format="osi5_80", size=128 * 1280, items={}
 )
 
 img2osi(
