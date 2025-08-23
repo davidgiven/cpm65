@@ -463,7 +463,7 @@ zendproc
 
 zproc screen_showcursor
     cmp #0
-    zif_eq
+    zif eq
         jsr prepare_for_screen_write
         lda (ptr), y
         ora #0x80
@@ -663,7 +663,7 @@ zendproc
 zproc toggle_cursor
     lda cursorf
     and #(SCREENF_CURSORENABLED)    ; draw cursor only if bit 5 it set
-    zif_ne
+    zif ne
         jsr prepare_for_screen_write
         lda (ptr), y
         eor #0x80
