@@ -120,7 +120,7 @@ const char *initScript =
     ": / /MOD NIP ;\n"
     ": MOD /MOD DROP ;\n"
     ": BL 32 ;\n"
-    ": CR 10 EMIT ;\n"
+    ": CR 13 EMIT 10 EMIT ;\n"
     ": SPACE BL EMIT ;\n"
     ": NEGATE 0 SWAP - ;\n"
     ": DNEGATE 0. 2SWAP D- ;\n"
