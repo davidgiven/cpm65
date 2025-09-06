@@ -677,6 +677,7 @@ BUILTIN(38, "QUIT", quit, 0)
                 tell("Unknown word: ");
                 for (i=0; i<memory[0]; i++)
                     putkey(memory[i+1]);
+                putkey('\r');
                 putkey('\n');
 
                 *sp = *rsp = 1;
@@ -886,7 +887,7 @@ BUILTIN(58, "*/", timesDivide, 0)
     push((cell)r);
     if ((cell)r != r)
     {
-        tell("Arithmetic overflow\n");
+        tell("Arithmetic overflow\r\n");
         errorFlag = 1;
     }
 }
@@ -902,7 +903,7 @@ BUILTIN(59, "*/MOD", timesDivideMod, 0)
     push((cell)r);
     if ((cell)r != r)
     {
-        tell("Arithmetic overflow\n");
+        tell("Arithmetic overflow\r\n");
         errorFlag = 1;
     }
 }
