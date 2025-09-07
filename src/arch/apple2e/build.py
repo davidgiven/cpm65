@@ -15,6 +15,8 @@ from config import (
 llvmcfile(
     name="bios_obj",
     srcs=["./apple2e.S"],
+#    cflags=["-DAPPLE2E"],
+    cflags=["-DAPPLE2PLUS"],
     deps=["include", "src/lib+bioslib"],
 )
 
@@ -22,6 +24,8 @@ llvmrawprogram(
     name="bios_prelink",
     srcs=[".+bios_obj"],
     deps=["src/lib+bioslib"],
+#    cflags=["-DAPPLE2E"],
+    cflags=["-DAPPLE2PLUS"],
     linkscript="./apple2e-prelink.ld",
     ldflags=["--defsym=BIOS_SIZE=0x4000"],
 )
@@ -57,14 +61,11 @@ mkcpmfs(
     items={
         "0:ccp.sys@sr": "src+ccp-tiny",
         "0:bdos.sys@sr": "src/bdos",
-        "0:scrntest.com": "apps+scrntest",
         "0:cls.com": "apps+cls",
-        "0:atbasic.com": "third_party/altirrabasic",
-        "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
-        "0:qe.com": "apps+qe",
     }
     | MINIMAL_APPS
-    | MINIMAL_APPS_SRCS,
+    | MINIMAL_APPS_SRCS
+    | SCREEN_APPS_SRCS
 )
 
 mkcpmfs(
@@ -72,10 +73,33 @@ mkcpmfs(
     format="appleiie",
     bootimage=".+bios_shuffled",
     size=143360,
-    items={} | SCREEN_APPS | SCREEN_APPS_SRCS | BIG_SCREEN_APPS | PASCAL_APPS
-             | FORTH_APPS,
+    items={
+        "0:ccp.sys@sr": "src+ccp-tiny",
+        "0:bdos.sys@sr": "src/bdos",
+        "0:cls.com": "apps+cls",
+        "0:atbasic.com": "third_party/altirrabasic",
+        "0:atbasic.txt": "cpmfs+atbasic_txt_cpm",
+        "0:qe.com": "apps+qe",
+    }
+    | MINIMAL_APPS
+    | SCREEN_APPS
 )
 
+mkcpmfs(
+    name="diskimage_c",
+    format="appleiie",
+    bootimage=".+bios_shuffled",
+    size=143360,
+    items={
+        "0:ccp.sys@sr": "src+ccp-tiny",
+        "0:bdos.sys@sr": "src/bdos",
+        "0:copy.com": "apps+copy",
+    }
+    | MINIMAL_APPS
+    | BIG_SCREEN_APPS
+    | PASCAL_APPS
+    | FORTH_APPS
+)
 
 mametest(
     name="mametest",
