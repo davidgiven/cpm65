@@ -1,4 +1,4 @@
-; CP/M-65 Copyright Â© 2023 David Given
+; CP/M-65 Copyright © 2023 David Given
 ; This file is licensed under the terms of the 2-clause BSD license. Please
 ; see the COPYING file in the root project directory for the full text.
 
@@ -48,8 +48,31 @@ DECODE_TABLE_START = 0x96
 
 SCREENF_CURSORSHOWN = 0x80
 SCREENF_INVERSE = 0x40
+SCREENF_CURSORENABLED = 0x20
 
+;#define APPLE2
+;#define APPLE2PLUS
+;#define APPLE2EUROPLUS
+;#define APPLE2JPLUS
+;#define APPLE2E
+;#define APPLE2EENHANCED
+;#define APPLE2C
+;#define APPLE2GS
+
+#define TTY_MODE_40COLUMNS 1
+#define TTY_MODE_80COLUMNS 2
+
+#if defined APPLE2C || defined APPLE2GS || defined APPLE2EENHANCED || defined APPLE2E
+#define TTY_MODE TTY_MODE_80COLUMNS
 SCRWIDTH = 80
+; TODO: we might to want 40 columns on newer models (really?)
+#elif defined APPLE2JPLUS || defined APPLE2EUROPLUS || defined APPLE2PLUS || defined APPLE2
+#define TTY_MODE TTY_MODE_40COLUMNS
+SCRWIDTH = 40
+; TOPO: we might have a Videx and use that one for 80 columns mode
+#else
+#error Unknown Apple II model
+#endif
 SCRHEIGHT = 24
 
 .extern biosentry
@@ -76,10 +99,12 @@ _start:
     cli
     lda MEM_BANKING+0xb     ; R/W 0xe000 RAM; bank 1 in 0xd000
     lda MEM_BANKING+0xb     ; yes, I'm sure
+#if TTY_MODE == TTY_MODE_80COLUMNS
     sta SCREEN_80COLON
     sta SCREEN_80STOREON
     sta SCREEN_PAGE2OFF
     sta SCREEN_ALTCHARSET
+#endif
     ldx #0xff
     txs                     ; reset stack
 
@@ -107,6 +132,7 @@ _start:
 
     jsr initdrivers
     lda #0
+    ora #(SCREENF_CURSORENABLED)
     sta cursorf
 
     ; Print the startup banner.
@@ -252,7 +278,7 @@ screen_jmptable_lo:
     jmptablo screen_putchar
     jmptablo screen_putstring
     jmptablo screen_getchar
-    jmptablo fail ; screen_showcursor
+    jmptablo screen_showcursor
     jmptablo screen_scrollup
     jmptablo screen_scrolldown
     jmptablo screen_cleartoeol
@@ -266,7 +292,7 @@ screen_jmptable_hi:
     jmptabhi screen_putchar
     jmptabhi screen_putstring
     jmptabhi screen_getchar
-    jmptabhi fail
+    jmptabhi screen_showcursor
     jmptabhi screen_scrollup
     jmptabhi screen_scrolldown
     jmptabhi screen_cleartoeol
@@ -295,6 +321,10 @@ zproc apply_style
     bit cursorf
     zif vc
         ora #0x80 ; non inverted
+#if TTY_MODE == TTY_MODE_40COLUMNS
+    zelse
+        and #0x3f ; inverted 40 columns
+#endif
     zendif
     rts
 zendproc
@@ -315,9 +345,11 @@ zproc screen_clear
         txa
         zrepeat
             dey
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2ON
             sta (ptr), y
             sta SCREEN_PAGE2OFF
+#endif
             sta (ptr), y
         zuntil eq
 
@@ -380,7 +412,21 @@ zproc screen_putstring
     rts
 zendproc
 
+; XA = timeout in cs (X=MSB, A=LSB)
+; carry set on timeout
+; carry clean when A=key
+
 zproc screen_getchar
+    sta ptr
+    stx ptr+1
+    ; this feels wrong, but how is otherwise X=0 working with DEC and underflows?
+    inc ptr+1
+    
+    ; TODO: adjust here
+    ;~ clc
+    ;~ rol ptr+1
+    ;~ rol ptr
+
     ; Turn the disk motor off.
 
     ldx #DISK_SLOT
@@ -392,14 +438,48 @@ zproc screen_getchar
 
     jsr draw_cursor
 
-    ; Wait for the key.
+    ; Wait for the key, or time out
 
-    zrepeat
-        lda KBD_READ
-    zuntil mi
+_wait_loop:
+    ldy #$ff            ; 255 * 5 cycles
+_inner_loop:
+    lda KBD_READ        ; 4 cycles
+    bpl _no_key         ; 3 cycles, branch usually taken
+    ; got a key
     sta KBD_STROBERESET
     and #0x7f
     clc
+    rts
+_no_key:
+    dey                 ; 2 cycles
+    bne _inner_loop      ; 3 cycles usually (unless 0)    
+    dec ptr             ; 5 cycles
+    bne _wait_loop      ; 3 cycles (2 if 0)
+    dec ptr+1           ; 5 cycles
+    bne _wait_loop      ; 3 cycles (2 if 0)
+    sec
+    rts
+zendproc
+
+zproc screen_showcursor
+    cmp #0
+    zif eq
+        jsr prepare_for_screen_write
+        lda (ptr), y
+        ora #0x80
+        sta (ptr), y
+        lda cursorf
+        and #(~SCREENF_CURSORENABLED) & 0xff ; unset bit 5, cursor is disabled
+        sta cursorf
+    zelse
+        lda cursorf
+        ora #SCREENF_CURSORENABLED ; set bit 5, cursor is enabled
+        sta cursorf
+        jsr prepare_for_screen_write
+        lda (ptr), y
+        and #0x7f
+        sta (ptr), y
+    zendif
     rts
 zendproc
 
@@ -419,12 +499,19 @@ zproc screen_scrollup
         txa
         jsr calculate_screen_address ; ptr is source pointer
 
+#if TTY_MODE == TTY_MODE_80COLUMNS
         ldy #(SCRWIDTH/2)-1
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        ldy #(SCRWIDTH)-1
+#endif
         zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2OFF
             lda (ptr), y
             sta (ptr1), y
             sta SCREEN_PAGE2ON
+#endif
             lda (ptr), y
             sta (ptr1), y
             dey
@@ -452,12 +539,19 @@ zproc screen_scrolldown
         txa
         jsr calculate_screen_address ; ptr is source pointer
 
+#if TTY_MODE == TTY_MODE_80COLUMNS
         ldy #(SCRWIDTH/2)-1
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        ldy #(SCRWIDTH)-1
+#endif
         zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
             sta SCREEN_PAGE2OFF
             lda (ptr), y
             sta (ptr1), y
             sta SCREEN_PAGE2ON
+#endif
             lda (ptr), y
             sta (ptr1), y
             dey
@@ -468,13 +562,20 @@ zproc screen_scrolldown
 zendproc
     ; fall through
 zproc clear_line_at_ptr
-    ldy #(SCRWIDTH/2)-1
+#if TTY_MODE == TTY_MODE_80COLUMNS
+        ldy #(SCRWIDTH/2)-1
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        ldy #(SCRWIDTH)-1
+#endif
     lda #32
     jsr apply_style
     zrepeat
+#if TTY_MODE == TTY_MODE_80COLUMNS
         sta SCREEN_PAGE2OFF
         sta (ptr), y
         sta SCREEN_PAGE2ON
+#endif
         sta (ptr), y
         dey
     zuntil mi
@@ -490,6 +591,7 @@ zproc screen_cleartoeol
     ldx cursorx
     zrepeat
         txa
+#if TTY_MODE == TTY_MODE_80COLUMNS
         lsr a
         pha
         rol a
@@ -499,13 +601,19 @@ zproc screen_cleartoeol
         sta SCREEN_PAGE2OFF, y
 
         pla
+#endif
         tay
         lda #32
         jsr apply_style
         sta (ptr), y
 
         inx
+#if TTY_MODE == TTY_MODE_80COLUMNS
         cpx #SCRWIDTH
+#endif
+#if TTY_MODE == TTY_MODE_40COLUMNS
+        cpx #40
+#endif
     zuntil eq
     rts
 zendproc
@@ -553,10 +661,14 @@ zproc hide_cursor
 zendproc
 
 zproc toggle_cursor
-    jsr prepare_for_screen_write
-    lda (ptr), y
-    eor #0x80
-    sta (ptr), y
+    lda cursorf
+    and #(SCREENF_CURSORENABLED)    ; draw cursor only if bit 5 it set
+    zif ne
+        jsr prepare_for_screen_write
+        lda (ptr), y
+        eor #0x80
+        sta (ptr), y
+    zendif
 
     lda cursorf
     eor #SCREENF_CURSORSHOWN
@@ -644,13 +756,17 @@ zproc prepare_for_screen_write
     lda cursory
     jsr calculate_screen_address
     lda cursorx
+#if TTY_MODE == TTY_MODE_80COLUMNS
     lsr a
+#endif
     tay
     lda #0
     rol
     eor #1
     tax
+#if TTY_MODE == TTY_MODE_80COLUMNS
     sta SCREEN_PAGE2OFF, x
+#endif
     rts
 zendproc
 

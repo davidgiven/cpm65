@@ -21,6 +21,7 @@ export(
         "images/oric.dsk": "src/arch/oric+diskimage",
         "images/apple2e.po": "src/arch/apple2e+diskimage",
         "images/apple2e_b.po": "src/arch/apple2e+diskimage_b",
+        "images/apple2e_c.po": "src/arch/apple2e+diskimage_c",
         "images/atari800.atr": "src/arch/atari800+atari800_diskimage",
         "images/atari800b.atr": "src/arch/atari800+atari800b_diskimage",
         "images/atari800c.atr": "src/arch/atari800+atari800c_diskimage",

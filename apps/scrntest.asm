@@ -15,8 +15,11 @@
 .zp style, 1
 .zp ptr1, 2
 .zp ptr2, 2
+.zp kbd_blocking, 1
+.zp spinner_pos, 1
 .label string_init
 .label string_a
+.label chars_spinner
 .label BIOS
 .label SCREEN
 .label update_cursor
@@ -55,9 +58,15 @@ zproc start
     
     lda #1
     sta cur_vis
+    ldy #SCREEN_SHOWCURSOR
+    jsr SCREEN
 
     lda #0
     sta style
+    sta spinner_pos
+    
+    lda #1
+    sta kbd_blocking
 
 help:
     \ Clear screen and print help
@@ -93,11 +102,59 @@ mainloop:
     sta cur_x
     stx cur_y
 
+timeout:
+    \ Show spinnig bar to test non-blocking keyboard read
+    lda #39
+    ldx #0
+    ldy #SCREEN_SETCURSOR
+    jsr SCREEN
+    ldy spinner_pos
+    iny
+    tya
+    cmp #4
+    zif eq
+        ldy #0
+    zendif
+    sty spinner_pos
+    \ldx kbd_blocking
+    \zif ne
+    \    lda #'*'
+    \zendif
+    ldx kbd_blocking
+    \zif eq
+        lda chars_spinner, y
+    \zendif
+    ldy #SCREEN_PUTCHAR
+    jsr SCREEN 
+
+    lda #39
+    ldx #1
+    ldy #SCREEN_SETCURSOR
+    jsr SCREEN
+    lda #32
+    ldy #SCREEN_PUTCHAR
+    jsr SCREEN 
+       
+    lda cur_x
+    ldx cur_y
+    ldy #SCREEN_SETCURSOR
+    jsr SCREEN
+
     \ Get and parse command
-    lda #10
-    ldx #00
+    
+    ldy kbd_blocking
+    zif ne
+        lda #0xff
+        ldx #0x7f
+    zendif
+    ldy kbd_blocking
+    zif eq
+        lda #10          \ 0.1 second timeout
+        ldx #0x0
+    zendif
     ldy #SCREEN_GETCHAR
     jsr SCREEN
+    bcs timeout \ make sure we don't have consecutive key presses because of short timeouts
     
     \ Convert to uppercase
     cmp #0x61
@@ -248,6 +305,21 @@ case_done:
         ldy #SCREEN_SETSTYLE
         jsr SCREEN
         jmp mainloop
+    zendif
+    
+    \ Toggle keyboard read mode
+    cmp #'B'
+    zif eq
+        lda kbd_blocking
+        zif eq
+            lda #1
+            sta kbd_blocking
+            jmp mainloop
+        zendif
+        lda #0
+        sta kbd_blocking
+        jmp mainloop
+        
     zendif
   
     \ Draw line numbers
@@ -443,6 +515,7 @@ string_init:
     .byte "J - Scroll down\r\n"
     .byte "L - Clear to End of Line\r\n"
     .byte "I - Toggle style\r\n"
+    .byte "B - Toggle blocking/non-blocking read\r\n"
     .byte "H - Clear screen and print this help\r\n"
     .byte "N - Draw line numbers\r\n"
     .byte "Q - Quit\r\n"
@@ -450,5 +523,9 @@ string_init:
 
 string_a:
     .byte "String"
+    .byte 0
+
+chars_spinner:
+    .byte "-\\|/"
     .byte 0
 
